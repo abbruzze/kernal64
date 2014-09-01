@@ -1,0 +1,84 @@
+<project name="Kernal64 C64 emulator" default="deploy" basedir="..">
+	<property name="sources.dir" value="${basedir}/src" />
+	<property name="build.dir" value="${basedir}/bin" />
+	<property name="dist.dir" value="${basedir}/dist" />
+	<property name="lib.dir" value="${basedir}/lib" />
+	<property name="c64.jar" value="${dist.dir}/kernal64.jar"/>
+	<property name="c64.install" value="${dist.dir}/kernal64_install.zip"/>
+	
+	<condition property="optimise" value="yes">
+		<not>
+			<isset property="optimise"/>
+		</not>
+	</condition>
+
+	<target name="scala-init">
+		<property name="scala-library.jar" value="${lib.dir}/scala-library.jar" />
+		<path id="build.classpath">
+			<pathelement location="${scala-library.jar}" />
+			<fileset dir="${lib.dir}">
+				<include name="**/*.jar" />
+			</fileset>
+			<pathelement location="${build.dir}" />
+		</path>
+		<taskdef resource="scala/tools/ant/antlib.xml">
+			<classpath>
+				<pathelement location="${lib.dir}/scala-compiler.jar" />
+				<pathelement location="${scala-library.jar}" />
+				<pathelement location="${lib.dir}/scala-reflect.jar" />
+				<pathelement location="${lib.dir}/scala-parser-combinators_2.11-1.0.1.jar" />
+			</classpath>
+		</taskdef>
+	</target>
+
+	<target name="compile" depends="scala-init">
+		<mkdir dir="${build.dir}"/>		
+		<echo message="Optimise is set to ${optimise}"/>
+		<javac srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/c64/peripheral/sid/resid/*.java">
+			<classpath refid="build.classpath"/>
+		</javac>
+		<scalac srcdir="${sources.dir}" excludes="ucesoft/c64/peripheral/sid/resid/**" 
+				destdir="${build.dir}" 
+				classpathref="build.classpath" 
+				deprecation="yes" 
+				optimise="${optimise}"
+				encoding="ISO-8859-1"
+				addparams="-Yinline-warnings -feature"				
+				target="jvm-1.7" />		
+	</target>
+		
+	<target name="deploy" depends="compile">
+		<mkdir dir="${dist.dir}"/>
+		<!-- copy images and roms -->
+		<mkdir dir="${build.dir}/resources"/>
+		<copy todir="${build.dir}/resources">
+			<fileset dir="${basedir}/resources"/>
+		</copy>
+		<mkdir dir="${build.dir}/roms"/>
+		<copy todir="${build.dir}/roms">
+			<fileset dir="${basedir}/roms"/>
+		</copy>
+		<jar destfile="${c64.jar}" basedir="${build.dir}">
+			<manifest>
+				<attribute name="Main-Class" value="ucesoft.c64.C64"/>
+			</manifest>
+		</jar>
+	</target>
+	
+	<target name="pack" depends="deploy">
+		<copy todir="${dist.dir}/pack/kernal64/lib">
+			<fileset dir="${basedir}/lib/" includes="*jinput* scala-library.jar"/>
+			<fileset dir="${dist.dir}" includes="*.jar"/>
+		</copy>
+		<copy todir="${dist.dir}/pack/kernal64">
+			<fileset dir="${basedir}/build" includes="*.bat *.sh"/>
+		</copy>
+		<zip destfile="${c64.install}" basedir="${dist.dir}/pack"/>
+		<delete dir="${dist.dir}/pack"/>
+	</target>
+		
+	<target name="clean">
+		<delete dir="${build.dir}"/>
+		<delete dir="${dist.dir}"/>
+	</target>				
+</project>
