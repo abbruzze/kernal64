@@ -194,7 +194,8 @@ object CPU6510Mems {
 
     @inline private def check0001 {
       // check tape motor
-      if ((ddr & 0x20) > 0) datassette.setMotor((pr & 0x20) == 0)
+      datassette.setMotor((ddr & 0x20) > 0 && (pr & 0x20) == 0)
+      datassette.setWriteLine((ddr & 0x08) > 0 && (pr & 0x08) > 0)
       val _LORAM = LORAM
       val _HIRAM = HIRAM
       val _CHAREN = CHAREN

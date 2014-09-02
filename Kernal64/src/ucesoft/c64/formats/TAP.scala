@@ -5,7 +5,7 @@ import java.io._
 class TAP(file:String) extends Iterator[Int] {
   private[this] val MAGIC = "C64-TAPE-RAW"
   private[this] val UNDEFINED_GAP = 20000
-  private[this] val tape = new RandomAccessFile(file, "r")
+  private[this] val tape = new RandomAccessFile(file, "rw")
   private[this] var _version = 0
   private[this] var _length = 0L
   private[this] var offset = 0L
@@ -44,6 +44,23 @@ class TAP(file:String) extends Iterator[Int] {
         if (newGap != 0) newGap else UNDEFINED_GAP 
       }
     }
-    else gap << 3//(gap * 8.119783039397187).toInt
+    else gap << 3
+  }
+  
+  def write(_value:Int) {
+    var value = _value
+    if (value > 0xFF) {
+      tape.write(0)
+      tape.write(value & 0xFF)
+      value >>= 8
+      tape.write(value & 0xFF)
+      value >>= 8
+      tape.write(value & 0xFF)
+      offset += 4
+    }
+    else {
+      tape.write(value)
+      offset += 1
+    }    
   }
 }

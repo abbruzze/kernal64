@@ -10,17 +10,26 @@ class Datassette(ciaFlagLow : () => Unit) extends C64Component {
   val componentID = "Datassette 1530"
   val componentType = C64ComponentType.TAPE
 
-  private[this] val MOTOR_DELAY = 1//32000
+  private[this] val MOTOR_DELAY = 32000
   private[this] var motorOn = false
   private[this] var playPressed = false
+  private[this] var recordPressed = false
   private[this] val clk = Clock.systemClock
   private[this] var tap : Option[TAP] = None
   private[this] var motorEvent = false
+  private[this] var lastWriteLineChangeClock = 0L
+  private[this] var lastWriteLine = false
+  private[this] var tapeListener : Option[DatassetteListener] = None
+  
+  def setTapeListener(tapeListener:DatassetteListener) = this.tapeListener = Some(tapeListener)
   
   def init {}
   def reset {
     motorOn = false
     playPressed = false
+    recordPressed = false
+    lastWriteLineChangeClock = 0
+    lastWriteLine = false
     tap match {
       case None =>
       case Some(tape) => tape.setOffset(0)
@@ -28,20 +37,74 @@ class Datassette(ciaFlagLow : () => Unit) extends C64Component {
   }
   def setTAP(tap:Option[TAP]) = {
     if (this.tap.isDefined) this.tap.get.close
+    playPressed = false
+    notifyStateChangedTo(DatassetteState.STOPPED)
     this.tap = tap
   }
   def isPlayPressed = playPressed
-  def pressPlay = playPressed = true
-  def pressStop = playPressed = false
+  def pressPlay {
+    if (!playPressed) {
+      playPressed = true
+      notifyStateChangedTo(DatassetteState.PLAYING)
+      if (motorOn) { // in case of end of tape
+        clk.pause
+        clk.schedule(new ClockEvent(componentID, clk.currentCycles + 1, clock _))
+        clk.play
+      }
+    }
+  }
+  def pressStop {
+    if (playPressed) {
+      playPressed = false
+      notifyStateChangedTo(DatassetteState.STOPPED)
+    }
+    recordPressed = false
+  }
+  def pressRecordAndPlay {
+    playPressed = true
+    notifyStateChangedTo(DatassetteState.RECORDING)
+    recordPressed = true
+  }
+  def setWriteLine(on:Boolean) {
+    if (recordPressed && (lastWriteLine != on)) {      
+      if (!lastWriteLine && on) { // raising edge
+        if (lastWriteLineChangeClock != 0) {
+          val cycles = clk.currentCycles - lastWriteLineChangeClock
+          //println("Writing " + Integer.toHexString(cycles.toInt) + " " + Integer.toHexString(cycles.toInt >> 3))
+          tap match {
+            case Some(t) => t.write(cycles.toInt >> 3)
+            case None =>
+          }
+        }
+        lastWriteLineChangeClock = clk.currentCycles
+      }
+      lastWriteLine = on
+    }    
+  }
 
   def setMotor(on: Boolean) = {    
     if (!motorOn && on) {
-      clk.schedule(new ClockEvent(componentID + "_Motor",clk.currentCycles + MOTOR_DELAY,clock _))
+      if (!recordPressed) {
+        clk.schedule(new ClockEvent(componentID + "_Motor",clk.currentCycles + MOTOR_DELAY,clock _))
+        if (playPressed) notifyStateChangedTo(DatassetteState.PLAYING)
+      }
+      else notifyStateChangedTo(DatassetteState.RECORDING)
       motorEvent = true
     }
     else
-    if (motorOn && !on) clk.cancel(componentID)
+    if (motorOn && !on) {
+      clk.cancel(componentID)
+      lastWriteLineChangeClock = 0
+      lastWriteLine = false
+    }
     motorOn = on
+  }
+  
+  private def notifyStateChangedTo(state:DatassetteState.Value) {
+    tapeListener match {
+      case Some(tl) => tl.datassetteStateChanged(state)
+      case None =>
+    }
   }
 
   override def getProperties = {
@@ -51,6 +114,7 @@ class Datassette(ciaFlagLow : () => Unit) extends C64Component {
     properties.setProperty("TAP length",if (tap.isDefined) tap.get.tapeLength.toString else "-")
     properties.setProperty("Motor on",motorOn.toString)
     properties.setProperty("Play pressed",playPressed.toString)
+    properties.setProperty("Record pressed",recordPressed.toString)
     properties.setProperty("Offset",if (tap.isDefined) tap.get.getOffset.toString else "-")
     properties
   }
@@ -65,10 +129,18 @@ class Datassette(ciaFlagLow : () => Unit) extends C64Component {
 	      
           if (tape.hasNext) {	        
 	        val gap = tape.next
-	        println(Integer.toHexString(gap) + " " + ((tap.get.getOffset / tap.get.tapeLength.toDouble) * 100).toInt + "%")
+	        val progressPerc = ((tap.get.getOffset / tap.get.tapeLength.toDouble) * 100).toInt
+	        //println(Integer.toHexString(gap) + " " + progressPerc + "%")
+	        tapeListener match {
+	          case Some(tl) => tl.datassetteUpdatePosition(progressPerc)
+	          case None =>
+	        }
 	        clk.schedule(new ClockEvent(componentID,cycles + gap,clock _))
           }
-          else playPressed = false
+          else {
+            playPressed = false
+            notifyStateChangedTo(DatassetteState.STOPPED)
+          }
       }
     }
   }

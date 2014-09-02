@@ -29,6 +29,9 @@ import ucesoft.c64.util.D64Canvas
 import ucesoft.c64.util.T64Canvas
 import ucesoft.c64.util.C64FileView
 import ucesoft.c64.peripheral.c2n.Datassette
+import ucesoft.c64.peripheral.c2n.DatassetteState
+import java.awt.geom.Path2D
+import ucesoft.c64.peripheral.c2n.DatassetteListener
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -55,8 +58,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   private[this] val irqSwitcher = new IRQSwitcher
   private[this] val keyb = new keyboard.Keyboard(keyboard.DefaultKeyboardMapper,nmiSwitcher.keyboardNMIAction _)	// key listener
   private[this] val displayFrame = {
-    val f = new JFrame("C64 emulator ver. " + VERSION)
-    //f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
+    val f = new JFrame("Kernal64 emulator ver. " + VERSION)
     f.addWindowListener(new WindowAdapter {
       override def windowClosing(e:WindowEvent) {
         close
@@ -79,7 +81,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   private[this] val c1541_real = new C1541(0x00,bus,this)
   private[this] var drive : Drive = c1541_real
   private[this] val driveLed = new DriveLed
-  private[this] val progressPanel = new DriveLoadProgressPanel
+  private[this] val diskProgressPanel = new DriveLoadProgressPanel
   // -------------------- TAPE -----------------
   private[this] var datassette : Datassette = _
   // -------------------------------------------
@@ -192,7 +194,50 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     }
   }
   
-  // DRIVE LED -------------------
+  // ------------- TAPE STATE & PROGRESS BAR ------------------
+  private class TapeState extends JComponent with DatassetteListener {
+    private[this] var state = DatassetteState.STOPPED
+    val progressBar = new JProgressBar
+    
+    setPreferredSize(new Dimension(10,10))
+    progressBar.setPreferredSize(new Dimension(100,15))
+    progressBar.setVisible(false)
+    setVisible(false)
+    
+    override def paint(g:Graphics) {
+      val size = getSize()
+      val g2 = g.asInstanceOf[Graphics2D]
+      import DatassetteState._
+      state match {
+        case PLAYING =>
+          g2.setColor(Color.GREEN.darker)
+          val path = new Path2D.Float
+          path.moveTo(0,0)
+          path.lineTo(size.width,size.height / 2)
+          path.lineTo(0,size.height)
+          path.closePath
+          g2.fill(path)
+        case STOPPED =>
+          g2.setColor(Color.BLACK)
+          g2.fillRect(0,0,size.width,size.height)
+        case RECORDING =>
+          g2.setColor(Color.RED)
+          g2.fillOval(0,0,size.width,size.height)
+      }
+    }
+    
+    def datassetteStateChanged(newState:DatassetteState.Value) {
+      setVisible(true)
+      progressBar.setVisible(true)
+      state = newState
+      repaint()
+    }
+    def datassetteUpdatePosition(perc:Int) {
+      progressBar.setValue(perc)
+    }
+  }
+  
+  // ------------- DRIVE LED & PROGRESS BAR -------------------
   private[this] var driveLedOn = false
   
   private class DriveLed extends JComponent with C64Component {
@@ -255,22 +300,22 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   }
   
   override def beginLoadingOf(fileName:String,indeterminate:Boolean=false) {
-    progressPanel.setIndeterminate(indeterminate)
-    progressPanel.beginLoading(fileName)
+    diskProgressPanel.setIndeterminate(indeterminate)
+    diskProgressPanel.beginLoading(fileName)
   }
   override def updateLoading(perc:Int) {
-    progressPanel.updateValue(perc)
+    diskProgressPanel.updateValue(perc)
   }
   override def endLoading {
-    progressPanel.endLoading
+    diskProgressPanel.endLoading
   }
   override def beginSavingOf(fileName:String) {
-    progressPanel.beginLoading(fileName)
-    progressPanel.setIndeterminate(true)
+    diskProgressPanel.beginLoading(fileName)
+    diskProgressPanel.setIndeterminate(true)
   }
   override def endSaving {
-    progressPanel.endLoading
-    progressPanel.setIndeterminate(false)
+    diskProgressPanel.endLoading
+    diskProgressPanel.setIndeterminate(false)
   }
     
   def reset {
@@ -342,13 +387,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     traceDialog = TraceDialog.getTraceDialog(displayFrame,mem,cpu,display,vicChip)
     diskTraceDialog = TraceDialog.getTraceDialog(displayFrame,c1541_real.getMem,c1541_real)
     // drive led
-    add(driveLed)
-    val ledPanel = new JPanel(new BorderLayout)
-    val dummyPanel = new JPanel
-    dummyPanel.add(progressPanel)
-    dummyPanel.add(driveLed)
-    ledPanel.add("East",dummyPanel)
-    displayFrame.getContentPane.add("South",ledPanel)    
+    add(driveLed)        
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }
       displayFrame.setLocation(xy(0),xy(1))
@@ -362,6 +401,18 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     datassette = new Datassette(cia1.setFlagLow _)
     mem.setDatassette(datassette)
     add(datassette)
+    
+    // info panel
+    val infoPanel = new JPanel(new BorderLayout)
+    val dummyPanel = new JPanel
+    val tapePanel = new TapeState
+    datassette.setTapeListener(tapePanel)
+    dummyPanel.add(tapePanel)
+    dummyPanel.add(tapePanel.progressBar)
+    dummyPanel.add(diskProgressPanel)
+    dummyPanel.add(driveLed)
+    infoPanel.add("East",dummyPanel)
+    displayFrame.getContentPane.add("South",infoPanel)
     Log.info(sw.toString)
   }
   
@@ -475,6 +526,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
         datassette.pressPlay
       case "TAPE_STOP" =>
         datassette.pressStop
+      case "TAPE_RECORD" =>
+        datassette.pressRecordAndPlay
       case "ATTACH_TAPE" =>
         attachTape
     }
@@ -711,6 +764,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
         datassette.setTAP(Some(new TAP(fc.getSelectedFile.toString)))
+        configuration.setProperty(CONFIGURATION_LASTDISKDIR,fc.getSelectedFile.getParentFile.toString)
       case _ =>
     }
   }
@@ -755,6 +809,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     tapeStopItem.setActionCommand("TAPE_STOP")
     tapeStopItem.addActionListener(this)
     tapeMenu.add(tapeStopItem)
+    
+    val tapeRecordItem = new JMenuItem("Cassette press record & play")
+    tapeRecordItem.setActionCommand("TAPE_RECORD")
+    tapeRecordItem.addActionListener(this)
+    tapeMenu.add(tapeRecordItem)
     
     fileMenu.addSeparator
     
