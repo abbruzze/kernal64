@@ -32,7 +32,7 @@ class Datassette(ciaFlagLow : () => Unit) extends C64Component {
     lastWriteLine = false
     tap match {
       case None =>
-      case Some(tape) => tape.setOffset(0)
+      case Some(tape) => tape.rewind
     }
   }
   def setTAP(tap:Option[TAP]) = {
@@ -64,6 +64,14 @@ class Datassette(ciaFlagLow : () => Unit) extends C64Component {
     playPressed = true
     notifyStateChangedTo(DatassetteState.RECORDING)
     recordPressed = true
+  }
+  def pressRewind  {
+    playPressed = false
+    recordPressed = false
+    tap match {
+      case None =>
+      case Some(tape) => tape.rewind
+    }
   }
   def setWriteLine(on:Boolean) {
     if (recordPressed && (lastWriteLine != on)) {      

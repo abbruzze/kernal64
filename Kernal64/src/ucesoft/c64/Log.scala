@@ -37,8 +37,8 @@ object Log {
     logPanel.setEditable(false)
     add("Center",new JScrollPane(logPanel))
     logPanel.setFont(new Font(Font.MONOSPACED,Font.BOLD,12))
-    logPanel.setForeground(Palette.VIC_COLORS(14))
-    logPanel.setBackground(Palette.VIC_COLORS(6))
+    logPanel.setForeground(Palette.VIC_COLORS(7))
+    logPanel.setBackground(Palette.VIC_COLORS(0))
     val writer = new PrintWriter(new Writer {
       def write(chars:Array[Char],off:Int,len:Int) {
         val str = new String(chars,off,len)        

@@ -2,13 +2,13 @@ package ucesoft.c64.util
 
 import ucesoft.c64.cpu.Memory
 import javax.swing._
-import java.awt.Graphics
 import ucesoft.c64.cpu.CPU6510Mems
 import java.awt.Dimension
 import scala.collection.mutable.ListBuffer
 import ucesoft.c64.peripheral.vic.Palette
+import java.awt.Graphics
 
-object CBMCanvas extends App {
+object CBMCanvas extends App {  
   val f = new JFrame
   val rom = new CPU6510Mems.CHARACTERS_ROM(null)
   rom.init
@@ -129,6 +129,15 @@ class CBMCanvas(charRom: Memory) extends JComponent {
   def end = { !!; checkSize; this }
   def dropFirst = { lines.remove(0); checkSize; this }
   def dropLast = { lines.remove(lines.length - 1); checkSize; this }
+  
+  def center(s:String,width:Int) = {
+    val delta = width - s.length
+    if (delta <= 0) s
+    else {
+      val left = delta / 2
+      (" " * left) + s + (" " * (delta - left))
+    }
+  }
 
   private def convertCode(c: Int) =
     if (c >= 64 && c <= 95) c - '@'

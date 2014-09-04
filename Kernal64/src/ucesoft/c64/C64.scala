@@ -32,6 +32,7 @@ import ucesoft.c64.peripheral.c2n.Datassette
 import ucesoft.c64.peripheral.c2n.DatassetteState
 import java.awt.geom.Path2D
 import ucesoft.c64.peripheral.c2n.DatassetteListener
+import ucesoft.c64.util.AboutCanvas
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -528,9 +529,18 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
         datassette.pressStop
       case "TAPE_RECORD" =>
         datassette.pressRecordAndPlay
+      case "TAPE_REWIND" =>
+        datassette.pressRewind
       case "ATTACH_TAPE" =>
-        attachTape
+        attachTape 
+      case "ABOUT" =>
+        showAbout
     }
+  }
+  
+  private def showAbout {
+    val about = new AboutCanvas(mem.CHAR_ROM,VERSION)
+    JOptionPane.showMessageDialog(displayFrame,about,"About",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
   }
   
   private def zoom(f:Double) {
@@ -782,10 +792,12 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     val editMenu = new JMenu("Edit")
     val traceMenu = new JMenu("Trace")
     val optionMenu = new JMenu("Settings")
+    val helpMenu = new JMenu("Help")
     menuBar.add(fileMenu)
     menuBar.add(editMenu)
     menuBar.add(traceMenu)
     menuBar.add(optionMenu)
+    menuBar.add(helpMenu)
     
     val tapeItem = new JMenuItem("Load file from tape ...")
     tapeItem.setActionCommand("TAPE")
@@ -814,6 +826,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     tapeRecordItem.setActionCommand("TAPE_RECORD")
     tapeRecordItem.addActionListener(this)
     tapeMenu.add(tapeRecordItem)
+    
+    val tapeRewindItem = new JMenuItem("Cassette press rewind")
+    tapeRewindItem.setActionCommand("TAPE_REWIND")
+    tapeRewindItem.addActionListener(this)
+    tapeMenu.add(tapeRewindItem)
     
     fileMenu.addSeparator
     
@@ -987,6 +1004,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     diskTrueEmuItem.setActionCommand("DISK_TRUE_EMU")
     diskTrueEmuItem.addActionListener(this)    
     optionMenu.add(diskTrueEmuItem)
+    
+    val aboutItem = new JMenuItem("About")
+    aboutItem.setActionCommand("ABOUT")
+    aboutItem.addActionListener(this)
+    helpMenu.add(aboutItem)
     
     displayFrame.setJMenuBar(menuBar)
   }

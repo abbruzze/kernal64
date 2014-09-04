@@ -7,8 +7,6 @@ class TAP(file:String) extends Iterator[Int] {
   private[this] val UNDEFINED_GAP = 20000
   private[this] val tape = new RandomAccessFile(file, "rw")
   private[this] var _version = 0
-  private[this] var _length = 0L
-  private[this] var offset = 0L
   
   loadHeader
   
@@ -19,27 +17,23 @@ class TAP(file:String) extends Iterator[Int] {
       if (read.toChar != i) throw new IllegalArgumentException("Bad TAP file")
     }
     _version = read
-    tape.seek(0x10)
-    _length = read | read << 8 | read << 16 | read << 24
+    // ignore length
+    rewind
   }
   
   def getFilename = file
   def close = tape.close
   def version = _version
-  def tapeLength = _length
-  def getOffset = offset
-  def setOffset(newOffset:Long) {
-    offset = newOffset
-    tape.seek(offset + 0x14)
-  }
-  def hasNext = offset < _length
+  def tapeLength = tape.length
+  def getOffset = tape.getFilePointer
+  def rewind = tape.seek(0x14)
+  
+  def hasNext = tape.getFilePointer < tape.length
   def next = {
-    offset += 1
     val gap = read
     if (gap == 0) {
       if (version == 0) UNDEFINED_GAP
       else {
-        offset += 3
         val newGap = read | read << 8 | read << 16
         if (newGap != 0) newGap else UNDEFINED_GAP 
       }
@@ -56,11 +50,9 @@ class TAP(file:String) extends Iterator[Int] {
       tape.write(value & 0xFF)
       value >>= 8
       tape.write(value & 0xFF)
-      offset += 4
     }
     else {
       tape.write(value)
-      offset += 1
     }    
   }
 }
