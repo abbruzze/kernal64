@@ -31,6 +31,8 @@ class Cartridge(file:String) {
   var ctrType = 0 
   var EXROM,GAME = false
   var chips : Array[Chip] = null
+  lazy val kbSize = (chips map { _.romSize } sum) / 1024
+  
   load 
   
   def load {

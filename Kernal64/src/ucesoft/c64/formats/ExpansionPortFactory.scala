@@ -63,42 +63,41 @@ object ExpansionPortFactory {
       }
     }
   } 
-  private class FinalICartridgeExpansionPort(crt:Cartridge) extends CartridgeExpansionPort(crt) {
-    private[this] val iomem = Array.ofDim[Int](512)
-    private def handleAccess(address:Int) {
-      //println("Access at " + Integer.toHexString(address))
-      if (address >= startAddress && address < startAddress + 256) {
-        game = true
-        exrom = true
-      }
-      else {
-        game = false
-        exrom = false
-      }
-      notifyMemoryConfigurationChange
-    }
-    override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
-      handleAccess(address)
-      /*
-      val target = address - startAddress
-      game = true
-      notifyMemoryConfigurationChange
-      0
-      * 
-      */
-      iomem(address - startAddress)
-    }
+  private class Comal80CartridgeExpansionPort(crt:Cartridge) extends CartridgeExpansionPort(crt) {
 	override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
-	  handleAccess(address)
-	  iomem(address - startAddress) = value
-	  /*
-      val target = address - startAddress
-      if (target == 0) {
-        game = false
-        notifyMemoryConfigurationChange
-      }
-      * 
-      */
+	  if ((value & 0x80) > 0) {
+	      val bank = value & 0x3
+	      romlBankIndex = bank
+	      romhBankIndex = bank
+	  }
+    }
+  } 
+  
+  private class Type7CartridgeExpansionPort(crt:Cartridge) extends CartridgeExpansionPort(crt) {
+	override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+      if (address == startAddress) {
+	    var bank = 0
+	    if ((value & 0x08) > 0) bank |= 1
+	    if ((value & 0x10) > 0) bank |= 2
+	    if ((value & 0x20) > 0) bank |= 4
+	    if ((value & 0x01) > 0) bank |= 8
+	    romlBankIndex = bank
+	  }
+    }
+  } 
+  
+  private class Type8CartridgeExpansionPort(crt:Cartridge) extends CartridgeExpansionPort(crt) {
+	override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+      if (address == 0xDF00) {
+	    val bank = value & 0x03
+	    romlBankIndex = bank
+	    romhBankIndex = bank
+	    val invGame = (bank & 4) > 0
+	    val invExrom = (bank & 8) > 0
+	    game = invGame
+	    exrom = invExrom
+	    notifyMemoryConfigurationChange
+	  }
     }
   } 
   
@@ -107,21 +106,6 @@ object ExpansionPortFactory {
       val target = address - startAddress
       if (target == 0) {
         romlBankIndex = value & 0x7F
-        println("Bank selected is " + romlBankIndex)
-        /*
-        if ((value & 0x80) == 0x80) {
-          game = false
-          exrom = false
-          println("Disabled game exrom")
-        }
-        else {
-          game = crt.GAME
-          exrom = crt.EXROM
-          println("Enabled game exrom as cartridge")
-        }
-        
-        */
-        //notifyMemoryConfigurationChange
       }
     }
   }   
@@ -130,9 +114,12 @@ object ExpansionPortFactory {
       val target = address - startAddress
       if (target == 0) {
         val bank = value & 0x3F
-        romlBankIndex = bank
-        //romhBankIndex = bank
-        //notifyMemoryConfigurationChange
+        crt.kbSize match {
+          case 256 =>
+            if (bank < 16) romlBankIndex = bank else romhBankIndex = bank - 16
+          case _ =>
+            romlBankIndex = bank
+        }        
       }
     }
   }
@@ -189,12 +176,14 @@ object ExpansionPortFactory {
     crt.ctrType match {
       case 0 => new CartridgeExpansionPort(crt)
       case 4 => new SimonsBasicCartridgeExpansionPort(crt)
-      case 13 => new FinalICartridgeExpansionPort(crt)
+      case 21 => new Comal80CartridgeExpansionPort(crt)
       case 19 => new Type19CartridgeExpansionPort(crt)
       case 17 => new Type17CartridgeExpansionPort(crt)
       case 15 => new Type15CartridgeExpansionPort(crt)
       case 32 => new Type32CartridgeExpansionPort(crt)
       case 5 => new Type5CartridgeExpansionPort(crt)
+      case 7 => new Type7CartridgeExpansionPort(crt)
+      case 8 => new Type8CartridgeExpansionPort(crt)
       case _ => throw new IllegalArgumentException(s"Unsupported cartridge type ${crt.ctrType} for ${crt.name}")
     }
   }

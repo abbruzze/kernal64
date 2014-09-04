@@ -426,7 +426,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     Log.info(CPU6510.disassemble(mem,cpu.getCurrentInstructionPC).toString)
     t.printStackTrace(Log.getOut)
     t.printStackTrace
-    JOptionPane.showMessageDialog(displayFrame,t.toString, "Fatal error",JOptionPane.ERROR_MESSAGE)
+    JOptionPane.showMessageDialog(displayFrame,t.toString + " [PC=" + Integer.toHexString(cpu.getCurrentInstructionPC) + "]", "Fatal error",JOptionPane.ERROR_MESSAGE)
     trace(true,true)
   }
   private def mainLoop(cycles:Long) {
