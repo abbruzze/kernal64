@@ -45,7 +45,7 @@ object ExpansionPortFactory {
     def ROML = if (romlBanks.length > 0) romlBanks(romlBankIndex) else null
     def ROMH = if (romhBanks.length > 0) romhBanks(romhBankIndex) else null
     
-    override def toString = s"ExpansionPort{type=${crt.ctrType} game=${game} exrom=${exrom} romlBanks=${romlBanks.mkString("<",",",">")} romhBanks=${romhBanks.mkString("<",",",">")}}"
+    override def toString = s"ExpansionPort{crt=${crt} game=${game} exrom=${exrom} romlBanks=${romlBanks.mkString("<",",",">")} romhBanks=${romhBanks.mkString("<",",",">")}}"
   }
   // ================================= CARTRIDGE IMPL ===================================================
   private class SimonsBasicCartridgeExpansionPort(crt:Cartridge) extends CartridgeExpansionPort(crt) {
