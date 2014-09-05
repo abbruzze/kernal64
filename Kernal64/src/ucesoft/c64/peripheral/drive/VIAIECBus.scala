@@ -14,6 +14,7 @@ class VIAIECBus(driveID:Int,
   val busid = name
   private[this] val IDJACK = driveID & 0x03
   private[this] var active = true
+  private[this] var data_out = IECBus.VOLTAGE
   
   bus.registerListener(this)
   
@@ -44,8 +45,8 @@ class VIAIECBus(driveID:Int,
     address - startAddress match {
       case PB|DDRB =>        
         if ((regs(DDRB) & 0x02) > 0) {
-          val data_out = (regs(PB) & 0x02) > 0        
-          bus.setLine(busid,IECBusLine.DATA,if (data_out) IECBus.GROUND else IECBus.VOLTAGE)
+          data_out = if ((regs(PB) & 0x02) > 0) IECBus.GROUND else IECBus.VOLTAGE
+          bus.setLine(busid,IECBusLine.DATA,data_out)
         }
         if ((regs(DDRB) & 0x08) > 0) {
           val clock_out = (regs(PB) & 0x08) > 0
@@ -57,7 +58,8 @@ class VIAIECBus(driveID:Int,
   }
   
   private def autoacknwoledgeData {
-    val dataOut = (bus.atn == IECBus.GROUND) ^ ((regs(PB) & 0x10) > 0)
-    if (dataOut) bus.setLine(busid,IECBusLine.DATA,IECBus.GROUND)
+    val atna = (regs(PB) & 0x10) > 0
+    val dataOut = (bus.atn == IECBus.GROUND) ^ atna
+    if (dataOut) bus.setLine(busid,IECBusLine.DATA,IECBus.GROUND) else bus.setLine(busid,IECBusLine.DATA,data_out)
   }
 }
