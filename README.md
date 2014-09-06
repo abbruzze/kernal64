@@ -1,4 +1,4 @@
-kernal64
+kernal64 ver 0.9.9
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
 
@@ -8,7 +8,7 @@ Written in the Scala language (http://www.scala-lang.org/) and available for any
 
 Here the main features:
 * Cycle based: exact cycle emulation using the PAL frequency
-* VIC emulation based on the Christian Bauer's article: "The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64". I know that it's incomplete (and in some cases buggy). I tried to close some issues by myself. Some others,Sprite Crunch for instance, are still open
+* VIC emulation based on the Christian Bauer's article: "The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64". I know that it's incomplete (and in some cases buggy). I tried to close some issues by myself. Some others,Sprite Crunch for instance, are still open. With the current implementation most of the games run properly. Some demos run with "strange" effects, naturally.
 * 6502 CPU full emulation (with illegal opcodes too)
 * CIA1, CIA2 chips emulation: almost full. RS-232 lines are not emulated
 * IEC Serial Bus
