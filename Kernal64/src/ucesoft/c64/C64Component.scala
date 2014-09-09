@@ -13,6 +13,7 @@ object C64ComponentType extends Enumeration {
   val DISK = Value
   val INTERNAL = Value
   val TAPE = Value
+  val PRINTER = Value
 }
 
 trait C64Component {

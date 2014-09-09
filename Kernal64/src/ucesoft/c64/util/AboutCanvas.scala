@@ -7,7 +7,10 @@ class AboutCanvas(charRom:Memory,version:String) extends CBMCanvas(charRom) {
   
   for(_ <- 1 to 4) newLine
   red
-  add(center("KERNAL64 VER. " + version,WIDTH)).newLine
+  enhanceWidth
+  add(center("KERNAL64",WIDTH)).newLine.newLine
+  standardWidth
+  add(center("VER " + version,WIDTH)).newLine
   newLine
   white
   add(center("A COMMODORE 64 EMULATOR WRITTEN IN SCALA",WIDTH)).newLine

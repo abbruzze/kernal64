@@ -33,6 +33,8 @@ import ucesoft.c64.peripheral.c2n.DatassetteState
 import java.awt.geom.Path2D
 import ucesoft.c64.peripheral.c2n.DatassetteListener
 import ucesoft.c64.util.AboutCanvas
+import ucesoft.c64.peripheral.bus.BusSnoop
+import ucesoft.c64.peripheral.printer.MPS803
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -76,6 +78,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   private[this] var diskTraceDialog : TraceDialog = _
   private[this] var inspectDialog : JDialog = _
   private[this] var traceItem,traceDiskItem : JCheckBoxMenuItem = _
+  private[this] val busSnooper = new BusSnoop(bus)
+  private[this] var busSnooperActive = false
   // -------------------- DISK -----------------
   private[this] var attachedDisk : Option[D64] = None
   private[this] val c1541 = new C1541Emu(bus,this)
@@ -85,6 +89,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   private[this] val diskProgressPanel = new DriveLoadProgressPanel
   // -------------------- TAPE -----------------
   private[this] var datassette : Datassette = _
+  // -------------------- PRINTER --------------
+  private[this] var printer = new MPS803(bus,mem.CHAR_ROM)
   // -------------------------------------------
   private[this] val configuration = {
     val props = new Properties
@@ -402,6 +408,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     datassette = new Datassette(cia1.setFlagLow _)
     mem.setDatassette(datassette)
     add(datassette)
+    // printer
+    add(printer)
     
     // info panel
     val infoPanel = new JPanel(new BorderLayout)
@@ -434,6 +442,9 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     vicChip.clock(cycles)
     //DRIVES
     drive.clock(cycles)
+    // bus snoop
+    if (busSnooperActive) busSnooper.clock(cycles)
+    printer.clock(cycles)
     // CPU
     val canExecCPU = cycles > cpuWaitUntil && cycles > baLowUntil
     if (canExecCPU) cpuWaitUntil = cycles + cpu.fetchAndExecute
@@ -506,6 +517,9 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
         drive.setActive(false)
         drive = if (trueEmu) c1541_real else c1541
         drive.setActive(true)
+      case "DISK_CAN_GO_SLEEP" =>
+        val canGoSleep = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        drive.setCanSleep(canGoSleep)
       case "NO_PEN" =>
         lightPenButtonEmulation = LIGHT_PEN_NO_BUTTON
         keypadControlPort.setLightPenEmulation(false)
@@ -535,7 +549,15 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
         attachTape 
       case "ABOUT" =>
         showAbout
+      case "BUS_SNOOP" =>
+        busSnooperActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+      case "PRINTER_PREVIEW" =>
+        showPrinterPreview
     }
+  }
+  
+  private def showPrinterPreview {
+    JOptionPane.showMessageDialog(displayFrame,printer.sheet,"Printer preview",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
   }
   
   private def showAbout {
@@ -999,11 +1021,30 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     
     optionMenu.addSeparator
     
+    val printerPreviewItem = new JMenuItem("Printer preview ...")
+    printerPreviewItem.setActionCommand("PRINTER_PREVIEW")
+    printerPreviewItem.addActionListener(this)
+    optionMenu.add(printerPreviewItem)
+    
+    optionMenu.addSeparator
+    
     val diskTrueEmuItem = new JCheckBoxMenuItem("1541 True emulation")
     diskTrueEmuItem.setSelected(true)
     diskTrueEmuItem.setActionCommand("DISK_TRUE_EMU")
     diskTrueEmuItem.addActionListener(this)    
     optionMenu.add(diskTrueEmuItem)
+    
+    val diskCanSleepItem = new JCheckBoxMenuItem("1541 can go sleeping")
+    diskCanSleepItem.setSelected(true)
+    diskCanSleepItem.setActionCommand("DISK_CAN_GO_SLEEP")
+    diskCanSleepItem.addActionListener(this)    
+    optionMenu.add(diskCanSleepItem)
+    
+    val busSnooperActiveItem = new JCheckBoxMenuItem("Bus snoop active")
+    busSnooperActiveItem.setSelected(false)
+    busSnooperActiveItem.setActionCommand("BUS_SNOOP")
+    busSnooperActiveItem.addActionListener(this)    
+    optionMenu.add(busSnooperActiveItem)
     
     val aboutItem = new JMenuItem("About")
     aboutItem.setActionCommand("ABOUT")

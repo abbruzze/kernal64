@@ -27,6 +27,10 @@ object C1541Mems {
 
     private[this] val mem = Array.fill(length)(0)
     final val isActive = true
+    private[this] var channelActive = 0
+    
+    def isChannelActive = channelActive != 0
+    def getChannelsState = channelActive
     
     def init {
       Log.info("Initialaizing C1541 RAM memory ...")
@@ -35,7 +39,13 @@ object C1541Mems {
       for(i <- 0 until mem.length) mem(i) = 0
     }
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address & 0xFFFF)
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address & 0xFFFF) = value & 0xff    
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+      mem(address & 0xFFFF) = value & 0xff
+      if (address >= 0x22B && address <= 0x239) {
+        val channel = address - 0x22B
+        if (value != 0xFF) channelActive |= 1 << channel else channelActive &= ~(1 << channel)
+      }
+    }
   }
   
   class C1541_RAM extends BridgeMemory {
@@ -57,6 +67,9 @@ object C1541Mems {
     }
     
     def reset {}
+    
+    def isChannelActive = RAM.isChannelActive
+    def getChannelsState = RAM.getChannelsState
     
     override def defaultValue(address:Int) = Some(address >> 8)
   }

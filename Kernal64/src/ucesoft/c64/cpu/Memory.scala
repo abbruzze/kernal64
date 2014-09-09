@@ -37,7 +37,7 @@ abstract class BridgeMemory extends RAMComponent {
   @inline private def select(address:Int) = {
     var ptr = bridges
     var found : Memory = null
-    while (ptr != Nil && found == null) {
+    while (ptr.nonEmpty && found == null) {
       val mem = ptr.head
       if (address >= mem._1 && address <= mem._2) found = mem._3
       else ptr = ptr.tail

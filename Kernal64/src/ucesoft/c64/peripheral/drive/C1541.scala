@@ -32,10 +32,14 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] var awakeCycles = 0L
   private[this] var goSleepingCycles = 0L
   private[this] var tracing = false
+  private[this] var canSleep = true
 
   def setDriveReader(driveReader: D64) = viaDisk.setDriveReader(driveReader)
   override def setActive(active: Boolean) = viaBus.setActive(active)
-  
+  override def setCanSleep(canSleep:Boolean) {
+    this.canSleep = canSleep
+    awake
+  }
   private def awake {
     if (!running) {
       running = true
@@ -46,6 +50,11 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   
   override def getProperties = {
     properties.setProperty("Running",running.toString)
+    val channels = mem.getChannelsState
+    for(i <- 0 to 15) {
+      val opened = (channels & (1 << i)) > 0
+      properties.setProperty("Channel " + i,if (opened) "open" else "inactive")
+    }
     properties
   }
 
@@ -110,7 +119,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
           if (viaDisk.formatDisk) cpu.jmpTo(FORMAT_ROUTINE_OK) else cpu.jmpTo(FORMAT_ROUTINE_NOK) 
         }
         else
-        if (pc == WAIT_LOOP_ROUTINE && !viaDisk.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
+        if (pc == WAIT_LOOP_ROUTINE && canSleep && !mem.isChannelActive && !viaDisk.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
           running = false
           goSleepingCycles = cycles
           ledListener.beginLoadingOf("Disk go sleeping...")

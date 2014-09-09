@@ -8,7 +8,6 @@ object IECBusDevice {
   private val EOI_TIMEOUT = 80
   private val WAIT_BETWEEN_BYTES = 100
   private val WRITE_KEEP_BIT_TIMEOUT = 100
-  private val NOT_ME_TIMEOUT = 2000  
   private val DEBUG = false
   
   object Mode extends Enumeration {
@@ -18,7 +17,6 @@ object IECBusDevice {
     val WRITE = Value
     val TURNAROUND = Value
     val INIT_WRITE = Value
-    val NOT_ME = Value
   }
   
   private object WriteMode extends Enumeration {
@@ -42,7 +40,7 @@ object IECBusDevice {
     val LISTENER = Value
   }
   
-  private object Command extends Enumeration {
+  object Command extends Enumeration {
     val TALK = Value(0x40)
     val LISTEN = Value(0x20)
     val UNTALK = Value(0x5F)
@@ -116,7 +114,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
   protected def isDeviceReady : Boolean
   protected def loadData(fileName:String) : Option[BusDataIterator]
   
-  protected def byteJustRead(isLast:Boolean) {}
+  protected def byteJustRead(byte:Int,isLast:Boolean) {}
   protected def byteJustWritten(isLast:Boolean) {}
   protected def fileNameReceived {}
   protected def dataNotFound {}
@@ -127,6 +125,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
   protected def talk {}
   protected def untalk {}
   protected def close {}
+  protected def onCommand(cmd:Command.Value,secondaryAddress:Int) {}
   
   // -------------------------------
   
@@ -139,8 +138,6 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     clocked(cycles)
     
     mode match {
-      case NOT_ME =>
-        if (timeout) setMode(IDLE)
       case TURNAROUND =>
         if (!clk) {
           //if (DEBUG) println("CLK -> true")
@@ -170,7 +167,8 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
         }
         else
         if (!atn) {
-          setMode(IDLE)
+          if (role == LISTENER) setMode(IDLE)
+          else reset
         }
       case READ =>
         if (atn && !lastAtn) {
@@ -191,8 +189,11 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
                     fileNameReceived
                   }
                 }
-                else channels(channel).addToBuffer(r)
-                byteJustRead(byteReadLastChar)
+                else 
+                if (role == LISTENER) {
+                  channels(channel).addToBuffer(r)
+                  byteJustRead(r,byteReadLastChar)
+                }                
               }
           }
         }
@@ -245,14 +246,11 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     val CMD = Command(cmd)
     if (DEBUG) println(s"Dev/SecA=${devOrSecAddr} cmd=${CMD}")
     
+    onCommand(CMD,devOrSecAddr)
     CMD match {
       case LISTEN =>
         if (devOrSecAddr == device) role = LISTENER
-        else {
-          reset
-          setMode(NOT_ME)
-          waitTimeout = cycles + NOT_ME_TIMEOUT
-        }
+        else reset
         listen
       case UNLISTEN =>
         set(DATA,VOLTAGE)
@@ -260,21 +258,22 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
         role = NONE
         unlisten//if (channel == 15) handleChannel15(true)
       case OPEN =>
-        channel = devOrSecAddr        
-        channels(channel).fileName.clear
-        isReadingFileName = true
-        open
+        if (role == LISTENER) {
+          channel = devOrSecAddr        
+          channels(channel).fileName.clear
+          isReadingFileName = true       
+          open
+        }        
+        else reset
       case OPEN_CHANNEL =>
         channel = devOrSecAddr
-        if (DEBUG) println("Floppy channel=" + devOrSecAddr)        
         isReadingFileName = false
         if (role == READY_TO_BE_TALKER) {
           role = TALKER
-          setMode(TURNAROUND)
-          if (!channels(channel).isOpened) {
-            open_channel
-          }
+          setMode(TURNAROUND)     
+          open_channel
         }
+        if (role == LISTENER) open_channel
       case TALK =>
         if (devOrSecAddr == device) role = READY_TO_BE_TALKER
         talk
@@ -282,9 +281,11 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
         role = NONE
         untalk
       case CLOSE =>
-        channels(channel).close
-        close
-        reset
+        if (role != NONE) {
+          channels(channel).close
+          close
+          reset
+        }
     }
   }
   

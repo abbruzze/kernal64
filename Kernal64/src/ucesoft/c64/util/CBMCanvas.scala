@@ -12,7 +12,7 @@ object CBMCanvas extends App {
   val f = new JFrame
   val rom = new CPU6510Mems.CHARACTERS_ROM(null)
   rom.init
-  val c = new CBMCanvas(rom)
+  val c = new CBMCanvas(rom).enhanceWidth
   c rep (32, 40) newLine;
   c << "ALESSANDRO" newLine;
   c.rvsOn
@@ -26,7 +26,7 @@ object CBMCanvas extends App {
   f.getContentPane.add("Center", c)
   f.pack
   f.setVisible(true)
-
+  
   c.upCase
   c.yellow
   for (i <- 1 to 5) {
@@ -57,7 +57,7 @@ object CBMCanvas extends App {
 }
 
 class CBMCanvas(charRom: Memory) extends JComponent {
-  private[this] case class Char(fgColor: Int, charCode: Int)
+  private[this] case class Char(fgColor: Int, charCode: Int,double:Boolean)
 
   private[this] val lines = new ListBuffer[ListBuffer[Char]]
   private[this] var currentLine = new ListBuffer[Char]
@@ -66,6 +66,7 @@ class CBMCanvas(charRom: Memory) extends JComponent {
   private[this] var lowerCase = false
   private[this] var reverseOn = false
   private[this] var scrollY = 0
+  private[this] var doubleWidth = false
 
   def clear = {
     lines.clear
@@ -90,6 +91,8 @@ class CBMCanvas(charRom: Memory) extends JComponent {
   def lightBlue = fgColor(14)
   def lightGray = fgColor(15)
 
+  def enhanceWidth = { doubleWidth = true ; this }
+  def standardWidth = { doubleWidth = false ; this }
   def yscroll(value: Int) = { scrollY = value; this }
   def fgColor(fgColor: Int) = { foregroundColor = fgColor; this }
   def bgColor(bgColor: Int) = { backgroundColor = bgColor; this }
@@ -118,12 +121,12 @@ class CBMCanvas(charRom: Memory) extends JComponent {
   def add(ch: scala.Char): CBMCanvas = add(ch.toString)
   def add(txt: String) = {
     for (c <- txt) {
-      currentLine += Char(foregroundColor, withModifiers(convertCode(c)))
+      currentLine += Char(foregroundColor, withModifiers(convertCode(c)),doubleWidth)
     }
     this
   }
   def add(code: Int) = {
-    currentLine += Char(foregroundColor, withModifiers(convertCode(code)))
+    currentLine += Char(foregroundColor, withModifiers(convertCode(code)),doubleWidth)
     this
   }
   def end = { !!; checkSize; this }
@@ -131,11 +134,12 @@ class CBMCanvas(charRom: Memory) extends JComponent {
   def dropLast = { lines.remove(lines.length - 1); checkSize; this }
   
   def center(s:String,width:Int) = {
-    val delta = width - s.length
+    val delta = width - (if (doubleWidth) s.length * 2 else s.length)
     if (delta <= 0) s
     else {
       val left = delta / 2
-      (" " * left) + s + (" " * (delta - left))
+      if (doubleWidth) (" " * (left / 2)) + s + (" " * (delta - left / 2))
+      else (" " * left) + s + (" " * (delta - left))
     }
   }
 
@@ -156,7 +160,7 @@ class CBMCanvas(charRom: Memory) extends JComponent {
     c
   }
 
-  private def checkSize {
+  def checkSize {
     val maxWidth = lines map { _.length } max
 
     setPreferredSize(new Dimension(maxWidth * 8, lines.length * 8))
@@ -176,13 +180,17 @@ class CBMCanvas(charRom: Memory) extends JComponent {
           val byte = charRom.read(charRom.startAddress | (char.charCode << 3) | rc)
           g.setColor(Palette.VIC_COLORS(char.fgColor))
           var bit = 0x80
-          var dx = 0
+          var dx = 0          
           while (bit > 0) {
-            if ((byte & bit) > 0) g.drawRect(x << 3 | dx, y << 3 | rc, 0, 0)
-            dx += 1
+            var width = if (char.double) 2 else 1
+            while (width > 0) {
+              if ((byte & bit) > 0) g.drawRect(x << 3 | dx, y << 3 | rc, 0, 0)
+              dx += 1
+              width -= 1
+            }
             bit >>= 1
           }
-          x += 1
+          x += (if (char.double) 2 else 1)
         }
       }
       y += 1

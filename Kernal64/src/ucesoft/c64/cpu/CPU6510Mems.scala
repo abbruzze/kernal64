@@ -169,7 +169,7 @@ object CPU6510Mems {
     private[this] val ROML = new ExtendedROM(ram,"ROML",M_ROML)
     private[this] val ROMH = new ExtendedROM(ram,"ROMH",M_BASIC)
     private[this] val ROMH_ULTIMAX = new ExtendedROM(ram,"ROMH_ULTIMAX",M_KERNAL)
-    private[this] val banks = Array(IO,CHAR_ROM,KERNAL_ROM,BASIC_ROM,ROML,ROMH,ROMH_ULTIMAX)
+    private[this] val banks = Array(KERNAL_ROM,IO,CHAR_ROM,BASIC_ROM,ROML,ROMH,ROMH_ULTIMAX)
     
     private[this] var LORAM = true
     private[this] var HIRAM = true
