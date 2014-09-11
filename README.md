@@ -1,4 +1,4 @@
-kernal64 ver 0.9.9
+kernal64 ver 0.9.9A
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
 
@@ -20,6 +20,7 @@ Here the main features:
 * Datassette: full emulation using TAP file (read/write)
 * 1541 Drive: exact cycle emulation (read/write) using 6502 CPU (1Mhz). Supports D64 format only. In the Settings menù it's possible to turn off the full drive emulation and turn on the faster one.
 * Cartridges emulation (some CRT types are not emulated). Supports CRT format.
+* MPS803 printer emulation. Preview panel updated while printing.
 * Fast program loading of PRG/T64 local file or D64's file entry.
 * Debug panel for main CPU and for 1541's cpu (break point, step by step execution, disassembler, assembler, etc.)
 * Component panel: shows all internal components while running
