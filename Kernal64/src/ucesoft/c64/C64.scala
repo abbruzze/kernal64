@@ -35,6 +35,8 @@ import ucesoft.c64.peripheral.c2n.DatassetteListener
 import ucesoft.c64.util.AboutCanvas
 import ucesoft.c64.peripheral.bus.BusSnoop
 import ucesoft.c64.peripheral.printer.MPS803
+import ucesoft.c64.peripheral.printer.MPS803GFXDriver
+import ucesoft.c64.peripheral.printer.MPS803ROM
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -90,7 +92,15 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   // -------------------- TAPE -----------------
   private[this] var datassette : Datassette = _
   // -------------------- PRINTER --------------
-  private[this] var printer = new MPS803(bus,mem.CHAR_ROM)
+  private[this] var printerGraphicsDriver = new MPS803GFXDriver(new MPS803ROM)
+  private[this] var printer = new MPS803(bus,printerGraphicsDriver)  
+  private[this] var printerDialog = {
+    val dialog = new JDialog(displayFrame,"Print preview")
+    dialog.getContentPane.add("Center",new JScrollPane(printerGraphicsDriver))
+    printerGraphicsDriver.checkSize
+    dialog.pack
+    dialog
+  }
   // -------------------------------------------
   private[this] val configuration = {
     val props = new Properties
@@ -557,12 +567,13 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   }
   
   private def showPrinterPreview {
-    JOptionPane.showMessageDialog(displayFrame,printer.sheet,"Printer preview",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
+    printerGraphicsDriver.checkSize
+    printerDialog.setVisible(true)
   }
   
   private def showAbout {
     val about = new AboutCanvas(mem.CHAR_ROM,VERSION)
-    JOptionPane.showMessageDialog(displayFrame,about,"About",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
+    JOptionPane.showMessageDialog(displayFrame,about,"About",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))    
   }
   
   private def zoom(f:Double) {

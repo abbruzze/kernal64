@@ -283,9 +283,9 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
       case CLOSE =>
         if (role != NONE) {
           channels(channel).close
-          close
-          reset
-        }
+          close          
+        }      
+        reset
     }
   }
   
