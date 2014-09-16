@@ -51,6 +51,7 @@ abstract class VIA(val name:String,
   private[this] val PB_LATCH_ENABLED = 0x02
   
   private[this] val clock = Clock.systemClock
+  protected var active = true
   
   def init {
     clock.schedule(new ClockEvent(name,clock.nextCycles,update _))
@@ -59,6 +60,11 @@ abstract class VIA(val name:String,
   def reset = {
     for(i <- 0 until regs.length) regs(i) = 0
     init
+  }
+    
+  def setActive(active:Boolean) {
+    if (!this.active && active) init
+    this.active = active
   }
   
   protected def irq_set(irq:Int) {
@@ -153,7 +159,7 @@ abstract class VIA(val name:String,
   protected def update(cycles:Long) {
     updateT1
     updateT2
-    clock.schedule(new ClockEvent(name,cycles + UPDATE_CLOCKS,update _))
+    if (active) clock.schedule(new ClockEvent(name,cycles + UPDATE_CLOCKS,update _))
   }
   
   private def updateT1 {

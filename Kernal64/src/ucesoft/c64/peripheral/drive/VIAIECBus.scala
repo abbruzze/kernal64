@@ -13,15 +13,15 @@ class VIAIECBus(driveID:Int,
   override lazy val componentID = "VIA1 (Bus)"
   val busid = name
   private[this] val IDJACK = driveID & 0x03
-  private[this] var active = true
   private[this] var data_out = IECBus.VOLTAGE
+  private[this] var driveEnabled = true
   
   bus.registerListener(this)
   
-  def setActive(active:Boolean) = this.active = active
+  def setEnabled(enabled:Boolean) = driveEnabled = enabled
   
   override def atnChanged(oldValue:Int,newValue:Int) {
-    if (active) {
+    if (driveEnabled) {
       if (newValue == IECBus.GROUND) {
         irq_set(IRQ_CA1)
         atnOn()
@@ -44,21 +44,18 @@ class VIAIECBus(driveID:Int,
     super.write(address,value,chipID)
     address - startAddress match {
       case PB|DDRB =>        
-        if ((regs(DDRB) & 0x02) > 0) {
-          data_out = if ((regs(PB) & 0x02) > 0) IECBus.GROUND else IECBus.VOLTAGE
-          bus.setLine(busid,IECBusLine.DATA,data_out)
-        }
-        if ((regs(DDRB) & 0x08) > 0) {
-          val clock_out = (regs(PB) & 0x08) > 0
-          bus.setLine(busid,IECBusLine.CLK,if (clock_out) IECBus.GROUND else IECBus.VOLTAGE)
-        }
+        data_out = if ((regs(DDRB) & 0x02) > 0 && (regs(PB) & 0x02) > 0) IECBus.GROUND else IECBus.VOLTAGE
+        bus.setLine(busid,IECBusLine.DATA,data_out)
+        val clock_out = (regs(DDRB) & 0x08) > 0 && (regs(PB) & 0x08) > 0
+        bus.setLine(busid,IECBusLine.CLK,if (clock_out) IECBus.GROUND else IECBus.VOLTAGE)
+        
         autoacknwoledgeData
       case _ =>
     }         
   }
   
   private def autoacknwoledgeData {
-    val atna = (regs(PB) & 0x10) > 0
+    val atna = (regs(DDRB) & 0x10) > 0 && (regs(PB) & 0x10) > 0
     val dataOut = (bus.atn == IECBus.GROUND) ^ atna
     if (dataOut) bus.setLine(busid,IECBusLine.DATA,IECBus.GROUND) else bus.setLine(busid,IECBusLine.DATA,data_out)
   }

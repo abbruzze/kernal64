@@ -35,7 +35,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] var canSleep = true
 
   def setDriveReader(driveReader: D64) = viaDisk.setDriveReader(driveReader)
-  override def setActive(active: Boolean) = viaBus.setActive(active)
+  override def setActive(active: Boolean) = viaBus.setEnabled(active)
   override def setCanSleep(canSleep:Boolean) {
     this.canSleep = canSleep
     awake
@@ -43,11 +43,13 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private def awake {
     if (!running) {
       running = true
+      viaBus.setActive(true)
+      viaDisk.setActive(true)
       awakeCycles = clk.currentCycles
       viaDisk.awake
     }
   }
-  
+    
   override def getProperties = {
     properties.setProperty("Running",running.toString)
     val channels = mem.getChannelsState
@@ -86,6 +88,13 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       Log.debug(s"Handling IRQ viaBusIRQ=${viaBusIRQLow} viaDiskIRQ=${viaDiskIRQLow}")
       cpu.irqRequest(viaBusIRQLow || viaDiskIRQLow)
     }
+    
+    override def getProperties = {
+      properties.setProperty("ViaBus IRQ",viaBusIRQLow.toString)
+      properties.setProperty("ViaDisk IRQ",viaDiskIRQLow.toString)
+      
+      properties
+    }
 
     final def viaBusIRQ(low: Boolean) {
       Log.debug("VIABus setting IRQ as " + low)
@@ -121,6 +130,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
         else
         if (pc == WAIT_LOOP_ROUTINE && canSleep && !mem.isChannelActive && !viaDisk.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
           running = false
+          viaBus.setActive(false)
+          viaDisk.setActive(false)
           goSleepingCycles = cycles
           ledListener.beginLoadingOf("Disk go sleeping...")
         }
