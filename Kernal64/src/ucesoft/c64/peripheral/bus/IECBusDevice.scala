@@ -10,7 +10,7 @@ object IECBusDevice {
   private val WRITE_KEEP_BIT_TIMEOUT = 100
   private val DEBUG = false
   
-  object Mode extends Enumeration {
+  	object Mode extends Enumeration {
     val IDLE = Value
     val ATN_SEEN = Value
     val READ = Value
@@ -59,10 +59,13 @@ object IECBusDevice {
     
     def isOpened = opened
     def open = opened = true
-    def close = {
-      opened = false
+    def clear {
       buffer.clear
       fileName.clear
+    }
+    def close = {
+      opened = false
+      clear
     }
     def addToBuffer(value:Int) {
       _buffer += value
@@ -161,7 +164,6 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
       	}
       case ATN_SEEN =>
         if (atn && !clk) {	// READY_TO_SEND
-          set(DATA,VOLTAGE)	// READY_TO_DATA
           setMode(READ)
           readByte(cycles,true,timeout)
         }
@@ -249,14 +251,16 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     onCommand(CMD,devOrSecAddr)
     CMD match {
       case LISTEN =>
-        if (devOrSecAddr == device) role = LISTENER
-        else reset
-        listen
+        if (devOrSecAddr == device) {
+          role = LISTENER
+          listen
+        }
+        else reset        
       case UNLISTEN =>
         set(DATA,VOLTAGE)
         set(CLK,VOLTAGE)
         role = NONE
-        unlisten//if (channel == 15) handleChannel15(true)
+        unlisten//if (channel == 15) handleChannel15(true)        
       case OPEN =>
         if (role == LISTENER) {
           channel = devOrSecAddr        
@@ -273,10 +277,15 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
           setMode(TURNAROUND)     
           open_channel
         }
+        else
         if (role == LISTENER) open_channel
+        else reset
       case TALK =>
-        if (devOrSecAddr == device) role = READY_TO_BE_TALKER
-        talk
+        if (devOrSecAddr == device) {
+          role = READY_TO_BE_TALKER
+          talk
+        }     
+        else reset
       case UNTALK =>
         role = NONE
         untalk
