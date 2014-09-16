@@ -155,10 +155,11 @@ class D64(val file: String) {
         for (m <- initialAddress until initialAddress + data.length) mem.write(m, data(m - initialAddress))
         val endAddress = initialAddress + data.length
         println("Loaded " + fn + " from " + initialAddress + " to " + endAddress)
-        mem.write(45, endAddress % 256)
-        mem.write(46, endAddress / 256)
-        mem.write(0xAE, endAddress % 256)
-        mem.write(0xAF, endAddress / 256)
+        mem.write(45, endAddress % 256)	  // Pointer to the Start of the BASIC Variable Storage Area
+        mem.write(46, endAddress / 256)   //
+        mem.write(0xAE, endAddress % 256) // Pointer to Ending Address of Load (End of Program)
+        mem.write(0xAF, endAddress / 256) //
+        mem.write(0xBA,8)	// Current Device Number
         endAddress
     }
   }
