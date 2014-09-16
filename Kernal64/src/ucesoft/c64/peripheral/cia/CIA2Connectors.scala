@@ -19,11 +19,15 @@ object CIA2Connectors {
       (~((clk << 6) | (data << 7)) & 0xC0) | (latch & 0x3F)
     }
     final protected def performWrite(data:Int) = {
-      mem.setBank((data | ~ddr) & 3)
+      var bank = 0
+      if ((ddr & 1) > 0 && (data & 1) > 0) bank |= 1
+      if ((ddr & 2) > 0 && (data & 2) > 0) bank |= 2
+      if ((ddr & 4) > 0 && (data & 4) > 0) bank |= 4
+      mem.setBank(bank)
       
-      bus.setLine(busid,IECBusLine.ATN,if ((data & 8) == 8) GROUND else VOLTAGE)
-      bus.setLine(busid,IECBusLine.CLK,if ((data & 16) == 16) GROUND else VOLTAGE)
-      bus.setLine(busid,IECBusLine.DATA,if ((data & 32) == 32) GROUND else VOLTAGE)
+      bus.setLine(busid,IECBusLine.ATN,if ((ddr & 8) == 8 && (data & 8) == 8) GROUND else VOLTAGE)
+      bus.setLine(busid,IECBusLine.CLK,if ((ddr & 16) == 16 && (data & 16) == 16) GROUND else VOLTAGE)
+      bus.setLine(busid,IECBusLine.DATA,if ((ddr & 32) == 32 && (data & 32) == 32) GROUND else VOLTAGE)
     }    
   }
   object PortBConnector extends Connector {
