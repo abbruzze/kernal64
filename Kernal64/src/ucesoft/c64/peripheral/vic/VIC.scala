@@ -341,6 +341,7 @@ final class VIC(mem: Memory,
     val componentID = "Sprite " + index
     val componentType = C64ComponentType.INTERNAL
     
+    private[this] val mask = 1 << index
     private[this] var counter = 0
     private[this] var gdata = 0
     private[this] var _yexp = false
@@ -420,7 +421,10 @@ final class VIC(mem: Memory,
       val finished = counter == (if (xexp) 48 else 24)
       if (finished) {
         painting = false
-        if (lastLine) lastLine = false
+        if (lastLine) {
+          lastLine = false
+          spritesDisplayedMask &= ~mask
+        }
       }
       finished
     }
@@ -508,12 +512,14 @@ final class VIC(mem: Memory,
         //if (dma && rasterLine < BLANK_BOTTOM_LINE && (y) == (rasterLine & 0xFF)) {
         if (dma && rasterLine < 270 && (y) == (rasterLine & 0xFF)) {
           display = true
+          spritesDisplayedMask |= mask
           //Log.debug(s"Sprite #${index} displayable. " + this)
         }
       case _ => // do nothing
     }
   }
   private[this] val sprites = Array(new Sprite(0), new Sprite(1), new Sprite(2), new Sprite(3), new Sprite(4), new Sprite(5), new Sprite(6), new Sprite(7))
+  private[this] var spritesDisplayedMask = 0
   // ------------------------------ SHIFTERS ----------------------------------------------
   private[this] abstract class AbstractPixel {
     var source: Char = '?'
@@ -542,7 +548,8 @@ final class VIC(mem: Memory,
 
   @inline private def getPixel(color: Int, isForeground: Boolean = true) = {
     val pixel = PIXEL_CACHE(pixelCacheIndex)
-    pixelCacheIndex = (pixelCacheIndex + 1) % PIXEL_CACHE.length
+    pixelCacheIndex += 1
+    if (pixelCacheIndex == PIXEL_CACHE.length) pixelCacheIndex = 0
     pixel.color = VIC_RGB(color)
     if (traceRasterLineInfo) pixel.colorIndex = color
     pixel.isForeground = isForeground
@@ -578,10 +585,10 @@ final class VIC(mem: Memory,
     }
     final def producePixels {
       // optimization
-      drawBorder = rasterLine < TOP_BOTTOM_FF_COMP(rsel)(0) ||
-        rasterLine > TOP_BOTTOM_FF_COMP(rsel)(1) ||
-        rasterCycle > 15 ||
-        rasterCycle < 54
+      drawBorder = !den ||
+        rasterLine <= TOP_BOTTOM_FF_COMP(rsel)(0) ||
+        rasterLine >= TOP_BOTTOM_FF_COMP(rsel)(1) ||
+        rasterCycle < 16 || rasterCycle > 52
       if (!drawBorder) return
       var i = 0
       while (!isFinished) {
@@ -591,12 +598,9 @@ final class VIC(mem: Memory,
     }
     @inline final protected def shift = {
       counter += 1
-      if (isBlank) TransparentPixel
-      else {
-        checkBorderFF(xcoord)
-        xcoord += 1
-        if (mainBorderFF || verticalBorderFF) color else TransparentPixel
-      }
+      val hasBorder = checkBorderFF(xcoord)
+      xcoord += 1
+      if (hasBorder) color else TransparentPixel
     }
   }
   /**
@@ -612,11 +616,13 @@ final class VIC(mem: Memory,
     private[this] var mcm, ecm, isBlank = false
     private[this] var vml_p, vml_c: Array[Int] = _
     private[this] var vmli = 0
+    private[this] var isInvalidMode = false
+    private[this] var isInDisplayState = false
 
     def getPixels = pixels
 
     final def setData(gdata: Int) {
-      this.gdata = gdata
+      this.gdata = gdata      
       counter = 0
     }
 
@@ -627,7 +633,6 @@ final class VIC(mem: Memory,
     final def reset = firstPixel = true
     final def isFinished = counter == 8
     @inline final protected def shift = {
-      val isInvalidMode = mcm && ecm
       val pixel = if (isInvalidMode || isBlank || gdata < 0) BLACK_PIXEL
       else if (!bmm) { // text mode        
         val mc = (vml_c(vmli) & 8) == 8
@@ -723,6 +728,8 @@ final class VIC(mem: Memory,
       vml_p = VIC.this.vml_p
       vml_c = VIC.this.vml_c
       vmli = VIC.this.vmli
+      isInvalidMode = mcm && ecm
+      isInDisplayState = VIC.this.isInDisplayState
 
       // light pen checking
       var xcoord = 0
@@ -734,11 +741,9 @@ final class VIC(mem: Memory,
         lpx = display.getLightPenX
         baseX = rasterCycle << 3
       }
-      var i = 0
       while (!isFinished) {
-        pixels(i) = shift
-        if (checkLP && baseX + i == lpx) triggerLightPen
-        i += 1
+        pixels(counter) = shift
+        if (checkLP && baseX + counter == lpx) triggerLightPen
       }
     }
   }
@@ -1189,12 +1194,12 @@ final class VIC(mem: Memory,
       GFXShifter.producePixels
     }
     // ------------------- Sprites -----------------------
-    var almostOneSprite = false
+    val almostOneSprite = spritesDisplayedMask > 0
+    
+    if (almostOneSprite)
     while (s < 8) {
-      //if (sprites(s).enabled) sprites(s).producePixels
       if (sprites(s).displayable) {
         sprites(s).producePixels
-        almostOneSprite = true
       }
       s += 1
     }
@@ -1216,13 +1221,7 @@ final class VIC(mem: Memory,
         }
         s -= 1
       }
-      //val gfxPixel = if (gdata < 0) BLACK_PIXEL else gfxPixels(i)
       val gfxPixel = if (gdata < 0) BLACK_PIXEL else gfxPixels(i)
-      /*val gfxPixel = if (gdata < 0) {
-        val p = getPixel(if (isInDisplayState) backgroundColor(0) else 0, false)
-        if (traceRasterLineInfo) p.source = '-'
-        p
-      } else gfxPixels(i)*/
       if (gfxPixel.isForeground && !pixel.isTransparent) spriteDataCollision(pixel.spriteIndex) // sprite-data collision detected
       if (pixel.isTransparent || (gfxPixel.isForeground && pixel.behind)) pixel = gfxPixel
       if (!borderPixels(i).isTransparent) drawPixel(x + i, y, borderPixels(i))
@@ -1325,7 +1324,7 @@ final class VIC(mem: Memory,
     xcoord
   }
 
-  @inline private def checkBorderFF(xcoord: Int) {
+  @inline private def checkBorderFF(xcoord: Int) = {
     // 1
     if (xcoord == LEFT_RIGHT_FF_COMP(csel)(1)) mainBorderFF = true
     // 2
@@ -1338,6 +1337,8 @@ final class VIC(mem: Memory,
     if (xcoord == LEFT_RIGHT_FF_COMP(csel)(0) && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(0) && den) verticalBorderFF = false
     // 6
     if (xcoord == LEFT_RIGHT_FF_COMP(csel)(0) && !verticalBorderFF) mainBorderFF = false
+    
+    mainBorderFF || verticalBorderFF
   }
 
   def enableTraceRasterLine(enabled: Boolean) = traceRasterLineInfo = enabled
