@@ -96,8 +96,20 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   private[this] var printer = new MPS803(bus,printerGraphicsDriver)  
   private[this] var printerDialog = {
     val dialog = new JDialog(displayFrame,"Print preview")
-    dialog.getContentPane.add("Center",new JScrollPane(printerGraphicsDriver))
+    val sp = new JScrollPane(printerGraphicsDriver)
+    sp.getViewport.setBackground(Color.BLACK)
+    dialog.getContentPane.add("Center",sp)
     printerGraphicsDriver.checkSize
+    val buttonPanel = new JPanel
+    val exportPNGBUtton = new JButton("Export as PNG")
+    buttonPanel.add(exportPNGBUtton)
+    exportPNGBUtton.setActionCommand("PRINT_EXPORT_AS_PNG")
+    exportPNGBUtton.addActionListener(this)
+    val clearButton = new JButton("Clear")
+    buttonPanel.add(clearButton)
+    clearButton.setActionCommand("PRINT_CLEAR")
+    clearButton.addActionListener(this)
+    dialog.getContentPane.add("South",buttonPanel)
     dialog.pack
     dialog
   }
@@ -563,6 +575,22 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
         busSnooperActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
       case "PRINTER_PREVIEW" =>
         showPrinterPreview
+      case "PRINT_CLEAR" =>
+        printerGraphicsDriver.clearPages
+      case "PRINT_EXPORT_AS_PNG" =>
+        printerSaveImage
+      case "PRINTER_ENABLED" =>
+        printer.setActive(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
+    }
+  }
+  
+  private def printerSaveImage {
+    val fc = new JFileChooser
+    fc.showSaveDialog(printerDialog) match {
+      case JFileChooser.APPROVE_OPTION =>
+        val file = if (fc.getSelectedFile.getName.toUpperCase.endsWith(".PNG")) fc.getSelectedFile else new File(fc.getSelectedFile.toString + ".png")
+      	printerGraphicsDriver.saveAsPNG(file)
+      case _ =>
     }
   }
   
@@ -642,7 +670,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     val fc = new JFileChooser
     fc.showSaveDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-      	display.saveSnapshot(fc.getSelectedFile)
+        val file = if (fc.getSelectedFile.getName.toUpperCase.endsWith(".PNG")) fc.getSelectedFile else new File(fc.getSelectedFile.toString + ".png")
+      	display.saveSnapshot(file)
       case _ =>
     }
   }
@@ -1032,10 +1061,16 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     
     optionMenu.addSeparator
     
-    val printerPreviewItem = new JMenuItem("Printer preview ...")
+    val printerPreviewItem = new JMenuItem("Printer preview ...")    
     printerPreviewItem.setActionCommand("PRINTER_PREVIEW")
     printerPreviewItem.addActionListener(this)
     optionMenu.add(printerPreviewItem)
+    
+    val printerEnabledItem = new JCheckBoxMenuItem("Printer enabled")
+    printerEnabledItem.setSelected(false)
+    printerEnabledItem.setActionCommand("PRINTER_ENABLED")
+    printerEnabledItem.addActionListener(this)
+    optionMenu.add(printerEnabledItem)
     
     optionMenu.addSeparator
     

@@ -13,11 +13,14 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
   val componentType = C64ComponentType.PRINTER 
   
   val busid = "MPS803"
+    
+  private[this] var active = false
   
   // register itself to bus
   bus.registerListener(this)
   
-  protected def isDeviceReady = true
+  def setActive(active:Boolean) = this.active = active
+  protected def isDeviceReady = active
   protected def loadData(fileName:String) = None
   
   def init {
@@ -34,8 +37,13 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
     }
   }
   
+  override def close {
+    println("CLOSE")
+  }
+  
   override protected def byteJustRead(byte:Int,isLast:Boolean) {
-    println("MPS803: byte read " + Integer.toHexString(byte) + " " + byte.toChar)   
+    println("MPS803: byte read " + Integer.toHexString(byte) + " " + byte.toChar + " last=" + isLast) 
+    channels(channel).clear
     driver.print(byte)
   }
 }

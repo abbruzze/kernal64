@@ -7,6 +7,10 @@ import java.awt.Dimension
 import java.awt.Graphics
 import ucesoft.c64.peripheral.vic.Palette
 import ucesoft.c64.cpu.CPU6510Mems
+import java.io.File
+import java.awt.image.BufferedImage
+import javax.imageio.ImageIO
+import java.awt.Color
 
 object MPS803GFXDriver extends App {
   val f = new JFrame
@@ -83,6 +87,15 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
   private[this] var state = WAITING_CHAR
   private[this] var posL,posH,rep = 0
   private[this] var bitmapActive = false
+  
+  def clearPages {
+    operations.clear
+    quote = 0
+    state = WAITING_CHAR
+    bitmapActive = false
+    checkSize
+    repaint()
+  }
 
   def print(ch: Int) {
     state match {
@@ -151,7 +164,7 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
           }
         }
     }
-    repaint()
+    repaint()      
   }
 
   def checkSize {
@@ -162,18 +175,20 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
 
   @inline private def readChar(code: Int, line: Int) = charRom.read(charRom.startAddress + (code * CHRHEIGHT) + line)
 
-  override def paint(g: Graphics) {
-    val size = getSize()
+  override def paintComponent(g: Graphics) {
+    val size = getPreferredSize
     g.setColor(Palette.VIC_COLORS(1)) // white background
     g.fillRect(0, 0, size.width - 1, size.height - 1)
     g.setColor(Palette.VIC_COLORS(0)) // black foreground
 
+    val INTER_LINE_PIXEL = 2
+    val INTER_LINE_PIXEL_BITMAP = 0
     var x, y = 0
     var graphicMode = true
     var rvsOn = false
     var doubleWidth = false
     var bitmapMode = false
-    var interLinePixels = 2
+    var interLinePixels = INTER_LINE_PIXEL
 
     val opIterator = operations.iterator
     while (opIterator.hasNext) {
@@ -202,7 +217,10 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
               if (x >= LINE_DOTS) {
                 x = 0
                 y += CHRHEIGHT + interLinePixels
-                if (y > getSize().height) setPreferredSize(new Dimension(getSize().width, y))
+                if (y > getPreferredSize.height) {
+                  setPreferredSize(new Dimension(getPreferredSize.width, y + 2 * (CHRHEIGHT + interLinePixels)))
+                  invalidate
+                }
               }
             case true => // bitmap mode
               val byte = ch & 0x7F // clear 8th bit
@@ -214,12 +232,18 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
         case CarrigeReturn =>
           x = 0
           y += CHRHEIGHT + interLinePixels
-          if (y > getSize().height) setPreferredSize(new Dimension(getSize().width, y))
+          if (y > getPreferredSize.height) {
+            setPreferredSize(new Dimension(getPreferredSize.width, y + 2 * (CHRHEIGHT + interLinePixels)))
+            invalidate
+          }
           rvsOn = false
         case LineFeed =>
           x = 0
           y += CHRHEIGHT + interLinePixels
-          if (y > getSize().height) setPreferredSize(new Dimension(getSize().width, y))
+          if (y > getPreferredSize.height) {
+            setPreferredSize(new Dimension(getPreferredSize.width, y + 2 * (CHRHEIGHT + interLinePixels)))
+            invalidate
+          }
         case GraphicMode =>
           graphicMode = true
         case BusinessMode =>
@@ -231,19 +255,27 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
         case EnhanceOn =>
           doubleWidth = true
           bitmapMode = false
-          interLinePixels = 2
+          interLinePixels = INTER_LINE_PIXEL
         case EnhanceOff =>
           doubleWidth = false
           bitmapMode = false
-          interLinePixels = 2
+          interLinePixels = INTER_LINE_PIXEL
         case MoveHeadTo(targetX) =>
           x = targetX
         case PosTo(targetX) =>
           x = targetX * CHRWIDTH
         case BitmapMode =>
           bitmapMode = true
-          interLinePixels = 1
+          interLinePixels = INTER_LINE_PIXEL_BITMAP
       }
     }
+    g.setColor(Color.RED)
+    g.drawRect(x,y,CHRWIDTH - 1,CHRHEIGHT - 1)    
+  }
+  
+  def saveAsPNG(file: File) {
+    val snap = createImage(getPreferredSize.width, getPreferredSize.height).asInstanceOf[BufferedImage]
+    paint(snap.getGraphics)
+    ImageIO.write(snap, "png", file)
   }
 }
