@@ -1,4 +1,4 @@
-kernal64 ver 0.9.9A
+kernal64 ver 0.9.9D
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
 
