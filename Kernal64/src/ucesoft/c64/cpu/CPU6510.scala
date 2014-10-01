@@ -22,7 +22,7 @@ object CPU6510 {
     // UNDOC
     val KIL, SLO, ANC, RLA, SRE, ALR, RRA, ARR, SAX = Value
     val XAA, AHX, TAS, SHY, SHX, LAX, LAS, DCP, AXS = Value
-    val ISC = Value
+    val ISC,LAXI = Value
 
     val MARK = Value // mark value for instructions counting
   }
@@ -43,21 +43,21 @@ object CPU6510 {
   private val OP_MATRIX: Array[Array[OperationCell]] = Array(
     //  		x0			x1				x2				x3				x4			x5				x6				x7				x8			x9				xA				xB				xC				xD				xE			xF
     Array((BRK, IMP, 7), (ORA, IZX, 6), (KIL, IMP, 0), (SLO, IZX, 8), (NOP, ZP , 3), (ORA, ZP , 3), (ASL, ZP , 5), (SLO, ZP , 5), (PHP, IMP, 3), (ORA, IMM, 2), (ASL, IMP, 2), (ANC, IMM, 2), (NOP, ABS, 4), (ORA, ABS, 4), (ASL, ABS, 6), (SLO, ABS, 6)), // 0x
-    Array((BPL, REL, 2), (ORA, IZY, 5), (KIL, IMP, 0), (SLO, IZY, 8), (NOP, ZPX, 4), (ORA, ZPX, 4), (ASL, ZPX, 6), (SLO, ZPX, 6), (CLC, IMP, 2), (ORA, ABY, 4), (NOP, IMP, 2), (SLO, ABY, 7), (NOP, ABX, 4), (ORA, ABX, 4), (ASL, ABX, 7), (SLO, ABX, 7)), // 1x
+    Array((BPL, REL,-2), (ORA, IZY,-5), (KIL, IMP, 0), (SLO, IZY, 8), (NOP, ZPX, 4), (ORA, ZPX, 4), (ASL, ZPX, 6), (SLO, ZPX, 6), (CLC, IMP, 2), (ORA, ABY,-4), (NOP, IMP, 2), (SLO, ABY, 7), (NOP, ABX,-4), (ORA, ABX,-4), (ASL, ABX, 7), (SLO, ABX, 7)), // 1x
     Array((JSR, ABS, 6), (AND, IZX, 6), (KIL, IMP, 0), (RLA, IZX, 8), (BIT, ZP , 3), (AND, ZP , 3), (ROL, ZP , 5), (RLA, ZP , 5), (PLP, IMP, 4), (AND, IMM, 2), (ROL, IMP, 2), (ANC, IMM, 2), (BIT, ABS, 4), (AND, ABS, 4), (ROL, ABS, 6), (RLA, ABS, 6)), // 2x
-    Array((BMI, REL, 2), (AND, IZY, 5), (KIL, IMP, 0), (RLA, IZY, 8), (NOP, ZPX, 4), (AND, ZPX, 4), (ROL, ZPX, 6), (RLA, ZPX, 6), (SEC, IMP, 2), (AND, ABY, 4), (NOP, IMP, 2), (RLA, ABY, 7), (NOP, ABX, 4), (AND, ABX, 4), (ROL, ABX, 7), (RLA, ABX, 7)), // 3x
+    Array((BMI, REL,-2), (AND, IZY,-5), (KIL, IMP, 0), (RLA, IZY, 8), (NOP, ZPX, 4), (AND, ZPX, 4), (ROL, ZPX, 6), (RLA, ZPX, 6), (SEC, IMP, 2), (AND, ABY,-4), (NOP, IMP, 2), (RLA, ABY, 7), (NOP, ABX,-4), (AND, ABX,-4), (ROL, ABX, 7), (RLA, ABX, 7)), // 3x
     Array((RTI, IMP, 6), (EOR, IZX, 6), (KIL, IMP, 0), (SRE, IZX, 8), (NOP, ZP , 3), (EOR, ZP , 3), (LSR, ZP , 5), (SRE, ZP , 5), (PHA, IMP, 3), (EOR, IMM, 2), (LSR, IMP, 2), (ALR, IMM, 2), (JMP, ABS, 3), (EOR, ABS, 4), (LSR, ABS, 6), (SRE, ABS, 6)), // 4x
-    Array((BVC, REL, 2), (EOR, IZY, 5), (KIL, IMP, 0), (SRE, IZY, 8), (NOP, ZPX, 4), (EOR, ZPX, 4), (LSR, ZPX, 6), (SRE, ZPX, 6), (CLI, IMP, 2), (EOR, ABY, 4), (NOP, IMP, 2), (SRE, ABY, 7), (NOP, ABX, 4), (EOR, ABX, 4), (LSR, ABX, 7), (SRE, ABX, 7)), // 5x
+    Array((BVC, REL,-2), (EOR, IZY,-5), (KIL, IMP, 0), (SRE, IZY, 8), (NOP, ZPX, 4), (EOR, ZPX, 4), (LSR, ZPX, 6), (SRE, ZPX, 6), (CLI, IMP, 2), (EOR, ABY,-4), (NOP, IMP, 2), (SRE, ABY, 7), (NOP, ABX,-4), (EOR, ABX,-4), (LSR, ABX, 7), (SRE, ABX, 7)), // 5x
     Array((RTS, IMP, 6), (ADC, IZX, 6), (KIL, IMP, 0), (RRA, IZX, 8), (NOP, ZP , 3), (ADC, ZP , 3), (ROR, ZP , 5), (RRA, ZP , 5), (PLA, IMP, 4), (ADC, IMM, 2), (ROR, IMP, 2), (ARR, IMM, 2), (JMP, IND, 5), (ADC, ABS, 4), (ROR, ABS, 6), (RRA, ABS, 6)), // 6x
-    Array((BVS, REL, 2), (ADC, IZY, 5), (KIL, IMP, 0), (RRA, IZY, 8), (NOP, ZPX, 4), (ADC, ZPX, 4), (ROR, ZPX, 6), (RRA, ZPX, 6), (SEI, IMP, 2), (ADC, ABY, 4), (NOP, IMP, 2), (RRA, ABY, 7), (NOP, ABX, 4), (ADC, ABX, 4), (ROR, ABX, 7), (RRA, ABX, 7)), // 7x
+    Array((BVS, REL,-2), (ADC, IZY,-5), (KIL, IMP, 0), (RRA, IZY, 8), (NOP, ZPX, 4), (ADC, ZPX, 4), (ROR, ZPX, 6), (RRA, ZPX, 6), (SEI, IMP, 2), (ADC, ABY,-4), (NOP, IMP, 2), (RRA, ABY, 7), (NOP, ABX,-4), (ADC, ABX,-4), (ROR, ABX, 7), (RRA, ABX, 7)), // 7x
     Array((NOP, IMM, 2), (STA, IZX, 6), (NOP, IMM, 2), (SAX, IZX, 6), (STY, ZP , 3), (STA, ZP , 3), (STX, ZP , 3), (SAX, ZP , 3), (DEY, IMP, 2), (NOP, IMM, 2), (TXA, IMP, 2), (XAA, IMM, 2), (STY, ABS, 4), (STA, ABS, 4), (STX, ABS, 4), (SAX, ABS, 4)), // 8x
-    Array((BCC, REL, 2), (STA, IZY, 6), (KIL, IMP, 0), (AHX, IZY, 6), (STY, ZPX, 4), (STA, ZPX, 4), (STX, ZPY, 4), (SAX, ZPY, 4), (TYA, IMP, 2), (STA, ABY, 5), (TXS, IMP, 2), (TAS, ABY, 5), (SHY, ABX, 5), (STA, ABX, 5), (SHX, ABY, 5), (AHX, ABY, 5)), // 9x
-    Array((LDY, IMM, 2), (LDA, IZX, 6), (LDX, IMM, 2), (LAX, IZX, 6), (LDY, ZP , 3), (LDA, ZP , 3), (LDX, ZP , 3), (LAX, ZP , 3), (TAY, IMP, 2), (LDA, IMM, 2), (TAX, IMP, 2), (LAX, IMM, 2), (LDY, ABS, 4), (LDA, ABS, 4), (LDX, ABS, 4), (LAX, ABS, 4)), // Ax
-    Array((BCS, REL, 2), (LDA, IZY, 5), (KIL, IMP, 0), (LAX, IZY, 5), (LDY, ZPX, 4), (LDA, ZPX, 4), (LDX, ZPY, 4), (LAX, ZPY, 4), (CLV, IMP, 2), (LDA, ABY, 4), (TSX, IMP, 2), (LAS, ABY, 4), (LDY, ABX, 4), (LDA, ABX, 4), (LDX, ABY, 4), (LAX, ABY, 4)), // Bx
+    Array((BCC, REL,-2), (STA, IZY, 6), (KIL, IMP, 0), (AHX, IZY, 6), (STY, ZPX, 4), (STA, ZPX, 4), (STX, ZPY, 4), (SAX, ZPY, 4), (TYA, IMP, 2), (STA, ABY, 5), (TXS, IMP, 2), (TAS, ABY, 5), (SHY, ABX, 5), (STA, ABX, 5), (SHX, ABY, 5), (AHX, ABY, 5)), // 9x
+    Array((LDY, IMM, 2), (LDA, IZX, 6), (LDX, IMM, 2), (LAX, IZX, 6), (LDY, ZP , 3), (LDA, ZP , 3), (LDX, ZP , 3), (LAX, ZP , 3), (TAY, IMP, 2), (LDA, IMM, 2), (TAX, IMP, 2), (LAXI,IMM, 2), (LDY, ABS, 4), (LDA, ABS, 4), (LDX, ABS, 4), (LAX, ABS, 4)), // Ax
+    Array((BCS, REL,-2), (LDA, IZY,-5), (KIL, IMP, 0), (LAX, IZY,-5), (LDY, ZPX, 4), (LDA, ZPX, 4), (LDX, ZPY, 4), (LAX, ZPY, 4), (CLV, IMP, 2), (LDA, ABY,-4), (TSX, IMP, 2), (LAS, ABY,-4), (LDY, ABX,-4), (LDA, ABX,-4), (LDX, ABY,-4), (LAX, ABY,-4)), // Bx
     Array((CPY, IMM, 2), (CMP, IZX, 6), (NOP, IMM, 2), (DCP, IZX, 8), (CPY, ZP , 3), (CMP, ZP , 3), (DEC, ZP , 5), (DCP, ZP , 5), (INY, IMP, 2), (CMP, IMM, 2), (DEX, IMP, 2), (AXS, IMM, 2), (CPY, ABS, 4), (CMP, ABS, 4), (DEC, ABS, 6), (DCP, ABS, 6)), // Cx
-    Array((BNE, REL, 2), (CMP, IZY, 5), (KIL, IMP, 0), (DCP, IZY, 8), (NOP, ZPX, 4), (CMP, ZPX, 4), (DEC, ZPX, 6), (DCP, ZPX, 6), (CLD, IMP, 2), (CMP, ABY, 4), (NOP, IMP, 2), (DCP, ABY, 7), (NOP, ABX, 4), (CMP, ABX, 4), (DEC, ABX, 7), (DCP, ABX, 7)), // Dx
+    Array((BNE, REL,-2), (CMP, IZY,-5), (KIL, IMP, 0), (DCP, IZY, 8), (NOP, ZPX, 4), (CMP, ZPX, 4), (DEC, ZPX, 6), (DCP, ZPX, 6), (CLD, IMP, 2), (CMP, ABY,-4), (NOP, IMP, 2), (DCP, ABY, 7), (NOP, ABX,-4), (CMP, ABX,-4), (DEC, ABX, 7), (DCP, ABX, 7)), // Dx
     Array((CPX, IMM, 2), (SBC, IZX, 6), (NOP, IMM, 2), (ISC, IZX, 8), (CPX, ZP , 3), (SBC, ZP , 3), (INC, ZP , 5), (ISC, ZP , 5), (INX, IMP, 2), (SBC, IMM, 2), (NOP, IMP, 2), (SBC, IMM, 2), (CPX, ABS, 4), (SBC, ABS, 4), (INC, ABS, 6), (ISC, ABS, 6)), // Ex
-    Array((BEQ, REL, 2), (SBC, IZY, 5), (KIL, IMP, 0), (ISC, IZY, 8), (NOP, ZPX, 4), (SBC, ZPX, 4), (INC, ZPX, 6), (ISC, ZPX, 6), (SED, IMP, 2), (SBC, ABY, 4), (NOP, IMP, 2), (ISC, ABY, 7), (NOP, ABX, 4), (SBC, ABX, 4), (INC, ABX, 7), (ISC, ABX, 7))  // Fx
+    Array((BEQ, REL,-2), (SBC, IZY,-5), (KIL, IMP, 0), (ISC, IZY, 8), (NOP, ZPX, 4), (SBC, ZPX, 4), (INC, ZPX, 6), (ISC, ZPX, 6), (SED, IMP, 2), (SBC, ABY,-4), (NOP, IMP, 2), (ISC, ABY, 7), (NOP, ABX,-4), (SBC, ABX,-4), (INC, ABX, 7), (ISC, ABX, 7))  // Fx
     )
 
   private[this] val OP_Map = { // K=OP_MNEMONIC V=Seq[(code,Mode)]
@@ -145,7 +145,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   // ------------- Tracing --------------------
   private[this] var tracing = false
   private[this] var breakAt = -1
-  private[this] var breakCallBack : () => Unit = _
+  private[this] var breakCallBack : (String) => Unit = _
   private[this] var stepCallBack : (String) => Unit = _
   private[this] val syncObject = new Object
   // --------------- Registers ----------------
@@ -326,7 +326,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
     val op = opcode(mem,PC)
     PC += 1
     decodeAddressMode(op)
-    setOpInst(op._1,op._3)
+    setOpInst(op._1,math.abs(op._3))
   }    
 
   @inline private def decodeAddressMode(opCell: OperationCell) {
@@ -353,10 +353,11 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
         // read from a bad address
         val ah = address & 0xFF00
         val al = address & 0x00FF
-        mem.read(ah | ((al + offset) & 0xFF))
+        val effectiveAddress = ah | ((al + offset) & 0xFF)
+        mem.read(effectiveAddress)
         // good address
         val target = (address + offset) & 0xFFFF
-        setOp(opType = OpAddressType.ADDRESS,data = target,len = 2,addCycles = pageBoundaryCrossedCycles(address, target))
+        setOp(opType = OpAddressType.ADDRESS,data = target,len = 2,addCycles = pageBoundaryCrossedCycles(effectiveAddress, target))
       case IND =>
         val address = readWordFrom(PC, mem)
         setOp(opType = OpAddressType.ADDRESS,data = readWordFromWithBUG(address, mem),len = 2,addCycles = 0)
@@ -373,13 +374,14 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
         setOp(opType = OpAddressType.ADDRESS,data = address2,len = 1,addCycles = 0)
       case IZY =>
         val address = mem.read(PC)
-        // read from a bad address
-        val ah = address & 0xFF00
-        val al = address & 0x00FF
-        mem.read(ah | ((al + Y) & 0xFF))
+        // maybe read from a bad address
+        val ah = mem.read(address + 1) << 8
+        val al = mem.read(address)
+        val effectiveAddress = ah | (al + Y) & 0xFF
         // good address
-        val target = Y + readWordFromWithBUG(address, mem)
-        setOp(opType = OpAddressType.ADDRESS,data = target,len = 1,addCycles = pageBoundaryCrossedCycles(address, target))
+        //val target = Y + readWordFromWithBUG(address, mem)
+        val target = Y + (if (address == 0xFF) (mem.read(0) << 8 | al) else ah | al)
+        setOp(opType = OpAddressType.ADDRESS,data = target,len = 1,addCycles = pageBoundaryCrossedCycles(target, effectiveAddress))
     }
   }
 
@@ -412,7 +414,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
       new SET_CLR_SR(true, D_FLAG), new SET_CLR_SR(false, D_FLAG),
       new SET_CLR_SR(true, I_FLAG), new SET_CLR_SR(false, I_FLAG), new SET_CLR_SR(false, V_FLAG),
       // -----------------
-      new DCP,new LAX,new ANC,new SLO, new RLA,new SRE,new RRA,
+      new DCP,new LAX,new LAXI,new ANC,new SLO, new RLA,new SRE,new RRA,
       new SAX,new ISC,new ALR,new XAA,new AXS,new ARR,new AHX,new SHX,new SHY,new TAS,new LAS)
     for (op <- availableOperations) operations(op.code.id) = op
     operations
@@ -480,8 +482,11 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   private[this] class ADC extends StdOp {
     val code = ADC
     final def exe(data: Int) = {
+      var tmp = A + data + (if (isCarry) 1 else 0)
+      if ((tmp & 0xFF) == 0) sez else clz
+      
       if (isDecimal) {
-        var tmp = (A & 0xf) + (data & 0xf) + (if (isCarry) 1 else 0)
+        tmp = (A & 0xf) + (data & 0xf) + (if (isCarry) 1 else 0)
         if (tmp > 0x9) tmp += 0x6
         if (tmp <= 0x0f) tmp = (tmp & 0xf) + (A & 0xf0) + (data & 0xf0)
         else tmp = (tmp & 0xf) + (A & 0xf0) + (data & 0xf0) + 0x10
@@ -491,7 +496,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
         if (tmp > 0x99) sec else clc
         A = tmp & 0xff
       } else {
-        val tmp = A + data + (if (isCarry) 1 else 0)
+//        val tmp = A + data + (if (isCarry) 1 else 0)
         if ((((A ^ data) & 0x80) == 0) && (((A ^ tmp) & 0x80) != 0)) sev else clv
         if (tmp > 0xff) sec else clc
         A = tmp & 0xff
@@ -823,7 +828,24 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   private[this] class SRE extends CompositeOp(new ASL_LSR(false),new EOR) { val code = SRE }
   private[this] class RRA extends CompositeOp(new ROL_ROR(false),new ADC) { val code = RRA }
   private[this] class ISC extends CompositeOp(new INC_DEC(false),new SBC) { val code = ISC }  
-  private[this] class XAA extends CompositeOp(new TAXYS(false,X_REG),new AND) { val code = XAA }  
+  //private[this] class XAA extends CompositeOp(new TAXYS(false,X_REG),new AND) { val code = XAA }
+  
+  private[this] class LAXI extends StdOp {	// LAX imm
+    val code = LAXI
+    final def exe(data: Int) = {
+      A = (A | 0xEE) & data
+      X = A
+      checkNZ(A)
+    }
+  }
+  
+  private[this] class XAA extends StdOp {	// ANE
+    val code = XAA
+    final def exe(data: Int) = {
+      A = (A | 0xEE) & X & data
+      checkNZ(A)
+    }
+  }
   
   private[this] class LAS extends StdOp {
     val code = LAS
@@ -940,13 +962,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
     if (breakAt != -1 && PC == breakAt) {
       breakAt = -1
       tracing = true
-      breakCallBack()
-    }
-    if (tracing) {
-      syncObject.synchronized {
-        syncObject.wait
-      }
-      stepCallBack(toString)
+      breakCallBack(toString)
     }
     
     // check interrupts
@@ -962,10 +978,14 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
       if (tracing) Log.debug(formatDebug)
     
       CURRENT_OP_PC = PC
-      fecthAndDecode
+      fecthAndDecode      
       val opcode = OPERATIONS(opInstruction.id)
       if (opcode == null) throw new IllegalArgumentException("Opcode " + opInstruction + " not implemented")
       val totalCycles = opCycles + opcode.run(opAddressType,opData,opLen,opAdditionalCycles)
+      if (tracing) {
+        syncObject.synchronized { syncObject.wait }
+        stepCallBack(toString)
+      }
       totalCycles - 1 // 1 cycles has been consumed now
     }
   }
@@ -1021,7 +1041,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
       syncObject.notify
     }
   }
-  def setBreakAt(address:Int,callback:() => Unit) {
+  def setBreakAt(address:Int,callback:(String) => Unit) {
     tracing = false
     breakCallBack = callback
     breakAt = address

@@ -4,13 +4,15 @@ import ucesoft.c64.ChipID
 import ucesoft.c64.Clock
 import ucesoft.c64.formats.D64
 import ucesoft.c64.cpu.CPU6510
+import ucesoft.c64.ClockEvent
 
 class VIADiskControl(cpu: CPU6510,
   					 irqAction: (Boolean) => Unit,
   					 ledListener: DriveLedListener) extends VIA("VIA_DiskControl", 0x1C00,irqAction) {
   override lazy val componentID = "VIA2 (DC)"
   private[this] val WRITE_PROTECT_SENSE = 0x10
-  private[this] val WRITE_PROTECT_SENSE_WAIT = 3 * 400000L;
+  private[this] val WRITE_PROTECT_SENSE_WAIT = 3 * 400000L
+  private[this] val REMOVING_DISK_WAIT = 500000L
   private[this] val SYNC_DETECTION_LINE = 0x80
   private[this] val WAIT_CYCLES_INTER_SECTORS = 1000
   private[this] val TOTAL_TRACKS = D64.TOTAL_TRACKS
@@ -71,8 +73,19 @@ class VIADiskControl(cpu: CPU6510,
   def setDriveReader(driveReader: D64) {
     d64 = Some(driveReader)
     gcrSector = driveReader.gcrImageOf(track, sector)
+//    isDiskChanged = true
+//    diskChangedAtClockCycle = Clock.systemClock.currentCycles
     isDiskChanged = true
-    diskChangedAtClockCycle = Clock.systemClock.currentCycles
+    Clock.systemClock.schedule(new ClockEvent("DiskRemoving",Clock.systemClock.currentCycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
+      isDiskChanged = false
+      Clock.systemClock.schedule(new ClockEvent("DiskWaitingInserting",cycles + REMOVING_DISK_WAIT, cycles => {
+        isDiskChanged = true
+        diskChangedAtClockCycle = cycles
+//        Clock.systemClock.schedule(new ClockEvent("DiskInserting",cycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
+//          isDiskChanged = false      
+//        }))
+      }))
+    }))
   }
   
   def setCurrentFilename(fn:String) = currentFilename = fn

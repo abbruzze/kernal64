@@ -2,7 +2,7 @@ package ucesoft.c64.peripheral.sid
 
 import javax.sound.sampled._
 
-class DefaultAudioDriver(sampleRate:Int,bufferSize:Int) extends AudioDriver {
+class DefaultAudioDriver(sampleRate:Int,bufferSize:Int) {
   private[this] val dataLine = {
     val af = new AudioFormat(sampleRate, 16, 1, true, false)
     val dli = new DataLine.Info(classOf[SourceDataLine], af, bufferSize)

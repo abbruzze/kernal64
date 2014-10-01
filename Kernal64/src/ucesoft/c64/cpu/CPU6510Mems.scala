@@ -8,6 +8,7 @@ import ucesoft.c64.expansion.ExpansionPortConfigurationListener
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 import ucesoft.c64.peripheral.c2n.Datassette
+import ucesoft.c64.Clock
 
 object CPU6510Mems {
   val M_ROML = 0x8000
@@ -170,12 +171,19 @@ object CPU6510Mems {
     private[this] val ROMH = new ExtendedROM(ram,"ROMH",M_BASIC)
     private[this] val ROMH_ULTIMAX = new ExtendedROM(ram,"ROMH_ULTIMAX",M_KERNAL)
     private[this] val banks = Array(KERNAL_ROM,IO,CHAR_ROM,BASIC_ROM,ROML,ROMH,ROMH_ULTIMAX)
+    // cache
+    private[this] val banksStart = banks map { _.startAddress }
+    private[this] val banksEnd = banks map { _.endAddress }
+    private[this] val minAddress = banksStart min
+
     
     private[this] var LORAM = true
     private[this] var HIRAM = true
     private[this] var CHAREN = true
     private[this] var ULTIMAX = false
     private[this] var ddr,pr = 0
+    private[this] var lastCycle1Written6,lastCycle1Written7 = 0L
+    private[this] val CAPACITOR_FADE_CYCLES = 200000
     private[this] var datassette : Datassette = _
     
     def setDatassette(datassette:Datassette) = this.datassette = datassette
@@ -190,7 +198,18 @@ object CPU6510Mems {
       properties
     }
     
-    @inline private def read0001 = pr & 0xEF | (if (datassette.isPlayPressed) 0x00 else 0x10)  | ((ddr & 7) ^ 0x07) // pull up resistors
+    @inline private def read0001 = {
+      val playSense = if ((ddr & 0x10) > 0) pr & 0x10 else if (datassette.isPlayPressed) 0x00 else 0x10
+      val clk = Clock.systemClock.currentCycles
+      // check bit 6 & 7
+      // bit 6
+      if ((ddr & 0x40) == 0 && clk - lastCycle1Written6 > CAPACITOR_FADE_CYCLES) pr &= 0xBF
+      // bit 7
+      if ((ddr & 0x80) == 0 && clk - lastCycle1Written7 > CAPACITOR_FADE_CYCLES) pr &= 0x7F
+      var one = pr & 0xEF | playSense  | ((ddr & 0x7) ^ 0x7) // pull up resistors
+      if ((ddr & 0x20) == 0) one &= 0xDF
+      one
+    }
 
     @inline private def check0001 {
       // check tape motor
@@ -226,6 +245,7 @@ object CPU6510Mems {
       		   (HIRAM && CHAREN && !EXROM && !GAME)	||  // p14
       		   (LORAM && CHAREN && !EXROM && !GAME)	|| 	// p16
       		   (EXROM && !GAME)							// p18
+      
       val ROML = (LORAM && HIRAM && !EXROM) || (EXROM && !GAME)	// p19, p20
       val ROMH = (HIRAM && !EXROM && !GAME) || (EXROM && !GAME) // p21,p22
       // enabling/disabling ROMs
@@ -287,14 +307,14 @@ object CPU6510Mems {
       else {        
         var b = 0
         var found = false
-        var bank : Memory = null
-        while (b < banks.length && !found) {
-          bank = banks(b)
-          if (bank.isActive && address >= bank.startAddress && address < bank.endAddress) found = true
+        val length = banks.length
+        if (address >= minAddress)
+        while (b < length && !found) {
+          if (banks(b).isActive && address >= banksStart(b) && address < banksEnd(b)) found = true
           else b += 1
         }
         if (found) {
-          val r = bank.read(address, chipID)
+          val r = banks(b).read(address, chipID)
           //Log.debug("Reading from bank %s %4X = %2X".format(bank.name,address,r)) 
           r
         }
@@ -312,17 +332,36 @@ object CPU6510Mems {
     @inline final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
       var b = 0
       var found = false
-      var bank: Memory = null
-      while (b < banks.length && !found) {
-        bank = banks(b)
-        if (bank.isActive && address >= bank.startAddress && address < bank.endAddress) found = true
+      val length = banks.length
+      if (address >= minAddress)
+      while (b < length && !found) {
+        if (banks(b).isActive && address >= banksStart(b) && address < banksEnd(b)) found = true
         else b += 1
       }
-      if (!found) bank = ram
+      val bank = if (!found) ram else banks(b)
       //Log.debug("Writing to %s %4X = %2X".format(bank.name,address,value))      
       if (!found && address < 2) {
-        if (address == 0) ddr = value
-        else pr = value & 0x3F // bits 6 & 7 not used
+        if (address == 0) {          
+          val clk = Clock.systemClock.currentCycles
+          if ((ddr & 0x80) == 0 && (value & 0x80) > 0) lastCycle1Written7 = clk
+          if ((ddr & 0x40) == 0 && (value & 0x40) > 0) lastCycle1Written6 = clk
+          ddr = value
+        }
+        else 
+        if (pr != value) {
+          val clk = Clock.systemClock.currentCycles
+          val bit7 = if ((ddr & 0x80) > 0) {
+            lastCycle1Written7 = clk
+            value & 0x80 
+          }
+          else pr & 0x80
+          val bit6 = if ((ddr & 0x40) > 0) {
+            lastCycle1Written6 = clk
+            value & 0x40 
+          }
+          else pr & 0x40
+          pr = bit7 | bit6 | value & 0x3F            
+        }
         check0001
       }
       else bank.write(address,value,chipID)

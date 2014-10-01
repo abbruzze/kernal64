@@ -13,8 +13,7 @@ import ucesoft.c64.cpu.RAMComponent
 class SID extends Chip with RAMComponent {
   override lazy val componentID = "SID"
   private[this] val RESID_6581 = 1
-  private[this] val SAMPLE_RATE = 44000
-  private[this] val DL_BUFFER_SIZE = 44000
+  private[this] val SAMPLE_RATE = 44100
   private[this] val BUFFER_SIZE = 256
   private[this] val CPU_FREQ = 985248
   private[this] val CLOCKS_PER_SAMPLE = CPU_FREQ / SAMPLE_RATE
@@ -40,15 +39,11 @@ class SID extends Chip with RAMComponent {
   private[this] var potx = 0
   private[this] var poty = 0
   
-  private[this] var nextSample = Clock.systemClock.currentCycles
   private[this] var lastCycles = Clock.systemClock.currentCycles
   private[this] var nextRest = 0
   private[this] var pos = 0
   private[this] var removeSample = false
   private[this] val driver = new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE / 2)
-  
-  // add to scheduler
-  //start
   
   def init = start
   def reset = {
@@ -74,16 +69,17 @@ class SID extends Chip with RAMComponent {
   }
   
   private def sidEvent(cycles:Long) {
-    nextSample += CLOCKS_PER_SAMPLE
+    var nextSample = cycles + CLOCKS_PER_SAMPLE
     nextRest += CLOCKS_PER_SAMPLE_REST
     if (nextRest > 1000) {
       nextRest -= 1000
       nextSample += 1
     }
-    while (lastCycles < cycles) {
-      sid.clock
-      lastCycles += 1
-    }
+    
+    val delta = cycles - lastCycles
+    lastCycles = cycles
+    sid.clock(delta.toInt)
+    
     val sample = sid.output
     buffer(pos) = (sample & 0xff).toByte ; pos += 1
     buffer(pos) = ((sample >> 8)).toByte ; pos += 1
@@ -98,7 +94,6 @@ class SID extends Chip with RAMComponent {
   def stop = removeSample = true
   def start {
     Clock.systemClock.schedule(new ClockEvent("SID",Clock.systemClock.currentCycles + 5,sidEvent _))
-    nextSample = Clock.systemClock.currentCycles
     lastCycles = Clock.systemClock.currentCycles
     nextRest = 0
     pos = 0

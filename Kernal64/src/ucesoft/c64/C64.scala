@@ -48,7 +48,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "0.9.9B"
+  private[this] val VERSION = "0.9.9D"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -369,6 +369,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     add(ExpansionPort.getExpansionPort)
     // -----------------------
     val bankedMemory = new vic.BankedMemory(mem,mem.CHAR_ROM,mem.COLOR_RAM)    
+    ExpansionPort.setMemoryForEmptyExpansionPort(bankedMemory)
     import cia._
     // control ports
     val cia1CP1 = new CIA1Connectors.PortAConnector(keyb,controlPortA)

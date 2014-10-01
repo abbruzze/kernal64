@@ -14,6 +14,6 @@ class BusSnoop(bus:IECBus) extends IECBusDevice(bus,0xFF) {
     Log.info("Bus Snoop: %10s %d".format(cmd.toString,secondaryAddress))
   }
   override protected def byteJustRead(byte:Int,isLast:Boolean) {
-    Log.info("Bus Snoop: byte read " + Integer.toHexString(byte))
+    Log.info(s"Bus Snoop: byte read ${Integer.toHexString(byte)}")
   }
 }

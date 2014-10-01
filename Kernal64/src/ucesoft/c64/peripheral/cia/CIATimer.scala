@@ -53,6 +53,7 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
   private[this] var reload = false
   private[this] var countExternal = false
   private[this] var serialActionCallback : Option[() => Unit] = None
+  protected var countSystemClock = true
   
   def setSerialCallBack(serialActionCallback : Option[() => Unit]) = this.serialActionCallback = serialActionCallback
   def getLatch = latch
@@ -109,10 +110,14 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
     timerUnderflowOnPortB = (cr & 2) == 2
     toggleMode = (cr & 4) == 0
     val reload = (cr & 0x10) == 0x10
+    countSystemClock = (value & 0x20) == 0 
     // bit 1,2 and 5 ignored
     handleCR567
     enableTimer(startTimer)
-    if (reload) this.reload = true
+    if (reload) {
+      this.reload = true
+      counter = latch // reload immediately
+    }
     Log.debug(s"${ciaName}-${id} control register set to ${cr} latch=${latch}")
     //println(s"${ciaName}-${id} control register set to ${cr} latch=${latch} start=${startTimer} oneShot=${oneShot} under=${timerUnderflowOnPortB} toggle=${toggleMode} reload=${reload}")
   }
@@ -122,7 +127,7 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
   private def enableTimer(enabled: Boolean) {
     if (!started & enabled) {
       if (!countExternal) {
-        systemClock.schedule(new ClockEvent(EVENT_ID, systemClock.nextCycles, executeCount _))
+        systemClock.schedule(new ClockEvent(EVENT_ID,/*systemClock.currentCycles + 2*/systemClock.nextCycles, executeCount _))
         //println(s"${ciaName}-${id} started counter=${counter} latch=${latch}")
       }
     } 
@@ -140,6 +145,8 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
   }
 
   private def executeCount(cycles: Long) {
+    if (!countSystemClock) return // don't manage CNT counting
+    
     if (reload) {
       reload = false
       counter = latch
@@ -178,5 +185,6 @@ class CIATimerB(ciaName: String, id: String, irqAction: (String) => Unit) extend
   override protected def handleCR567 {
     val bit56 = (cr >> 5) & 0x3
     setCountExternal(bit56 == 2)
+    countSystemClock = bit56 == 2 || bit56 == 0
   }
 }

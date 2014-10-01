@@ -164,7 +164,7 @@ class CIA(val name:String,
     def writeHour(hour:Int) {
       if ((timerB.readCR & 0x80) > 0) { // set alarm
         alarmTime.h = hour & 0x7F
-        alarmTime.am = (hour & 0x80) == 0
+        alarmTime.am = (hour & 0x80) == 0        
       }
       else {
         actualTime.freezed = true
@@ -188,13 +188,14 @@ class CIA(val name:String,
     }
     def writeTenthSec(tsec:Int) {
       if ((timerB.readCR & 0x80) > 0) { // set alarm
-        alarmTime.ts = tsec & 0x0F
+        alarmTime.ts = tsec & 0x0F        
       }
       else 
       if (actualTime.freezed) {
         actualTime.ts = tsec  & 0x0F
         actualTime.freezed = false
       }
+      if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
     }
   }
       
@@ -224,7 +225,7 @@ class CIA(val name:String,
     icr |= bit
     if ((icrMask & bit) > 0) {
       icr |= 0x80
-      Log.debug(s"${name} is generating IRQ(${src})")
+      Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
       irqAction(true)
     }
   }

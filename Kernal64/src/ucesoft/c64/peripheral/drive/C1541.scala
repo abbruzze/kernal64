@@ -174,6 +174,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     cpu.setTrace(traceOn)
   }
   def step(updateRegisters: (String) => Unit) = cpu.step(updateRegisters)
-  def setBreakAt(address: Int, callback: () => Unit) = cpu.setBreakAt(address, callback)
+  def setBreakAt(address: Int, callback: (String) => Unit) = cpu.setBreakAt(address, callback)
   def jmpTo(pc: Int) = cpu.jmpTo(pc)
 }

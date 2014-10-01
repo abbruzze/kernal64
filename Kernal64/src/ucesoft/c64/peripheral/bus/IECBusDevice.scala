@@ -11,7 +11,7 @@ object IECBusDevice {
   private val DEBUG = false
   
   	object Mode extends Enumeration {
-    val IDLE = Value
+    val IDLE,IDLE2,IDLE3,IDLE4,IDLE5,IDLE6 = Value
     val ATN_SEEN = Value
     val READ = Value
     val WRITE = Value
@@ -108,7 +108,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
   private[this] var initNextByte = true
   
   protected def setMode(newMode:Mode.Value) {
-    if (DEBUG) println(s"${busid} - ${newMode} FROM ${mode}") 
+    if (DEBUG) println(s"${busid}[${role}] - ${newMode} FROM ${mode}") 
     mode = newMode
   } 
   
@@ -151,27 +151,46 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
       case INIT_WRITE =>
         setMode(WRITE)
         initByteToWrite(cycles)
-      case IDLE =>
-      	if (atn && clk && isDeviceReady) {      
-      	  set(CLK,VOLTAGE) 
+      case IDLE2 =>
+        if (timeout) setMode(IDLE3)
+      case IDLE3 =>
+        if (clk) {
+      	  setMode(IDLE6)
+      	  waitTimeout = cycles + 500
+        }
+      case IDLE6 =>
+        if (timeout) {
+          set(CLK,VOLTAGE) 
       	  set(DATA,GROUND)
       	  setMode(ATN_SEEN)
-      	}
-      	else 
-      	if (!atn && role == LISTENER && !clk) {
-      	  setMode(READ)
-      	  readByte(cycles,true,false)
-      	}
-      case ATN_SEEN =>
-        if (atn && !clk) {	// READY_TO_SEND
+        }
+      case IDLE4 =>
+        if (timeout) setMode(IDLE5)
+      case IDLE5 =>
+        if (!clk) {
           setMode(READ)
+      	  readByte(cycles,true,false)
+        }
+      case IDLE =>
+        if (atn && isDeviceReady) {
+          setMode(IDLE2)
+          waitTimeout = cycles + 100
+        }
+        else
+        if (!atn && role == LISTENER) {
+          setMode(IDLE4)
+          waitTimeout = cycles + 100
+        }
+      case ATN_SEEN =>
+          if (atn && !clk) {	// READY_TO_SEND
+          setMode(READ)          
           readByte(cycles,true,timeout)
         }
         else
         if (!atn) {
           if (role == LISTENER) setMode(IDLE)
           else reset
-        }
+        }      
       case READ =>
         if (atn && !lastAtn) {
           setMode(IDLE)
@@ -224,6 +243,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     setMode(IDLE)
     role = NONE
     readMode = WAIT_BIT 
+    lastAtn = false
     set(CLK,VOLTAGE)
     set(DATA,VOLTAGE)
   }
@@ -301,6 +321,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
   private def readByte(cycles:Long,restart:Boolean,timeout:Boolean) : Option[Int] = {
     val data = bus.data == GROUND
     val clk = bus.clk == GROUND
+    val atn = bus.atn == GROUND
     
     if (restart) {
       if (DEBUG) println("Start reading byte...")
@@ -314,7 +335,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
       return None
     }
     else 
-    if (timeout) {      
+    if (!atn && timeout) {      
       if (!readEOI) {
         //if (DEBUG) println("EOI timeout detected (phase 1)")
         set(DATA,GROUND)

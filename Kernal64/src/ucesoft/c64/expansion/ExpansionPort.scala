@@ -56,6 +56,7 @@ object ExpansionPort {
     val GAME = true
     val ROML = EmptyROM: Memory
     val ROMH = EmptyROM: Memory
+    override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = memoryForEmptyExpansionPort.lastByteRead
   }
   private val proxyExpansionPort = new ExpansionPort {
     val name = "Proxy Expansion Port"
@@ -67,8 +68,9 @@ object ExpansionPort {
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = expansionPort.write(address, value, chipID)
   }
 
-  private var expansionPort: ExpansionPort = emptyExpansionPort
-  private var listeners: List[ExpansionPortConfigurationListener] = Nil
+  private[this] var expansionPort: ExpansionPort = emptyExpansionPort
+  private[this] var listeners: List[ExpansionPortConfigurationListener] = Nil
+  private[this] var memoryForEmptyExpansionPort : LastByteReadMemory = _
 
   def addConfigurationListener(l: ExpansionPortConfigurationListener) {
     listeners = l :: listeners
@@ -77,6 +79,7 @@ object ExpansionPort {
   private def updateListeners = for (l <- listeners) l.expansionPortConfigurationChanged
 
   def getExpansionPort = proxyExpansionPort
+  def setMemoryForEmptyExpansionPort(mem:LastByteReadMemory) = memoryForEmptyExpansionPort = mem
   def setExpansionPort(expansionPort: ExpansionPort) = {
     this.expansionPort = expansionPort
     Log.debug("Setting new expansion port: " + expansionPort.name + " listeners are " + listeners)

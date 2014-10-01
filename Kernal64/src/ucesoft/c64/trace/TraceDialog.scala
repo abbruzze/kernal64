@@ -63,7 +63,7 @@ class TraceDialog private (displayFrame: JFrame,
         Log.setOutput(logPanel.writer)
         Option(JOptionPane.showInputDialog(this, "Break address:")) match {
           case Some(address) =>
-            traceListener.setBreakAt(s2a(address), () => { Log.setDebug; setVisible(true) })
+            traceListener.setBreakAt(s2a(address), (regs) => { Log.setDebug; setVisible(true); traceSR.setText(regs) })
             Log.setInfo
             traceListener.step(regs => traceSR.setText(regs))
           case _ =>

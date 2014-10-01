@@ -19,11 +19,7 @@ object CIA2Connectors {
       (~((clk << 6) | (data << 7)) & 0xC0) | (latch & 0x3F)
     }
     final protected def performWrite(data:Int) = {
-      var bank = 0
-      if ((ddr & 1) > 0 && (data & 1) > 0) bank |= 1
-      if ((ddr & 2) > 0 && (data & 2) > 0) bank |= 2
-      if ((ddr & 4) > 0 && (data & 4) > 0) bank |= 4
-      mem.setBank(bank)
+      mem.setBank((data | ~ddr) & 3)
       
       bus.setLine(busid,IECBusLine.ATN,if ((ddr & 8) == 8 && (data & 8) == 8) GROUND else VOLTAGE)
       bus.setLine(busid,IECBusLine.CLK,if ((ddr & 16) == 16 && (data & 16) == 16) GROUND else VOLTAGE)

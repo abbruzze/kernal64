@@ -21,6 +21,10 @@ trait Memory {
 
 abstract class BridgeMemory extends RAMComponent {
   private[this] var bridges : List[(Int,Int,Memory)] = Nil
+  // cache
+  private[this] var bridgesStart : Array[Int] = _
+  private[this] var bridgesEnd : Array[Int] = _
+  private[this] var bridgesMem : Array[Memory] = _
   
   def addBridge(m:Memory,start:Int= -1,length:Int= -1) {
     val startAddress = if (start != -1) start else m.startAddress
@@ -33,14 +37,32 @@ abstract class BridgeMemory extends RAMComponent {
         add(mc)
       case _ =>
     }
+    val ba = bridges.toArray
+    bridgesStart = Array.ofDim[Int](ba.length)
+    bridgesEnd = Array.ofDim[Int](ba.length)
+    bridgesMem = Array.ofDim[Memory](ba.length)
+    for(i <- 0 until ba.length) {
+      bridgesStart(i) = ba(i)._1
+      bridgesEnd(i) = ba(i)._2
+      bridgesMem(i) = ba(i)._3
+    }
   }
   @inline private def select(address:Int) = {
     var ptr = bridges
     var found : Memory = null
+    /*
     while (ptr.nonEmpty && found == null) {
       val mem = ptr.head
       if (address >= mem._1 && address <= mem._2) found = mem._3
       else ptr = ptr.tail
+    }
+    * 
+    */
+    var i = 0
+    val length = bridgesStart.length
+    while (found == null && i < length) {
+      if (address >= bridgesStart(i) && address <= bridgesEnd(i)) found = bridgesMem(i)
+      else i += 1
     }
     if (found == null) throw new IllegalArgumentException("Bad configuration of ram " + name + " while selecting address " + address + " " + bridges)
     found

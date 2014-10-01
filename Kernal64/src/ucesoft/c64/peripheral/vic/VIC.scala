@@ -183,7 +183,6 @@ final class VIC(mem: Memory,
   private[this] var isBlank = false // valid inside drawCycle: tells if we are in the blank area
   private[this] var display: Display = null // the display
   private[this] var displayMem: Array[Int] = null
-  private[this] val cyclePixels = Array.fill(8)(TransparentPixel) // the pixels of the cycle that has to be drawn 
   private[this] var firstModPixelX, firstModPixelY = 0 // first x,y pixel coordinate modified
   private[this] var lastModPixelX, lastModPixelY = 0 // last x,y pixel coordinate modified
   private[this] var lightPenEnabled = false
@@ -328,6 +327,25 @@ final class VIC(mem: Memory,
    * Set individual color for Sprite#0 - #7
    */
   private[this] var spriteColor = Array(0, 0, 0, 0, 0, 0, 0, 0)
+  
+  // ---------------------------- PIXELS --------------------------------------------------
+  // |doc 1|doc 0|sprite priority|sp 2|sp 1|sp 0|transparent|background/foreground|c3|c2|c1|c0|
+  // |  11 | 10  |       9       | 8  | 7  | 6  |     5     |          4          | 3| 2| 1| 0|
+  
+  // |doc 1|doc 0|
+  // | 0   |  0  | = 'N'
+  // | 0   |  1  | = 'B'
+  // | 1   |  0  | = 'G'
+  // | 1   |  1  | = 'S'
+  
+  private[this] val PIXEL_FOREGROUND = 1 << 4
+  private[this] val PIXEL_TRANSPARENT = 1 << 5
+  private[this] val PIXEL_DOX_N = 0
+  private[this] val PIXEL_DOX_B = 1 << 10
+  private[this] val PIXEL_DOX_G = 2 << 10
+  private[this] val PIXEL_DOX_S = 3 << 10
+  private[this] val PIXEL_SPRITE_PRIORITY = 1 << 9
+  private[this] val PIXEL_BLACK = 0
 
   // ----------------------------- SPRITE -------------------------------------------------
   private[this] class Sprite(index: Int,
@@ -354,7 +372,7 @@ final class VIC(mem: Memory,
     private[this] var lastLine = false
     var painting = false
     var hasPixels = false
-    private[this] val pixels = Array.fill[AbstractPixel](8)(TransparentPixel)
+    private[this] val pixels = Array.fill[Int](8)(PIXEL_TRANSPARENT)
     
     override def toString = s"Sprite #${index} cnt=${counter} data=${Integer.toBinaryString(gdata & 0xFFFFFF)} en=${enabled} hasPixels=${hasPixels} x=${x} y=${y} xexp=${xexp} yexp=${_yexp} color=${color} mcm=${isMulticolor} pr=${dataPriority} memP=${memoryPointer} mcbase=${mcbase} mc=${mc} dma=${dma} display=${display} ff=${expansionFF}"
 
@@ -376,6 +394,7 @@ final class VIC(mem: Memory,
     def yexp_=(v: Boolean) {
       _yexp = v
       if (!v) expansionFF = true
+      //if (rasterCycle == 24) mc = 42 & mc & mcbase | 21 & (mc | mcbase) // sprite crunch ??
     }
 
     def getPixels = pixels
@@ -388,19 +407,21 @@ final class VIC(mem: Memory,
     def init {}
 
     @inline final def reset {
-      hasPixels = false
-      var i = 0
-      while (i < 8) {
-        pixels(i) = TransparentPixel
-        i += 1
+      if (hasPixels) {
+        hasPixels = false
+        var i = 0
+        while (i < 8) {
+          pixels(i) = PIXEL_TRANSPARENT
+          i += 1
+        }      
       }
+      if (!displayable) spritesDisplayedMask &= ~mask
     }
 
     @inline final def producePixels {
       val xcoord = xCoord
       var i = 0
       while (i < 8) {
-        //compareAndSet(xcoord + i)
         if (!painting && x == xcoord + i && (display || lastLine)) painting = true
         if (painting && !isFinished) {
           pixels(i) = shift
@@ -422,42 +443,41 @@ final class VIC(mem: Memory,
       if (finished) {
         painting = false
         if (lastLine) {
-          lastLine = false
-          spritesDisplayedMask &= ~mask
+          lastLine = false          
         }
       }
       finished
     }
 
     final def shift = {
-      val pixel = if (!isMulticolor) { // no multicolor        
+      var pixel = if (!isMulticolor) { // no multicolor        
         if (xexp) {
           if (xexpCounter == 0) gdata <<= 1
           xexpCounter = (xexpCounter + 1) % 2
         } else gdata <<= 1
         val cbit = (gdata & 0x1000000) == 0x1000000
-        //if (cbit) new Pixel(VIC_RGB(color)) else TransparentPixel
-        if (cbit) getPixel(color) else TransparentPixel
+        if (cbit) color else PIXEL_TRANSPARENT
       } else { // multicolor
         if ((counter & 1) == 0) {
           if (xexp) {
             if (xexpCounter == 0) gdata <<= 2
-            xexpCounter = (xexpCounter + 1) % 2
+            xexpCounter += 1
+            if (xexpCounter == 2) xexpCounter = 0
           } else gdata <<= 2
         }
         val cbit = (gdata & 0x3000000)
         cbit match {
-          case 0x0000000 => TransparentPixel
-          case 0x1000000 => getPixel(spriteMulticolor01(0))
-          case 0x2000000 => getPixel(color)
-          case 0x3000000 => getPixel(spriteMulticolor01(1))
+          case 0x0000000 => PIXEL_TRANSPARENT
+          case 0x1000000 => spriteMulticolor01(0)
+          case 0x2000000 => color
+          case 0x3000000 => spriteMulticolor01(1)
         }
       }
       counter += 1
-      if (!pixel.isTransparent) hasPixels = true
-      pixel.behind = dataPriority
-      pixel.spriteIndex = index
-      if (traceRasterLineInfo) pixel.source = 'S'
+      if ((pixel & PIXEL_TRANSPARENT) == 0) hasPixels = true
+      if (dataPriority) pixel |= PIXEL_SPRITE_PRIORITY
+      pixel |= index << 6
+      if (traceRasterLineInfo) pixel |= PIXEL_DOX_S
       pixel
     }
 
@@ -498,7 +518,7 @@ final class VIC(mem: Memory,
       case 54 =>
         if (_yexp) expansionFF = !expansionFF
         //if (enabled && rasterLine < BLANK_BOTTOM_LINE && (y) == (rasterLine & 0xFF) && !dma) {
-        if (enabled && rasterLine < 270 && (y) == (rasterLine & 0xFF) && !dma) {
+        if (enabled /*&& rasterLine < 270*/ && (y) == (rasterLine & 0xFF) && !dma) {
           dma = true
           mcbase = 0
           if (_yexp) expansionFF = false
@@ -510,7 +530,7 @@ final class VIC(mem: Memory,
       case 57 =>
         mc = mcbase
         //if (dma && rasterLine < BLANK_BOTTOM_LINE && (y) == (rasterLine & 0xFF)) {
-        if (dma && rasterLine < 270 && (y) == (rasterLine & 0xFF)) {
+        if (dma /*&& rasterLine < 270*/ && (y) == (rasterLine & 0xFF)) {
           display = true
           spritesDisplayedMask |= mask
           //Log.debug(s"Sprite #${index} displayable. " + this)
@@ -520,68 +540,50 @@ final class VIC(mem: Memory,
   }
   private[this] val sprites = Array(new Sprite(0), new Sprite(1), new Sprite(2), new Sprite(3), new Sprite(4), new Sprite(5), new Sprite(6), new Sprite(7))
   private[this] var spritesDisplayedMask = 0
-  // ------------------------------ SHIFTERS ----------------------------------------------
-  private[this] abstract class AbstractPixel {
-    var source: Char = '?'
-    var colorIndex = 0
-    private[this] var _behind = false
-    private[this] var _spriteIndex = 0
-    var color: Int
-    val isTransparent = false
-    var isForeground: Boolean
-    // for sprites only
-    @inline final def spriteIndex = _spriteIndex
-    @inline final def spriteIndex_=(spriteIndex: Int) = _spriteIndex = spriteIndex
-    @inline final def behind = _behind
-    @inline final def behind_=(behind: Boolean) = _behind = behind
-  }
-  final private class Pixel( final var color: Int, final var isForeground: Boolean = true) extends AbstractPixel
-  final private case object TransparentPixel extends AbstractPixel {
-    source = 'T'
-    final var color = 0
-    final var isForeground = false
-    final override val isTransparent = true
-  }
-  private[this] val BLACK_PIXEL = { val pixel = new Pixel(VIC_RGB(0), false); pixel.source = 'N'; pixel }
-  private[this] val PIXEL_CACHE = Array.fill(1000)(new Pixel(0, false))
-  private[this] var pixelCacheIndex = 0
-
-  @inline private def getPixel(color: Int, isForeground: Boolean = true) = {
-    val pixel = PIXEL_CACHE(pixelCacheIndex)
-    pixelCacheIndex += 1
-    if (pixelCacheIndex == PIXEL_CACHE.length) pixelCacheIndex = 0
-    pixel.color = VIC_RGB(color)
-    if (traceRasterLineInfo) pixel.colorIndex = color
-    pixel.isForeground = isForeground
-    pixel
-  }
-
+  // -------------------------------- VIDEO CACHE -----------------------------------------
+  // | 43 - 40 | 39 - 36 | 35 - 32 | 31 - 28 | 27 - 24 | 23 - 16 | 15 - 8  | 7 - 0 |
+  // |  back 3 |  back 2 |  back 1 | back 0  | border c| $d018   | $d016   | $d011 |
+  
+  private[this] val hashVideoCache = Array.fill[Long](RASTER_LINES,RASTER_CYCLES)(-1)
+  private[this] val pixelVideoCache = Array.fill[Int](RASTER_LINES,RASTER_CYCLES,8)(-1)
+  private[this] val gfxVideoCache = Array.fill[Long](RASTER_LINES,RASTER_CYCLES)(-2)
+  
+  @inline private[this] def getHashVideoCache = backgroundColor(3).toLong << 40 |
+    											backgroundColor(2) << 36 |
+    											backgroundColor(1) << 32 |
+    											backgroundColor(0) << 28 |
+    											borderColor << 24 |
+    											vicBaseAddress << 16 | 
+  												controlRegister2 << 8 | 
+  												controlRegister1 & 0x7F
+ 						
+  // ------------------------------ SHIFTERS ----------------------------------------------  
   private[this] trait Shifter {
     def setData(gdata: Int)
-    protected def shift: AbstractPixel
+    protected def shift: Int
     def producePixels
     def isFinished: Boolean
     def clear
-    def getPixels: Array[AbstractPixel]
+    def getPixels: Array[Int]
   }
 
   private[this] object BorderShifter extends Shifter {
     private[this] var counter = 0
     private[this] var xcoord = 0
-    private[this] var color: AbstractPixel = _
-    private[this] val ALL_TRANSPARENT = Array.fill[AbstractPixel](8)(TransparentPixel)
-    private[this] val pixels = Array.fill[AbstractPixel](8)(TransparentPixel)
+    private[this] var color: Int = _
+    private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
+    private[this] val pixels = Array.fill(8)(PIXEL_TRANSPARENT)
     private[this] var drawBorder = true
 
-    def getPixels = if (drawBorder) pixels else ALL_TRANSPARENT
+    def getPixels = if (drawBorder) pixels else ALL_TRANSPARENT//if (drawBorder) pixelVideoCache(rasterLine)(rasterCycle) else ALL_TRANSPARENT//if (drawBorder) pixels else ALL_TRANSPARENT
     def clear { counter = 0 }
 
     final def isFinished = counter == 8
     final def setData(gdata: Int) {
       counter = 0
       xcoord = xCoord
-      color = getPixel(borderColor) //new Pixel(VIC_RGB(borderColor))
-      if (traceRasterLineInfo) color.source = 'B'
+      color = borderColor
+      if (traceRasterLineInfo) color |= PIXEL_DOX_B
     }
     final def producePixels {
       // optimization
@@ -590,9 +592,16 @@ final class VIC(mem: Memory,
         rasterLine >= TOP_BOTTOM_FF_COMP(rsel)(1) ||
         rasterCycle < 16 || rasterCycle > 52
       if (!drawBorder) return
+      
+      /*
+      val hash = getHashVideoCache
+      if (hashVideoCache(rasterLine)(rasterCycle) == hash) return
+      */
+      
       var i = 0
       while (!isFinished) {
         pixels(i) = shift
+        //pixelVideoCache(rasterLine)(rasterCycle)(i) = shift
         i += 1
       }
     }
@@ -600,7 +609,7 @@ final class VIC(mem: Memory,
       counter += 1
       val hasBorder = checkBorderFF(xcoord)
       xcoord += 1
-      if (hasBorder) color else TransparentPixel
+      if (hasBorder) color else PIXEL_TRANSPARENT
     }
   }
   /**
@@ -609,9 +618,9 @@ final class VIC(mem: Memory,
   private object GFXShifter extends Shifter {
     private[this] var counter = 0
     private[this] var gdata = 0
-    private[this] var xscrollBuffer = Array.fill(8)(BLACK_PIXEL)
+    private[this] var xscrollBuffer = Array.fill(8)(PIXEL_BLACK)
     private[this] var firstPixel = true
-    private[this] val pixels = Array.fill[AbstractPixel](8)(TransparentPixel)
+    private[this] val pixels = Array.fill(8)(PIXEL_TRANSPARENT)
 
     private[this] var mcm, ecm, isBlank = false
     private[this] var vml_p, vml_c: Array[Int] = _
@@ -619,7 +628,7 @@ final class VIC(mem: Memory,
     private[this] var isInvalidMode = false
     private[this] var isInDisplayState = false
 
-    def getPixels = pixels
+    def getPixels = pixels//pixelVideoCache(rasterLine)(rasterCycle)//pixels
 
     final def setData(gdata: Int) {
       this.gdata = gdata      
@@ -633,7 +642,7 @@ final class VIC(mem: Memory,
     final def reset = firstPixel = true
     final def isFinished = counter == 8
     @inline final protected def shift = {
-      val pixel = if (isInvalidMode || isBlank || gdata < 0) BLACK_PIXEL
+      var pixel = if (isInvalidMode || isBlank || gdata < 0) PIXEL_BLACK
       else if (!bmm) { // text mode        
         val mc = (vml_c(vmli) & 8) == 8
         val multicolor = mcm && mc
@@ -641,28 +650,28 @@ final class VIC(mem: Memory,
           gdata <<= 1
           val cbit = (gdata & 0x100) == 0x100
           if (cbit) { // foreground
-            if (isInDisplayState) getPixel(if (mcm) vml_c(vmli) & 7 else vml_c(vmli))
-            else getPixel(0,true)
+            if (isInDisplayState) (if (mcm) vml_c(vmli) & 7 else vml_c(vmli)) | PIXEL_FOREGROUND
+            else PIXEL_FOREGROUND
           }
           else { // background
             if (isInDisplayState) { 
               val backIndex = if (ecm) (vml_p(vmli) >> 6) & 3 else 0
-              getPixel(backgroundColor(backIndex), false)
+              backgroundColor(backIndex)
             }
-            else getPixel(backgroundColor(0),false)
+            else backgroundColor(0)
           }
         } else { // multi color mode          
           if ((counter & 1) == 0) gdata <<= 2
           val cbit = (gdata & 0x300) >> 8
           cbit match {
-            case 0 => if (isInDisplayState) getPixel(backgroundColor(cbit), false) // background
-            		  else getPixel(backgroundColor(0),false)
-            case 1 => if (isInDisplayState) getPixel(backgroundColor(cbit), false) // background
-            		  else getPixel(0,false)
-            case 2 => if (isInDisplayState) getPixel(backgroundColor(cbit)) // foreground
-            		  else getPixel(0,true)
-            case 3 => if (isInDisplayState) getPixel(vml_c(vmli) & 7)  // foreground
-            		  else getPixel(0,true)
+            case 0 => if (isInDisplayState) backgroundColor(cbit) // background
+            		  else backgroundColor(0)
+            case 1 => if (isInDisplayState) backgroundColor(cbit) // background
+            		  else 0
+            case 2 => if (isInDisplayState) backgroundColor(cbit) | PIXEL_FOREGROUND // foreground
+            		  else PIXEL_FOREGROUND
+            case 3 => if (isInDisplayState) (vml_c(vmli) & 7) | PIXEL_FOREGROUND // foreground
+            		  else PIXEL_FOREGROUND
           }
         }
       } else { // bitmap mode
@@ -672,31 +681,31 @@ final class VIC(mem: Memory,
           val col0 = vml_p(vmli) & 0x0F
           val col1 = (vml_p(vmli) >> 4) & 0x0F
           if (cbit) {
-            if (isInDisplayState) getPixel(col1) // foreground
-            else getPixel(0,true) 
+            if (isInDisplayState) col1 | PIXEL_FOREGROUND // foreground
+            else PIXEL_FOREGROUND 
           }
           else {
-            if (isInDisplayState) getPixel(col0, false) // background
-            else getPixel(0,false)
+            if (isInDisplayState) col0 // background
+            else 0
           }
         } else { // multi color mode          
           if ((counter & 1) == 0) gdata <<= 2
           val cbit = gdata & 0x300
           cbit match {
-            case 0x00 => if (isInDisplayState) getPixel(backgroundColor(0), false) // background
-            			 else getPixel(backgroundColor(0),false)
-            case 0x100 => if (isInDisplayState) getPixel((vml_p(vmli) >> 4) & 0x0F, false) // background
-            			  else getPixel(0,false)
-            case 0x200 => if (isInDisplayState) getPixel(vml_p(vmli) & 0x0F)// foreground
-            			  else getPixel(0,true)
-            case 0x300 => if (isInDisplayState) getPixel(vml_c(vmli))// foreground
-            		 	  else getPixel(0,true)
+            case 0x00 => if (isInDisplayState) backgroundColor(0) // background
+            			 else backgroundColor(0)
+            case 0x100 => if (isInDisplayState) (vml_p(vmli) >> 4) & 0x0F // background
+            			  else 0
+            case 0x200 => if (isInDisplayState) (vml_p(vmli) & 0x0F) | PIXEL_FOREGROUND// foreground
+            			  else PIXEL_FOREGROUND
+            case 0x300 => if (isInDisplayState) vml_c(vmli) | PIXEL_FOREGROUND// foreground
+            		 	  else PIXEL_FOREGROUND
           }
         }
       }
       counter += 1
       if (xscroll == 0) {
-        if (traceRasterLineInfo && pixel != BLACK_PIXEL) pixel.source = if (bmm) 'X' else 'G'
+        if (traceRasterLineInfo && pixel != PIXEL_BLACK) pixel |= PIXEL_DOX_G
         pixel
       } else {
         if (firstPixel) {
@@ -704,19 +713,19 @@ final class VIC(mem: Memory,
           var i = 0
           // insert xscroll black pixels
           while (i < xscroll) {
-            xscrollBuffer(i) = getPixel(backgroundColor(0), false) //BLACK_PIXEL
+            xscrollBuffer(i) = backgroundColor(0) //BLACK_PIXEL
             i += 1
           }
         }
         xscrollBuffer(xscroll) = pixel
         // shift xscrollBuffer
-        val headPixel = xscrollBuffer(0)
+        var headPixel = xscrollBuffer(0)
         var i = 0
         while (i < xscroll) {
           xscrollBuffer(i) = xscrollBuffer(i + 1)
           i += 1
         }
-        if (traceRasterLineInfo && pixel != BLACK_PIXEL) headPixel.source = 'G'
+        if (traceRasterLineInfo && pixel != PIXEL_BLACK) headPixel |= PIXEL_DOX_G
         headPixel
       }
     }
@@ -730,7 +739,16 @@ final class VIC(mem: Memory,
       vmli = VIC.this.vmli
       isInvalidMode = mcm && ecm
       isInDisplayState = VIC.this.isInDisplayState
-
+      
+      /*
+      val data = gfxVideoCache(rasterLine)(rasterCycle) & 0xFF
+      val color = gfxVideoCache(rasterLine)(rasterCycle) >> 8
+      if (data == gdata && color == vml_c(vmli)) {
+        val hash = getHashVideoCache
+        if (hashVideoCache(rasterLine)(rasterCycle) == hash) return
+      }
+      gfxVideoCache(rasterLine)(rasterCycle) = gdata | vml_c(vmli) << 8
+      */
       // light pen checking
       var xcoord = 0
       var lpx = 0
@@ -743,6 +761,7 @@ final class VIC(mem: Memory,
       }
       while (!isFinished) {
         pixels(counter) = shift
+        //pixelVideoCache(rasterLine)(rasterCycle)(counter) = shift
         if (checkLP && baseX + counter == lpx) triggerLightPen
       }
     }
@@ -914,7 +933,8 @@ final class VIC(mem: Memory,
           ecm = (controlRegister1 & 64) == 64
           if (debug) Log.info("VIC control register set to %s, yscroll=%d rsel=%d den=%b bmm=%b ecm=%b. Raster latch set to %4X".format(Integer.toBinaryString(controlRegister1), yscroll, rsel, den, bmm, ecm, rasterLatch))
         //Log.info("VIC control register set to %s, yscroll=%d rsel=%d den=%b bmm=%b ecm=%b. Raster latch set to %4X".format(Integer.toBinaryString(controlRegister1),yscroll,rsel,den,bmm,ecm,rasterLatch))
-        case 18 =>
+          //hashVideoCache(rasterLine)(rasterCycle) = getHashVideoCache
+    	case 18 =>
           //Log.debug("VIC previous value of raster latch is %4X".format(rasterLatch))
           val rst8 = rasterLatch & 0x100
           rasterLatch = value | rst8
@@ -940,6 +960,7 @@ final class VIC(mem: Memory,
           res = (controlRegister2 & 32) == 32
           if (debug) Log.info("VIC control register 2 set to %s, xscroll=%d csel=%d mcm=%b rasterLine=%d".format(Integer.toBinaryString(controlRegister2), xscroll, csel, mcm, rasterLine))
         //Log.info("VIC control register 2 set to %s, xscroll=%d csel=%d mcm=%b rasterLine=%d".format(Integer.toBinaryString(controlRegister2),xscroll,csel,mcm,rasterLine))
+          //hashVideoCache(rasterLine)(rasterCycle) = getHashVideoCach
         case 23 =>
           spriteYExpansion = value
           var i = 7
@@ -953,8 +974,9 @@ final class VIC(mem: Memory,
           videoMatrixAddress = ((vicBaseAddress >> 4) & 0x0F) << 10 //* 1024
           characterAddress = ((vicBaseAddress >> 1) & 0x07) << 11 //* 2048
           bitmapAddress = ((vicBaseAddress >> 3) & 1) << 13 //* 8192
+          //hashVideoCache(rasterLine)(rasterCycle) = getHashVideoCache
           if (debug) Log.info(s"VIC base pointer set to ${Integer.toBinaryString(vicBaseAddress)} video matrix=${videoMatrixAddress} char address=${characterAddress} bitmap address=${bitmapAddress}")
-        //Log.info(s"VIC base pointer set to ${Integer.toBinaryString(vicBaseAddress)} video matrix=${videoMatrixAddress} char address=${characterAddress} bitmap address=${bitmapAddress} raster=${rasterLine}")
+        //Log.info(s"VIC base pointer set to ${Integer.toBinaryString(vicBaseAddress)} video matrix=${videoMatrixAddress} char address=${characterAddress} bitmap address=${bitmapAddress} raster=${rasterLine}")          
         case 25 =>
 //          val tmp = if ((value & 0x80) != 0) 0xFF else value
 //          interruptControlRegister &= 0xFF ^ tmp
@@ -1007,9 +1029,11 @@ final class VIC(mem: Memory,
         case 30 | 31 => // can't be written
         case 32 =>
           borderColor = value & 0x0F
+          //hashVideoCache(rasterLine)(rasterCycle) = getHashVideoCache
         //Log.debug("VIC border color set to " + borderColor)
         case 33 | 34 | 35 | 36 =>
           backgroundColor(offset - 33) = value & 0x0F
+          //hashVideoCache(rasterLine)(rasterCycle) = getHashVideoCache
         //Log.debug("VIC background color #%d set to %d".format(offset - 33,value))
         case 37 | 38 =>
           spriteMulticolor01(offset - 37) = value & 0x0F
@@ -1150,9 +1174,11 @@ final class VIC(mem: Memory,
         else drawCycle(-1)
     }
     // at the end increase the cycle
-    rasterCycle = (rasterCycle + 1) % RASTER_CYCLES
+    rasterCycle += 1
+    if (rasterCycle == RASTER_CYCLES) rasterCycle = 0
     if (rasterCycle == 0) {
-      rasterLine = (rasterLine + 1) % RASTER_LINES
+      rasterLine += 1
+      if (rasterLine == RASTER_LINES) rasterLine = 0
       // update the 8th bit of raster in control register 1
       if (rasterLine > 0xFF) controlRegister1 |= 0x80 else controlRegister1 &= 0x7F
       if (rasterLine == 0) {
@@ -1163,13 +1189,22 @@ final class VIC(mem: Memory,
       }
     }
   }
-  @inline private[this] def tracePixel(pixel: AbstractPixel, x: Int) {
-    traceRasterLineBuffer(x) = "%c%2d%c%s%s".format(pixel.source, pixel.colorIndex, if (pixel.isForeground) 'F' else 'B', if (mcm) "M" else "", if (ecm) "E" else "")
+  @inline private[this] def tracePixel(pixel: Int, x: Int) {
+    val source = (pixel >> 10) & 3 match {
+      case 0 => 'N'
+      case 1 => 'B'
+      case 2 => 'G'
+      case 3 => 'S'
+    }
+    val color = pixel & 0x0F
+    val isForeground = (pixel & PIXEL_FOREGROUND) > 0
+    traceRasterLineBuffer(x) = "%c%2d%c%s%s".format(source,color, if (isForeground) 'F' else 'B', if (mcm) "M" else "", if (ecm) "E" else "")
   }
-  @inline private[this] def drawPixel(x: Int, y: Int, pixel: AbstractPixel) = {
+  @inline private[this] def drawPixel(x: Int, y: Int, pixel: Int) = {
     val index = y * SCREEN_WIDTH + x
-    if (displayMem(index) != pixel.color) {
-      displayMem(index) = pixel.color
+    val color = VIC_RGB(pixel & 0x0F)
+    if (displayMem(index) != color) {
+      displayMem(index) = color
       if (firstModPixelX == -1) {
         firstModPixelX = x
         firstModPixelY = y
@@ -1195,11 +1230,13 @@ final class VIC(mem: Memory,
     }
     // ------------------- Sprites -----------------------
     val almostOneSprite = spritesDisplayedMask > 0
+    //var almostOneSprite = false
     
     if (almostOneSprite)
     while (s < 8) {
       if (sprites(s).displayable) {
         sprites(s).producePixels
+        //almostOneSprite = true
       }
       s += 1
     }
@@ -1212,29 +1249,32 @@ final class VIC(mem: Memory,
     val borderPixels = BorderShifter.getPixels
     while (i < 8) { // scan each bit      
       s = 7
-      var pixel: AbstractPixel = TransparentPixel
-      if (almostOneSprite) while (s >= 0) { // scan each sprite
-        val spritePixels = sprites(s).getPixels
-        if (sprites(s).hasPixels && !spritePixels(i).isTransparent) {
-          if (!pixel.isTransparent) spriteSpriteCollision(pixel.spriteIndex, spritePixels(i).spriteIndex) // sprite-sprite collision detected
-          pixel = spritePixels(i)
+      var pixel = PIXEL_TRANSPARENT
+      if (almostOneSprite) 
+      while (s >= 0) {
+        if (sprites(s).hasPixels) { // scan each sprite      
+          val spritePixels = sprites(s).getPixels
+          if ((spritePixels(i) & PIXEL_TRANSPARENT) == 0) {
+            if ((pixel & PIXEL_TRANSPARENT) == 0) spriteSpriteCollision((pixel >> 6) & 7, (spritePixels(i) >> 6) & 7) // sprite-sprite collision detected
+            pixel = spritePixels(i)
+          }
         }
         s -= 1
       }
-      val gfxPixel = if (gdata < 0) BLACK_PIXEL else gfxPixels(i)
-      if (gfxPixel.isForeground && !pixel.isTransparent) spriteDataCollision(pixel.spriteIndex) // sprite-data collision detected
-      if (pixel.isTransparent || (gfxPixel.isForeground && pixel.behind)) pixel = gfxPixel
-      if (!borderPixels(i).isTransparent) drawPixel(x + i, y, borderPixels(i))
-      else {
-        //println(s"Drawing sprite #${s} pixel at ${x + i},${y}: raster=${rasterLine} cycle=${rasterCycle} ${sprites(s).pixels(i)}")
-        drawPixel(x + i, y, pixel)
-      }
+      val gfxPixel = if (gdata < 0) PIXEL_BLACK else gfxPixels(i)
+      if ((gfxPixel & 0x10) > 0 && (pixel & PIXEL_TRANSPARENT) == 0) spriteDataCollision((pixel >> 6) & 7) // sprite-data collision detected
+      if ((pixel & PIXEL_TRANSPARENT) > 0 || ((gfxPixel & 0x10) > 0 && (pixel & PIXEL_SPRITE_PRIORITY) > 0)) pixel = gfxPixel
+      if ((borderPixels(i) & PIXEL_TRANSPARENT) == 0) drawPixel(x + i, y, borderPixels(i))
+      else drawPixel(x + i, y, pixel)
+      
       i += 1
     }
     // ************************** RESET SPRITES ********************************
     s = 0
-    if (almostOneSprite) while (s < 8) {
-      if (sprites(s).hasPixels) sprites(s).reset
+    if (almostOneSprite) 
+    while (s < 8) {
+      //if (sprites(s).hasPixels) sprites(s).reset
+      sprites(s).reset
       s += 1
     }
     // *************************************************************************
