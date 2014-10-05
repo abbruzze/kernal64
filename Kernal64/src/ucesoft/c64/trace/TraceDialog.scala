@@ -46,6 +46,18 @@ class TraceDialog private (displayFrame: JFrame,
     case '%' => Integer.parseInt(address.substring(1), 2)
     case _ => address.toInt
   }
+  
+  def forceTracing(on:Boolean) {
+    tracing = on
+    traceListener.setTrace(tracing)
+    if (!tracing) {
+      traceListener.step(regs => traceSR.setText(regs))
+      Log.setInfo 
+    }
+    else Log.setDebug
+    notrace.setText("Tracing " + (if (!tracing) "on" else "off"))
+    traceListener.step(regs => traceSR.setText(regs))
+  }
 
   def actionPerformed(e: ActionEvent) {
     e.getActionCommand match {
@@ -103,11 +115,7 @@ class TraceDialog private (displayFrame: JFrame,
         }
       case "NOTRACE" =>
         tracing = !tracing
-        traceListener.setTrace(tracing)
-        //traceListener.setBreakAt(0)
-        if (!tracing) Log.setInfo else Log.setDebug
-        e.getSource.asInstanceOf[JButton].setText("Tracing " + (if (!tracing) "on" else "off"))
-        traceListener.step(regs => traceSR.setText(regs))
+        forceTracing(tracing)
       case "DISA" =>
         Option(JOptionPane.showInputDialog(this, "Disassemble from address to address:")) match {
           case Some(address) =>

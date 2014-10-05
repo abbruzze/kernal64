@@ -9,6 +9,8 @@ import ucesoft.c64.C64ComponentType
 import ucesoft.c64.ChipID
 
 object CPU6510 {
+  class CPUJammedException extends Exception
+  
   object Instruction extends Enumeration {
     type CODE = Value
     val ORA, AND, EOR, ADC, STA, LDA, CMP, SBC = Value
@@ -393,6 +395,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   private[this] val OPERATIONS = {
     val operations = Array.ofDim[Op](Instruction.MARK.id)
     val availableOperations = Array(
+      new KIL,
       // Logical and arithmetic commands
       new ORA, new AND, new EOR, new ADC, new SBC, new CMP(A_REG), new CMP(X_REG), new CMP(Y_REG),
       new INC_DEC(true), new INC_DEC(false),
@@ -478,6 +481,10 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   }
 
   // --------------------------- Instructions implementation -------------------
+  private[this] class KIL extends StdOp {
+    val code = KIL
+    final def exe(data: Int) = throw new CPUJammedException
+  }
   // Logical and arithmetic commands
   private[this] class ADC extends StdOp {
     val code = ADC
@@ -759,6 +766,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
     val code = RTI
     final def exe(data: Int) = {
       SR = pop
+      clb
       val PC_L = pop
       val PC_H = pop
       PC = (PC_H << 8) | PC_L
@@ -978,7 +986,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
       if (tracing) Log.debug(formatDebug)
     
       CURRENT_OP_PC = PC
-      fecthAndDecode      
+      fecthAndDecode    
       val opcode = OPERATIONS(opInstruction.id)
       if (opcode == null) throw new IllegalArgumentException("Opcode " + opInstruction + " not implemented")
       val totalCycles = opCycles + opcode.run(opAddressType,opData,opLen,opAdditionalCycles)

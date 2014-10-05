@@ -45,6 +45,7 @@ class SID extends Chip with RAMComponent {
   private[this] var removeSample = false
   private[this] val driver = new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE / 2)
   
+  def getDriver = driver
   def init = start
   def reset = {
     sid.reset

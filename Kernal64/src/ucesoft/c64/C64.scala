@@ -37,6 +37,8 @@ import ucesoft.c64.peripheral.bus.BusSnoop
 import ucesoft.c64.peripheral.printer.MPS803
 import ucesoft.c64.peripheral.printer.MPS803GFXDriver
 import ucesoft.c64.peripheral.printer.MPS803ROM
+import ucesoft.c64.cpu.CPU6510.CPUJammedException
+import ucesoft.c64.util.VolumeSettingsPanel
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -113,6 +115,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     dialog.pack
     dialog
   }
+  // -------------- AUDIO ----------------------
+  private[this] val volumeDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
   // -------------------------------------------
   private[this] val configuration = {
     val props = new Properties
@@ -453,22 +457,38 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   }
   
   private def errorHandler(t:Throwable) {
-    Log.info("Fatal error occurred: " + cpu + "-" + t)
-    Log.info(CPU6510.disassemble(mem,cpu.getCurrentInstructionPC).toString)
-    t.printStackTrace(Log.getOut)
-    t.printStackTrace
-    JOptionPane.showMessageDialog(displayFrame,t.toString + " [PC=" + Integer.toHexString(cpu.getCurrentInstructionPC) + "]", "Fatal error",JOptionPane.ERROR_MESSAGE)
-    trace(true,true)
+    t match {
+      case j:CPUJammedException =>
+        JOptionPane.showConfirmDialog(displayFrame,
+            "CPU jammed at " + Integer.toHexString(cpu.getCurrentInstructionPC) + ". Do you want to open debugger or reset ?",
+            "CPU jammed",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.ERROR_MESSAGE) match {
+          case JOptionPane.YES_OPTION =>
+            traceDialog.forceTracing(true)
+            trace(true,true)
+          case _ => 
+            reset(true)
+        }
+      case _ =>
+        Log.info("Fatal error occurred: " + cpu + "-" + t)
+        Log.info(CPU6510.disassemble(mem,cpu.getCurrentInstructionPC).toString)
+        t.printStackTrace(Log.getOut)
+        t.printStackTrace
+        JOptionPane.showMessageDialog(displayFrame,t.toString + " [PC=" + Integer.toHexString(cpu.getCurrentInstructionPC) + "]", "Fatal error",JOptionPane.ERROR_MESSAGE)
+        trace(true,true)
+    }    
   }
   private def mainLoop(cycles:Long) {
-    // VIC
+    // VIC PHI1
     vicChip.clock(cycles)
     //DRIVES
     drive.clock(cycles)
     // bus snoop
     if (busSnooperActive) busSnooper.clock(cycles)
+    // printer
     printer.clock(cycles)
-    // CPU
+    // CPU PHI2
     val canExecCPU = cycles > cpuWaitUntil && cycles > baLowUntil
     if (canExecCPU) cpuWaitUntil = cycles + cpu.fetchAndExecute
   }
@@ -582,6 +602,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
         printerSaveImage
       case "PRINTER_ENABLED" =>
         printer.setActive(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
+      case "VOLUME" =>
+        volumeDialog.setVisible(true)
     }
   }
   
@@ -716,7 +738,9 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   }
   
   private def reset(play:Boolean=true) {
-    clock.pause
+    traceDialog.forceTracing(false)
+    diskTraceDialog.forceTracing(false)
+    if (Thread.currentThread != Clock.systemClock) clock.pause
     if (play) ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
     resetComponent
     if (play) clock.play
@@ -943,12 +967,16 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     exitItem.setActionCommand("EXIT")
     exitItem.addActionListener(this)
     fileMenu.add(exitItem)
+    
+    // edit
         
     val pasteItem = new JMenuItem("Paste text")
     pasteItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V,java.awt.Event.CTRL_MASK))
     pasteItem.setActionCommand("PASTE")
     pasteItem.addActionListener(this)
     editMenu.add(pasteItem)
+    
+    // trace
     
     traceItem = new JCheckBoxMenuItem("Trace CPU")
     traceItem.setSelected(false)
@@ -967,6 +995,16 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     inspectItem.setActionCommand("INSPECT")
     inspectItem.addActionListener(this)    
     traceMenu.add(inspectItem)
+    
+    // settings
+    
+    val volumeItem = new JMenuItem("Volume settings ...")
+    volumeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V,java.awt.Event.ALT_MASK))
+    volumeItem.setActionCommand("VOLUME")
+    volumeItem.addActionListener(this)
+    optionMenu.add(volumeItem)
+    
+    optionMenu.addSeparator
     
     val maxSpeedItem = new JCheckBoxMenuItem("Maximum speed")
     maxSpeedItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F8,0))

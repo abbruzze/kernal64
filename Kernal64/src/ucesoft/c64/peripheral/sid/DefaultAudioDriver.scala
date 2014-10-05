@@ -23,7 +23,9 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int) {
   def getMicros = dataLine.getMicrosecondPosition
   def hasSound = dataLine != null
   def setMasterVolume(v:Int) {
-    if (volume != null) volume.setValue(-10.0f + 0.1f * v)
+    val max = volume.getMaximum
+    val min = volume.getMinimum / 2f
+    if (volume != null) volume.setValue((v / 100.0f) * (max - min) + min)//-10.0f + 0.1f * v)
     vol = v
   }
   def shutdown = if (dataLine != null) dataLine.close
