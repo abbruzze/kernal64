@@ -39,7 +39,6 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
   val componentType = C64ComponentType.CHIP 
   
   private[this] val EVENT_ID = ciaName + id
-  private[this] val UPDATE_CYCLES = 1
 
   private[this] var latch = 0xFFFF
   private[this] var counter = 0xFFFF
@@ -147,11 +146,11 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
   private def executeCount(cycles: Long) {
     if (!countSystemClock) return // don't manage CNT counting
     
-    if (reload) {
-      reload = false
-      counter = latch
-      Log.debug(s"${ciaName}-${id} reload to ${latch}")
-    }
+//    if (reload) {
+//      reload = false
+//      counter = latch
+//      Log.debug(s"${ciaName}-${id} reload to ${latch}")
+//    }
     if (counter <= 0) {
       // check serial callback
       if (!oneShot && serialActionCallback.isDefined) serialActionCallback.get()
@@ -172,10 +171,10 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
 
       irqAction(id)
       if (oneShot) started = false
-      else if (!countExternal) systemClock.schedule(new ClockEvent(EVENT_ID,cycles + UPDATE_CYCLES, executeCount _))
+      else if (!countExternal) systemClock.schedule(new ClockEvent(EVENT_ID,cycles + 1, executeCount _))
     } else {
-      counter -= UPDATE_CYCLES
-      if (!countExternal) systemClock.schedule(new ClockEvent(EVENT_ID,cycles + UPDATE_CYCLES, executeCount _))
+      counter -= 1
+      if (!countExternal) systemClock.schedule(new ClockEvent(EVENT_ID,cycles + 1, executeCount _))
     }
   }
 

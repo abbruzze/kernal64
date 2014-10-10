@@ -236,7 +236,7 @@ class CIA(val name:String,
     super.getProperties
   }
   
-  @inline private def decodeAddress(address:Int) = (address - startAddress) % 16
+  @inline private def decodeAddress(address:Int) = (address - startAddress) & 0x0F //% 16
 	
   final def read(address: Int, chipID: ChipID.ID): Int = decodeAddress(address) match {
     case PRA => portAConnector.read      

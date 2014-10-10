@@ -10,8 +10,8 @@ object IECBusDevice {
   private val WRITE_KEEP_BIT_TIMEOUT = 100
   private val DEBUG = false
   
-  	object Mode extends Enumeration {
-    val IDLE,IDLE2,IDLE3,IDLE4,IDLE5,IDLE6 = Value
+  object Mode extends Enumeration {
+    val IDLE = Value
     val ATN_SEEN = Value
     val READ = Value
     val WRITE = Value
@@ -57,15 +57,16 @@ object IECBusDevice {
     val fileName = new StringBuilder
     private var opened = false
     
-    def isOpened = opened
-    def open = opened = true
     def clear {
       buffer.clear
       fileName.clear
     }
+    def isOpened = opened
+    def open = opened = true
     def close = {
       opened = false
-      clear
+      buffer.clear
+      fileName.clear
     }
     def addToBuffer(value:Int) {
       _buffer += value
@@ -108,7 +109,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
   private[this] var initNextByte = true
   
   protected def setMode(newMode:Mode.Value) {
-    if (DEBUG) println(s"${busid}[${role}] - ${newMode} FROM ${mode}") 
+    if (DEBUG) println(s"${busid} - ${newMode} FROM ${mode}") 
     mode = newMode
   } 
   
@@ -151,46 +152,28 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
       case INIT_WRITE =>
         setMode(WRITE)
         initByteToWrite(cycles)
-      case IDLE2 =>
-        if (timeout) setMode(IDLE3)
-      case IDLE3 =>
-        if (clk) {
-      	  setMode(IDLE6)
-      	  waitTimeout = cycles + 500
-        }
-      case IDLE6 =>
-        if (timeout) {
-          set(CLK,VOLTAGE) 
+      case IDLE =>
+      	if (atn && clk && isDeviceReady) {      
+      	  set(CLK,VOLTAGE) 
       	  set(DATA,GROUND)
       	  setMode(ATN_SEEN)
-        }
-      case IDLE4 =>
-        if (timeout) setMode(IDLE5)
-      case IDLE5 =>
-        if (!clk) {
-          setMode(READ)
+      	}
+      	else 
+      	if (!atn && role == LISTENER && !clk) {
+      	  setMode(READ)
       	  readByte(cycles,true,false)
-        }
-      case IDLE =>
-        if (atn && isDeviceReady) {
-          setMode(IDLE2)
-          waitTimeout = cycles + 100
-        }
-        else
-        if (!atn && role == LISTENER) {
-          setMode(IDLE4)
-          waitTimeout = cycles + 100
-        }
+      	}
       case ATN_SEEN =>
-          if (atn && !clk) {	// READY_TO_SEND
-          setMode(READ)          
+        if (atn && !clk) {	// READY_TO_SEND
+          set(DATA,VOLTAGE)	// READY_TO_DATA
+          setMode(READ)
           readByte(cycles,true,timeout)
         }
         else
         if (!atn) {
           if (role == LISTENER) setMode(IDLE)
           else reset
-        }      
+        }
       case READ =>
         if (atn && !lastAtn) {
           setMode(IDLE)
@@ -243,7 +226,6 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     setMode(IDLE)
     role = NONE
     readMode = WAIT_BIT 
-    lastAtn = false
     set(CLK,VOLTAGE)
     set(DATA,VOLTAGE)
   }
@@ -271,16 +253,14 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     onCommand(CMD,devOrSecAddr)
     CMD match {
       case LISTEN =>
-        if (devOrSecAddr == device) {
-          role = LISTENER
-          listen
-        }
-        else reset        
+        if (devOrSecAddr == device) role = LISTENER
+        else reset
+        listen
       case UNLISTEN =>
         set(DATA,VOLTAGE)
         set(CLK,VOLTAGE)
         role = NONE
-        unlisten//if (channel == 15) handleChannel15(true)        
+        unlisten//if (channel == 15) handleChannel15(true)
       case OPEN =>
         if (role == LISTENER) {
           channel = devOrSecAddr        
@@ -297,24 +277,19 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
           setMode(TURNAROUND)     
           open_channel
         }
-        else
         if (role == LISTENER) open_channel
-        else reset
       case TALK =>
-        if (devOrSecAddr == device) {
-          role = READY_TO_BE_TALKER
-          talk
-        }     
-        else reset
+        if (devOrSecAddr == device) role = READY_TO_BE_TALKER
+        talk
       case UNTALK =>
         role = NONE
         untalk
       case CLOSE =>
         if (role != NONE) {
           channels(channel).close
-          close          
-        }      
-        reset
+          close
+          reset
+        }
     }
   }
   

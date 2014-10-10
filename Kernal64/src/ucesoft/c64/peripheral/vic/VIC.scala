@@ -125,11 +125,11 @@ final class VIC(mem: Memory,
   private[this] val BLANK_TOP_LINE = 15
   private[this] val BLANK_BOTTOM_LINE = 300
   private[this] val BLANK_LEFT_CYCLE = 9
-  private[this] val BLANK_RIGHT_CYCLE = 60
+  private[this] val BLANK_RIGHT_CYCLE = 61
   private[this] val BA_CYCLES_FOR_CHARS = 40
   private[this] val BA_CYCLES_PER_SPRITE = 3
-  val VISIBLE_SCREEN_WIDTH = (BLANK_RIGHT_CYCLE - BLANK_LEFT_CYCLE - 1) * 8
-  val VISIBLE_SCREEN_HEIGHT = BLANK_BOTTOM_LINE - BLANK_TOP_LINE + 1
+  val VISIBLE_SCREEN_WIDTH = 403//(BLANK_RIGHT_CYCLE - BLANK_LEFT_CYCLE - 1) * 8
+  val VISIBLE_SCREEN_HEIGHT = BLANK_BOTTOM_LINE - BLANK_TOP_LINE - 1
   val SCREEN_ASPECT_RATIO = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
   // ----------------------- INTERNAL REGISTERS -----------------------------------------------------------
   private[this] var videoMatrixAddress = 0
@@ -355,7 +355,7 @@ final class VIC(mem: Memory,
     var xexp: Boolean = false,
     var color: Int = 0,
     var isMulticolor: Boolean = false,
-    var dataPriority: Boolean = false) extends Shifter with C64Component {
+    var dataPriority: Boolean = false) extends C64Component {
     val componentID = "Sprite " + index
     val componentType = C64ComponentType.INTERNAL
     
@@ -389,18 +389,18 @@ final class VIC(mem: Memory,
       properties
     }
     
-    def yexp = _yexp
+    final def yexp = _yexp
     final def displayable = (display || lastLine)
 
-    def yexp_=(v: Boolean) {
+    final def yexp_=(v: Boolean) {
       _yexp = v
       if (!v) expansionFF = true
       //if (rasterCycle == 24) mc = 42 & mc & mcbase | 21 & (mc | mcbase) // sprite crunch ??
     }
 
-    def getPixels = pixels
+    final def getPixels = pixels
 
-    override def clear {
+    final def clear {
       counter = 0
       reset
     }
@@ -503,7 +503,7 @@ final class VIC(mem: Memory,
       }
     }
 
-    def checkForCycle(cycle: Int) = cycle match {
+    final def checkForCycle(cycle: Int) = cycle match {
     case 15 =>
       if (expansionFF) mcbase += 2
       case 16 =>
@@ -559,34 +559,19 @@ final class VIC(mem: Memory,
   												controlRegister2 << 8 | 
   												controlRegister1 & 0x7F
  						
-  // ------------------------------ SHIFTERS ----------------------------------------------  
-  private[this] trait Shifter {
-    def setData(gdata: Int)
-    protected def shift: Int
-    def producePixels
-    def isFinished: Boolean
-    def clear
-    def getPixels: Array[Int]
-  }
-
-  private[this] object BorderShifter extends Shifter {
+  // ------------------------------ SHIFTERS ----------------------------------------------    
+  private[this] object BorderShifter {
     private[this] var counter = 0
     private[this] var xcoord = 0
-    private[this] var color: Int = _
+    private[this] var color = 0
     private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
     private[this] val pixels = Array.fill(8)(PIXEL_TRANSPARENT)
     private[this] var drawBorder = true
 
-    def getPixels = if (drawBorder) pixels else ALL_TRANSPARENT//if (drawBorder) pixelVideoCache(rasterLine)(rasterCycle) else ALL_TRANSPARENT//if (drawBorder) pixels else ALL_TRANSPARENT
-    def clear { counter = 0 }
+    final def getPixels = if (drawBorder) pixels else ALL_TRANSPARENT//if (drawBorder) pixelVideoCache(rasterLine)(rasterCycle) else ALL_TRANSPARENT//if (drawBorder) pixels else ALL_TRANSPARENT
+    final def clear { counter = 0 }
 
     final def isFinished = counter == 8
-    final def setData(gdata: Int) {
-      counter = 0
-      xcoord = xCoord
-      color = borderColor
-      if (traceRasterLineInfo) color |= PIXEL_DOX_B
-    }
     final def producePixels {
       // optimization
       drawBorder = !den ||
@@ -594,7 +579,10 @@ final class VIC(mem: Memory,
         rasterLine >= TOP_BOTTOM_FF_COMP(rsel)(1) ||
         rasterCycle < 16 || rasterCycle > 52
       if (!drawBorder) return
-      
+      counter = 0
+      xcoord = xCoord
+      color = borderColor
+      if (traceRasterLineInfo) color |= PIXEL_DOX_B
       /*
       val hash = getHashVideoCache
       if (hashVideoCache(rasterLine)(rasterCycle) == hash) return
@@ -617,7 +605,7 @@ final class VIC(mem: Memory,
   /**
    * Graphics Shifter for text/bitmap & blank lines
    */
-  private object GFXShifter extends Shifter {
+  private object GFXShifter {
     private[this] var counter = 0
     private[this] var gdata = 0
     private[this] var xscrollBuffer = Array.fill(8)(PIXEL_BLACK)
@@ -630,14 +618,14 @@ final class VIC(mem: Memory,
     private[this] var isInvalidMode = false
     private[this] var isInDisplayState = false
 
-    def getPixels = pixels//pixelVideoCache(rasterLine)(rasterCycle)//pixels
+    final def getPixels = pixels//pixelVideoCache(rasterLine)(rasterCycle)//pixels
 
     final def setData(gdata: Int) {
       this.gdata = gdata      
       counter = 0
     }
 
-    final override def clear {
+    final def clear {
       counter = 0
       reset
     }
@@ -839,7 +827,8 @@ final class VIC(mem: Memory,
     this.display = display
     displayMem = display.displayMem
     if (clip)
-      display.setClipArea((BLANK_LEFT_CYCLE + 1) * 8, BLANK_TOP_LINE + 1, BLANK_RIGHT_CYCLE * 8, BLANK_BOTTOM_LINE)
+      //display.setClipArea((BLANK_LEFT_CYCLE + 1) * 8, BLANK_TOP_LINE + 1, BLANK_RIGHT_CYCLE * 8, BLANK_BOTTOM_LINE)
+      display.setClipArea((BLANK_LEFT_CYCLE + 1) * 8, BLANK_TOP_LINE + 1, (BLANK_RIGHT_CYCLE - 1) * 8 + 3, BLANK_BOTTOM_LINE)
   }
 
   def enableLightPen(enabled: Boolean) = lightPenEnabled = enabled
@@ -1059,6 +1048,8 @@ final class VIC(mem: Memory,
       c += 1
     }
   }
+  
+  private[this] var ref = 0
 
   final def clock(cycles: Long) {
     isBlank = rasterLine <= BLANK_TOP_LINE || rasterLine >= BLANK_BOTTOM_LINE || rasterCycle <= BLANK_LEFT_CYCLE || rasterCycle >= BLANK_RIGHT_CYCLE
@@ -1067,6 +1058,7 @@ final class VIC(mem: Memory,
     if (badLine) isInDisplayState = true
 
     if (rasterLine == 0) {
+      ref = 0xFF
       vcbase = 0
       vc = 0
     }
@@ -1085,7 +1077,8 @@ final class VIC(mem: Memory,
       case s => 
         sprites(s).readMemoryData(cycles)
     }
-    rasterCycle match {
+    import annotation.switch
+    (rasterCycle: @switch) match {
       case 0 =>
         // check raster line with raster latch if irq enabled     
         if (rasterLine > 0 && rasterLine == rasterLatch) rasterLineEqualsLatch
@@ -1116,6 +1109,7 @@ final class VIC(mem: Memory,
       case 10 =>
         drawCycle(-1)
       case 11 =>
+        mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
         drawCycle(-1)
       // ---------------------------------------------------------------
       case 55 =>
@@ -1125,15 +1119,16 @@ final class VIC(mem: Memory,
         drawCycle(-1)
       case 57 =>
         spriteCheck
+        
+        drawCycle(-1)	
+      // ---------------------------------------------------------------
+      case 58 =>     
         if (rc == 7) {
           isInDisplayState = false
           vcbase = vc
           //Log.fine(s"VIC cycle 58 vcbase=${vcbase}")
         }
         if (badLine || isInDisplayState) rc = (rc + 1) & 7
-        drawCycle(-1)	
-      // ---------------------------------------------------------------
-      case 58 =>     
         drawCycle(-1)
       // ---------------------------------------------------------------
       case 59 =>        
@@ -1149,12 +1144,19 @@ final class VIC(mem: Memory,
       case _ => // 12 - 54
         rasterCycle match {
           case 12 =>
+            mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
             if (badLine) baLow(cycles + BA_CYCLES_FOR_CHARS)
           case 13 =>
+            mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+          case 14 =>
+            mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
             vc = vcbase
             vmli = 0
             if (badLine) rc = 0
-          case 15 | 16 | 54 =>
+          case 15 =>
+            spriteCheck
+            mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+          case 16 | 54 =>
             spriteCheck
           case _ =>
         }
@@ -1219,7 +1221,7 @@ final class VIC(mem: Memory,
     if (traceRasterLineInfo && y == traceRasterLine) tracePixel(pixel, x)
   }
 
-  private def drawCycle(gdata: Int) {
+  private[this] def drawCycle(gdata: Int) {
     if (isBlank) return
 
     val y = rasterLine
@@ -1245,7 +1247,7 @@ final class VIC(mem: Memory,
       s += 1
     }
     // ------------------- Border ------------------------
-    BorderShifter.setData(0)
+    //BorderShifter.setData(0)
     BorderShifter.producePixels
     // ************************** RENDERING ************************************
 

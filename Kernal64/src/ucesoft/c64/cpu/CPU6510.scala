@@ -234,13 +234,10 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   // -------------------------------------------
   import CPU6510._
   
-  /*
-  private[this] object Phase extends Enumeration {
-    val FETCH = Value
-    val EXECUTE = Value
-    val WAIT = Value
-  }
-  */
+//  private[this] object Phase extends Enumeration {
+//    val FETCH = Value
+//    val EXECUTE = Value
+//  }
   
   // cache for performance optimization
   private[this] object OpAddressType extends Enumeration {
@@ -253,7 +250,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   private[this] var opAddressType = OpAddressType.IMPLICIT
   private[this] var opInstruction : Instruction.CODE = null
   private[this] var opCycles = 0
-  //private[this] var phase = Phase.FETCH
+//  private[this] var phase = Phase.FETCH
   //private[this] var waitCycles = 0L
   //private[this] var baLowUntil = 0L
   
@@ -704,9 +701,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
     final def exe(data: Int) = {
       if (isPush) {
         if (reg == A_REG) push(A) else {
-          seb
-          push(SR)
-          clb
+          push(SR | B_FLAG)
         }
       } else {
         if (reg == A_REG) {

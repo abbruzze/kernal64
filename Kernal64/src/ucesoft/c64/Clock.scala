@@ -54,7 +54,6 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   
   // ------ PERFORMANCE MANAGEMENT -------------
   private[this] val C64_CLOCK_HZ = 985248.0
-  private[this] val MINIMUM_WAIT_TIME = 0
   private[this] val PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS = 1 * 1000
   
   private[this] var _maximumSpeed = false
@@ -136,11 +135,8 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
         val cyclesDiff = cycles - lastCorrectionCycles
         val expectedCycles = timeDiff * C64_CLOCK_HZ / 1000
         if (cyclesDiff > expectedCycles) {
-          val waitTime = 1000 * (cyclesDiff - expectedCycles) / C64_CLOCK_HZ
-          if (waitTime > MINIMUM_WAIT_TIME) {
-            val intWaitTime = waitTime.toInt
-            Thread.sleep(intWaitTime)
-          }
+          val waitTime = (1000 * (cyclesDiff - expectedCycles) / C64_CLOCK_HZ).asInstanceOf[Int]
+          Thread.sleep(waitTime)
         }
       }
       if (System.currentTimeMillis > nextPerformanceMeasurementTime) {

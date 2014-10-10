@@ -71,9 +71,10 @@ class Display(width: Int, height: Int, title: String, frame: JFrame) extends JCo
       dimension.width = getWidth
       dimension.height = getHeight
       if (debugImage == null) debugImage = createImage(width, height)
-      Log.debug(s"New screen dimension ${dimension.width} x ${dimension.height}")
+      Log.debug(s"New screen dimension ${dimension.width} x ${dimension.height}")      
       zoomFactorX = dimension.width.toDouble / (if (clipArea != null) clipArea._2.x - clipArea._1.x else screen.getWidth(this))
       zoomFactorY = dimension.height.toDouble / (if (clipArea != null) clipArea._2.y - clipArea._1.y else screen.getHeight(this))
+      println(s"New screen dimension ${dimension.width} x ${dimension.height} ${zoomFactorX} x ${zoomFactorY}")
     }
     val srcImage = if (drawRasterLine) {
       val dg = debugImage.getGraphics
