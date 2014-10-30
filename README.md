@@ -1,4 +1,4 @@
-kernal64 ver 0.9.9F
+kernal64 ver 0.9.9G
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
 
@@ -24,6 +24,7 @@ Here the main features:
 * Fast program loading of PRG/T64 local file or D64's file entry.
 * Debug panel for main CPU and for 1541's cpu (break point, step by step execution, disassembler, assembler, etc.)
 * Component panel: shows all internal components while running
+* Drag & Drop support
 * ... and more
 
 In the meanwhile you can download the dist/kernal64_install.zip file to try it out: be sure to have Java installed.
