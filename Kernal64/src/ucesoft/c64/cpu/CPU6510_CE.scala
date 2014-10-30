@@ -43,7 +43,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 
   // -----------------------------------------
 
-  final def setBaLow(baLow: Boolean) { this.baLow = baLow }
+  final def isWriting = false
+  final override def setBaLow(baLow: Boolean) { this.baLow = baLow }
   final def getPC = PC
   final def getCurrentInstructionPC = CURRENT_OP_PC
   final def getMem(address: Int) = mem.read(address)
@@ -1066,8 +1067,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 		state = O_PHA1
 	  case O_PHA1 =>
 	    //push(A)
-	    mem.write(SR | 0x100,A)
-	    SR = (SR - 1) & 0xFF
+	    mem.write(SP | 0x100,A)
+	    SP = (SP - 1) & 0xFF
 		Last
 	  case O_PLA =>
 	    if (baLow) return
@@ -1102,7 +1103,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	  case O_PLP2 =>
 	    if (baLow) return
 	    data = mem.read(SP | 0x100)
-	    SR |= data & ~B_FLAG
+	    SR = (data & ~B_FLAG) | (SR & B_FLAG)
 		Last
 	  // Jump/branch group
 	  case O_JMP =>
@@ -1116,7 +1117,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 		Last
 	  case O_JMP_I =>
 	    if (baLow) return
-	    ar = mem.read(PC)
+	    PC = mem.read(ar)
 		state = O_JMP_I1
 	  case O_JMP_I1 =>
 	    if (baLow) return
@@ -1132,7 +1133,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	    mem.read(SP | 0x100)
 		state = O_JSR2
 	  case O_JSR2 =>
-	    mem.write(SP | 0x100,PC >> 8)
+	    mem.write(SP | 0x100,(PC >> 8) & 0xFF)
 	    SP = (SP - 1) & 0xFF
 		state = O_JSR3
 	  case O_JSR3 =>
@@ -1179,7 +1180,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	  case O_RTI2 =>
 	    if (baLow) return
 	    data = mem.read(SP | 0x100)
-	    SR |= data & ~B_FLAG
+	    SR = (data & ~B_FLAG) | (SR & B_FLAG)
 		SP = (SP + 1) & 0xFF
 		state = O_RTI3
 	  case O_RTI3 =>
@@ -1291,7 +1292,157 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	    if (baLow) return
 	    mem.read(PC)
 		Last
+	  // Undocumented
+		// NOP group
+	  case O_NOP_I =>
+	    if (baLow) return
+	    mem.read(PC)
+	    PC += 1
+		Last
+	  case O_NOP_A =>
+	    if (baLow) return
+	    mem.read(ar)
+		Last
+	  // Load A/X group
+	  case O_LAX =>
+	    if (baLow) return
+	    data = mem.read(ar)
+	    A = data
+	    X = data
+	    set_nz(A)
+		Last
+	  // Store A/X group
+	  case O_SAX =>
+	    mem.write(ar,A & X)
+		Last
+	  // ASL/ORA group
+	  case O_SLO =>
+	    if ((rdbuf & 0x80) > 0) sec else clc
+		rdbuf <<= 1
+		mem.write(ar,rdbuf)
+		A |= rdbuf
+		set_nz(A)
+		Last
+	  // ROL/AND group
+	  case O_RLA =>
+		val tmp = (rdbuf & 0x80) > 0
+		rdbuf = if (isCarry) (rdbuf << 1) | 0x01 else rdbuf << 1
+		if (tmp) sec else clc
+		mem.write(ar,rdbuf)
+		A &= rdbuf
+		set_nz(A)
+		Last
+	  // LSR/EOR group
+	  case O_SRE =>
+	    if ((rdbuf & 0x01) > 0) sec else clc
+		rdbuf >>= 1
+		mem.write(ar,rdbuf)
+		A ^= rdbuf
+		set_nz(A)
+		Last
+	  // ROR/ADC group
+	  case O_RRA =>
+		val tmp = (rdbuf & 0x01) > 0
+		rdbuf = if (isCarry) (rdbuf >> 1) | 0x80 else rdbuf >> 1
+		if (tmp) sec else clc
+		mem.write(ar,rdbuf)
+		do_adc(rdbuf)
+		Last
+	  // DEC/CMP group
+	  case O_DCP =>
+	    rdbuf -= 1
+	    mem.write(ar,rdbuf & 0xFF)
+	    ar = A - rdbuf
+	    set_nz(ar)
+	    if (ar < 0x100) sec else clc
+		Last
+	  // INC/SBC group
+	  case O_ISB =>
+	    rdbuf = (rdbuf + 1) & 0xFF
+	    mem.write(ar,rdbuf)
+		do_sbc(rdbuf)
+		Last
+	  // Complex functions
+	  case O_ANC_I =>
+	    if (baLow) return
+	    data = mem.read(PC) ; PC += 1
+	    A &= data
+		set_nz(A)
+	    if (isNegative) sec else clc
+		Last
+	  case O_ASR_I =>
+	    if (baLow) return
+	    data = mem.read(PC) ; PC += 1
+	    A &= data
+	    if ((A & 0x01) > 0) sec else clc
+	    A >>= 1
+	    set_nz(A)
+		Last
+	  case O_ARR_I =>
+	    if (baLow) return
+	    data = mem.read(PC) ; PC += 1
+	    val _data = data & A
+	    A = if (isCarry) (_data >> 1) | 0x80 else _data >> 1
+	    if (!isDecimal) {
+          set_nz(A)
+          if ((A & 0x40) > 0) sec else clc
+          if (((A & 0x40) ^ ((A & 0x20) << 1)) > 0) sev else clv
+        }
+        else {
+          if (isCarry) sen else cln
+          if (A == 0) sez else clz
+          if (((_data ^ A) & 0x40) != 0) sev else clv
+          if ((_data & 0x0F) + (_data & 0x01) > 5) A = A & 0xF0 | (A + 6) & 0x0F
+          if (((_data + (_data & 0x10)) & 0x1F0) > 0x50) {
+            sec
+            A += 0x60
+          } 
+          else clc
+        }
+	  case O_ANE_I =>
+	    if (baLow) return
+	    data = mem.read(PC) ; PC += 1
+	    A = (A | 0xee) & X & data
+		set_nz(A)
+		Last
+	  case O_LXA_I =>
+	    if (baLow) return
+	    data = mem.read(PC) ; PC += 1
+	    A = (A | 0xee) & data
+	    X = A
+		set_nz(A)
+		Last
+	  case O_SBX_I =>
+	    if (baLow) return
+	    data = mem.read(PC) ; PC += 1
+	    ar = (X & A) - data
+	    X = ar & 0xFF
+	    set_nz(X)
+	    if (ar < 0x100) sec else clc
+		Last
+	  case O_LAS =>
+	    if (baLow) return
+	    data = mem.read(ar)
+	    X = data & SP
+	    SP = X
+	    A = X
+		set_nz(A)
+		Last
+	  case O_SHS =>		// ar2 contains the high byte of the operand address
+	    SP = A & X
+	    mem.write(ar,(ar2 + 1) & SP)
+		Last
+	  case O_SHY =>		// ar2 contains the high byte of the operand address
+	    mem.write(ar,Y & (ar2 + 1))
+		Last
+	  case O_SHX =>		// ar2 contains the high byte of the operand address
+	    mem.write(ar,X & (ar2 + 1))
+		Last
+	  case O_SHA =>		// ar2 contains the high byte of the operand address
+	    mem.write(ar,A & X & (ar2 + 1))
+		Last
 	  case 1 => throw new CPU6510.CPUJammedException
+	  case _ => throw new IllegalArgumentException("Bad state " + state + " at PC=" + Integer.toHexString(PC))
     }
   }
   
@@ -1350,6 +1501,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     irqLow = false
     nmiLow = false
     nmiOnNegativeEdge = false
+    state = 0
     A = 0
     X = 0
     Y = 0
@@ -1376,10 +1528,10 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     }
     else {
       if (tracing && state == 0) Log.debug(formatDebug)
-      if (state == 0) println(formatDebug + "\t" + this)
+      //if (state == 0) println(formatDebug + "\t" + this)
       CURRENT_OP_PC = PC
       execute
-      if (tracing) {
+      if (tracing && state == 0) {
         syncObject.synchronized { syncObject.wait }
         stepCallBack(toString)
       }

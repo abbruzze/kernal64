@@ -16,6 +16,8 @@ import java.util.Arrays
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 import ucesoft.c64.cpu.RAMComponent
+import annotation.switch
+
 /*
 object VIC extends App {
   import CPU6510Mems._
@@ -141,6 +143,7 @@ final class VIC(mem: Memory,
   private[this] var rc = 0 // row counter
   private[this] var vmli = 0 // video matrix line index
   private[this] var isInDisplayState = false // display or idle state
+  private[this] var badLine = false
   private[this] var yscroll = 0 // y scroll value 0-7
   private[this] var xscroll = 0 // x scroll value 0-7
   private[this] var rsel = 0 // 1 => 25 rows, 0 => 24 rows
@@ -470,7 +473,7 @@ final class VIC(mem: Memory,
           } else gdata <<= 2
         }
         val cbit = (gdata & 0x3000000)
-        cbit match {
+        (cbit : @switch) match {
           case 0x0000000 => PIXEL_TRANSPARENT
           case 0x1000000 => spriteMulticolor01(0)
           case 0x2000000 => color
@@ -503,7 +506,7 @@ final class VIC(mem: Memory,
       }
     }
 
-    final def checkForCycle(cycle: Int) = cycle match {
+    final def checkForCycle(cycle: Int) = (cycle : @switch) match {
     case 15 =>
       if (expansionFF) mcbase += 2
       case 16 =>
@@ -653,7 +656,7 @@ final class VIC(mem: Memory,
         } else { // multi color mode          
           if ((counter & 1) == 0) gdata <<= 2
           val cbit = (gdata & 0x300) >> 8
-          cbit match {
+          (cbit : @switch) match {
             case 0 => if (isInDisplayState) backgroundColor(cbit) // background
             		  else backgroundColor(0)
             case 1 => if (isInDisplayState) backgroundColor(cbit) // background
@@ -681,7 +684,7 @@ final class VIC(mem: Memory,
         } else { // multi color mode          
           if ((counter & 1) == 0) gdata <<= 2
           val cbit = gdata & 0x300
-          cbit match {
+          (cbit : @switch) match {
             case 0x00 => if (isInDisplayState) backgroundColor(0) // background
             			 else backgroundColor(0)
             case 0x100 => if (isInDisplayState) (vml_p(vmli) >> 4) & 0x0F // background
@@ -851,7 +854,7 @@ final class VIC(mem: Memory,
     if (offset <= 0xF) spriteXYCoord(offset)
     else if (offset >= 0x2F && offset <= 0x3F) 0xFF
     else
-      offset match {
+      (offset : @switch) match {
         case 16 => spriteXCoord9thBit
         case 17 => controlRegister1
         case 18 => rasterLine & 0xFF
@@ -888,12 +891,12 @@ final class VIC(mem: Memory,
         case _ => 0xFF // $D02F-$D03F
       }
   }
-
+  
   final def write(address: Int, value: Int, chipID: ChipID.ID) = {
     val offset = decodeAddress(address)
     if (offset <= 0xF) {
       spriteXYCoord(offset) = value
-      val sindex = offset / 2
+      val sindex = offset >> 1 /// 2
       val isX = (offset & 1) == 0
       if (isX) {
         val bit9 = sprites(sindex).x & 0x100
@@ -901,7 +904,7 @@ final class VIC(mem: Memory,
       } else sprites(sindex).y = value
       //Log.fine(s"Sprite #${sindex} update coord ${if (isX) "x" else "y"} = ${value}")
     } else
-      offset match {
+      (offset : @switch) match {
         case 16 =>
           spriteXCoord9thBit = value
           var i = 0
@@ -924,6 +927,7 @@ final class VIC(mem: Memory,
             den = (controlRegister1 & 16) == 16
             bmm = (controlRegister1 & 32) == 32
             ecm = (controlRegister1 & 64) == 64
+            badLine = isBadLine
           }))
           if (debug) Log.info("VIC control register set to %s, yscroll=%d rsel=%d den=%b bmm=%b ecm=%b. Raster latch set to %4X".format(Integer.toBinaryString(controlRegister1), yscroll, rsel, den, bmm, ecm, rasterLatch))
         //Log.info("VIC control register set to %s, yscroll=%d rsel=%d den=%b bmm=%b ecm=%b. Raster latch set to %4X".format(Integer.toBinaryString(controlRegister1),yscroll,rsel,den,bmm,ecm,rasterLatch))
@@ -947,11 +951,14 @@ final class VIC(mem: Memory,
           }
         //Log.fine("Sprite enable register se to " + Integer.toBinaryString(spriteEnableRegister))
         case 22 =>
+          //val clk = Clock.systemClock
+          //clk.schedule(new ClockEvent("$D016",clk.currentCycles + 2,(cycles) => {
           controlRegister2 = value
           xscroll = controlRegister2 & 7
           csel = (controlRegister2 & 8) >> 3
           mcm = (controlRegister2 & 16) == 16
           res = (controlRegister2 & 32) == 32
+          //}))
           if (debug) Log.info("VIC control register 2 set to %s, xscroll=%d csel=%d mcm=%b rasterLine=%d".format(Integer.toBinaryString(controlRegister2), xscroll, csel, mcm, rasterLine))
         //Log.info("VIC control register 2 set to %s, xscroll=%d csel=%d mcm=%b rasterLine=%d".format(Integer.toBinaryString(controlRegister2),xscroll,csel,mcm,rasterLine))
           //hashVideoCache(rasterLine)(rasterCycle) = getHashVideoCach
@@ -964,10 +971,13 @@ final class VIC(mem: Memory,
           }
         //Log.fine("Sprite Y expansion se to " + Integer.toBinaryString(spriteYExpansion))
         case 24 =>
+          //val clk = Clock.systemClock
+          //clk.schedule(new ClockEvent("$D018",clk.currentCycles + 2,(cycles) => {
           vicBaseAddress = value
           videoMatrixAddress = ((vicBaseAddress >> 4) & 0x0F) << 10 //* 1024
           characterAddress = ((vicBaseAddress >> 1) & 0x07) << 11 //* 2048
           bitmapAddress = ((vicBaseAddress >> 3) & 1) << 13 //* 8192
+          //}))
           //hashVideoCache(rasterLine)(rasterCycle) = getHashVideoCache
           if (debug) Log.info(s"VIC base pointer set to ${Integer.toBinaryString(vicBaseAddress)} video matrix=${videoMatrixAddress} char address=${characterAddress} bitmap address=${bitmapAddress}")
         //Log.info(s"VIC base pointer set to ${Integer.toBinaryString(vicBaseAddress)} video matrix=${videoMatrixAddress} char address=${characterAddress} bitmap address=${bitmapAddress} raster=${rasterLine}")          
@@ -981,6 +991,7 @@ final class VIC(mem: Memory,
             interruptControlRegister &= 0x7F
             irqAction(false)
           }
+          else interruptControlRegister |= 0x80
         // light pen ignored
         //Log.debug("VIC interrupt control register set to " + Integer.toBinaryString(interruptControlRegister))
         case 26 =>
@@ -1053,7 +1064,7 @@ final class VIC(mem: Memory,
 
   final def clock(cycles: Long) {
     isBlank = rasterLine <= BLANK_TOP_LINE || rasterLine >= BLANK_BOTTOM_LINE || rasterCycle <= BLANK_LEFT_CYCLE || rasterCycle >= BLANK_RIGHT_CYCLE
-    val badLine = isBadLine
+    //val badLine = isBadLine
 
     if (badLine) isInDisplayState = true
 
@@ -1065,10 +1076,10 @@ final class VIC(mem: Memory,
 
     //Log.fine(s"VIC rasterLine=${rasterLine} vicCycle=${rasterCycle} vcbase=${vcbase} vc=${vc} vmli=${vmli} mainFF=${mainBorderFF} verticalFF=${verticalBorderFF} displayState=${isInDisplayState} Xcoord=${xCoord}")
     // check sprite cycle
-    SPRITE_READ_CYCLE(rasterCycle) match {
+    (SPRITE_READ_CYCLE(rasterCycle) : @switch) match {
       case -1 =>
         // check sprite ba
-        SPRITE_BA_CYCLE(rasterCycle) match {
+        (SPRITE_BA_CYCLE(rasterCycle) : @switch) match {
           case -1 =>
           case s if sprites(s).dma =>
             baLow(cycles + BA_CYCLES_PER_SPRITE)
@@ -1077,13 +1088,14 @@ final class VIC(mem: Memory,
       case s => 
         sprites(s).readMemoryData(cycles)
     }
-    import annotation.switch
+    
     (rasterCycle: @switch) match {
       case 0 =>
         // check raster line with raster latch if irq enabled     
         if (rasterLine > 0 && rasterLine == rasterLatch) rasterLineEqualsLatch
         // check den on $30
         if (rasterLine == 0x30) denOn30 = den
+        badLine = isBadLine
         drawCycle(-1)
       // ---------------------------------------------------------------  
       case 1 =>
@@ -1128,7 +1140,10 @@ final class VIC(mem: Memory,
           vcbase = vc
           //Log.fine(s"VIC cycle 58 vcbase=${vcbase}")
         }
-        if (badLine || isInDisplayState) rc = (rc + 1) & 7
+        if (badLine || isInDisplayState) {
+          rc = (rc + 1) & 7
+          isInDisplayState = true
+        }
         drawCycle(-1)
       // ---------------------------------------------------------------
       case 59 =>        
@@ -1142,10 +1157,11 @@ final class VIC(mem: Memory,
         drawCycle(-1)
       // ---------------------------------------------------------------
       case _ => // 12 - 54
-        rasterCycle match {
+        if (badLine) baLow(cycles)
+        (rasterCycle : @switch) match {
           case 12 =>
             mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
-            if (badLine) baLow(cycles + BA_CYCLES_FOR_CHARS)
+            //if (badLine) baLow(cycles + BA_CYCLES_FOR_CHARS)
           case 13 =>
             mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
           case 14 =>
@@ -1160,15 +1176,13 @@ final class VIC(mem: Memory,
             spriteCheck
           case _ =>
         }
-
+        
         if (isInDisplayState && rasterCycle >= 15) {
           if (badLine) readAndStoreVideoMemory
           // g-access
           drawCycle(readCharFromMemory)
-          if (isInDisplayState) {
-            vc = (vc + 1) & 0x3FF //% 1024
-            vmli = (vmli + 1) & 0x3F //% 64
-          }
+          vc = (vc + 1) & 0x3FF //% 1024
+          vmli += 1
         } 
         else 
         if (!isInDisplayState && rasterCycle >= 15) {

@@ -50,7 +50,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "0.9.9F"
+  private[this] val VERSION = "0.9.9G"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -224,6 +224,39 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     def reset {
       ciaIRQLow = false
       vicIRQLow = false
+    }
+  }
+  
+  // ------------------------------------ Drag and Drop ----------------------------
+  private[this] val DNDHandler = new TransferHandler {
+    override def canImport(support:TransferHandler.TransferSupport) : Boolean = support.isDataFlavorSupported(DataFlavor.javaFileListFlavor)
+
+    override def importData(support: TransferHandler.TransferSupport) : Boolean = {
+        if (!canImport(support)) {
+            return false
+        }
+        
+        val t = support.getTransferable();
+
+        try {
+          import scala.collection.JavaConversions._
+          t.getTransferData(DataFlavor.javaFileListFlavor).asInstanceOf[java.util.List[File]].headOption match {
+            case None =>
+            case Some(f) =>
+              val name = f.getName.toUpperCase
+              if (name.endsWith(".D64") || name.endsWith(".TAP") || name.endsWith(".PRG") || name.endsWith(".CRT")) {
+                handleDND(f)
+                return true
+              }
+              return false
+          }
+        } 
+        catch {
+          case t:Throwable =>
+            return false
+        }
+
+        true
     }
   }
   
@@ -449,6 +482,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     dummyPanel.add(driveLed)
     infoPanel.add("East",dummyPanel)
     displayFrame.getContentPane.add("South",infoPanel)
+    displayFrame.setTransferHandler(DNDHandler)
     Log.info(sw.toString)
   }
   
@@ -499,7 +533,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
       //Log.fine(s"BA low until ${cycles}")
     }
   }
-  
+    
   // ---------------------------------- GUI HANDLING -------------------------------
     
   final def actionPerformed(e:ActionEvent) {
@@ -607,6 +641,97 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     }
   }
   
+  private def handleDND(file:File) {
+    val name = file.getName.toUpperCase
+    if (name.endsWith(".CRT")) loadCartridgeFile(file)
+    else {
+      reset(false)
+      clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => {
+        if (name.endsWith(".PRG")) loadPRGFile(file,true)
+	    else    
+	    if (name.endsWith(".D64")) attachDiskFile(file,true)
+	    else
+	    if (name.endsWith(".TAP")) attachTapeFile(file,true)
+      })
+      )
+      clock.play
+    }
+  }
+  
+  private def loadPRGFile(file:File,autorun:Boolean) {    
+    val in = new FileInputStream(file)
+    val start = in.read + in.read * 256
+    var m = start
+    var b = in.read
+    var size = 0
+    while (b != -1) {
+      mem.write(m, b)
+      m += 1
+      size += 1
+      b = in.read
+    }
+    in.close
+    val end = start + size
+    mem.write(45, end % 256)
+    mem.write(46, end / 256)
+    mem.write(0xAE,end % 256)
+    mem.write(0xAF,end / 256)
+    Log.info(s"BASIC program loaded from ${start} to ${end} size=${size}")
+    configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
+    if (autorun) {
+      insertTextIntoKeyboardBuffer("RUN" + 13.toChar)
+    }
+  }
+  
+  private def loadCartridgeFile(file:File) {
+    try {          
+      val ep = ExpansionPortFactory.loadExpansionPort(file.toString)
+      println(ep)
+      ExpansionPort.setExpansionPort(ep)
+      Log.info(s"Attached cartridge ${ExpansionPort.getExpansionPort.name}")
+      reset(false)
+      configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)          
+    }
+    catch {
+      case t:Throwable =>
+        t.printStackTrace(traceDialog.logPanel.writer)
+        JOptionPane.showMessageDialog(displayFrame,t.toString, "Cartridge loading error",JOptionPane.ERROR_MESSAGE)
+    }
+    finally {
+      clock.play
+    }
+  }
+  
+  private def attachDiskFile(file:File,autorun:Boolean) {
+    try {
+      val disk = new D64(file.toString)
+      attachedDisk match {
+        case Some(oldDisk) => oldDisk.close
+        case None =>
+      }
+      attachedDisk = Some(disk)
+      drive.setDriveReader(disk)
+      configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
+      if (autorun) {
+        insertTextIntoKeyboardBuffer("LOAD\"*\",8,1" + 13.toChar + "RUN" + 13.toChar)
+      }
+    }
+    catch {
+      case t:Throwable =>
+        t.printStackTrace
+        JOptionPane.showMessageDialog(displayFrame,t.toString, "Disk attaching error",JOptionPane.ERROR_MESSAGE)
+    }
+  }
+  
+  private def attachTapeFile(file:File,autorun:Boolean) {
+    datassette.setTAP(Some(new TAP(file.toString)))
+    configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
+    if (autorun) {
+        insertTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar)
+      }
+  }
+  // -------------------------------------------------
+  
   private def printerSaveImage {
     val fc = new JFileChooser
     fc.showSaveDialog(printerDialog) match {
@@ -665,26 +790,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
       def getDescription = "PRG files"
     })
     fc.showOpenDialog(displayFrame) match {
-      case JFileChooser.APPROVE_OPTION =>
-        configuration.setProperty(CONFIGURATION_LASTDISKDIR,fc.getSelectedFile.getParentFile.toString)
-        val in = new FileInputStream(fc.getSelectedFile)
-        val start = in.read + in.read * 256
-        var m = start
-        var b = in.read
-        var size = 0
-        while (b != -1) {
-          mem.write(m, b)
-          m += 1
-          size += 1
-          b = in.read
-        }
-        in.close
-        val end = start + size
-        mem.write(45, end % 256)
-        mem.write(46, end / 256)
-        mem.write(0xAE,end % 256)
-        mem.write(0xAF,end / 256)
-        Log.info(s"BASIC program loaded from ${start} to ${end} size=${size}")
+      case JFileChooser.APPROVE_OPTION =>                
+        loadPRGFile(fc.getSelectedFile,false)
       case _ =>
     }
   }
@@ -756,22 +863,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     })
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-        try {          
-          val ep = ExpansionPortFactory.loadExpansionPort(fc.getSelectedFile.toString)
-          println(ep)
-          ExpansionPort.setExpansionPort(ep)
-          Log.info(s"Attached cartridge ${ExpansionPort.getExpansionPort.name}")
-          reset(false)
-          configuration.setProperty(CONFIGURATION_LASTDISKDIR,fc.getSelectedFile.getParentFile.toString)          
-        }
-        catch {
-          case t:Throwable =>
-            t.printStackTrace(traceDialog.logPanel.writer)
-            JOptionPane.showMessageDialog(displayFrame,t.toString, "Cartridge loading error",JOptionPane.ERROR_MESSAGE)
-        }
-        finally {
-          clock.play
-        }
+        loadCartridgeFile(fc.getSelectedFile)
       case _ =>
     }
   }
@@ -787,24 +879,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     })
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-        try {
-          val disk = new D64(fc.getSelectedFile.toString)
-          attachedDisk match {
-            case Some(oldDisk) => oldDisk.close
-            case None =>
-          }
-          attachedDisk = Some(disk)
-          drive.setDriveReader(disk)
-          configuration.setProperty(CONFIGURATION_LASTDISKDIR,fc.getSelectedFile.getParentFile.toString)
-          if (autorun) {
-            insertTextIntoKeyboardBuffer("LOAD\"*\",8,1" + 13.toChar + "RUN" + 13.toChar)
-          }
-        }
-        catch {
-          case t:Throwable =>
-            t.printStackTrace
-            JOptionPane.showMessageDialog(displayFrame,t.toString, "Disk attaching error",JOptionPane.ERROR_MESSAGE)
-        }
+        attachDiskFile(fc.getSelectedFile,autorun)
       case _ =>
     }
   }
@@ -860,8 +935,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     })
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-        datassette.setTAP(Some(new TAP(fc.getSelectedFile.toString)))
-        configuration.setProperty(CONFIGURATION_LASTDISKDIR,fc.getSelectedFile.getParentFile.toString)
+        attachTapeFile(fc.getSelectedFile,false)
       case _ =>
     }
   }

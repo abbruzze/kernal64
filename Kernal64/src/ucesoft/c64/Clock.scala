@@ -72,7 +72,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   def maximumSpeed = _maximumSpeed
   def maximumSpeed_=(maximumSpeed:Boolean) {
     _maximumSpeed = maximumSpeed
-    lastCorrectionTime == 0
+    lastCorrectionTime = 0
   }
   
   override def getProperties = {
@@ -141,7 +141,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       }
       if (System.currentTimeMillis > nextPerformanceMeasurementTime) {
         val executed = cycles - throttleStartedAt
-        lastPerformance = (100.0 * executed / C64_CLOCK_HZ / (PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS / 1000)).toInt
+        lastPerformance = math.round(100.0 * executed / C64_CLOCK_HZ / (PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS / 1000)).toInt
         setupNextMeasurement
       }
     }

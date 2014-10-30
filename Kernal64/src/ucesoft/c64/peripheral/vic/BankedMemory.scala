@@ -40,12 +40,12 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
     // check if we have to read CHAR ROM
     if (address >= 4096 && address < 8192 && (bank == 0 || bank == 2)) {
       val offset = address - 4096 + CPU6510Mems.M_CHARACTERS
-      Log.fine("VIC reading character ROM at offset %4X".format(offset))
+      //Log.fine("VIC reading character ROM at offset %4X".format(offset))
       charROM.read(offset,chipID)
     }
     else {      
-      val realAddress = baseAddress + address
-      Log.fine("VIC reading RAM at %4X".format(realAddress))
+      val realAddress = baseAddress | address
+      //Log.fine("VIC reading RAM at %4X".format(realAddress))
       mem.read(realAddress,chipID)
     }
     

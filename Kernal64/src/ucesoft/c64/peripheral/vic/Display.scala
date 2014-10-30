@@ -19,7 +19,7 @@ class Display(width: Int, height: Int, title: String, frame: JFrame) extends JCo
   private[this] val dimension = new Dimension(0, 0)
   private[this] var clipArea: Tuple2[Point, Point] = null
   private[this] var frameCounter = 0L
-  private[this] var framePerSecond = 0L
+  private[this] var framePerSecond = 0
   private[this] var ts = 0L
   val displayMem = Array.fill(width * height)(0xFF000000)
   private[this] val displayImage = new MemoryImageSource(width, height, displayMem, 0, width)
@@ -98,7 +98,7 @@ class Display(width: Int, height: Int, title: String, frame: JFrame) extends JCo
     frameCounter += 1
     val now = System.currentTimeMillis
     if (ts == 0 || now - ts > 1000) {
-      framePerSecond = (frameCounter / ((now - ts) / 1000.0)).toInt
+      framePerSecond = math.round(frameCounter / ((now - ts) / 1000.0)).toInt
       ts = now
       frameCounter = 0
       frame.setTitle(title + " - " + framePerSecond + "fps - " + Clock.systemClock.getLastPerformancePerc + "%")

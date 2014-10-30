@@ -133,7 +133,7 @@ trait CPU6510 extends Chip with TraceListener {
   def nmiRequest(low: Boolean)
   def irqRequest(low: Boolean)
   
-  //def setBaLow(cycles:Long)
+  def setBaLow(low:Boolean) {}
   //def clock(cycles:Long)
 }
 
@@ -152,20 +152,20 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   private[this] val syncObject = new Object
   // --------------- Registers ----------------
   private[this] val FLAG_# = "00100000".b
-  private[this] val N_FLAG = "10000000".b
-  private[this] val V_FLAG = "01000000".b
-  private[this] val B_FLAG = "00010000".b
+  private[this] final val N_FLAG = "10000000".b
+  private[this] final val V_FLAG = "01000000".b
+  private[this] final val B_FLAG = "00010000".b
   private[this] val NOT_B_FLAG = "11101111".b
-  private[this] val D_FLAG = "00001000".b
-  private[this] val I_FLAG = "00000100".b
-  private[this] val Z_FLAG = "00000010".b
-  private[this] val C_FLAG = "00000001".b
+  private[this] final val D_FLAG = "00001000".b
+  private[this] final val I_FLAG = "00000100".b
+  private[this] final val Z_FLAG = "00000010".b
+  private[this] final val C_FLAG = "00000001".b
 
-  private[this] val A_REG = 0
-  private[this] val X_REG = 1
-  private[this] val Y_REG = 2
-  private[this] val SP_REG = 3
-  private[this] val SR_REG = 4
+  private[this] final val A_REG = 0
+  private[this] final val X_REG = 1
+  private[this] final val Y_REG = 2
+  private[this] final val SP_REG = 3
+  private[this] final val SR_REG = 4
   private[this] val FLAGS = "CZIDB#VN"
 
   private[this] var PC= 0
@@ -240,21 +240,36 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
 //  }
   
   // cache for performance optimization
-  private[this] object OpAddressType extends Enumeration {
-    type Type = Value
-    val IMPLICIT, IMMEDIATE, ADDRESS = Value
-  }
+//  private[this] object OpAddressType extends Enumeration {
+//    type Type = Value
+//    val IMPLICIT, IMMEDIATE, ADDRESS = Value
+//  }
+  private[this] final val IMPLICIT = 0
+  private[this] final val IMMEDIATE = 1
+  private[this] final val ADDRESS = 2
+  private[this] final val ZP_MODE = Mode.ZP.id
+  private[this] final val ZPX_MODE = Mode.ZPX.id
+  private[this] final val ZPY_MODE = Mode.ZPY.id
+  private[this] final val IZX_MODE = Mode.IZX.id
+  private[this] final val IZY_MODE = Mode.IZY.id
+  private[this] final val ABS_MODE = Mode.ABS.id
+  private[this] final val ABX_MODE = Mode.ABX.id
+  private[this] final val ABY_MODE = Mode.ABY.id
+  private[this] final val IMM_MODE = Mode.IMM.id
+  private[this] final val IND_MODE = Mode.IND.id
+  private[this] final val REL_MODE = Mode.REL.id
+  private[this] final val IMP_MODE = Mode.IMP.id
   private[this] var opAdditionalCycles = 0
   private[this] var opLen = 0
   private[this] var opData = 0
-  private[this] var opAddressType = OpAddressType.IMPLICIT
+  private[this] var opAddressType = IMPLICIT
   private[this] var opInstruction : Instruction.CODE = null
   private[this] var opCycles = 0
 //  private[this] var phase = Phase.FETCH
   //private[this] var waitCycles = 0L
   //private[this] var baLowUntil = 0L
   
-  @inline private def setOp(opType:OpAddressType.Type,data:Int,len:Int,addCycles:Int) {
+  @inline private def setOp(opType:Int,data:Int,len:Int,addCycles:Int) {
     opAddressType = opType
     opData = data
     opLen = len
@@ -330,6 +345,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
 
   @inline private def decodeAddressMode(opCell: OperationCell) {
     import Mode._
+    import annotation.switch
     
     @inline def pageBoundaryCrossedCycles(address: Int, target: Int) = {
       val addhi = address & 0xff00
@@ -337,18 +353,18 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
       if (opCell._3 < 0 && addhi != tahi) 1 else 0
     } 
     
-    val mode = opCell._2
-    mode match {
-      case IMP => //Implicit
-        setOp(opType = OpAddressType.IMPLICIT,data = 0,len = 0,addCycles = 0)
-      case IMM | REL =>
-        setOp(opType = OpAddressType.IMMEDIATE,data = mem.read(PC),len = 1,addCycles = 0)
-      case ABS =>
+    val mode = opCell._2.id
+    (mode : @switch) match {
+      case IMP_MODE => //Implicit
+        setOp(opType = IMPLICIT,data = 0,len = 0,addCycles = 0)
+      case IMM_MODE | REL_MODE =>
+        setOp(opType = IMMEDIATE,data = mem.read(PC),len = 1,addCycles = 0)
+      case ABS_MODE =>
         val address = readWordFrom(PC, mem)
-        setOp(opType = OpAddressType.ADDRESS,data = address,len = 2,addCycles = 0)
-      case ABX | ABY =>
+        setOp(opType = ADDRESS,data = address,len = 2,addCycles = 0)
+      case ABX_MODE | ABY_MODE =>
         val address = readWordFrom(PC, mem)
-        val offset = if (mode == ABX) X else Y
+        val offset = if (mode == ABX_MODE) X else Y
         // read from a bad address
         val ah = address & 0xFF00
         val al = address & 0x00FF
@@ -356,22 +372,22 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
         mem.read(effectiveAddress)
         // good address
         val target = (address + offset) & 0xFFFF
-        setOp(opType = OpAddressType.ADDRESS,data = target,len = 2,addCycles = pageBoundaryCrossedCycles(effectiveAddress, target))
-      case IND =>
+        setOp(opType = ADDRESS,data = target,len = 2,addCycles = pageBoundaryCrossedCycles(effectiveAddress, target))
+      case IND_MODE =>
         val address = readWordFrom(PC, mem)
-        setOp(opType = OpAddressType.ADDRESS,data = readWordFromWithBUG(address, mem),len = 2,addCycles = 0)
-      case ZP =>
+        setOp(opType = ADDRESS,data = readWordFromWithBUG(address, mem),len = 2,addCycles = 0)
+      case ZP_MODE =>
         val address = mem.read(PC)
-        setOp(opType = OpAddressType.ADDRESS,data = address,len = 1,addCycles = 0)
-      case ZPX | ZPY =>
+        setOp(opType = ADDRESS,data = address,len = 1,addCycles = 0)
+      case ZPX_MODE | ZPY_MODE =>
         val address = mem.read(PC)
-        val target = (address + (if (mode == ZPX) X else Y)) & 0xff
-        setOp(opType = OpAddressType.ADDRESS,data = target,len = 1,addCycles = pageBoundaryCrossedCycles(address, target))
-      case IZX =>
+        val target = (address + (if (mode == ZPX_MODE) X else Y)) & 0xff
+        setOp(opType = ADDRESS,data = target,len = 1,addCycles = pageBoundaryCrossedCycles(address, target))
+      case IZX_MODE =>
         val address = (mem.read(PC) + X) & 0xFF
         val address2 = readWordFromWithBUG(address, mem)
-        setOp(opType = OpAddressType.ADDRESS,data = address2,len = 1,addCycles = 0)
-      case IZY =>
+        setOp(opType = ADDRESS,data = address2,len = 1,addCycles = 0)
+      case IZY_MODE =>
         val address = mem.read(PC)
         // maybe read from a bad address
         val ah = mem.read(address + 1) << 8
@@ -380,7 +396,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
         // good address
         //val target = Y + readWordFromWithBUG(address, mem)
         val target = Y + (if (address == 0xFF) (mem.read(0) << 8 | al) else ah | al)
-        setOp(opType = OpAddressType.ADDRESS,data = target,len = 1,addCycles = pageBoundaryCrossedCycles(target, effectiveAddress))
+        setOp(opType = ADDRESS,data = target,len = 1,addCycles = pageBoundaryCrossedCycles(target, effectiveAddress))
     }
   }
 
@@ -421,11 +437,11 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   }
 
   private[this] abstract class Op {
-    val OP_R = 0 // read
-    val OP_RW = 1 // read/write
-    val N_BIT = "10000000".b
-    val V_BIT = "01000000".b
-    val DATA_IMPLICIT = 0x10000
+    final val OP_R = 0 // read
+    final val OP_RW = 1 // read/write
+    final val N_BIT = "10000000".b
+    final val V_BIT = "01000000".b
+    final val DATA_IMPLICIT = 0x10000
 
     val code: Instruction.CODE
     val rw = OP_R
@@ -436,16 +452,16 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
       if (value == 0) sez else clz
     }
     
-    final def getData(opAddressType:OpAddressType.Type,opData:Int) = {
-      import OpAddressType._
-      opAddressType match {
+    final def getData(opAddressType:Int,opData:Int) = {  
+      import annotation.switch
+      (opAddressType : @switch) match {
         case IMPLICIT => DATA_IMPLICIT
         case IMMEDIATE => opData
         case ADDRESS => if (rw == OP_R) mem.read(opData) else opData
       }
     }
 
-    def run(opAddressType:OpAddressType.Type,opData:Int,opLen:Int,addCycles:Int): Int = {
+    def run(opAddressType:Int,opData:Int,opLen:Int,addCycles:Int): Int = {
       val data = getData(opAddressType,opData)
       PC += opLen
       execute(data) + addCycles
@@ -463,7 +479,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   }    
   
   private[this] abstract class CompositeOp(ops:StdOp*) extends StdOp {
-    override final def run(opAddressType:OpAddressType.Type,opData:Int,opLen:Int,addCycles:Int): Int = {
+    override final def run(opAddressType:Int,opData:Int,opLen:Int,addCycles:Int): Int = {
       var i = 0
       while (i < ops.length) {
         val data = ops(i).getData(opAddressType,opData)
@@ -548,13 +564,14 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
     }
   }
   private[this] class CMP(reg: Int) extends StdOp {
-    val code = reg match {
+    import annotation.switch
+    val code = (reg: @switch) match {
       case A_REG => CMP
       case X_REG => CPX
       case Y_REG => CPY
     }
     final def exe(data: Int) = {
-      val R = reg match {
+      val R = (reg: @switch) match {
         case A_REG => A
         case X_REG => X
         case Y_REG => Y
@@ -632,13 +649,14 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   }
   // Move commands
   private[this] class LDAXY(reg: Int) extends StdOp {
+    import annotation.switch
     val code = reg match {
       case A_REG => LDA
       case X_REG => LDX
       case Y_REG => LDY
     }
     final def exe(data: Int) = {
-      val r = reg match {
+      val r = (reg: @switch) match {
         case A_REG =>
           A = data; A
         case X_REG =>
@@ -649,14 +667,15 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
     }
   }
   private[this] class STAXY(reg: Int) extends StdOp {
+    import annotation.switch
     override val rw = OP_RW
-    val code = reg match {
+    val code = (reg: @switch) match {
       case A_REG => STA
       case X_REG => STX
       case Y_REG => STY
     }
     final def exe(data: Int) = {
-      reg match {
+      (reg: @switch) match {
         case A_REG => mem.write(data, A)
         case X_REG => mem.write(data, X)
         case Y_REG => mem.write(data, Y)
@@ -664,6 +683,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
     }
   }
   private[this] class TAXYS(flip: Boolean, reg: Int) extends StdOp {
+    import annotation.switch
     val code = (flip, reg) match {
       case (true, X_REG) => TAX
       case (false, X_REG) => TXA
@@ -674,7 +694,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
       case (_, _) => throw new IllegalArgumentException("Bad configuration of TAXYS")
     }
     final def exe(data: Int) = {
-      reg match {
+      (reg: @switch) match {
         case X_REG =>
           val r = if (flip) { X = A; X } else { A = X; A }
           checkNZ(r)
@@ -717,6 +737,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   }
   // Jump/Flag commands
   private[this] class Branch(bit: Int, onZero: Boolean) extends Op {
+    import annotation.switch
     val code = (bit, onZero) match {
       case (N_FLAG, true) => BPL
       case (N_FLAG, false) => BMI
@@ -729,7 +750,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
       case (_, _) => throw new IllegalArgumentException("Bad configuration of Branch")
     }
     final def execute(data: Int) = {
-      val flag = bit match {
+      val flag = (bit : @switch) match {
         case N_FLAG => isNegative
         case V_FLAG => isOverflow
         case C_FLAG => isCarry
@@ -800,6 +821,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
     }
   }
   private[this] class SET_CLR_SR(isSet: Boolean, bit: Int) extends StdOp {
+    import annotation.switch
     val code = (isSet, bit) match {
       case (true, C_FLAG) => SEC
       case (false, C_FLAG) => CLC
@@ -811,7 +833,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
       case (_, _) => throw new IllegalArgumentException("Bad configuration of SET_CLR_SR")	    
     }
     final def exe(data: Int) = {
-      bit match {
+      (bit : @switch) match {
         case C_FLAG => if (isSet) sec else clc
         case D_FLAG => if (isSet) sed else cld
         case I_FLAG => if (isSet) sei else cli
