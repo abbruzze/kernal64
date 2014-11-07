@@ -12,7 +12,10 @@ abstract class ExpansionPort extends RAMComponent {
   val startAddress = 0xDE00
   val length = 512
   val isRom = false
-  def isActive = true
+  val isActive = true
+  protected[this] var baLow = false
+  
+  def setBaLow(baLow:Boolean) = this.baLow = baLow
 
   def EXROM: Boolean
   def GAME: Boolean

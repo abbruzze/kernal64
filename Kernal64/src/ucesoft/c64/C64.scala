@@ -50,14 +50,15 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "0.9.9G"
+  private[this] val VERSION = "0.9.9H"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
   private[this] val CONFIGURATION_FRAME_DIM = "frame.dim"
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mem = new CPU6510Mems.MAIN_MEMORY
-  private[this] val cpu = CPU6510.make(mem)  
+  private[this] var cpu = CPU6510.make(mem)  
+  private[this] var cpuExact = cpu.isExact
   private[this] var vicChip : vic.VIC = _
   private[this] val sid = new SID
   private[this] var display : vic.Display = _
@@ -76,7 +77,10 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   }
   private[this] val bus = new IECBus
   private[this] var baLowUntil = -1L
+  private[this] var baLow = false
+  private[this] var dma = false
   private[this] var cpuWaitUntil = -1L
+  private[this] val expansionPort = ExpansionPort.getExpansionPort
   // -------------------- TRACE ----------------
   private[this] var traceDialog : TraceDialog = _
   private[this] var diskTraceDialog : TraceDialog = _
@@ -403,7 +407,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     add(controlPortA)
     add(controlPortB)
     add(bus)
-    add(ExpansionPort.getExpansionPort)
+    add(expansionPort)
     // -----------------------
     val bankedMemory = new vic.BankedMemory(mem,mem.CHAR_ROM,mem.COLOR_RAM)    
     ExpansionPort.setMemoryForEmptyExpansionPort(bankedMemory)
@@ -513,6 +517,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
         trace(true,true)
     }    
   }
+  
   private def mainLoop(cycles:Long) {
     // VIC PHI1
     vicChip.clock(cycles)
@@ -523,13 +528,34 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     // printer
     printer.clock(cycles)
     // CPU PHI2
-    val canExecCPU = cycles > cpuWaitUntil && cycles > baLowUntil
-    if (canExecCPU) cpuWaitUntil = cycles + cpu.fetchAndExecute
+    if (cpuExact) {
+      if (baLow && cycles > baLowUntil) {
+        cpu.setBaLow(false)
+        expansionPort.setBaLow(false)
+        baLow = false
+      }
+      cpu.fetchAndExecute
+    }
+    else {
+      if (baLow && cycles > baLowUntil) {
+        expansionPort.setBaLow(false)
+        baLow = false
+      }
+      val canExecCPU = cycles > cpuWaitUntil && cycles > baLowUntil && !dma
+      if (canExecCPU) cpuWaitUntil = cycles + cpu.fetchAndExecute
+    }
+  }
+  
+  private def setDMA(dma:Boolean) {
+    this.dma = dma
+    if (cpuExact) cpu.setDMA(dma)
   }
   
   private def baLow(cycles:Long) {
     if (cycles > baLowUntil) {
       baLowUntil = cycles
+      baLow = true
+      if (cpuExact) cpu.setBaLow(true)
       //Log.fine(s"BA low until ${cycles}")
     }
   }
@@ -638,7 +664,21 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
         printer.setActive(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
       case "VOLUME" =>
         volumeDialog.setVisible(true)
+      case "CPU_CE" => changeCPU(true)
+      case "CPU" => changeCPU(false)
     }
+  }
+  
+  private def changeCPU(cycleExact:Boolean) {
+    clock.pause
+    val oldCpu = cpu
+    cpu = CPU6510.make(mem,cycleExact)
+    cpu.initComponent
+    cpuExact = cycleExact
+    change(oldCpu,cpu)
+    drive.changeCPU(cycleExact)
+    
+    reset(true)
   }
   
   private def handleDND(file:File) {
@@ -1204,6 +1244,23 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     busSnooperActiveItem.setActionCommand("BUS_SNOOP")
     busSnooperActiveItem.addActionListener(this)    
     optionMenu.add(busSnooperActiveItem)
+    
+    optionMenu.addSeparator
+    
+    val group4 = new ButtonGroup
+    val cpuExactItem = new JRadioButtonMenuItem("CPU exact")
+    cpuExactItem.setSelected(cpuExact)
+    cpuExactItem.setToolTipText("CPU with cycle exact behaviour")
+    cpuExactItem.setActionCommand("CPU_CE")
+    cpuExactItem.addActionListener(this)
+    optionMenu.add(cpuExactItem)
+    group4.add(cpuExactItem)
+    val cpuFastItem = new JRadioButtonMenuItem("Faster CPU")    
+    cpuFastItem.setToolTipText("Faster CPU with non-cycle exact behaviour")
+    cpuFastItem.setActionCommand("CPU")
+    cpuFastItem.addActionListener(this)
+    optionMenu.add(cpuFastItem)
+    group4.add(cpuFastItem)
     
     val aboutItem = new JMenuItem("About")
     aboutItem.setActionCommand("ABOUT")

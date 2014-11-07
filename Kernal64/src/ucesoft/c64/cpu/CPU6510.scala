@@ -117,7 +117,7 @@ object CPU6510 {
     DisassembledInfo(address, op._1.toString, ind, bytes.toArray)
   }
   
-  def make(mem:Memory,id:ChipID.ID = ChipID.CPU) : CPU6510 = new CPU6510Impl(mem,id)
+  def make(mem:Memory,exact:Boolean = true,id:ChipID.ID = ChipID.CPU) : CPU6510 = if (exact) new CPU6510_CE(mem,id) else new CPU6510Impl(mem,id)
 }
 
 trait CPU6510 extends Chip with TraceListener {
@@ -133,8 +133,9 @@ trait CPU6510 extends Chip with TraceListener {
   def nmiRequest(low: Boolean)
   def irqRequest(low: Boolean)
   
+  val isExact = false
   def setBaLow(low:Boolean) {}
-  //def clock(cycles:Long)
+  def setDMA(dma:Boolean) {}
 }
 
 private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {

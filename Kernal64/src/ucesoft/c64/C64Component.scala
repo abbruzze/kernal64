@@ -32,6 +32,13 @@ trait C64Component {
   def reset
   def init
   
+  final def change(oldComponent:C64Component,newComponent:C64Component) {
+    _components indexOf (oldComponent) match {
+      case -1 => throw new IllegalArgumentException("Can't find component " + oldComponent)
+      case i => _components(i) = newComponent
+    }
+  }
+  
   def afterInitHook {}
   
   final def resetComponent : Unit = {

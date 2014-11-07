@@ -11,4 +11,5 @@ trait Drive extends C64Component {
   def setCanSleep(canSleep:Boolean) {}
   def setDriveReader(driveReader:D64)
   def clock(cycles:Long)
+  def changeCPU(cycleExact:Boolean) {}
 }

@@ -398,29 +398,41 @@ final class VIC(mem: Memory,
     final def yexp_=(v: Boolean) {
       _yexp = v
       if (!v) expansionFF = true
-      //if (rasterCycle == 24) mc = 42 & mc & mcbase | 21 & (mc | mcbase) // sprite crunch ??
+      if (rasterCycle == 24) mc = 42 & mc & mcbase | 21 & (mc | mcbase) // sprite crunch ??
     }
 
     final def getPixels = pixels
 
-    final def clear {
+    final def reset {
+      enabled = false
+      x = 0
+      y = 0
+      xexp = false
+      color = 0
+      isMulticolor = false
+      dataPriority = false
+      gdata = 0
+      _yexp = false
+      memoryPointer = 0
+      mcbase = 0
+      mc = 0
+      dma = false
+      expansionFF = true
+      xexpCounter = 0
+      display = false
+      lastLine = false
+      painting = false
+      hasPixels = false
       counter = 0
-      reset
+      resetSprite
     }
     
     def init {}
 
-    @inline final def reset {
+    @inline final def resetSprite {
       if (hasPixels) {
         hasPixels = false
         Array.copy(ALL_TRANSPARENT,0,pixels,0,8)
-        /*
-        var i = 0
-        while (i < 8) {
-          pixels(i) = PIXEL_TRANSPARENT
-          i += 1
-        } 
-        */     
       }
       if (!displayable) spritesDisplayedMask &= ~mask
     }
@@ -821,7 +833,6 @@ final class VIC(mem: Memory,
     spriteXExpansion = 0
     spriteSpriteCollision = 0
     spriteBackgroundCollision = 0
-    for (s <- 0 to 7) sprites(s).clear
     BorderShifter.clear
     GFXShifter.clear
   }
@@ -916,8 +927,8 @@ final class VIC(mem: Memory,
           }
         //Log.fine((for(i <- 0 to 7) yield "Sprite x updated to" + sprites(i).x) mkString("\n"))
         case 17 =>
-          val clk = Clock.systemClock
-          clk.schedule(new ClockEvent("$D011",clk.currentCycles + 2,(cycles) => {
+          //val clk = Clock.systemClock
+          //clk.schedule(new ClockEvent("$D011",clk.currentCycles + 4,(cycles) => {
             controlRegister1 = value
             if ((controlRegister1 & 128) == 128) rasterLatch |= 0x100 else rasterLatch &= 0xFF
             if (rasterLatch > RASTER_LINES) rasterLatch &= 0xFF
@@ -928,7 +939,7 @@ final class VIC(mem: Memory,
             bmm = (controlRegister1 & 32) == 32
             ecm = (controlRegister1 & 64) == 64
             badLine = isBadLine
-          }))
+          //}))
           if (debug) Log.info("VIC control register set to %s, yscroll=%d rsel=%d den=%b bmm=%b ecm=%b. Raster latch set to %4X".format(Integer.toBinaryString(controlRegister1), yscroll, rsel, den, bmm, ecm, rasterLatch))
         //Log.info("VIC control register set to %s, yscroll=%d rsel=%d den=%b bmm=%b ecm=%b. Raster latch set to %4X".format(Integer.toBinaryString(controlRegister1),yscroll,rsel,den,bmm,ecm,rasterLatch))
           //hashVideoCache(rasterLine)(rasterCycle) = getHashVideoCache
@@ -952,7 +963,7 @@ final class VIC(mem: Memory,
         //Log.fine("Sprite enable register se to " + Integer.toBinaryString(spriteEnableRegister))
         case 22 =>
           //val clk = Clock.systemClock
-          //clk.schedule(new ClockEvent("$D016",clk.currentCycles + 2,(cycles) => {
+          //clk.schedule(new ClockEvent("$D016",clk.currentCycles + 4,(cycles) => {
           controlRegister2 = value
           xscroll = controlRegister2 & 7
           csel = (controlRegister2 & 8) >> 3
@@ -972,7 +983,7 @@ final class VIC(mem: Memory,
         //Log.fine("Sprite Y expansion se to " + Integer.toBinaryString(spriteYExpansion))
         case 24 =>
           //val clk = Clock.systemClock
-          //clk.schedule(new ClockEvent("$D018",clk.currentCycles + 2,(cycles) => {
+          //clk.schedule(new ClockEvent("$D018",clk.currentCycles + 4,(cycles) => {
           vicBaseAddress = value
           videoMatrixAddress = ((vicBaseAddress >> 4) & 0x0F) << 10 //* 1024
           characterAddress = ((vicBaseAddress >> 1) & 0x07) << 11 //* 2048
@@ -1294,7 +1305,7 @@ final class VIC(mem: Memory,
     if (almostOneSprite) 
     while (s < 8) {
       //if (sprites(s).hasPixels) sprites(s).reset
-      sprites(s).reset
+      sprites(s).resetSprite
       s += 1
     }
     // *************************************************************************
