@@ -3,14 +3,23 @@ package ucesoft.c64.formats
 import scala.collection.mutable.ListBuffer
 
 private[formats] object GCR {
-  private val SYNC = 0xFF
-  private val SYNC_SIZE = 5
-  private val HEADER_SIZE = 10
-  private val GAP = 0x55
-  private val HEADER_DATA_GAP_SIZE = 9  
-  private val DATA_SIZE = 325
-  private val GAP_AFTER_DATA_SIZE = 8
-  private val GCR_SECTOR_SIZE = SYNC_SIZE + HEADER_SIZE + HEADER_DATA_GAP_SIZE + SYNC_SIZE + DATA_SIZE + GAP_AFTER_DATA_SIZE
+  final private[this] val SYNC = 0xFF
+  final private[this] val SYNC_SIZE = 5
+  final private[this] val HEADER_SIZE = 10
+  final private[this] val GAP = 0x55
+  final private[this] val HEADER_DATA_GAP_SIZE = 9  
+  final private[this] val DATA_SIZE = 325
+  //final private[this] val GAP_AFTER_DATA_SIZE = 8
+  //final private[this] val GCR_SECTOR_SIZE = SYNC_SIZE + HEADER_SIZE + HEADER_DATA_GAP_SIZE + SYNC_SIZE + DATA_SIZE + GAP_AFTER_DATA_SIZE
+  
+  final private[this] val INTER_SECTOR_GAPS_PER_ZONE = Array(9, 12, 17, 8) 
+  
+  @inline private def getZoneFrom(track:Int) = {
+    if (track <= 17) 0
+    else if (track <= 24) 1
+    else if (track <= 30) 2
+    else 3
+  } 
   
   /**
    * Convert a gcr sector back to a disk format sector.
@@ -59,7 +68,7 @@ private[formats] object GCR {
     gcr.addAndConvertToGCR(dataChecksum)
     gcr.addAndConvertToGCR(0x00,0x00)
     // SECTOR-HEADER GAP
-    for(_ <- 1 to GAP_AFTER_DATA_SIZE) gcr.add(GAP)
+    for(_ <- 1 to INTER_SECTOR_GAPS_PER_ZONE(getZoneFrom(track))) gcr.add(GAP)
     gcr.getGCRBytes
   }  
 }
@@ -157,5 +166,5 @@ private[formats]class GCR private {
   /**
    * Get the final GCR buffer.
    */
-  def getGCRBytes = if (GCRBuffer.size == GCR_SECTOR_SIZE) GCRBuffer.toArray else throw new IllegalStateException("Buffer is not full.Current length is " + GCRBuffer.size)
+  def getGCRBytes = GCRBuffer.toArray// else throw new IllegalStateException("Buffer is not full.Current length is " + GCRBuffer.size)
 }

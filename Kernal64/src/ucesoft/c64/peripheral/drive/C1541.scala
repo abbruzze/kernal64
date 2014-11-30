@@ -10,6 +10,7 @@ import ucesoft.c64.formats.D64
 import ucesoft.c64.C64ComponentType
 import ucesoft.c64.C64Component
 import ucesoft.c64.cpu.CPU6510_CE
+import ucesoft.c64.trace.BreakType
 
 class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends TraceListener with Drive {
   val componentID = "C1541 Disk Drive"
@@ -45,13 +46,14 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private def awake {
     if (!running) {
       running = true
+      isRunningListener(true)
       viaBus.setActive(true)
       viaDisk.setActive(true)
       awakeCycles = clk.currentCycles
       viaDisk.awake
     }
   }
-
+  
   override def getProperties = {
     properties.setProperty("Running", running.toString)
     val channels = mem.getChannelsState
@@ -74,6 +76,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
 
   def reset {
     running = true
+    isRunningListener(true)
     awakeCycles = 0
     goSleepingCycles = 0
     if (ledListener != null) ledListener.turnOn
@@ -82,6 +85,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   override def changeCPU(cycleExact:Boolean) {
     val oldCpu = cpu
     cpu = CPU6510.make(mem,cycleExact,ChipID.CPU_1541)
+    viaDisk.cpu = cpu
     cpu.initComponent
     cpuExact = cycleExact
     change(oldCpu,cpu)
@@ -135,7 +139,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       setFilename
       if (viaDisk.formatDisk) cpu.jmpTo(FORMAT_ROUTINE_OK) else cpu.jmpTo(FORMAT_ROUTINE_NOK)
     } else if (pc == WAIT_LOOP_ROUTINE && canSleep && !mem.isChannelActive && !viaDisk.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
-      running = false
+      running = false      
       viaBus.setActive(false)
       viaDisk.setActive(false)
       goSleepingCycles = cycles
@@ -149,7 +153,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
         checkPC(cycles)
         cpu.fetchAndExecute
         cycleFrac += CYCLE_ADJ
-        if (cycleFrac > 1) {
+        if (cycleFrac >= 1) {
           cycleFrac -= 1
           cpu.fetchAndExecute
         }
@@ -159,7 +163,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
           cpuWaitUntil = cycles + cpu.fetchAndExecute
           val delta = cpuWaitUntil - cycles + 1
           cycleFrac += delta * CYCLE_ADJ
-          if (cycleFrac > 1) {
+          if (cycleFrac >= 1) {
             cpuWaitUntil -= 1
             cycleFrac -= 1
           }
@@ -172,6 +176,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     } else if (cycles - goSleepingCycles > GO_SLEEPING_MESSAGE_CYCLES) {
       ledListener.endLoading
       goSleepingCycles = Long.MaxValue
+      isRunningListener(false)
     }
   }
 
@@ -195,6 +200,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     cpu.setTrace(traceOn)
   }
   def step(updateRegisters: (String) => Unit) = cpu.step(updateRegisters)
-  def setBreakAt(address: Int, callback: (String) => Unit) = cpu.setBreakAt(address, callback)
+  def setBreakAt(breakType:BreakType,callback:(String) => Unit) = cpu.setBreakAt(breakType,callback)
   def jmpTo(pc: Int) = cpu.jmpTo(pc)
 }

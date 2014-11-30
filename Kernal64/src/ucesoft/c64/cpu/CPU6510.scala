@@ -7,6 +7,7 @@ import ucesoft.c64.trace.TraceListener
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 import ucesoft.c64.ChipID
+import ucesoft.c64.trace.BreakType
 
 object CPU6510 {
   class CPUJammedException extends Exception
@@ -147,7 +148,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   
   // ------------- Tracing --------------------
   private[this] var tracing = false
-  private[this] var breakAt = -1
+  private[this] var breakType : BreakType = null
   private[this] var breakCallBack : (String) => Unit = _
   private[this] var stepCallBack : (String) => Unit = _
   private[this] val syncObject = new Object
@@ -985,19 +986,29 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   }
   
   final def fetchAndExecute : Int = {
-    if (breakAt != -1 && PC == breakAt) {
-      breakAt = -1
+    if (breakType != null && breakType.isBreak(PC,false,false)) {
+      breakType = null
       tracing = true
       breakCallBack(toString)
     }
     
     // check interrupts
     if (nmiOnNegativeEdge) {
+      if (breakType != null && breakType.isBreak(PC,false,true)) {
+        breakType = null
+        tracing = true
+        breakCallBack(toString)
+      }
       nmiOnNegativeEdge = false
-      handleInterrupt(NMI_ROUTINE)
+      handleInterrupt(NMI_ROUTINE)      
     } 
     else 
-    if (irqLow && !isInterrupt) {      
+    if (irqLow && !isInterrupt) {
+      if (breakType != null && breakType.isBreak(PC,true,false)) {
+        breakType = null
+        tracing = true
+        breakCallBack(toString)
+      }
       handleInterrupt(IRQ_ROUTINE)
     }
     else {
@@ -1067,10 +1078,10 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
       syncObject.notify
     }
   }
-  def setBreakAt(address:Int,callback:(String) => Unit) {
+  def setBreakAt(breakType:BreakType,callback:(String) => Unit) {
     tracing = false
     breakCallBack = callback
-    breakAt = address
+    this.breakType = breakType
   }
   def jmpTo(pc:Int) {
     PC = pc

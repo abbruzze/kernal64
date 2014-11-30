@@ -11,12 +11,12 @@ import ucesoft.c64.peripheral.c2n.Datassette
 import ucesoft.c64.Clock
 
 object CPU6510Mems {
-  val M_ROML = 0x8000
-  val M_BASIC = 0xA000
-  val M_KERNAL = 0xE000
-  val M_CHARACTERS, M_IO = 0xD000
-  val COLOR_RAM = 0xD800
-  val SID_RAM = 0xD400
+  final val M_ROML = 0x8000
+  final val M_BASIC = 0xA000
+  final val M_KERNAL = 0xE000
+  final val M_CHARACTERS, M_IO = 0xD000
+  final val COLOR_RAM = 0xD800
+  final val SID_RAM = 0xD400
     
   abstract class ROM(ram: Memory, val name: String, val startAddress: Int, val length: Int, resourceName: String) extends RAMComponent {
     val componentID = "ROM " + name
@@ -135,7 +135,7 @@ object CPU6510Mems {
     val isRom = true
     
     private[this] var active = false
-    private[this] val isROML = name == "ROML"
+    final private[this] val isROML = name == "ROML"
       
     final def isActive = active
     def setActive(active:Boolean) = this.active = active
@@ -144,7 +144,8 @@ object CPU6510Mems {
     
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       val selectedROM = if (isROML) getExpansionPort.ROML else getExpansionPort.ROMH
-      if (selectedROM != null) selectedROM.read(address,chipID) else ram.read(address,chipID)
+      if (selectedROM != null) selectedROM.read(address,chipID)      
+      else ram.read(address,chipID)
     }
     final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
       if (!getExpansionPort.isUltimax) ram.write(address,value,chipID)
@@ -266,6 +267,7 @@ object CPU6510Mems {
       }
       ULTIMAX = !GAME && EXROM
       Log.debug(s"Memory configuration is: BASIC=${BASIC} KERNAL=${KERNAL} CHARROM=${CHARROM} IO=${IO} ROML=${ROML} ROMH=${ROMH} GAME=${GAME} EXROM=${EXROM}")
+      //println(s"Memory configuration is: BASIC=${BASIC} KERNAL=${KERNAL} CHARROM=${CHARROM} IO=${IO} ROML=${ROML} ROMH=${ROMH} GAME=${GAME} EXROM=${EXROM}")
     }
 
     def init {
@@ -287,6 +289,8 @@ object CPU6510Mems {
     
     def reset {
       Log.info("Resetting main memory...")
+      ddr = 0
+      pr = 0
       LORAM = true
       HIRAM = true
       CHAREN = true
@@ -295,6 +299,7 @@ object CPU6510Mems {
     }
     
     @inline final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
+      if (isForwardRead) forwardReadTo.read(address)
       if (ULTIMAX) {
         if (chipID == ChipID.VIC) {
           if (address >= 0x3000 && address < 0x4000) return ROMH.read(0xF000 + address - 0x3000,chipID)
@@ -330,6 +335,8 @@ object CPU6510Mems {
     }
     
     @inline final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
+      if (isForwardWrite) forwardWriteTo.write(address,value)      
+      
       var b = 0
       var found = false
       val length = banks.length
@@ -347,8 +354,8 @@ object CPU6510Mems {
           if ((ddr & 0x40) == 0 && (value & 0x40) > 0) lastCycle1Written6 = clk
           ddr = value
         }
-        else 
-        if (pr != value) {
+        else { 
+        //if (pr != value) {
           val clk = Clock.systemClock.currentCycles
           val bit7 = if ((ddr & 0x80) > 0) {
             lastCycle1Written7 = clk
@@ -364,7 +371,7 @@ object CPU6510Mems {
         }
         check0001
       }
-      else bank.write(address,value,chipID)
+      else bank.write(address,value,chipID)           
     }
     
     override def toString = ram.toString + banks.map(_.toString).mkString("[",",","]")

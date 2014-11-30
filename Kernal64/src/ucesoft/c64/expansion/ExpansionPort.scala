@@ -22,10 +22,12 @@ abstract class ExpansionPort extends RAMComponent {
   def ROML: Memory
   def ROMH: Memory
 
-  def isUltimax = !GAME && EXROM
+  final def isUltimax = !GAME && EXROM
 
-  def init {}
-  def reset {}
+  override def init {}
+  override def reset {}
+  def eject {}
+  def isEmpty = false
 
   override def getProperties = {
     properties.setProperty("EXROM", EXROM.toString)
@@ -36,14 +38,17 @@ abstract class ExpansionPort extends RAMComponent {
     properties
   }
 
-  def notifyMemoryConfigurationChange = ExpansionPort.updateListeners
+  final def notifyMemoryConfigurationChange = ExpansionPort.updateListeners
 
   def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = 0
   def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
+  
+  def freezeButton {}
+  def isFreezeButtonSupported = false
 }
 
 object ExpansionPort {
-  val emptyExpansionPort = new ExpansionPort {
+  val emptyExpansionPort : ExpansionPort = new ExpansionPort {
     private object EmptyROM extends Memory {
       val name = "EmptyROM"
       val startAddress = 0
@@ -59,19 +64,27 @@ object ExpansionPort {
     val GAME = true
     val ROML = EmptyROM: Memory
     val ROMH = EmptyROM: Memory
+    override def isEmpty = true
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = memoryForEmptyExpansionPort.lastByteRead
   }
-  private val proxyExpansionPort = new ExpansionPort {
+  private val proxyExpansionPort : ExpansionPort = new ExpansionPort {
     val name = "Proxy Expansion Port"
     def EXROM = expansionPort.EXROM
     def GAME = expansionPort.GAME
     def ROML = expansionPort.ROML
     def ROMH = expansionPort.ROMH
-    override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = expansionPort.read(address, chipID)
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = expansionPort.write(address, value, chipID)
+    final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = expansionPort.read(address, chipID)
+    final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = expansionPort.write(address, value, chipID)
+    final override def reset = expansionPort.reset
+    final override def init = expansionPort.init
+    final override def isEmpty = expansionPort.isEmpty
+    final override def setBaLow(baLow:Boolean) = expansionPort.setBaLow(baLow)
+    final override def freezeButton = expansionPort.freezeButton
+    final override def isFreezeButtonSupported = expansionPort.isFreezeButtonSupported
+    final override def eject = expansionPort.eject
   }
 
-  private[this] var expansionPort: ExpansionPort = emptyExpansionPort
+  private[this] var expansionPort = emptyExpansionPort
   private[this] var listeners: List[ExpansionPortConfigurationListener] = Nil
   private[this] var memoryForEmptyExpansionPort : LastByteReadMemory = _
 

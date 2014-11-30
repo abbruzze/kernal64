@@ -17,6 +17,8 @@ class C64FileView extends FileView {
     if (f.getName.toUpperCase.endsWith(".PRG")) "Commodore 64 program file"
     else
     if (f.getName.toUpperCase.endsWith(".CRT")) "Commodore 64 cartridge file"
+    else
+    if (f.getName.toUpperCase.endsWith(".REU")) "Commodore 64 ram expansion unit file"
     else null
   }
   override def getIcon(f:File) = {
@@ -25,6 +27,7 @@ class C64FileView extends FileView {
         name.endsWith(".T64") || 
         name.endsWith(".PRG") || 
         name.endsWith(".CRT") ||
+        name.endsWith(".REU") ||
         name.endsWith(".TAP")) icon
     else null
   }

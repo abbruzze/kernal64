@@ -56,7 +56,7 @@ class Cartridge(file:String) {
       name = sb.toString
       in.seek(0x40)
       var tmp : List[Chip] = Nil
-      while (in.getFilePointer < in.length) {
+      while (in.getFilePointer < in.length) {        
         val chip = new Chip
         chip.load(in)
         tmp = chip :: tmp

@@ -58,8 +58,18 @@ class TraceDialog private (displayFrame: JFrame,
     notrace.setText("Tracing " + (if (!tracing) "on" else "off"))
     traceListener.step(regs => traceSR.setText(regs))
   }
-
+  
   def actionPerformed(e: ActionEvent) {
+    try {
+      handleAction(e)
+    }
+    catch {
+      case t:Throwable =>
+        JOptionPane.showMessageDialog(this,t.toString,"Debug error",JOptionPane.ERROR_MESSAGE)
+    }
+  }
+
+  private def handleAction(e: ActionEvent) {
     e.getActionCommand match {
       case "JMP" =>
         Option(JOptionPane.showInputDialog(this, "Jump to address:")) match {
@@ -73,9 +83,9 @@ class TraceDialog private (displayFrame: JFrame,
         traceListener.step(regs => traceSR.setText(regs))
       case "GOTO" =>
         Log.setOutput(logPanel.writer)
-        Option(JOptionPane.showInputDialog(this, "Break address:")) match {
-          case Some(address) =>
-            traceListener.setBreakAt(s2a(address), (regs) => { Log.setDebug; setVisible(true); traceSR.setText(regs) })
+        Option(JOptionPane.showInputDialog(this, "Break type:")) match {
+          case Some(breakType) =>
+            traceListener.setBreakAt(BreakType.makeBreak(breakType), (regs) => { traceSR.setText(regs) ; forceTracing(true) })
             Log.setInfo
             traceListener.step(regs => traceSR.setText(regs))
           case _ =>

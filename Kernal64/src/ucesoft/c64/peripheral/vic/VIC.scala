@@ -102,6 +102,7 @@ object VIC extends App {
 }
 */
 final class VIC(mem: Memory,
+  colorMem:Memory,
   irqAction: (Boolean) => Unit,
   baLow: (Long) => Unit,
   debug: Boolean = false,
@@ -115,30 +116,30 @@ final class VIC(mem: Memory,
   val id = ChipID.VIC
 
   // ----------------------- Constants --------------------------------------------------------------------
-  private[this] val CYCLE_FOR_FIRST_XCOORD = 12
-  private[this] val RASTER_LINES = 312
-  private[this] val RASTER_CYCLES = 63
-  val SCREEN_WIDTH = RASTER_CYCLES * 8
-  val SCREEN_HEIGHT = RASTER_LINES
-  private[this] val PIXELS_PER_LINE = RASTER_CYCLES * 8
-  private[this] val LEFT_RIGHT_FF_COMP = Array(Array(0x1F, 0x14F), Array(0x18, 0x158)) // first index is CSEL's value 0 or 1, second index is 0=left, 1=right 
-  private[this] val TOP_BOTTOM_FF_COMP = Array(Array(0x37, 0xF7), Array(0x33, 0xFB)) // first index is RSEL's value 0 or 1, second index is 0=left, 1=right
-  private[this] val COLOR_ADDRESS = 0xD800
-  private[this] val BLANK_TOP_LINE = 15
-  private[this] val BLANK_BOTTOM_LINE = 300
-  private[this] val BLANK_LEFT_CYCLE = 9
-  private[this] val BLANK_RIGHT_CYCLE = 61
-  private[this] val BA_CYCLES_FOR_CHARS = 40
-  private[this] val BA_CYCLES_PER_SPRITE = 3
-  val VISIBLE_SCREEN_WIDTH = 403//(BLANK_RIGHT_CYCLE - BLANK_LEFT_CYCLE - 1) * 8
-  val VISIBLE_SCREEN_HEIGHT = BLANK_BOTTOM_LINE - BLANK_TOP_LINE - 1
-  val SCREEN_ASPECT_RATIO = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
+  final private[this] val CYCLE_FOR_FIRST_XCOORD = 12
+  final private[this] val RASTER_LINES = 312
+  final private[this] val RASTER_CYCLES = 63
+  final val SCREEN_WIDTH = RASTER_CYCLES * 8
+  final val SCREEN_HEIGHT = RASTER_LINES
+  final private[this] val PIXELS_PER_LINE = RASTER_CYCLES * 8
+  final private[this] val LEFT_RIGHT_FF_COMP = Array(Array(0x1F, 0x14F), Array(0x18, 0x158)) // first index is CSEL's value 0 or 1, second index is 0=left, 1=right 
+  final private[this] val TOP_BOTTOM_FF_COMP = Array(Array(0x37, 0xF7), Array(0x33, 0xFB)) // first index is RSEL's value 0 or 1, second index is 0=left, 1=right
+  final private[this] val COLOR_ADDRESS = 0xD800
+  final private[this] val BLANK_TOP_LINE = 15
+  final private[this] val BLANK_BOTTOM_LINE = 300
+  final private[this] val BLANK_LEFT_CYCLE = 9
+  final private[this] val BLANK_RIGHT_CYCLE = 61
+  final private[this] val BA_CYCLES_FOR_CHARS = 40
+  final private[this] val BA_CYCLES_PER_SPRITE = 3
+  final val VISIBLE_SCREEN_WIDTH = 403//(BLANK_RIGHT_CYCLE - BLANK_LEFT_CYCLE - 1) * 8
+  final val VISIBLE_SCREEN_HEIGHT = BLANK_BOTTOM_LINE - BLANK_TOP_LINE - 1
+  final val SCREEN_ASPECT_RATIO = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
   // ----------------------- INTERNAL REGISTERS -----------------------------------------------------------
   private[this] var videoMatrixAddress = 0
   private[this] var characterAddress = 0
   private[this] var bitmapAddress = 0
-  private[this] val vml_p = Array.fill(40)(0) // video matrix line for characters pointers
-  private[this] val vml_c = Array.fill(40)(0) // video matrix line for characters colors
+  final private[this] val vml_p = Array.fill(40)(0) // video matrix line for characters pointers
+  final private[this] val vml_c = Array.fill(40)(0) // video matrix line for characters colors
   private[this] var vcbase, vc = 0
   private[this] var rc = 0 // row counter
   private[this] var vmli = 0 // video matrix line index
@@ -159,7 +160,7 @@ final class VIC(mem: Memory,
   private[this] var verticalBorderFF = false // vertical border flip flop
 
   private[this] var rasterCycle = 0 // horizontal cycle 0-62
-  private[this] val SPRITE_READ_CYCLE = {
+  final private[this] val SPRITE_READ_CYCLE = {
     val cycles = Array.fill[Int](RASTER_CYCLES)(-1)
     cycles(58) = 0
     cycles(60) = 1
@@ -171,7 +172,7 @@ final class VIC(mem: Memory,
     cycles(9)  = 7
     cycles
   }
-  private[this] val SPRITE_BA_CYCLE = {
+  final private[this] val SPRITE_BA_CYCLE = {
     val baCycles = Array.fill[Int](RASTER_CYCLES)(-1)
     for(i <- 0 until SPRITE_READ_CYCLE.length) {
       if (SPRITE_READ_CYCLE(i) != -1) {
@@ -191,14 +192,14 @@ final class VIC(mem: Memory,
   private[this] var lightPenEnabled = false
   // --------------------- DEBUG --------------------------------------------------------------------------
   private[this] var traceRasterLineInfo = false
-  private[this] val traceRasterLineBuffer = Array.fill(SCREEN_WIDTH)("")
+  final private[this] val traceRasterLineBuffer = Array.fill(SCREEN_WIDTH)("")
   private[this] var traceRasterLine = 0
   // ------------------------ PUBLIC REGISTERS ------------------------------------------------------------
   /*
    * $D000 - $D00F
    * x,y coordinate of sprite i, 0 <= i <= 7
    */
-  private[this] val spriteXYCoord = Array.fill(16)(0)
+  final private[this] val spriteXYCoord = Array.fill(16)(0)
   /*
    * $D010
    * 9th bit of x coordinate of sprite i
@@ -228,7 +229,7 @@ final class VIC(mem: Memory,
    * $D013 - $D014
    * Light Pen XY Coord
    */
-  private[this] val lightPenXYCoord = Array(0, 0)
+  final private[this] val lightPenXYCoord = Array(0, 0)
   private[this] var canUpdateLightPenCoords = true
   /*
    * $D015
@@ -319,17 +320,17 @@ final class VIC(mem: Memory,
    * $D021 - $D024
    * Set Background Color 0 - 3 to one of the 16 Colors ($00-$0F)
    */
-  private[this] var backgroundColor = Array(0, 0, 0, 0)
+  final private[this] var backgroundColor = Array(0, 0, 0, 0)
   /*
    * $D025 - $D026
    * Set Color 1 - 2 shared by Multicolor Sprites
    */
-  private[this] var spriteMulticolor01 = Array(0, 0)
+  final private[this] var spriteMulticolor01 = Array(0, 0)
   /*
    * $D027 - $D02E
    * Set individual color for Sprite#0 - #7
    */
-  private[this] var spriteColor = Array(0, 0, 0, 0, 0, 0, 0, 0)
+  final private[this] var spriteColor = Array(0, 0, 0, 0, 0, 0, 0, 0)
   
   // ---------------------------- PIXELS --------------------------------------------------
   // |doc 1|doc 0|sprite priority|sp 2|sp 1|sp 0|transparent|background/foreground|c3|c2|c1|c0|
@@ -341,18 +342,17 @@ final class VIC(mem: Memory,
   // | 1   |  0  | = 'G'
   // | 1   |  1  | = 'S'
   
-  private[this] val PIXEL_FOREGROUND = 1 << 4
-  private[this] val PIXEL_TRANSPARENT = 1 << 5
-  private[this] val PIXEL_DOX_N = 0
-  private[this] val PIXEL_DOX_B = 1 << 10
-  private[this] val PIXEL_DOX_G = 2 << 10
-  private[this] val PIXEL_DOX_S = 3 << 10
-  private[this] val PIXEL_SPRITE_PRIORITY = 1 << 9
-  private[this] val PIXEL_BLACK = 0
+  final private[this] val PIXEL_FOREGROUND = 1 << 4
+  final private[this] val PIXEL_TRANSPARENT = 1 << 5
+  final private[this] val PIXEL_DOX_N = 0
+  final private[this] val PIXEL_DOX_B = 1 << 10
+  final private[this] val PIXEL_DOX_G = 2 << 10
+  final private[this] val PIXEL_DOX_S = 3 << 10
+  final private[this] val PIXEL_SPRITE_PRIORITY = 1 << 9
+  final private[this] val PIXEL_BLACK = 0
 
   // ----------------------------- SPRITE -------------------------------------------------
   private[this] class Sprite(index: Int,
-    var enabled: Boolean = false,
     var x: Int = 0,
     var y: Int = 0,
     var xexp: Boolean = false,
@@ -362,6 +362,7 @@ final class VIC(mem: Memory,
     val componentID = "Sprite " + index
     val componentType = C64ComponentType.INTERNAL
     
+    private[this] var _enabled = false
     private[this] val mask = 1 << index
     private[this] var counter = 0
     private[this] var gdata = 0
@@ -377,11 +378,23 @@ final class VIC(mem: Memory,
     var hasPixels = false
     private[this] val pixels = Array.fill[Int](8)(PIXEL_TRANSPARENT)
     private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
+    private[this] var yexpClearedOn15 = false
     
-    override def toString = s"Sprite #${index} cnt=${counter} data=${Integer.toBinaryString(gdata & 0xFFFFFF)} en=${enabled} hasPixels=${hasPixels} x=${x} y=${y} xexp=${xexp} yexp=${_yexp} color=${color} mcm=${isMulticolor} pr=${dataPriority} memP=${memoryPointer} mcbase=${mcbase} mc=${mc} dma=${dma} display=${display} ff=${expansionFF}"
+    def enabled = _enabled
+    def enabled_=(enabled:Boolean) = {
+      _enabled = enabled
+      if (!enabled) {
+        dma = false
+        mc = 0
+        mcbase = 0
+        counter = 0
+      }
+    }
+    
+    override def toString = s"Sprite #${index} cnt=${counter} data=${Integer.toBinaryString(gdata & 0xFFFFFF)} en=${_enabled} hasPixels=${hasPixels} x=${x} y=${y} xexp=${xexp} yexp=${_yexp} color=${color} mcm=${isMulticolor} pr=${dataPriority} memP=${memoryPointer} mcbase=${mcbase} mc=${mc} dma=${dma} display=${display} ff=${expansionFF}"
 
     override def getProperties = {
-      properties.setProperty("Enabled",enabled.toString)
+      properties.setProperty("Enabled",_enabled.toString)
       properties.setProperty("X",x.toString)
       properties.setProperty("Y",y.toString)
       properties.setProperty("X expansion",xexp.toString)
@@ -399,12 +412,13 @@ final class VIC(mem: Memory,
       _yexp = v
       if (!v) expansionFF = true
       if (rasterCycle == 24) mc = 42 & mc & mcbase | 21 & (mc | mcbase) // sprite crunch ??
+      yexpClearedOn15 = rasterCycle == 15 && !v
     }
 
     final def getPixels = pixels
 
     final def reset {
-      enabled = false
+      _enabled = false
       x = 0
       y = 0
       xexp = false
@@ -500,11 +514,11 @@ final class VIC(mem: Memory,
       pixel
     }
 
-    @inline def readMemoryData(cycles: Long) {
-      // p-accesses
-      memoryPointer = mem.read(videoMatrixAddress + 1016 + index) << 6//* 64
+    @inline def readMemoryData(cycles: Long) {      
       // s-accesses
       if (dma) {
+        // p-accesses
+    	memoryPointer = mem.read(videoMatrixAddress + 1016 + index) << 6
         var data = 0
         var i = 16
         while (i >= 0) {
@@ -516,16 +530,20 @@ final class VIC(mem: Memory,
         //Log.fine("Sprite #%d. Loaded data=%4X on raster %d mcbase=%d mc=%d".format(index,data,rasterLine,mcbase,mc))
         //println("Sprite #%d. Loaded data=%4X on raster %d mcbase=%d mc=%d".format(index,data,rasterLine,mcbase,mc))
       }
+      else mem.read(0x3FFF) // idle read
     }
 
     final def checkForCycle(cycle: Int) = (cycle : @switch) match {
-    case 15 =>
-      if (expansionFF) mcbase += 2
+      case 15 =>
+        if (expansionFF) mcbase += 2
       case 16 =>
         if (expansionFF) {
           mcbase += 1
-//          if (!yexpClearedOn15) mcbase = mc
-//          else mcbase = (0x2A & (mcbase & mc)) | (0x15 & (mcbase | mc)) // patch from VIC-Addentum
+          if (!yexpClearedOn15) mcbase = mc
+          else {
+            yexpClearedOn15 = false
+            mcbase = (0x2A & (mcbase & mc)) | (0x15 & (mcbase | mc)) // patch from VIC-Addentum
+          }
 
           if (mcbase == 63) {
             dma = false
@@ -536,7 +554,7 @@ final class VIC(mem: Memory,
         }
       case 54 =>
         if (_yexp) expansionFF = !expansionFF
-        if (enabled && (y) == (rasterLine & 0xFF) && !dma) {
+        if (_enabled && (y) == (rasterLine & 0xFF) && !dma) {
           dma = true
           mcbase = 0
           if (_yexp) expansionFF = false
@@ -555,7 +573,7 @@ final class VIC(mem: Memory,
       case _ => // do nothing
     }
   }
-  private[this] val sprites = Array(new Sprite(0), new Sprite(1), new Sprite(2), new Sprite(3), new Sprite(4), new Sprite(5), new Sprite(6), new Sprite(7))
+  final private[this] val sprites = Array(new Sprite(0), new Sprite(1), new Sprite(2), new Sprite(3), new Sprite(4), new Sprite(5), new Sprite(6), new Sprite(7))
   private[this] var spritesDisplayedMask = 0
   // -------------------------------- VIDEO CACHE -----------------------------------------
   // | 43 - 40 | 39 - 36 | 35 - 32 | 31 - 28 | 27 - 24 | 23 - 16 | 15 - 8  | 7 - 0 |
@@ -1093,7 +1111,7 @@ final class VIC(mem: Memory,
         (SPRITE_BA_CYCLE(rasterCycle) : @switch) match {
           case -1 =>
           case s if sprites(s).dma =>
-            baLow(cycles + BA_CYCLES_PER_SPRITE)
+            baLow(cycles + BA_CYCLES_PER_SPRITE - 1)
           case _ =>
         }
       case s => 
@@ -1358,7 +1376,7 @@ final class VIC(mem: Memory,
    */
   @inline private def readAndStoreVideoMemory {
     val charCode = mem.read(videoMatrixAddress | vc)
-    val color = mem.read(COLOR_ADDRESS | vc) & 0x0F
+    val color = colorMem.read(COLOR_ADDRESS | vc) & 0x0F
     vml_p(vmli) = charCode
     vml_c(vmli) = color
     //Log.fine(s"Reading video memory at ${videoMatrixAddress + offset}: charCode=${charCode} color=${color}")

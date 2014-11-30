@@ -2,6 +2,8 @@ package ucesoft.c64.cpu
 
 import ucesoft.c64.ChipID
 import ucesoft.c64.Log
+import ucesoft.c64.Clock
+import ucesoft.c64.trace.BreakType
 
 class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   override lazy val componentID = "6510_CE"
@@ -10,7 +12,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   private[this] var ready = true
   // ------------- Tracing --------------------
   private[this] var tracing = false
-  private[this] var breakAt = -1
+  private[this] var breakType : BreakType = null
   private[this] var breakCallBack: (String) => Unit = _
   private[this] var stepCallBack: (String) => Unit = _
   private[this] val syncObject = new Object
@@ -43,7 +45,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   private[this] var nmiOnNegativeEdge = false
   private[this] var irqLow = false
   private[this] var nmiLow = false
-
+  private[this] var irqFirstCycle = 0L
+  private[this] val clk = Clock.systemClock
   // -----------------------------------------
 
   final override val isExact = true
@@ -61,10 +64,12 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   final def irqRequest(low: Boolean) {
     if (tracing) Log.debug(s"IRQ request low=${low}")
     irqLow = low
+    if (irqLow && irqFirstCycle > 0) irqFirstCycle = clk.currentCycles
   }
   final def nmiRequest(low: Boolean) {
     if (!nmiLow && low) {
       nmiOnNegativeEdge = true
+      irqFirstCycle = clk.currentCycles
       if (tracing) Log.debug("NMI request on negative edge")
     }
     nmiLow = low
@@ -129,10 +134,10 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       syncObject.notify
     }
   }
-  def setBreakAt(address: Int, callback: (String) => Unit) {
+  def setBreakAt(breakType:BreakType, callback: (String) => Unit) {
     tracing = false
     breakCallBack = callback
-    breakAt = address
+    this.breakType = breakType
   }
   def jmpTo(pc: Int) {
     PC = pc
@@ -1690,11 +1695,11 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	  }
 	  // DEC/CMP group
 	  case O_DCP => () => {
-	    rdbuf -= 1
-	    mem.write(ar,rdbuf & 0xFF)
+	    rdbuf = (rdbuf - 1) & 0xFF
+	    mem.write(ar,rdbuf)
 	    ar = A - rdbuf
 	    set_nz(ar)
-	    if (ar < 0x100) sec else clc
+	    if (ar >= 0) sec else clc
 		Last
 	  }
 	  // INC/SBC group
@@ -1727,8 +1732,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	  case O_ARR_I => () => {
 	    if (ready) {
 	    data = mem.read(PC) ; PC += 1
-	    val _data = data & A
-	    A = if (isCarry) (_data >> 1) | 0x80 else _data >> 1
+	    data &= A
+	    A = if (isCarry) (data >> 1) | 0x80 else data >> 1
 	    if (!isDecimal) {
           set_nz(A)
           if ((A & 0x40) > 0) sec else clc
@@ -1737,15 +1742,16 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
         else {
           if (isCarry) sen else cln
           if (A == 0) sez else clz
-          if (((_data ^ A) & 0x40) != 0) sev else clv
-          if ((_data & 0x0F) + (_data & 0x01) > 5) A = A & 0xF0 | (A + 6) & 0x0F
-          if (((_data + (_data & 0x10)) & 0x1F0) > 0x50) {
+          if (((data ^ A) & 0x40) != 0) sev else clv
+          if ((data & 0x0F) + (data & 0x01) > 5) A = A & 0xF0 | (A + 6) & 0x0F
+          if (((data + (data & 0x10)) & 0x1F0) > 0x50) {
             sec
             A += 0x60
           } 
           else clc
         }
-	    }
+	    Last
+	    }	    
 	  }
 	  case O_ANE_I => () => {
 	    if (ready) {
@@ -1770,7 +1776,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	    ar = (X & A) - data
 	    X = ar & 0xFF
 	    set_nz(X)
-	    if (ar < 0x100) sec else clc
+	    if (ar >= 0) sec else clc
 		Last
 	    }
 	  }
@@ -1801,8 +1807,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	    mem.write(ar,A & X & (ar2 + 1))
 		Last
 	  }
-	  case 1 => () => { throw new CPU6510.CPUJammedException }
-	  case _ => () => {}
+	  case 1 => () => { Last ; throw new CPU6510.CPUJammedException }
+	  case _ => () => { println("Check CPU6510_CE states") }
 	  //case _ => throw new IllegalArgumentException("Bad state " + state + " at PC=" + Integer.toHexString(PC))
     }
   }
@@ -1875,20 +1881,34 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   }
 
   final def fetchAndExecute: Int = {
-    if (breakAt != -1 && PC == breakAt && state == 0) {
-      breakAt = -1
+    if (breakType != null && state == 0 && breakType.isBreak(PC,false,false)) {
+      breakType = null
       tracing = true
       breakCallBack(toString)
     }
     
     // check interrupts
-    if (nmiOnNegativeEdge && state == 0) {
+    if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - irqFirstCycle >= 2) {
+      irqFirstCycle = 0
       nmiOnNegativeEdge = false
       state = NMI_STATE
+      if (breakType != null && breakType.isBreak(PC,false,true)) {
+        breakType = null
+        tracing = true
+        breakCallBack(toString)
+        Log.debug("NMI Break")
+      }
     } 
     else 
-    if (irqLow && !isInterrupt && state == 0) {      
+    if (irqLow && !isInterrupt && state == 0 && clk.currentCycles - irqFirstCycle >= 2) {    
+      irqFirstCycle = 0
       state = IRQ_STATE
+      if (breakType != null && breakType.isBreak(PC,true,false)) {
+        breakType = null
+        tracing = true
+        breakCallBack(toString)
+        Log.debug("IRQ Break")
+      }
     }
     else {
       if (tracing && state == 0) Log.debug(formatDebug)

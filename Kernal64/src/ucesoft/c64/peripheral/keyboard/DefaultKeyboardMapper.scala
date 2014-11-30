@@ -82,5 +82,6 @@ object DefaultKeyboardMapper extends KeyboardMapper {
     VK_Q -> Q,
     VK_ESCAPE -> RUN_STOP,
     VK_QUOTE -> PLUS,
-    VK_DELETE -> RESTORE)
+    VK_DELETE -> RESTORE,
+    VK_PAGE_UP -> LIRA)
 }

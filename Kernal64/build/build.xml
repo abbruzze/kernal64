@@ -34,10 +34,10 @@
 	<target name="compile" depends="scala-init">
 		<mkdir dir="${build.dir}"/>		
 		<echo message="Optimise is set to ${optimise}"/>
-		<javac srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/c64/peripheral/sid/resid/*.java">
+		<javac srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/c64/peripheral/sid/resid/*.java ucesoft/c64/peripheral/sid/resid2/*.java">
 			<classpath refid="build.classpath"/>
 		</javac>
-		<scalac srcdir="${sources.dir}" excludes="ucesoft/c64/peripheral/sid/resid/**" 
+		<scalac srcdir="${sources.dir}" excludes="ucesoft/c64/peripheral/sid/resid/** ucesoft/c64/peripheral/sid/resid2/**" 
 				destdir="${build.dir}" 
 				classpathref="build.classpath" 
 				deprecation="yes" 

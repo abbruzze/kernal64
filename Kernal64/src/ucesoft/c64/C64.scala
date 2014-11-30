@@ -39,6 +39,9 @@ import ucesoft.c64.peripheral.printer.MPS803GFXDriver
 import ucesoft.c64.peripheral.printer.MPS803ROM
 import ucesoft.c64.cpu.CPU6510.CPUJammedException
 import ucesoft.c64.util.VolumeSettingsPanel
+import ucesoft.c64.expansion.REU
+import ucesoft.c64.trace.BreakType
+import ucesoft.c64.peripheral.sid.SIDDevice
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -46,11 +49,11 @@ object C64 extends App {
   c64.run
 }
 
-class C64 extends C64Component with ActionListener with DriveLedListener {
+class C64 extends C64Component with ActionListener with DriveLedListener with TraceListener {
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "0.9.9H"
+  private[this] val VERSION = "0.9.9I"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -60,9 +63,9 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   private[this] var cpu = CPU6510.make(mem)  
   private[this] var cpuExact = cpu.isExact
   private[this] var vicChip : vic.VIC = _
-  private[this] val sid = new SID
+  private[this] val sid : SIDDevice = new ucesoft.c64.peripheral.sid.SID
   private[this] var display : vic.Display = _
-  private[this] val nmiSwitcher = new keyboard.NMISwitcher(cpu.nmiRequest _)
+  private[this] val nmiSwitcher = new NMISwitcher
   private[this] val irqSwitcher = new IRQSwitcher
   private[this] val keyb = new keyboard.Keyboard(keyboard.DefaultKeyboardMapper,nmiSwitcher.keyboardNMIAction _)	// key listener
   private[this] val displayFrame = {
@@ -75,6 +78,13 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     f.setIconImage(new ImageIcon(getClass.getResource("/resources/commodore.png")).getImage)    
     f
   }
+  // -------------- MENU ITEMS -----------------
+  private[this] val maxSpeedItem = new JCheckBoxMenuItem("Maximum speed")
+  private[this] val loadFileItem = new JMenuItem("Load file from attached disk ...")
+  private[this] val tapeMenu = new JMenu("Tape control...")
+  private[this] val detachCtrItem = new JMenuItem("Detach cartridge")
+  private[this] val cartMenu = new JMenu("Cartridge")
+  // -------------------------------------------
   private[this] val bus = new IECBus
   private[this] var baLowUntil = -1L
   private[this] var baLow = false
@@ -89,6 +99,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   private[this] val busSnooper = new BusSnoop(bus)
   private[this] var busSnooperActive = false
   // -------------------- DISK -----------------
+  private[this] var isDiskActive = true
   private[this] var attachedDisk : Option[D64] = None
   private[this] val c1541 = new C1541Emu(bus,this)
   private[this] val c1541_real = new C1541(0x00,bus,this)
@@ -98,6 +109,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   // -------------------- TAPE -----------------
   private[this] var datassette : Datassette = _
   // -------------------- PRINTER --------------
+  private[this] var printerEnabled = false
   private[this] var printerGraphicsDriver = new MPS803GFXDriver(new MPS803ROM)
   private[this] var printer = new MPS803(bus,printerGraphicsDriver)  
   private[this] var printerDialog = {
@@ -120,7 +132,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     dialog
   }
   // -------------- AUDIO ----------------------
-  private[this] val volumeDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
+  private[this] val volumeDialog : JDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
   // -------------------------------------------
   private[this] val configuration = {
     val props = new Properties
@@ -200,26 +212,33 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     
     private[this] var ciaIRQLow = false
     private[this] var vicIRQLow = false
+    private[this] var expPortIRQLow = false
     
     private def handleIRQ = {
-      Log.debug(s"Handling IRQ ciaIRQ=${ciaIRQLow} vicIRQ=${vicIRQLow}")
-      cpu.irqRequest(ciaIRQLow || vicIRQLow)
+      //Log.debug(s"Handling IRQ ciaIRQ=${ciaIRQLow} vicIRQ=${vicIRQLow}")
+      cpu.irqRequest(ciaIRQLow || vicIRQLow || expPortIRQLow)
     }
     
     final def ciaIRQ(low:Boolean) {     
-      Log.debug("CIA setting IRQ as " + low)
+      //Log.debug("CIA setting IRQ as " + low)
       ciaIRQLow = low
       handleIRQ
     }
     final def vicIRQ(low:Boolean) {  
-      Log.debug("VIC setting IRQ as " + low)
+      //Log.debug("VIC setting IRQ as " + low)
       vicIRQLow = low
+      handleIRQ
+    }
+    
+    final def expPortIRQ(low:Boolean) {
+      expPortIRQLow = low
       handleIRQ
     }
     
     override def getProperties = {
       properties.setProperty("CIA1 IRQ",ciaIRQLow.toString)
-      properties.setProperty("VIQ IRQ",vicIRQLow.toString)
+      properties.setProperty("VIC IRQ",vicIRQLow.toString)
+      properties.setProperty("Expansion port IRQ",expPortIRQLow.toString)
       properties
     }
     
@@ -228,6 +247,46 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     def reset {
       ciaIRQLow = false
       vicIRQLow = false
+      expPortIRQLow = false
+    }
+  }
+
+  class NMISwitcher extends C64Component {
+    val componentID = "NMI Switcher (CIA2)"
+    val componentType = C64ComponentType.INTERNAL
+
+    private var keyboardNMILow = false
+    private var cia2NMILow = false
+    private var expPortNMILow = false
+
+    def keyboardNMIAction(low: Boolean) {
+      keyboardNMILow = low
+      handleNMI
+    }
+    def cia2NMIAction(low: Boolean) {
+      cia2NMILow = low
+      handleNMI
+    }
+    def expansionPortNMI(low: Boolean) {
+      expPortNMILow = low
+      handleNMI
+    }
+
+    @inline private def handleNMI = cpu.nmiRequest(keyboardNMILow || cia2NMILow || expPortNMILow)
+
+    override def getProperties = {
+      properties.setProperty("CIA2 NMI", cia2NMILow.toString)
+      properties.setProperty("Keyboard restore NMI", keyboardNMILow.toString)
+      properties.setProperty("Expansion port NMI", expPortNMILow.toString)
+      properties
+    }
+
+    def init {}
+
+    def reset {
+      keyboardNMILow = false
+      cia2NMILow = false
+      expPortNMILow = false
     }
   }
   
@@ -391,6 +450,10 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   def reset {
     baLowUntil = 0
     cpuWaitUntil = 0
+    baLow = false
+    dma = false
+    clock.maximumSpeed = false
+    maxSpeedItem.setSelected(false)
   }
   
   def init {
@@ -434,7 +497,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     				   cia2CP1,
     				   cia2CP2,
     				   nmiSwitcher.cia2NMIAction _)
-    vicChip = new vic.VIC(bankedMemory,irqSwitcher.vicIRQ _,baLow _)    
+    vicChip = new vic.VIC(bankedMemory,mem.COLOR_RAM,irqSwitcher.vicIRQ _,baLow _)    
     // mapping I/O chips in memory
     val io = mem.IO    
     io.addBridge(cia1)
@@ -455,7 +518,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     val mouse = new Mouse1351
     add(mouse)
     display.addMouseMotionListener(mouse)
-    traceDialog = TraceDialog.getTraceDialog(displayFrame,mem,cpu,display,vicChip)
+    traceDialog = TraceDialog.getTraceDialog(displayFrame,mem,this,display,vicChip)
     diskTraceDialog = TraceDialog.getTraceDialog(displayFrame,c1541_real.getMem,c1541_real)
     // drive led
     add(driveLed)        
@@ -465,6 +528,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     }    
     configureJoystick
     // drive
+    c1541_real.setIsRunningListener(diskRunning => isDiskActive = diskRunning)
     add(c1541)
     add(c1541_real)    
     Log.setOutput(traceDialog.logPanel.writer)
@@ -522,11 +586,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     // VIC PHI1
     vicChip.clock(cycles)
     //DRIVES
-    drive.clock(cycles)
+    if (isDiskActive) drive.clock(cycles)
     // bus snoop
     if (busSnooperActive) busSnooper.clock(cycles)
     // printer
-    printer.clock(cycles)
+    if (printerEnabled) printer.clock(cycles)
     // CPU PHI2
     if (cpuExact) {
       if (baLow && cycles > baLowUntil) {
@@ -556,6 +620,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
       baLowUntil = cycles
       baLow = true
       if (cpuExact) cpu.setBaLow(true)
+      expansionPort.setBaLow(true)
       //Log.fine(s"BA low until ${cycles}")
     }
   }
@@ -577,10 +642,14 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
         reset(true)
       case "ATTACH_CTR" => 
         attachCtr
+      case "DETACH_CTR" =>
+        detachCtr
       case "MAXSPEED" =>
         val maxSpeedItem = e.getSource.asInstanceOf[JCheckBoxMenuItem]
         clock.maximumSpeed = maxSpeedItem.isSelected
+        clock.pause
         sid.setFullSpeed(maxSpeedItem.isSelected)
+        clock.play
       case "ADJUSTRATIO" =>
         val dim = display.asInstanceOf[java.awt.Component].getSize
         dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).toInt
@@ -661,11 +730,42 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
       case "PRINT_EXPORT_AS_PNG" =>
         printerSaveImage
       case "PRINTER_ENABLED" =>
-        printer.setActive(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
+        printerEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        printer.setActive(printerEnabled)
       case "VOLUME" =>
         volumeDialog.setVisible(true)
       case "CPU_CE" => changeCPU(true)
       case "CPU" => changeCPU(false)
+      case "CRT_PRESS" => ExpansionPort.getExpansionPort.freezeButton
+      case "NO_REU" =>
+        ExpansionPort.getExpansionPort.eject
+        ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+      case "REU_128" => 
+        ExpansionPort.setExpansionPort(REU.getREU(REU.REU_1700,mem,setDMA _,irqSwitcher.expPortIRQ _,None))
+      case "REU_256" => 
+        ExpansionPort.setExpansionPort(REU.getREU(REU.REU_1764,mem,setDMA _,irqSwitcher.expPortIRQ _,None))
+      case "REU_512" => 
+        ExpansionPort.setExpansionPort(REU.getREU(REU.REU_1750,mem,setDMA _,irqSwitcher.expPortIRQ _,None))
+      case "REU_16M" => 
+        val fc = new JFileChooser
+	    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+	    fc.setFileView(new C64FileView)
+	    fc.setFileFilter(new FileFilter {
+	      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".REU")
+	      def getDescription = "REU files"
+	    })
+	    fc.showOpenDialog(displayFrame) match {
+	      case JFileChooser.APPROVE_OPTION => 
+	        try {
+	          val reu = REU.getREU(REU.REU_16M,mem,setDMA _,irqSwitcher.expPortIRQ _,Some(fc.getSelectedFile))	          
+	          ExpansionPort.setExpansionPort(reu)
+	        }
+	        catch {
+	          case t:Throwable =>
+	            JOptionPane.showMessageDialog(displayFrame,t.toString, "REU loading error",JOptionPane.ERROR_MESSAGE)
+	        }
+	      case _ =>
+	    }	          
     }
   }
   
@@ -725,12 +825,14 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   
   private def loadCartridgeFile(file:File) {
     try {          
-      val ep = ExpansionPortFactory.loadExpansionPort(file.toString)
+      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.expPortIRQ _,nmiSwitcher.expansionPortNMI _)
       println(ep)
+      if (ep.isFreezeButtonSupported) cartMenu.setVisible(true)
       ExpansionPort.setExpansionPort(ep)
       Log.info(s"Attached cartridge ${ExpansionPort.getExpansionPort.name}")
       reset(false)
-      configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)          
+      configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)  
+      detachCtrItem.setEnabled(true)
     }
     catch {
       case t:Throwable =>
@@ -751,6 +853,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
       }
       attachedDisk = Some(disk)
       drive.setDriveReader(disk)
+      loadFileItem.setEnabled(true)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
       if (autorun) {
         insertTextIntoKeyboardBuffer("LOAD\"*\",8,1" + 13.toChar + "RUN" + 13.toChar)
@@ -765,6 +868,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
   
   private def attachTapeFile(file:File,autorun:Boolean) {
     datassette.setTAP(Some(new TAP(file.toString)))
+    tapeMenu.setEnabled(true)
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
     if (autorun) {
         insertTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar)
@@ -888,10 +992,21 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     traceDialog.forceTracing(false)
     diskTraceDialog.forceTracing(false)
     if (Thread.currentThread != Clock.systemClock) clock.pause
-    if (play) ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+    //if (play) ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
     resetComponent
     if (play) clock.play
   } 
+  
+  private def detachCtr {
+    if (ExpansionPort.getExpansionPort.isEmpty) JOptionPane.showMessageDialog(displayFrame,"No cartridge attached!", "Detach error",JOptionPane.ERROR_MESSAGE)
+    else {
+      ExpansionPort.getExpansionPort.eject
+      ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+      reset(true)
+    }
+    detachCtrItem.setEnabled(false)
+    cartMenu.setVisible(false)
+  }
   
   private def attachCtr {
     val fc = new JFileChooser
@@ -993,11 +1108,14 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     val editMenu = new JMenu("Edit")
     val traceMenu = new JMenu("Trace")
     val optionMenu = new JMenu("Settings")
-    val helpMenu = new JMenu("Help")
+    val helpMenu = new JMenu("Help")    
+    cartMenu.setVisible(false)
+    
     menuBar.add(fileMenu)
     menuBar.add(editMenu)
     menuBar.add(traceMenu)
-    menuBar.add(optionMenu)
+    menuBar.add(optionMenu)         
+    menuBar.add(cartMenu)
     menuBar.add(helpMenu)
     
     val tapeItem = new JMenuItem("Load file from tape ...")
@@ -1009,8 +1127,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     attachTapeItem.setActionCommand("ATTACH_TAPE")
     attachTapeItem.addActionListener(this)
     fileMenu.add(attachTapeItem)
-    
-    val tapeMenu = new JMenu("Tape control...")
+        
+    tapeMenu.setEnabled(false)
     fileMenu.add(tapeMenu)
     
     val tapePlayItem = new JMenuItem("Cassette press play")
@@ -1044,8 +1162,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     attachDiskItem.setActionCommand("ATTACH_DISK")
     attachDiskItem.addActionListener(this)
     fileMenu.add(attachDiskItem)
-    
-    val loadFileItem = new JMenuItem("Load file from attached disk ...")
+        
+    loadFileItem.setEnabled(false)
     loadFileItem.setActionCommand("LOAD_FILE")
     loadFileItem.addActionListener(this)
     fileMenu.add(loadFileItem)    
@@ -1074,6 +1192,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     attachCtrItem.setActionCommand("ATTACH_CTR")
     attachCtrItem.addActionListener(this)
     fileMenu.add(attachCtrItem)
+        
+    detachCtrItem.setEnabled(false)
+    detachCtrItem.setActionCommand("DETACH_CTR")
+    detachCtrItem.addActionListener(this)
+    fileMenu.add(detachCtrItem)
     
     fileMenu.addSeparator
     
@@ -1119,8 +1242,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     optionMenu.add(volumeItem)
     
     optionMenu.addSeparator
-    
-    val maxSpeedItem = new JCheckBoxMenuItem("Maximum speed")
+        
     maxSpeedItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F8,0))
     maxSpeedItem.setSelected(clock.maximumSpeed)
     maxSpeedItem.setActionCommand("MAXSPEED")
@@ -1247,25 +1369,68 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     
     optionMenu.addSeparator
     
+    val reuItem = new JMenu("REU")
+    val group5 = new ButtonGroup
+    val noReuItem = new JRadioButtonMenuItem("None")
+    noReuItem.setSelected(true)
+    noReuItem.setActionCommand("NO_REU")
+    noReuItem.addActionListener(this)
+    group5.add(noReuItem)
+    reuItem.add(noReuItem)
+    val reu128Item = new JRadioButtonMenuItem("128K")
+    reu128Item.setActionCommand("REU_128")
+    reu128Item.addActionListener(this)
+    group5.add(reu128Item)
+    reuItem.add(reu128Item)
+    val reu256Item = new JRadioButtonMenuItem("256K")
+    reu256Item.setActionCommand("REU_256")
+    reu256Item.addActionListener(this)
+    group5.add(reu256Item)
+    reuItem.add(reu256Item)
+    val reu512Item = new JRadioButtonMenuItem("512K")
+    reu512Item.setActionCommand("REU_512")
+    reu512Item.addActionListener(this)
+    group5.add(reu512Item)
+    reuItem.add(reu512Item)
+    val reu16MItem = new JRadioButtonMenuItem("16M ...")
+    reu16MItem.setActionCommand("REU_16M")
+    reu16MItem.addActionListener(this)
+    group5.add(reu16MItem)
+    reuItem.add(reu16MItem)
+    
+    optionMenu.add(reuItem)
+    
+    optionMenu.addSeparator
+    
+    val cpuItem = new JMenu("CPU")
     val group4 = new ButtonGroup
     val cpuExactItem = new JRadioButtonMenuItem("CPU exact")
     cpuExactItem.setSelected(cpuExact)
     cpuExactItem.setToolTipText("CPU with cycle exact behaviour")
     cpuExactItem.setActionCommand("CPU_CE")
     cpuExactItem.addActionListener(this)
-    optionMenu.add(cpuExactItem)
+    cpuItem.add(cpuExactItem)
     group4.add(cpuExactItem)
     val cpuFastItem = new JRadioButtonMenuItem("Faster CPU")    
     cpuFastItem.setToolTipText("Faster CPU with non-cycle exact behaviour")
     cpuFastItem.setActionCommand("CPU")
     cpuFastItem.addActionListener(this)
-    optionMenu.add(cpuFastItem)
+    cpuItem.add(cpuFastItem)
+    optionMenu.add(cpuItem)
     group4.add(cpuFastItem)
+    
+    // cartridge
+    val cartButtonItem = new JMenuItem("Press cartridge button...")
+    cartButtonItem.setActionCommand("CRT_PRESS")
+    cartButtonItem.addActionListener(this)
+    cartMenu.add(cartButtonItem)
+    
+    // help
     
     val aboutItem = new JMenuItem("About")
     aboutItem.setActionCommand("ABOUT")
     aboutItem.addActionListener(this)
-    helpMenu.add(aboutItem)
+    helpMenu.add(aboutItem)        
     
     displayFrame.setJMenuBar(menuBar)
   }
@@ -1320,6 +1485,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener {
     sys.exit(0)
   }
   
+  // ------------------------------- TRACE LISTENER ------------------------------------------
+  def setTrace(traceOn:Boolean) = cpu.setTrace(traceOn)
+  def step(updateRegisters: (String) => Unit) = cpu.step(updateRegisters)
+  def setBreakAt(breakType:BreakType,callback:(String) => Unit) = cpu.setBreakAt(breakType,callback)
+  def jmpTo(pc:Int) = cpu.jmpTo(pc)
   // -----------------------------------------------------------------------------------------
   
   def run {

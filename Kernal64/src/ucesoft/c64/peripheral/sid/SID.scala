@@ -10,7 +10,7 @@ import ucesoft.c64.ClockEvent
 import ucesoft.c64.Log
 import ucesoft.c64.cpu.RAMComponent
 
-class SID extends Chip with RAMComponent {
+class SID extends Chip with SIDDevice {
   override lazy val componentID = "SID"
   private[this] val RESID_6581 = 1
   private[this] val SAMPLE_RATE = 44100
@@ -31,7 +31,7 @@ class SID extends Chip with RAMComponent {
   private[this] val sid = {
     val sid = new RESID
     sid.set_chip_model(ISIDDefs.chip_model.MOS6581)
-    sid.set_sampling_parameters(CPU_FREQ,ISIDDefs.sampling_method.SAMPLE_FAST, SAMPLE_RATE, -1, 0.97)
+    sid.set_sampling_parameters(CPU_FREQ,ISIDDefs.sampling_method.SAMPLE_FAST, SAMPLE_RATE,-1, 0.97)
     sid
   }
   private[this] val POTX_OFS = 0x19
@@ -43,7 +43,7 @@ class SID extends Chip with RAMComponent {
   private[this] var nextRest = 0
   private[this] var pos = 0
   private[this] var removeSample = false
-  private[this] val driver = new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE / 2)
+  private[this] val driver = new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE)
   
   def getDriver = driver
   def init = start

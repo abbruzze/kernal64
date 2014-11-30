@@ -10,6 +10,32 @@ trait Memory {
   val startAddress: Int
   lazy val endAddress = startAddress + length
   val name: String
+  
+  private[this] var forwardRead,forwardWrite = false
+  protected[this] var forwardReadTo,forwardWriteTo : Memory = null
+  
+  final def isForwardRead = forwardRead
+  final def isForwardWrite = forwardWrite
+  final def setForwardReadTo(forwardReadTo:Option[Memory]) {
+    this.forwardReadTo = forwardReadTo match {
+      case Some(fr) =>
+        forwardRead = true
+        fr
+      case None =>
+        forwardRead = false
+        null
+    }
+  }
+  final def setForwardWriteTo(forwardWriteTo:Option[Memory]) {
+    this.forwardWriteTo = forwardWriteTo match {
+      case Some(fw) =>
+        forwardWrite = true
+        fw
+      case None =>
+        forwardWrite = false
+        null
+    }
+  }
 
   def init
   def isActive: Boolean  
@@ -50,14 +76,6 @@ abstract class BridgeMemory extends RAMComponent {
   @inline private def select(address:Int) = {
     var ptr = bridges
     var found : Memory = null
-    /*
-    while (ptr.nonEmpty && found == null) {
-      val mem = ptr.head
-      if (address >= mem._1 && address <= mem._2) found = mem._3
-      else ptr = ptr.tail
-    }
-    * 
-    */
     var i = 0
     val length = bridgesStart.length
     while (found == null && i < length) {
@@ -77,7 +95,13 @@ abstract class BridgeMemory extends RAMComponent {
         case Some(dv) => dv
       }
   }
-  final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = select(address).write(address,value,chipID)
+  final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = try {
+    select(address).write(address,value,chipID)
+  }
+  catch {
+    case ill:IllegalArgumentException =>
+      println("Bad write on address " + Integer.toHexString(address))
+  }
   
   def defaultValue(address:Int) : Option[Int] = None
   override def toString = name + bridges.mkString("[",",","]")

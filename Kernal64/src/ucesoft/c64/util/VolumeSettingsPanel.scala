@@ -1,13 +1,13 @@
 package ucesoft.c64.util
 
 import javax.swing._
-import ucesoft.c64.peripheral.sid.DefaultAudioDriver
+import ucesoft.c64.peripheral.sid.AudioDriverDevice
 import javax.swing.event.ChangeListener
 import javax.swing.event.ChangeEvent
 import java.awt.BorderLayout
 
 object VolumeSettingsPanel {
-  def getDialog(frame:JFrame,driver:DefaultAudioDriver) = {
+  def getDialog(frame:JFrame,driver:AudioDriverDevice) = {
     val dialog = new JDialog(frame,"Volume settings")
     dialog.getContentPane.add("Center",new VolumeSettingsPanel(driver))
     dialog.pack
@@ -16,7 +16,7 @@ object VolumeSettingsPanel {
   }
 }
 
-class VolumeSettingsPanel(driver:DefaultAudioDriver) extends JPanel with ChangeListener {
+class VolumeSettingsPanel(driver:AudioDriverDevice) extends JPanel with ChangeListener {
   private[this] val slider = new JSlider
   private[this] val mute = new JCheckBox
   

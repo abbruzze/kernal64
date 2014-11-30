@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
- * @author Ken Händel
+ * @author Ken Handel
  *
  */
 package ucesoft.c64.peripheral.sid.resid;
@@ -28,7 +28,7 @@ package ucesoft.c64.peripheral.sid.resid;
  * waveform is taken from intermediate bits of a 23 bit shift register. This
  * register is clocked by bit 19 of the accumulator.
  * 
- * @author Ken Händel
+ * @author Ken Handel
  * 
  */
 public class WaveformGenerator implements IWave6581, IWave8580 {

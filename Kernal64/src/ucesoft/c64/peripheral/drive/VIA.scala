@@ -63,7 +63,14 @@ abstract class VIA(val name:String,
   }
     
   def setActive(active:Boolean) {
-    if (!this.active && active) init
+    if (!this.active && active) {
+      if (Thread.currentThread != clock) {
+        clock.pause
+        init
+        clock.play
+      }
+      else init
+    }
     this.active = active
   }
   

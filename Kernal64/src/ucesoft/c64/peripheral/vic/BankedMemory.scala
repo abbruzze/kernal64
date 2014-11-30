@@ -33,13 +33,11 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
   def lastByteRead = memLastByteRead
   
   def read(address: Int, chipID: ChipID.ID = ChipID.VIC): Int = { 
+    /*
     memLastByteRead =
-    // check if the VIC is accessing COLOR area
-    if (address >= 0xD800 && address <= 0xDBFF) colorRam.read(address,chipID)
-    else
     // check if we have to read CHAR ROM
     if (address >= 4096 && address < 8192 && (bank == 0 || bank == 2)) {
-      val offset = address - 4096 + CPU6510Mems.M_CHARACTERS
+      val offset = address + 0xC000 //- 4096 + CPU6510Mems.M_CHARACTERS
       //Log.fine("VIC reading character ROM at offset %4X".format(offset))
       charROM.read(offset,chipID)
     }
@@ -48,6 +46,12 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
       //Log.fine("VIC reading RAM at %4X".format(realAddress))
       mem.read(realAddress,chipID)
     }
+    * 
+    */
+    val realAddress = baseAddress | address
+    memLastByteRead =
+    if ((realAddress & 0x7000) == 0x1000) charROM.read(0xD000 | (address & 0x0FFF),chipID)//(address + 0xC000,chipID)
+    else mem.read(realAddress,chipID)
     
     memLastByteRead
   }

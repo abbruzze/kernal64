@@ -6,7 +6,7 @@ import ucesoft.c64.formats.D64
 import ucesoft.c64.cpu.CPU6510
 import ucesoft.c64.ClockEvent
 
-class VIADiskControl(cpu: CPU6510,
+class VIADiskControl(var cpu: CPU6510,
   					 irqAction: (Boolean) => Unit,
   					 ledListener: DriveLedListener) extends VIA("VIA_DiskControl", 0x1C00,irqAction) {
   override lazy val componentID = "VIA2 (DC)"
@@ -40,13 +40,13 @@ class VIADiskControl(cpu: CPU6510,
    * 3		25-30	266.667 bit/s
    * 4		31-35	250.000 bit/s
    */
-  private[this] val rotationCyclesForByte: Int => Int = {
+  private[this] val rotationCyclesForByte: Int => Double = {
     val C1541_CLOCK_HZ = 1000000
-    val zones = Array.ofDim[Int](4)
-    zones(0) = (8.0 / (307692.0 / C1541_CLOCK_HZ)).toInt
-    zones(1) = (8.0 / (285714.0 / C1541_CLOCK_HZ)).toInt
-    zones(2) = (8.0 / (266667.0 / C1541_CLOCK_HZ)).toInt
-    zones(3) = (8.0 / (250000.0 / C1541_CLOCK_HZ)).toInt
+    val zones = Array.ofDim[Double](4)
+    zones(0) = (307692.0 / C1541_CLOCK_HZ)
+    zones(1) = (285714.0 / C1541_CLOCK_HZ)
+    zones(2) = (266667.0 / C1541_CLOCK_HZ)
+    zones(3) = (250000.0 / C1541_CLOCK_HZ)
     t: Int => {
       if (t <= 17) zones(0)
       else if (t <= 24) zones(1)
@@ -55,6 +55,7 @@ class VIADiskControl(cpu: CPU6510,
     }
   }
   private[this] var byteCycleWait = rotationCyclesForByte(1)
+  private[this] var rotationCycleCounter = 0.0
   
   override def getProperties = {
     properties.setProperty("Motor on",motorOn.toString)
@@ -110,7 +111,7 @@ class VIADiskControl(cpu: CPU6510,
 
   @inline private def isSync = d64 match {
     case None => false
-    case Some(d) => motorOn && gcrSector(gcrIndex) == 0xFF && gcrIndex + 1 < gcrSector.length && gcrSector(gcrIndex + 1) != 0xFF
+    case Some(d) => motorOn && gcrSector(gcrIndex) == 0xFF// && gcrIndex + 1 < gcrSector.length && gcrSector(gcrIndex + 1) != 0xFF
   }
 
   override def read(address: Int, chipID: ChipID.ID) = address - startAddress match {
@@ -170,6 +171,7 @@ class VIADiskControl(cpu: CPU6510,
       sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
       sector = 0            
       byteCycleWait = rotationCyclesForByte(track)
+      rotationCycleCounter = 0.0
       if (d64.isDefined) gcrSector = d64.get.gcrImageOf(track, sector)
       //println(s"Moved on track ${track}")
     }
@@ -179,8 +181,12 @@ class VIADiskControl(cpu: CPU6510,
     if (ledListener != null) ledListener.beginLoadingOf("%s %02d/%02d".format(currentFilename,track,sector),true)
   }
   
-  private def rotateDisk = {
+  private def rotateDisk : Int = {
     if (gcrSector != null) {
+      rotationCycleCounter += byteCycleWait
+      if (rotationCycleCounter < 8) return 0
+      rotationCycleCounter -= 8
+      
       if (isWriting && gcrIndex >= gcrIndexFromToWrite) {    
         gcrSector(gcrIndex) = regs(PA)
         sectorModified = true
@@ -198,7 +204,7 @@ class VIADiskControl(cpu: CPU6510,
 
       if (isWriting || !isSync || !lastSync) cpu.setOverflowFlag // byte ready
       lastSync = isSync
-      byteCycleWait
+      0
     } 
     else 0
   }
