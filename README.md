@@ -1,4 +1,4 @@
-kernal64 ver 0.9.9H
+kernal64 ver 0.9.9I
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
 
@@ -25,6 +25,7 @@ Here the main features:
 * Debug panel for main CPU and for 1541's cpu (break point, step by step execution, disassembler, assembler, etc.)
 * Component panel: shows all internal components while running
 * Drag & Drop support
+* REU support (128,256,512,16M)
 * ... and more
 
 In the meanwhile you can download the dist/kernal64_install.zip file to try it out: be sure to have Java installed.
