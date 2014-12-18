@@ -100,7 +100,7 @@ abstract class BridgeMemory extends RAMComponent {
   }
   catch {
     case ill:IllegalArgumentException =>
-      println("Bad write on address " + Integer.toHexString(address))
+      //println("Bad write on address " + Integer.toHexString(address))
   }
   
   def defaultValue(address:Int) : Option[Int] = None
