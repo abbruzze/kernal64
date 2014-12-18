@@ -104,7 +104,7 @@ object VIC extends App {
 final class VIC(mem: Memory,
   colorMem:Memory,
   irqAction: (Boolean) => Unit,
-  baLow: (Long) => Unit,
+  baLow: (Boolean) => Unit,
   debug: Boolean = false,
   clip: Boolean = true) extends Chip with RAMComponent {
   override lazy val componentID = "VIC 6569"
@@ -514,23 +514,23 @@ final class VIC(mem: Memory,
       pixel
     }
 
-    @inline def readMemoryData(cycles: Long) {      
+    @inline def readMemoryData(cycles: Long,first:Boolean) {            
       // s-accesses
-      if (dma) {
-        // p-accesses
-    	memoryPointer = mem.read(videoMatrixAddress + 1016 + index) << 6
-        var data = 0
-        var i = 16
-        while (i >= 0) {
-          data |= (mem.read(memoryPointer + mc) & 0xFF) << i
-          mc += 1
-          i -= 8
+      if (dma) {    
+        if (first) {          
+          // p-accesses
+          memoryPointer = mem.read(videoMatrixAddress + 1016 + index) << 6
+          gdata = (mem.read(memoryPointer + mc) & 0xFF) << 16
         }
-        setData(data)
-        //Log.fine("Sprite #%d. Loaded data=%4X on raster %d mcbase=%d mc=%d".format(index,data,rasterLine,mcbase,mc))
-        //println("Sprite #%d. Loaded data=%4X on raster %d mcbase=%d mc=%d".format(index,data,rasterLine,mcbase,mc))
+        else {
+          gdata |= (mem.read(memoryPointer + mc) & 0xFF) << 8
+          mc += 1
+          gdata |= (mem.read(memoryPointer + mc) & 0xFF)
+          setData(gdata)
+        } 
+        mc += 1
       }
-      else mem.read(0x3FFF) // idle read
+      else mem.read(0x3FFF) // idle access
     }
 
     final def checkForCycle(cycle: Int) = (cycle : @switch) match {
@@ -552,8 +552,8 @@ final class VIC(mem: Memory,
             //Log.debug(s"Sprite #${index} NOT displayable anymore on raster ${rasterLine}")
           }
         }
-      case 54 =>
-        if (_yexp) expansionFF = !expansionFF
+      case 55|56 =>
+        if (cycle == 55 && _yexp) expansionFF = !expansionFF
         if (_enabled && (y) == (rasterLine & 0xFF) && !dma) {
           dma = true
           mcbase = 0
@@ -561,9 +561,9 @@ final class VIC(mem: Memory,
           //Log.debug(s"Sprite #${index}. " + this)
           //println(s"Sprite #${index} DMA=true on rasterLine=${rasterLine}")
         }
-      case 56 =>
-        if (!dma) painting = false
-      case 57 =>
+//      case 56 =>
+//        if (!dma) painting = false
+      case 58 =>
         mc = mcbase
         if (dma && (y) == (rasterLine & 0xFF)) {
           display = true
@@ -760,7 +760,7 @@ final class VIC(mem: Memory,
       vml_p = VIC.this.vml_p
       vml_c = VIC.this.vml_c
       vmli = VIC.this.vmli
-      isInvalidMode = mcm && ecm
+      isInvalidMode = mcm && ecm || bmm && ecm
       isInDisplayState = VIC.this.isInDisplayState
       
       /*
@@ -1105,18 +1105,9 @@ final class VIC(mem: Memory,
 
     //Log.fine(s"VIC rasterLine=${rasterLine} vicCycle=${rasterCycle} vcbase=${vcbase} vc=${vc} vmli=${vmli} mainFF=${mainBorderFF} verticalFF=${verticalBorderFF} displayState=${isInDisplayState} Xcoord=${xCoord}")
     // check sprite cycle
-    (SPRITE_READ_CYCLE(rasterCycle) : @switch) match {
-      case -1 =>
-        // check sprite ba
-        (SPRITE_BA_CYCLE(rasterCycle) : @switch) match {
-          case -1 =>
-          case s if sprites(s).dma =>
-            baLow(cycles + BA_CYCLES_PER_SPRITE - 1)
-          case _ =>
-        }
-      case s => 
-        sprites(s).readMemoryData(cycles)
-    }
+    // check sprite ba
+//    val baSprite = SPRITE_BA_CYCLE(rasterCycle)
+//    if (baSprite >= 0 && sprites(baSprite).dma) baLow(cycles + BA_CYCLES_PER_SPRITE - 1)
     
     (rasterCycle: @switch) match {
       case 0 =>
@@ -1125,45 +1116,74 @@ final class VIC(mem: Memory,
         // check den on $30
         if (rasterLine == 0x30) denOn30 = den
         badLine = isBadLine
+        sprites(2).readMemoryData(cycles,false)
+        if (sprites(4).dma) baLow(true)
         drawCycle(-1)
       // ---------------------------------------------------------------  
       case 1 =>
         // check raster line with raster latch if irq enabled    
         if (rasterLine == 0 && rasterLine == rasterLatch) rasterLineEqualsLatch
+        sprites(3).readMemoryData(cycles,true)
+        if (!sprites(3).dma && !sprites(4).dma) baLow(false)
         drawCycle(-1)
       case 2 =>
+        sprites(3).readMemoryData(cycles,false)
+        if (sprites(5).dma) baLow(true)
         drawCycle(-1)
       case 3 =>
+        sprites(4).readMemoryData(cycles,true)
+        if (!sprites(4).dma && !sprites(5).dma) baLow(false)
         drawCycle(-1)
       case 4 =>
+        sprites(4).readMemoryData(cycles,false)
+        if (sprites(6).dma) baLow(true)
         drawCycle(-1)
       case 5 =>
+        sprites(5).readMemoryData(cycles,true)
+        if (!sprites(5).dma && !sprites(6).dma) baLow(false)
         drawCycle(-1)
       case 6 =>
+        sprites(5).readMemoryData(cycles,false)
+        if (sprites(7).dma) baLow(true)
         drawCycle(-1)
       case 7 =>
+        sprites(6).readMemoryData(cycles,true)
+        if (!sprites(6).dma && !sprites(7).dma) baLow(false)
         drawCycle(-1)
       case 8 =>
+        sprites(6).readMemoryData(cycles,false)
         drawCycle(-1)
       case 9 =>
+        sprites(7).readMemoryData(cycles,true)
+        if (!sprites(7).dma) baLow(false)
         drawCycle(-1)
       case 10 =>
+        sprites(7).readMemoryData(cycles,false)
         drawCycle(-1)
       case 11 =>
         mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+        baLow(false)
         drawCycle(-1)
       // ---------------------------------------------------------------
       case 55 =>
+        mem.read(0x3FFF)
+        spriteCheck
+        if (sprites(0).dma) baLow(true) else baLow(false)
         drawCycle(-1)
       case 56 =>
+        mem.read(0x3FFF)
         spriteCheck
+        if (sprites(0).dma) baLow(true)
         drawCycle(-1)
       case 57 =>
-        spriteCheck
+        mem.read(0x3FFF)
+        //spriteCheck
+        if (sprites(1).dma) baLow(true)
         
         drawCycle(-1)	
       // ---------------------------------------------------------------
       case 58 =>     
+        spriteCheck
         if (rc == 7) {
           isInDisplayState = false
           vcbase = vc
@@ -1173,24 +1193,32 @@ final class VIC(mem: Memory,
           rc = (rc + 1) & 7
           isInDisplayState = true
         }
+        sprites(0).readMemoryData(cycles,true)
         drawCycle(-1)
       // ---------------------------------------------------------------
       case 59 =>        
+        sprites(0).readMemoryData(cycles,false)
+        if (sprites(2).dma) baLow(true)
         drawCycle(-1)
       case 60 =>
+        sprites(1).readMemoryData(cycles,true)
+        if (!sprites(1).dma && !sprites(2).dma) baLow(false)
         drawCycle(-1)
       case 61 =>
+        sprites(1).readMemoryData(cycles,false)
+        if (sprites(3).dma) baLow(true)
         drawCycle(-1)
       case 62 =>
+        sprites(2).readMemoryData(cycles,true)
+        if (!sprites(2).dma && !sprites(3).dma) baLow(false)
         GFXShifter.reset
         drawCycle(-1)
       // ---------------------------------------------------------------
       case _ => // 12 - 54
-        if (badLine) baLow(cycles)
+        if (badLine) baLow(true)
         (rasterCycle : @switch) match {
           case 12 =>
             mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
-            //if (badLine) baLow(cycles + BA_CYCLES_FOR_CHARS)
           case 13 =>
             mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
           case 14 =>
@@ -1201,13 +1229,14 @@ final class VIC(mem: Memory,
           case 15 =>
             spriteCheck
             mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
-          case 16 | 54 =>
+          case 16 =>
             spriteCheck
           case _ =>
         }
         
         if (isInDisplayState && rasterCycle >= 15) {
           if (badLine) readAndStoreVideoMemory
+          
           // g-access
           drawCycle(readCharFromMemory)
           vc = (vc + 1) & 0x3FF //% 1024
