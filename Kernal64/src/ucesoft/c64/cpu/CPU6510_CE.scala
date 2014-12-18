@@ -140,6 +140,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     this.breakType = breakType
   }
   def jmpTo(pc: Int) {
+    state = 0
     PC = pc
   }
 
@@ -149,6 +150,21 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   private[this] var state = 0
   private[this] var ar,ar2,data,rdbuf = 0
 
+  // IRQ & NMI
+  final private[this] val IRQ_STATE = 0x8
+  final private[this] val IRQ_STATE_2 = 0x9
+  final private[this] val IRQ_STATE_3 = 0xA
+  final private[this] val IRQ_STATE_4 = 0xB
+  final private[this] val IRQ_STATE_5 = 0xC
+  final private[this] val IRQ_STATE_6 = 0xD
+  final private[this] val IRQ_STATE_7 = 0xE
+  final private[this] val NMI_STATE = 0x10
+  final private[this] val NMI_STATE_2 = 0x11
+  final private[this] val NMI_STATE_3 = 0x12
+  final private[this] val NMI_STATE_4 = 0x13
+  final private[this] val NMI_STATE_5 = 0x14
+  final private[this] val NMI_STATE_6 = 0x15
+  final private[this] val NMI_STATE_7 = 0x16
   // Read effective address, no extra cycles
   final private[this] val A_ZERO = 0x18
   final private[this] val A_ZEROX = 0x19
@@ -371,7 +387,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     O_CLD, AE_ABSY, O_NOP, M_ABSY, AE_ABSX, AE_ABSX, M_ABSX, M_ABSX,
     O_CPX_I, A_INDX, O_NOP_I, M_INDX, A_ZERO, A_ZERO, M_ZERO, M_ZERO, // e0
     O_INX, O_SBC_I, O_NOP, O_SBC_I, A_ABS, A_ABS, M_ABS, M_ABS,
-    O_BEQ, AE_INDY, O_EXT, M_INDY, A_ZEROX, A_ZEROX, M_ZEROX, M_ZEROX, // f0
+    O_BEQ, AE_INDY, 1, M_INDY, A_ZEROX, A_ZEROX, M_ZEROX, M_ZEROX, // f0
     O_SED, AE_ABSY, O_NOP, M_ABSY, AE_ABSX, AE_ABSX, M_ABSX, M_ABSX)
   private[this] val OP_TAB = Array(
     1, O_ORA, 1, O_SLO, O_NOP_A, O_ORA, O_ASL, O_SLO, // 00
@@ -406,34 +422,14 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     1, 1, 1, 1, O_CPX, O_SBC, O_INC, O_ISB,
     1, O_SBC, 1, O_ISB, O_NOP_A, O_SBC, O_INC, O_ISB, // f0
     1, O_SBC, 1, O_ISB, O_NOP_A, O_SBC, O_INC, O_ISB)
-
-  final private[this] val IRQ_STATE = 0x8
-  final private[this] val IRQ_STATE_2 = 0x9
-  final private[this] val IRQ_STATE_3 = 0xA
-  final private[this] val IRQ_STATE_4 = 0xB
-  final private[this] val IRQ_STATE_5 = 0xC
-  final private[this] val IRQ_STATE_6 = 0xD
-  final private[this] val IRQ_STATE_7 = 0xE
-  final private[this] val NMI_STATE = 0x10
-  final private[this] val NMI_STATE_2 = 0x11
-  final private[this] val NMI_STATE_3 = 0x12
-  final private[this] val NMI_STATE_4 = 0x13
-  final private[this] val NMI_STATE_5 = 0x14
-  final private[this] val NMI_STATE_6 = 0x15
-  final private[this] val NMI_STATE_7 = 0x16
-  
-  final private[this] val states = Array.ofDim[() => Unit](O_EXT + 1)
+    
+  final private[this] val states = Array.ofDim[() => Unit](O_EXT)
 
   // -----------------------------------------------------------------------------------------------------  
 
   @inline private[this] def push(data: Int) {
     mem.write(0x0100 | SP, data)
     SP = (SP - 1) & 0xff
-  }
-
-  @inline private[this] def pop = {
-    SP = (SP + 1) & 0xff
-    mem.read(0x0100 | SP)
   }
 
   @inline private[this] final def set_nz(src: Int) {
@@ -1808,19 +1804,21 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 		Last
 	  }
 	  case 1 => () => { Last ; throw new CPU6510.CPUJammedException }
-	  case _ => () => { println("Check CPU6510_CE states") }
+	  case s => () => { println("Check CPU6510_CE states: " + s) }
 	  //case _ => throw new IllegalArgumentException("Bad state " + state + " at PC=" + Integer.toHexString(PC))
     }
   }
   
   @inline private[this] def branch(flag:Boolean) {
-    data = mem.read(PC) ; PC += 1
-	if (flag) {
-	  ar = PC + data.asInstanceOf[Byte]
-	  if ((ar >> 8) != (PC >> 8)) {
-		if ((data & 0x80) > 0) state = O_BRANCH_BP else state = O_BRANCH_FP
-	  } else state = O_BRANCH_NP
-	} else state = 0
+    if (ready) {
+      data = mem.read(PC) ; PC += 1
+	  if (flag) {
+	    ar = PC + data.asInstanceOf[Byte]
+	    if ((ar >> 8) != (PC >> 8)) {
+		  if ((data & 0x80) > 0) state = O_BRANCH_BP else state = O_BRANCH_FP
+	    } else state = O_BRANCH_NP
+	  } else state = 0
+    }
   }
   
   @inline private[this] def do_adc(data:Int) {
@@ -1872,6 +1870,9 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     nmiLow = false
     nmiOnNegativeEdge = false
     state = 0
+    dma = false
+    ready = true
+    baLow = false
     A = 0
     X = 0
     Y = 0
