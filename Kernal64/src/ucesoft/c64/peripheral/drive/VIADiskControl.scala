@@ -15,7 +15,7 @@ class VIADiskControl(var cpu: CPU6510,
   private[this] val REMOVING_DISK_WAIT = 500000L
   private[this] val SYNC_DETECTION_LINE = 0x80
   private[this] val WAIT_CYCLES_INTER_SECTORS = 1000
-  private[this] val TOTAL_TRACKS = D64.TOTAL_TRACKS
+  private[this] var TOTAL_TRACKS = 0
   private[this] var isWriting = false
   private[this] var isDiskChanged = true
   private[this] var diskChangedAtClockCycle = 0L
@@ -73,6 +73,7 @@ class VIADiskControl(var cpu: CPU6510,
 
   def setDriveReader(driveReader: D64) {
     d64 = Some(driveReader)
+    TOTAL_TRACKS = d64.get.TOTAL_TRACKS
     gcrSector = driveReader.gcrImageOf(track, sector)
 //    isDiskChanged = true
 //    diskChangedAtClockCycle = Clock.systemClock.currentCycles
@@ -192,7 +193,7 @@ class VIADiskControl(var cpu: CPU6510,
         sectorModified = true
       }
       gcrIndex += 1
-      if (gcrIndex == gcrSector.length) { // end of current sector
+      if (gcrIndex >= gcrSector.length) { // end of current sector
         if (sectorModified) {
           sectorModified = false
           d64.get.writeGCRSector(track,sector,gcrSector)

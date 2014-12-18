@@ -6,6 +6,7 @@ import ucesoft.c64.cpu.Memory
 import ucesoft.c64.peripheral.bus.BusDataIterator
 import java.util.StringTokenizer
 import scala.collection.mutable.ArrayBuffer
+import scala.language.postfixOps 
 
 object D64 {
   object FileType extends Enumeration {
@@ -38,18 +39,20 @@ object D64 {
     }
   }
 
-  val TOTAL_TRACKS = 35
+  private val DISK_SIZE_40_TRACKS = 196608
+  private val DISK_SIZE_35_TRACKS = 174848
+  
   private val BYTES_PER_SECTOR = 256
   private val DIR_TRACK = 18
   private val DIR_SECTOR = 1
   private val BAM_SECTOR = 0
   val TRACK_ALLOCATION = // Key = #track => Value = #sectors per track
-    (for (t <- 1 to TOTAL_TRACKS) yield {
+    (for (t <- 1 to 40) yield {
       if (t >= 1 && t <= 17) (t, 21)
       else if (t >= 18 && t <= 24) (t, 19)
       else if (t >= 25 && t <= 30) (t, 18)
       else (t, 17)
-    }) toMap
+    }).toMap
   val TOTAL_AVAILABLE_SECTORS = 664
   @inline private def absoluteSector(t: Int, s: Int) = (1 until t).foldLeft(0) { (acc, t) => acc + TRACK_ALLOCATION(t) } + s
 }
@@ -57,6 +60,7 @@ object D64 {
 class D64(val file: String) {
   import D64._
   private[this] val d64 = new RandomAccessFile(file, "rw")
+  TOTAL_TRACKS // just to check for a valid track format
   private[this] val GCRImage = {
     val gcr = Array.ofDim[Array[Array[Int]]](TOTAL_TRACKS)
     for(i <- 0 until gcr.length) {
@@ -65,6 +69,12 @@ class D64(val file: String) {
     gcr
   }
   private[this] var _bam = bamInfo
+  
+  def TOTAL_TRACKS = d64.length match {
+    case DISK_SIZE_35_TRACKS => 35
+    case DISK_SIZE_40_TRACKS => 40
+    case _ => throw new IllegalArgumentException("Unsupported D64 file format. size is " + d64.length)
+  }
   
   def bam = _bam
   
