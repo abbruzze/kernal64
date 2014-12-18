@@ -53,7 +53,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "0.9.9I"
+  private[this] val VERSION = "0.9.9J"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -190,6 +190,13 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     private[this] var x,y = 0
     
     override def mouseMoved(e:MouseEvent) = if (mouseEnabled) {
+      x = display.getMouseX & 0x7F
+      y = 0x7F - display.getMouseY & 0x7F
+      sid.write(0xD419,x << 1)
+      sid.write(0xD41A,y << 1)
+    }
+    
+    override def mouseDragged(e:MouseEvent) = if (mouseEnabled) {
       x = display.getMouseX & 0x7F
       y = 0x7F - display.getMouseY & 0x7F
       sid.write(0xD419,x << 1)
@@ -593,19 +600,20 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     if (printerEnabled) printer.clock(cycles)
     // CPU PHI2
     if (cpuExact) {
-      if (baLow && cycles > baLowUntil) {
-        cpu.setBaLow(false)
-        expansionPort.setBaLow(false)
-        baLow = false
-      }
+//      if (baLow && cycles > baLowUntil) {
+//        cpu.setBaLow(false)
+//        expansionPort.setBaLow(false)
+//        baLow = false
+//      }
       cpu.fetchAndExecute
     }
     else {
-      if (baLow && cycles > baLowUntil) {
-        expansionPort.setBaLow(false)
-        baLow = false
-      }
-      val canExecCPU = cycles > cpuWaitUntil && cycles > baLowUntil && !dma
+//      if (baLow && cycles > baLowUntil) {
+//        expansionPort.setBaLow(false)
+//        baLow = false
+//      }
+      //val canExecCPU = cycles > cpuWaitUntil && cycles > baLowUntil && !dma
+      val canExecCPU = cycles > cpuWaitUntil && !baLow && !dma
       if (canExecCPU) cpuWaitUntil = cycles + cpu.fetchAndExecute
     }
   }
@@ -615,7 +623,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     if (cpuExact) cpu.setDMA(dma)
   }
   
-  private def baLow(cycles:Long) {
+  private def baLow(low:Boolean) {
+    /*
     if (cycles > baLowUntil) {
       baLowUntil = cycles
       baLow = true
@@ -623,6 +632,10 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
       expansionPort.setBaLow(true)
       //Log.fine(s"BA low until ${cycles}")
     }
+    */
+    baLow = low
+    if (cpuExact) cpu.setBaLow(low)
+    expansionPort.setBaLow(low)
   }
     
   // ---------------------------------- GUI HANDLING -------------------------------
