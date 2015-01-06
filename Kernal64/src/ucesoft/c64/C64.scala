@@ -53,7 +53,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "0.9.9J"
+  private[this] val VERSION = "0.9.9K"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -1060,7 +1060,13 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
         Option(JOptionPane.showInputDialog(displayFrame,"Load file","*")) match {
           case None =>
           case Some(fileName) =>
-            d64.loadInMemory(mem,fileName,relocate)
+            try {
+              d64.loadInMemory(mem,fileName,relocate)
+            }
+            catch {
+              case t:Throwable =>
+                JOptionPane.showMessageDialog(displayFrame, "Errore while loading from disk: " + t.getMessage,"Loading error",JOptionPane.ERROR_MESSAGE)
+            }
         }
     }
   }    
