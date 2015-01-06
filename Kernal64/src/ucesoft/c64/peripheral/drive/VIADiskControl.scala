@@ -20,6 +20,8 @@ class VIADiskControl(var cpu: CPU6510,
   private[this] var isDiskChanged = true
   private[this] var diskChangedAtClockCycle = 0L
   private[this] var motorOn = false
+  private[this] var canSetByteReady = false
+  private[this] var byteReady = false
   private[this] var trackSteps = 2
   private[this] var track = 1
   private[this] var sector = 0
@@ -136,6 +138,7 @@ class VIADiskControl(var cpu: CPU6510,
   override def write(address: Int, value: Int, chipID: ChipID.ID) {
     address - startAddress match {
       case PCR =>
+        canSetByteReady = (value & 2) > 0
         if ((value & 0x20) == 0) {
           isWriting = true
           gcrIndexFromToWrite = gcrIndex + 1
@@ -203,7 +206,11 @@ class VIADiskControl(var cpu: CPU6510,
         gcrSector = d64.get.gcrImageOf(track, sector)
       }
 
-      if (isWriting || !isSync || !lastSync) cpu.setOverflowFlag // byte ready
+      if (isWriting || !isSync || !lastSync) {
+        byteReady = true
+        irq_set(IRQ_CA1)
+//        cpu.setOverflowFlag // byte ready
+      }
       lastSync = isSync
       0
     } 
@@ -211,6 +218,14 @@ class VIADiskControl(var cpu: CPU6510,
   }
 
   def clock(cycles: Long) = {
-    if (motorOn) rotateDisk else 0
+    if (motorOn) {
+      val ret = rotateDisk
+      if (byteReady && canSetByteReady) {
+        cpu.setOverflowFlag
+        byteReady = false
+      }
+      ret 
+    }
+    else 0
   }
 }
