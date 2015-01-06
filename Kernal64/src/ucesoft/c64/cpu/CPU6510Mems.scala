@@ -76,7 +76,17 @@ object CPU6510Mems {
       Log.info("Initialaizing RAM memory ...")
     }
     def reset {
-      for(i <- 0 until mem.length) mem(i) = 0xFF
+      var i = 0
+      while (i < mem.length) {
+        for(j <- 1 to 64) {
+          mem(i) = 0
+          i += 1
+        }
+        for(j <- 1 to 64) {
+          mem(i) = 0xFF
+          i += 1
+        }
+      }
     }
     
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address & 0xFFFF)
