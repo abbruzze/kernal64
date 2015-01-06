@@ -530,7 +530,8 @@ final class VIC(mem: Memory,
         } 
         mc += 1
       }
-      else mem.read(0x3FFF) // idle access
+      else 
+      if (first) mem.read(0x3FFF) // idle access
     }
 
     final def checkForCycle(cycle: Int) = (cycle : @switch) match {
@@ -1172,7 +1173,6 @@ final class VIC(mem: Memory,
         drawCycle(-1)
       // ---------------------------------------------------------------
       case 55 =>
-        mem.read(0x3FFF)
         spriteCheck
         //if (sprites(0).dma) baLow(true) else baLow(false)
         baLow(sprites(0).dma)
