@@ -190,12 +190,18 @@ abstract class VIA(val name:String,
   }
   
   private def updateT2 {
-    if (is_set(ACR,0x20)) {	// DO NOT count pulses on PB6
+    if (!is_set(ACR,0x20)) {	// DO NOT count pulses on PB6
       var counter = regs(T2LC) | regs(T2HC) << 8
       counter -= UPDATE_CLOCKS
       if (counter <= 0) irq_set(IRQ_TIMER_2)
       regs(T2LC) = counter & 0xFF
       regs(T2HC) = (counter >> 8) & 0xFF
     }
+  }
+  
+  override def getProperties = {
+    properties.setProperty("T1 counter",Integer.toHexString(regs(T1LC) | regs(T1HC) << 8))
+    properties.setProperty("T2 counter",Integer.toHexString(regs(T2LC) | regs(T2HC) << 8))
+    super.getProperties
   }
 }
