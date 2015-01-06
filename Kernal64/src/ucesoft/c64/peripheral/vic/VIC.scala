@@ -128,7 +128,7 @@ final class VIC(mem: Memory,
   final private[this] val BLANK_TOP_LINE = 15
   final private[this] val BLANK_BOTTOM_LINE = 300
   final private[this] val BLANK_LEFT_CYCLE = 9
-  final private[this] val BLANK_RIGHT_CYCLE = 61
+  final private[this] val BLANK_RIGHT_CYCLE = 63
   final private[this] val BA_CYCLES_FOR_CHARS = 40
   final private[this] val BA_CYCLES_PER_SPRITE = 3
   final val VISIBLE_SCREEN_WIDTH = 403//(BLANK_RIGHT_CYCLE - BLANK_LEFT_CYCLE - 1) * 8
@@ -144,7 +144,7 @@ final class VIC(mem: Memory,
   private[this] var rc = 0 // row counter
   private[this] var vmli = 0 // video matrix line index
   private[this] var isInDisplayState = false // display or idle state
-  private[this] var badLine = false
+  //private[this] var badLine = false
   private[this] var yscroll = 0 // y scroll value 0-7
   private[this] var xscroll = 0 // x scroll value 0-7
   private[this] var rsel = 0 // 1 => 25 rows, 0 => 24 rows
@@ -383,12 +383,12 @@ final class VIC(mem: Memory,
     def enabled = _enabled
     def enabled_=(enabled:Boolean) = {
       _enabled = enabled
-      if (!enabled) {
-        dma = false
-        mc = 0
-        mcbase = 0
-        counter = 0
-      }
+//      if (!enabled) {
+//        dma = false
+//        mc = 0
+//        mcbase = 0
+//        counter = 0
+//      }
     }
     
     override def toString = s"Sprite #${index} cnt=${counter} data=${Integer.toBinaryString(gdata & 0xFFFFFF)} en=${_enabled} hasPixels=${hasPixels} x=${x} y=${y} xexp=${xexp} yexp=${_yexp} color=${color} mcm=${isMulticolor} pr=${dataPriority} memP=${memoryPointer} mcbase=${mcbase} mc=${mc} dma=${dma} display=${display} ff=${expansionFF}"
@@ -482,7 +482,7 @@ final class VIC(mem: Memory,
       finished
     }
 
-    final def shift = {
+    final private def shift = {
       var pixel = if (!isMulticolor) { // no multicolor        
         if (xexp) {
           if (xexpCounter == 0) gdata <<= 1
@@ -514,7 +514,7 @@ final class VIC(mem: Memory,
       pixel
     }
 
-    @inline def readMemoryData(cycles: Long,first:Boolean) {            
+    @inline final def readMemoryData(cycles: Long,first:Boolean) {            
       // s-accesses
       if (dma) {    
         if (first) {          
@@ -594,7 +594,6 @@ final class VIC(mem: Memory,
  						
   // ------------------------------ SHIFTERS ----------------------------------------------    
   private[this] object BorderShifter {
-    private[this] var counter = 0
     private[this] var xcoord = 0
     private[this] var color = 0
     private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
@@ -602,17 +601,14 @@ final class VIC(mem: Memory,
     private[this] var drawBorder = true
 
     final def getPixels = if (drawBorder) pixels else ALL_TRANSPARENT//if (drawBorder) pixelVideoCache(rasterLine)(rasterCycle) else ALL_TRANSPARENT//if (drawBorder) pixels else ALL_TRANSPARENT
-    final def clear { counter = 0 }
 
-    final def isFinished = counter == 8
     final def producePixels {
-      // optimization
+      // optimization           
       drawBorder = !den ||
         rasterLine <= TOP_BOTTOM_FF_COMP(rsel)(0) ||
         rasterLine >= TOP_BOTTOM_FF_COMP(rsel)(1) ||
         rasterCycle < 16 || rasterCycle > 52
       if (!drawBorder) return
-      counter = 0
       xcoord = xCoord
       color = borderColor
       if (traceRasterLineInfo) color |= PIXEL_DOX_B
@@ -622,14 +618,13 @@ final class VIC(mem: Memory,
       */
       
       var i = 0
-      while (!isFinished) {
+      while (i < 8) {
         pixels(i) = shift
         //pixelVideoCache(rasterLine)(rasterCycle)(i) = shift
         i += 1
       }
     }
-    @inline final protected def shift = {
-      counter += 1
+    @inline final private def shift = {
       val hasBorder = checkBorderFF(xcoord)
       xcoord += 1
       if (hasBorder) color else PIXEL_TRANSPARENT
@@ -663,7 +658,6 @@ final class VIC(mem: Memory,
       reset
     }
     final def reset = firstPixel = true
-    final def isFinished = counter == 8
     @inline final protected def shift = {
       var pixel = if (isInvalidMode || isBlank || gdata < 0) PIXEL_BLACK
       else if (!bmm) { // text mode        
@@ -782,7 +776,8 @@ final class VIC(mem: Memory,
         lpx = display.getLightPenX
         baseX = rasterCycle << 3
       }
-      while (!isFinished) {
+      counter = 0
+      while (counter < 8) {
         pixels(counter) = shift
         //pixelVideoCache(rasterLine)(rasterCycle)(counter) = shift
         if (checkLP && baseX + counter == lpx) triggerLightPen
@@ -791,7 +786,7 @@ final class VIC(mem: Memory,
   }
 
   def init {
-    sprites foreach { add _ }
+    sprites foreach { add _ }    
   }
 
   override def getProperties = {    
@@ -811,6 +806,9 @@ final class VIC(mem: Memory,
       properties.setProperty("IRQ control register",Integer.toHexString(interruptControlRegister))
       properties.setProperty("IRQ mask register",Integer.toHexString(interruptMaskRegister))
       properties.setProperty("Raster latch",Integer.toHexString(rasterLatch))
+      properties.setProperty("Raster cycle",Integer.toHexString(rasterCycle))
+      properties.setProperty("Main border FF",mainBorderFF.toString)
+      properties.setProperty("Vertical border FF",verticalBorderFF.toString)
       super.getProperties
     }
 
@@ -851,7 +849,6 @@ final class VIC(mem: Memory,
     spriteXExpansion = 0
     spriteSpriteCollision = 0
     spriteBackgroundCollision = 0
-    BorderShifter.clear
     GFXShifter.clear
   }
 
@@ -859,8 +856,7 @@ final class VIC(mem: Memory,
     this.display = display
     displayMem = display.displayMem
     if (clip)
-      //display.setClipArea((BLANK_LEFT_CYCLE + 1) * 8, BLANK_TOP_LINE + 1, BLANK_RIGHT_CYCLE * 8, BLANK_BOTTOM_LINE)
-      display.setClipArea((BLANK_LEFT_CYCLE + 1) * 8, BLANK_TOP_LINE + 1, (BLANK_RIGHT_CYCLE - 1) * 8 + 3, BLANK_BOTTOM_LINE)
+      display.setClipArea((BLANK_LEFT_CYCLE + 1) * 8, BLANK_TOP_LINE + 1, 483, BLANK_BOTTOM_LINE)
   }
 
   def enableLightPen(enabled: Boolean) = lightPenEnabled = enabled
@@ -955,8 +951,7 @@ final class VIC(mem: Memory,
             rsel = (controlRegister1 & 8) >> 3
             den = (controlRegister1 & 16) == 16
             bmm = (controlRegister1 & 32) == 32
-            ecm = (controlRegister1 & 64) == 64
-            badLine = isBadLine
+            ecm = (controlRegister1 & 64) == 64            
           //}))
           if (debug) Log.info("VIC control register set to %s, yscroll=%d rsel=%d den=%b bmm=%b ecm=%b. Raster latch set to %4X".format(Integer.toBinaryString(controlRegister1), yscroll, rsel, den, bmm, ecm, rasterLatch))
         //Log.info("VIC control register set to %s, yscroll=%d rsel=%d den=%b bmm=%b ecm=%b. Raster latch set to %4X".format(Integer.toBinaryString(controlRegister1),yscroll,rsel,den,bmm,ecm,rasterLatch))
@@ -981,7 +976,7 @@ final class VIC(mem: Memory,
         //Log.fine("Sprite enable register se to " + Integer.toBinaryString(spriteEnableRegister))
         case 22 =>
           //val clk = Clock.systemClock
-          //clk.schedule(new ClockEvent("$D016",clk.currentCycles + 4,(cycles) => {
+          //clk.schedule(new ClockEvent("$D016",clk.currentCycles + 2,(cycles) => {
           controlRegister2 = value
           xscroll = controlRegister2 & 7
           csel = (controlRegister2 & 8) >> 3
@@ -1090,10 +1085,10 @@ final class VIC(mem: Memory,
   }
   
   private[this] var ref = 0
-
+  
   final def clock(cycles: Long) {
     isBlank = rasterLine <= BLANK_TOP_LINE || rasterLine >= BLANK_BOTTOM_LINE || rasterCycle <= BLANK_LEFT_CYCLE || rasterCycle >= BLANK_RIGHT_CYCLE
-    //val badLine = isBadLine
+    val badLine = isBadLine
 
     if (badLine) isInDisplayState = true
 
@@ -1115,50 +1110,61 @@ final class VIC(mem: Memory,
         if (rasterLine > 0 && rasterLine == rasterLatch) rasterLineEqualsLatch
         // check den on $30
         if (rasterLine == 0x30) denOn30 = den
-        badLine = isBadLine
+        //badLine = isBadLine
         sprites(2).readMemoryData(cycles,false)
-        if (sprites(4).dma) baLow(true)
+        //if (sprites(4).dma) baLow(true)
+        baLow(sprites(2).dma || sprites(3).dma || sprites(4).dma)
         drawCycle(-1)
       // ---------------------------------------------------------------  
       case 1 =>
         // check raster line with raster latch if irq enabled    
         if (rasterLine == 0 && rasterLine == rasterLatch) rasterLineEqualsLatch
         sprites(3).readMemoryData(cycles,true)
-        if (!sprites(3).dma && !sprites(4).dma) baLow(false)
+        //if (!sprites(3).dma && !sprites(4).dma) baLow(false)
+        baLow(sprites(3).dma || sprites(4).dma)
         drawCycle(-1)
       case 2 =>
         sprites(3).readMemoryData(cycles,false)
-        if (sprites(5).dma) baLow(true)
+        //if (sprites(5).dma) baLow(true)
+        baLow(sprites(3).dma || sprites(4).dma || sprites(5).dma)
         drawCycle(-1)
       case 3 =>
         sprites(4).readMemoryData(cycles,true)
-        if (!sprites(4).dma && !sprites(5).dma) baLow(false)
+        //if (!sprites(4).dma && !sprites(5).dma) baLow(false)
+        baLow(sprites(4).dma || sprites(5).dma)
         drawCycle(-1)
       case 4 =>
         sprites(4).readMemoryData(cycles,false)
-        if (sprites(6).dma) baLow(true)
+        //if (sprites(6).dma) baLow(true)
+        baLow(sprites(4).dma || sprites(5).dma || sprites(6).dma)
         drawCycle(-1)
       case 5 =>
         sprites(5).readMemoryData(cycles,true)
-        if (!sprites(5).dma && !sprites(6).dma) baLow(false)
+        //if (!sprites(5).dma && !sprites(6).dma) baLow(false)
+        baLow(sprites(5).dma || sprites(6).dma)
         drawCycle(-1)
       case 6 =>
         sprites(5).readMemoryData(cycles,false)
-        if (sprites(7).dma) baLow(true)
+        //if (sprites(7).dma) baLow(true)
+        baLow(sprites(5).dma || sprites(6).dma || sprites(7).dma)
         drawCycle(-1)
       case 7 =>
         sprites(6).readMemoryData(cycles,true)
-        if (!sprites(6).dma && !sprites(7).dma) baLow(false)
+        //if (!sprites(6).dma && !sprites(7).dma) baLow(false)
+        baLow(sprites(6).dma || sprites(7).dma)
         drawCycle(-1)
       case 8 =>
         sprites(6).readMemoryData(cycles,false)
+        baLow(sprites(6).dma || sprites(7).dma)
         drawCycle(-1)
       case 9 =>
         sprites(7).readMemoryData(cycles,true)
-        if (!sprites(7).dma) baLow(false)
+        //if (!sprites(7).dma) baLow(false)
+        baLow(sprites(7).dma)
         drawCycle(-1)
       case 10 =>
         sprites(7).readMemoryData(cycles,false)
+        baLow(sprites(7).dma)
         drawCycle(-1)
       case 11 =>
         mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
@@ -1168,17 +1174,20 @@ final class VIC(mem: Memory,
       case 55 =>
         mem.read(0x3FFF)
         spriteCheck
-        if (sprites(0).dma) baLow(true) else baLow(false)
+        //if (sprites(0).dma) baLow(true) else baLow(false)
+        baLow(sprites(0).dma)
         drawCycle(-1)
       case 56 =>
         mem.read(0x3FFF)
         spriteCheck
-        if (sprites(0).dma) baLow(true)
+        //if (sprites(0).dma) baLow(true)
+        baLow(sprites(0).dma)
         drawCycle(-1)
       case 57 =>
         mem.read(0x3FFF)
         //spriteCheck
-        if (sprites(1).dma) baLow(true)
+        //if (sprites(1).dma) baLow(true)
+        baLow(sprites(0).dma || sprites(1).dma)
         
         drawCycle(-1)	
       // ---------------------------------------------------------------
@@ -1194,28 +1203,33 @@ final class VIC(mem: Memory,
           isInDisplayState = true
         }
         sprites(0).readMemoryData(cycles,true)
+        baLow(sprites(0).dma || sprites(1).dma)
         drawCycle(-1)
       // ---------------------------------------------------------------
       case 59 =>        
         sprites(0).readMemoryData(cycles,false)
-        if (sprites(2).dma) baLow(true)
+        //if (sprites(2).dma) baLow(true)
+        baLow(sprites(0).dma || sprites(1).dma || sprites(2).dma)
         drawCycle(-1)
       case 60 =>
         sprites(1).readMemoryData(cycles,true)
-        if (!sprites(1).dma && !sprites(2).dma) baLow(false)
+        //if (!sprites(1).dma && !sprites(2).dma) baLow(false)
+        baLow(sprites(1).dma || sprites(2).dma)
         drawCycle(-1)
       case 61 =>
         sprites(1).readMemoryData(cycles,false)
-        if (sprites(3).dma) baLow(true)
+        //if (sprites(3).dma) baLow(true)
+        baLow(sprites(1).dma || sprites(2).dma || sprites(3).dma)
         drawCycle(-1)
       case 62 =>
         sprites(2).readMemoryData(cycles,true)
-        if (!sprites(2).dma && !sprites(3).dma) baLow(false)
+        //if (!sprites(2).dma && !sprites(3).dma) baLow(false)
+        baLow(sprites(2).dma || sprites(3).dma)
         GFXShifter.reset
         drawCycle(-1)
       // ---------------------------------------------------------------
       case _ => // 12 - 54
-        if (badLine) baLow(true)
+        baLow(badLine)
         (rasterCycle : @switch) match {
           case 12 =>
             mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
@@ -1266,6 +1280,7 @@ final class VIC(mem: Memory,
       }
     }
   }
+  
   @inline private[this] def tracePixel(pixel: Int, x: Int) {
     val source = (pixel >> 10) & 3 match {
       case 0 => 'N'
@@ -1446,11 +1461,13 @@ final class VIC(mem: Memory,
     // 1
     if (xcoord == LEFT_RIGHT_FF_COMP(csel)(1)) mainBorderFF = true
     // 2
-    if (rasterCycle == RASTER_CYCLES && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(1)) verticalBorderFF = true
+    if (rasterCycle == RASTER_CYCLES - 1 && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(1)) verticalBorderFF = true
+    else
     // 3
-    if (rasterCycle == RASTER_CYCLES && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(0) && den) verticalBorderFF = false
+    if (rasterCycle == RASTER_CYCLES - 1 && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(0) && den) verticalBorderFF = false
     // 4
     if (xcoord == LEFT_RIGHT_FF_COMP(csel)(0) && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(1)) verticalBorderFF = true
+    else
     // 5
     if (xcoord == LEFT_RIGHT_FF_COMP(csel)(0) && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(0) && den) verticalBorderFF = false
     // 6
