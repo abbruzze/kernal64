@@ -45,7 +45,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   private[this] var nmiOnNegativeEdge = false
   private[this] var irqLow = false
   private[this] var nmiLow = false
-  private[this] var irqFirstCycle = 0L
+  private[this] var irqFirstCycle,nmiFirstCycle = 0L
   private[this] val clk = Clock.systemClock
   // -----------------------------------------
 
@@ -64,12 +64,12 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   final def irqRequest(low: Boolean) {
     if (tracing) Log.debug(s"IRQ request low=${low}")
     irqLow = low
-    if (irqLow && irqFirstCycle > 0) irqFirstCycle = clk.currentCycles
+    if (irqLow && irqFirstCycle == 0) irqFirstCycle = clk.currentCycles
   }
   final def nmiRequest(low: Boolean) {
     if (!nmiLow && low) {
       nmiOnNegativeEdge = true
-      irqFirstCycle = clk.currentCycles
+      nmiFirstCycle = clk.currentCycles
       if (tracing) Log.debug("NMI request on negative edge")
     }
     nmiLow = low
@@ -1511,7 +1511,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 		state = O_BRK4
 	  }
 	  case O_BRK4 => () => {
-	    // first_nmi_cycle++
+	    irqFirstCycle += 1
 	    if (ready) {	
 	    PC = mem.read(0xfffe)
 		state = O_BRK5
@@ -1533,13 +1533,15 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	  case O_BMI => () => { branch(isNegative) }
 	  case O_BPL => () => { branch(!isNegative) }
 	  case O_BRANCH_NP => () => {	// No page crossed
+	    irqFirstCycle += 1
+	    nmiFirstCycle += 1
 	    if (ready) {
 	    mem.read(PC)
 		PC = ar
 		Last
 	    }
 	  }
-	  case O_BRANCH_BP => () => {	// Page crossed, branch backwards
+	  case O_BRANCH_BP => () => {	// Page crossed, branch backwards	    
 	    if (ready) {
 	    mem.read(PC)
 		PC = ar
@@ -1889,8 +1891,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     }
     
     // check interrupts
-    if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - irqFirstCycle >= 2) {
-      irqFirstCycle = 0
+    if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - nmiFirstCycle >= 2) {
+      nmiFirstCycle = 0
       nmiOnNegativeEdge = false
       state = NMI_STATE
       if (breakType != null && breakType.isBreak(PC,false,true)) {
@@ -1923,5 +1925,5 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     0
   }
   
-  protected def formatDebug = s"[${id.toString}] ${CPU6510.disassemble(mem,PC).toString}"
+  protected def formatDebug = s"[${id.toString}] ${CPU6510.disassemble(mem,PC).toString} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
 }
