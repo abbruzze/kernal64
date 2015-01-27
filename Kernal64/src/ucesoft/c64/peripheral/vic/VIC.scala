@@ -116,7 +116,7 @@ final class VIC(mem: Memory,
   val id = ChipID.VIC
 
   // ----------------------- Constants --------------------------------------------------------------------
-  final private[this] val CYCLE_FOR_FIRST_XCOORD = 12
+  final private[this] val CYCLE_FOR_FIRST_XCOORD = 13
   final private[this] val RASTER_LINES = 312
   final private[this] val RASTER_CYCLES = 63
   final val SCREEN_WIDTH = RASTER_CYCLES * 8
@@ -128,7 +128,7 @@ final class VIC(mem: Memory,
   final private[this] val BLANK_TOP_LINE = 15
   final private[this] val BLANK_BOTTOM_LINE = 300
   final private[this] val BLANK_LEFT_CYCLE = 9
-  final private[this] val BLANK_RIGHT_CYCLE = 63
+  final private[this] val BLANK_RIGHT_CYCLE = 61
   final private[this] val BA_CYCLES_FOR_CHARS = 40
   final private[this] val BA_CYCLES_PER_SPRITE = 3
   final val VISIBLE_SCREEN_WIDTH = 403//(BLANK_RIGHT_CYCLE - BLANK_LEFT_CYCLE - 1) * 8
@@ -150,6 +150,7 @@ final class VIC(mem: Memory,
   private[this] var rsel = 0 // 1 => 25 rows, 0 => 24 rows
   private[this] var den = false // blank screen if false
   private[this] var denOn30 = false // den value at raster line $30
+  private[this] var badLine = false
   private[this] var bmm = false // bitmap mode: true enabled
   private[this] var ecm = false // extended color mode: true enabled
   private[this] var csel = 0 // 1 => 40 cols, 0 => 38 cols
@@ -159,30 +160,7 @@ final class VIC(mem: Memory,
   private[this] var mainBorderFF = false // main border flip flop
   private[this] var verticalBorderFF = false // vertical border flip flop
 
-  private[this] var rasterCycle = 0 // horizontal cycle 0-62
-  final private[this] val SPRITE_READ_CYCLE = {
-    val cycles = Array.fill[Int](RASTER_CYCLES)(-1)
-    cycles(58) = 0
-    cycles(60) = 1
-    cycles(62) = 2
-    cycles(1)  = 3
-    cycles(3)  = 4
-    cycles(5)  = 5
-    cycles(7)  = 6
-    cycles(9)  = 7
-    cycles
-  }
-  final private[this] val SPRITE_BA_CYCLE = {
-    val baCycles = Array.fill[Int](RASTER_CYCLES)(-1)
-    for(i <- 0 until SPRITE_READ_CYCLE.length) {
-      if (SPRITE_READ_CYCLE(i) != -1) {
-        var baIndex = i - BA_CYCLES_PER_SPRITE
-        if (baIndex < 0) baIndex += RASTER_CYCLES
-        baCycles(baIndex) = SPRITE_READ_CYCLE(i)
-      } 
-    }
-    baCycles
-  }
+  private[this] var rasterCycle = 1 // horizontal cycle 1-63
   // graphics management
   private[this] var isBlank = false // valid inside drawCycle: tells if we are in the blank area
   private[this] var display: Display = null // the display
@@ -190,6 +168,7 @@ final class VIC(mem: Memory,
   private[this] var firstModPixelX, firstModPixelY = 0 // first x,y pixel coordinate modified
   private[this] var lastModPixelX, lastModPixelY = 0 // last x,y pixel coordinate modified
   private[this] var lightPenEnabled = false
+  private[this] var _baLow = false
   // --------------------- DEBUG --------------------------------------------------------------------------
   private[this] var traceRasterLineInfo = false
   final private[this] val traceRasterLineBuffer = Array.fill(SCREEN_WIDTH)("")
@@ -223,7 +202,7 @@ final class VIC(mem: Memory,
     When Writing:Define Rasterline for Interrupt triggering
     Bit#7 of $D011 is (to be) set if line number exceeds 255
    */
-  private[this] var rasterLine = 0x100 // real raster line 0-8 bits  
+  private[this] var rasterLine = 0 // real raster line 0-8 bits  
   private[this] var rasterLatch = 0
   /*
    * $D013 - $D014
@@ -362,6 +341,7 @@ final class VIC(mem: Memory,
     val componentID = "Sprite " + index
     val componentType = C64ComponentType.INTERNAL
     
+    private[this] val DMA_INDEX = 1 << index
     private[this] var _enabled = false
     private[this] val mask = 1 << index
     private[this] var counter = 0
@@ -373,22 +353,15 @@ final class VIC(mem: Memory,
     private[this] var expansionFF = true
     private[this] var xexpCounter = 0
     private[this] var display = false
-    private[this] var lastLine = false
+    //private[this] var lastLine = false
     var painting = false
     var hasPixels = false
     private[this] val pixels = Array.fill[Int](8)(PIXEL_TRANSPARENT)
     private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
-    private[this] var yexpClearedOn15 = false
     
     def enabled = _enabled
     def enabled_=(enabled:Boolean) = {
       _enabled = enabled
-//      if (!enabled) {
-//        dma = false
-//        mc = 0
-//        mcbase = 0
-//        counter = 0
-//      }
     }
     
     override def toString = s"Sprite #${index} cnt=${counter} data=${Integer.toBinaryString(gdata & 0xFFFFFF)} en=${_enabled} hasPixels=${hasPixels} x=${x} y=${y} xexp=${xexp} yexp=${_yexp} color=${color} mcm=${isMulticolor} pr=${dataPriority} memP=${memoryPointer} mcbase=${mcbase} mc=${mc} dma=${dma} display=${display} ff=${expansionFF}"
@@ -406,13 +379,14 @@ final class VIC(mem: Memory,
     }
     
     final def yexp = _yexp
-    final def displayable = (display || lastLine)
+    final def displayable = display
 
     final def yexp_=(v: Boolean) {
+      if (!v && !expansionFF) { // sprite crunch
+        if (rasterCycle == 15) mcbase = (0x2A & (mcbase & mc)) | (0x15 & (mcbase | mc)) // patch from VIC-Addentum
+        expansionFF = true
+      }
       _yexp = v
-      if (!v) expansionFF = true
-      if (rasterCycle == 24) mc = 42 & mc & mcbase | 21 & (mc | mcbase) // sprite crunch ??
-      yexpClearedOn15 = rasterCycle == 15 && !v
     }
 
     final def getPixels = pixels
@@ -434,7 +408,7 @@ final class VIC(mem: Memory,
       expansionFF = true
       xexpCounter = 0
       display = false
-      lastLine = false
+      //lastLine = false
       painting = false
       hasPixels = false
       counter = 0
@@ -455,7 +429,7 @@ final class VIC(mem: Memory,
       val xcoord = xCoord
       var i = 0
       while (i < 8) {
-        if (!painting && x == xcoord + i && (display || lastLine)) painting = true
+        if (!painting && x == xcoord + i && display) painting = true
         if (painting && !isFinished) {
           pixels(i) = shift
           //println(s"Sprite #${s} shifted a pixel ${sprite.pixels(i)} in ${i} raster=${rasterLine} cycle=${rasterCycle} ${sprites(s)}")
@@ -475,9 +449,9 @@ final class VIC(mem: Memory,
       val finished = counter == (if (xexp) 48 else 24)
       if (finished) {
         painting = false
-        if (lastLine) {
-          lastLine = false          
-        }
+//        if (lastLine) {
+//          lastLine = false          
+//        }
       }
       finished
     }
@@ -514,12 +488,12 @@ final class VIC(mem: Memory,
       pixel
     }
 
-    @inline final def readMemoryData(cycles: Long,first:Boolean) {            
+    @inline final def readMemoryData(first:Boolean) {            
       // s-accesses
+      if (first) memoryPointer = mem.read(videoMatrixAddress + 1016 + index) << 6
       if (dma) {    
         if (first) {          
-          // p-accesses
-          memoryPointer = mem.read(videoMatrixAddress + 1016 + index) << 6
+          // p-accesses          
           gdata = (mem.read(memoryPointer + mc) & 0xFF) << 16
         }
         else {
@@ -531,51 +505,44 @@ final class VIC(mem: Memory,
         mc += 1
       }
       else 
-      if (first) mem.read(0x3FFF) // idle access
+      if (!first) mem.read(0x3FFF) // idle access
     }
 
     final def checkForCycle(cycle: Int) = (cycle : @switch) match {
-      case 15 =>
-        if (expansionFF) mcbase += 2
       case 16 =>
         if (expansionFF) {
-          mcbase += 1
-          if (!yexpClearedOn15) mcbase = mc
-          else {
-            yexpClearedOn15 = false
-            mcbase = (0x2A & (mcbase & mc)) | (0x15 & (mcbase | mc)) // patch from VIC-Addentum
-          }
-
+          mcbase = mc
           if (mcbase == 63) {
             dma = false
-            if (display) lastLine = true
-            display = false
-            //Log.debug(s"Sprite #${index} NOT displayable anymore on raster ${rasterLine}")
+            spriteDMAon &= ~DMA_INDEX
           }
         }
       case 55|56 =>
         if (cycle == 55 && _yexp) expansionFF = !expansionFF
         if (_enabled && (y) == (rasterLine & 0xFF) && !dma) {
           dma = true
+          spriteDMAon |= DMA_INDEX
           mcbase = 0
           if (_yexp) expansionFF = false
           //Log.debug(s"Sprite #${index}. " + this)
           //println(s"Sprite #${index} DMA=true on rasterLine=${rasterLine}")
         }
-//      case 56 =>
-//        if (!dma) painting = false
       case 58 =>
         mc = mcbase
-        if (dma && (y) == (rasterLine & 0xFF)) {
-          display = true
-          spritesDisplayedMask |= mask
-          //Log.debug(s"Sprite #${index} displayable. " + this)
+        if (dma) {
+          if (_enabled && (y) == (rasterLine & 0xFF)) {
+            display = true
+            spritesDisplayedMask |= mask
+          }          
         }
+        else display = false 
+        
       case _ => // do nothing
     }
   }
   final private[this] val sprites = Array(new Sprite(0), new Sprite(1), new Sprite(2), new Sprite(3), new Sprite(4), new Sprite(5), new Sprite(6), new Sprite(7))
   private[this] var spritesDisplayedMask = 0
+  private[this] var spriteDMAon = 0
   // -------------------------------- VIDEO CACHE -----------------------------------------
   // | 43 - 40 | 39 - 36 | 35 - 32 | 31 - 28 | 27 - 24 | 23 - 16 | 15 - 8  | 7 - 0 |
   // |  back 3 |  back 2 |  back 1 | back 0  | border c| $d018   | $d016   | $d011 |
@@ -605,11 +572,11 @@ final class VIC(mem: Memory,
 
     final def producePixels {
       // optimization           
-      drawBorder = !den ||
-        rasterLine <= TOP_BOTTOM_FF_COMP(rsel)(0) ||
-        rasterLine >= TOP_BOTTOM_FF_COMP(rsel)(1) ||
-        rasterCycle < 16 || rasterCycle > 52
-      if (!drawBorder) return
+//      drawBorder = !den ||
+//        rasterLine <= TOP_BOTTOM_FF_COMP(rsel)(0) ||
+//        rasterLine >= TOP_BOTTOM_FF_COMP(rsel)(1) ||
+//        (rasterCycle > 8 && rasterCycle < 17) || (rasterCycle > 53 && rasterCycle < 61)
+//      if (!drawBorder) return
       xcoord = xCoord
       color = borderColor
       if (traceRasterLineInfo) color |= PIXEL_DOX_B
@@ -620,15 +587,11 @@ final class VIC(mem: Memory,
       
       var i = 0
       while (i < 8) {
-        pixels(i) = shift
+        val hasBorder = checkBorderFF(xcoord + i)
+        pixels(i) = if (hasBorder) color else PIXEL_TRANSPARENT
         //pixelVideoCache(rasterLine)(rasterCycle)(i) = shift
         i += 1
       }
-    }
-    @inline final private def shift = {
-      val hasBorder = checkBorderFF(xcoord)
-      xcoord += 1
-      if (hasBorder) color else PIXEL_TRANSPARENT
     }
   }
   /**
@@ -810,6 +773,8 @@ final class VIC(mem: Memory,
       properties.setProperty("Raster cycle",Integer.toHexString(rasterCycle))
       properties.setProperty("Main border FF",mainBorderFF.toString)
       properties.setProperty("Vertical border FF",verticalBorderFF.toString)
+      properties.setProperty("Den",den.toString)
+      properties.setProperty("BA",_baLow.toString)
       super.getProperties
     }
 
@@ -834,7 +799,7 @@ final class VIC(mem: Memory,
     res = false
     mainBorderFF = false
     verticalBorderFF = false
-    rasterCycle = 0
+    rasterCycle = 1
     spriteXCoord9thBit = 0
     controlRegister1 = 0x9B
     rasterLine = 0
@@ -850,6 +815,7 @@ final class VIC(mem: Memory,
     spriteXExpansion = 0
     spriteSpriteCollision = 0
     spriteBackgroundCollision = 0
+    spriteDMAon = 0
     GFXShifter.clear
   }
 
@@ -857,7 +823,7 @@ final class VIC(mem: Memory,
     this.display = display
     displayMem = display.displayMem
     if (clip)
-      display.setClipArea((BLANK_LEFT_CYCLE + 1) * 8, BLANK_TOP_LINE + 1, 483, BLANK_BOTTOM_LINE)
+      display.setClipArea((BLANK_LEFT_CYCLE + 1) * 8 - 3, BLANK_TOP_LINE + 1, 480, BLANK_BOTTOM_LINE)
   }
 
   def enableLightPen(enabled: Boolean) = lightPenEnabled = enabled
@@ -943,16 +909,19 @@ final class VIC(mem: Memory,
         //Log.fine((for(i <- 0 to 7) yield "Sprite x updated to" + sprites(i).x) mkString("\n"))
         case 17 =>
           //val clk = Clock.systemClock
-          //clk.schedule(new ClockEvent("$D011",clk.currentCycles + 4,(cycles) => {
+          //clk.schedule(new ClockEvent("$D011",clk.currentCycles + 2,(cycles) => {
             controlRegister1 = value
+            val prevRasterLatch = rasterLatch
             if ((controlRegister1 & 128) == 128) rasterLatch |= 0x100 else rasterLatch &= 0xFF
-            if (rasterLatch > RASTER_LINES) rasterLatch &= 0xFF
-            //if (rasterLine == rasterLatch) rasterLineEqualsLatch
+            //if (rasterLatch > RASTER_LINES) rasterLatch &= 0xFF
+            if (prevRasterLatch != rasterLatch && rasterLine == rasterLatch) rasterLineEqualsLatch
             yscroll = controlRegister1 & 7
             rsel = (controlRegister1 & 8) >> 3
             den = (controlRegister1 & 16) == 16
             bmm = (controlRegister1 & 32) == 32
             ecm = (controlRegister1 & 64) == 64            
+            badLine = isBadLine
+            if (rasterLine == 0x30 && den) denOn30 = true
           //}))
           if (debug) Log.info("VIC control register set to %s, yscroll=%d rsel=%d den=%b bmm=%b ecm=%b. Raster latch set to %4X".format(Integer.toBinaryString(controlRegister1), yscroll, rsel, den, bmm, ecm, rasterLatch))
         //Log.info("VIC control register set to %s, yscroll=%d rsel=%d den=%b bmm=%b ecm=%b. Raster latch set to %4X".format(Integer.toBinaryString(controlRegister1),yscroll,rsel,den,bmm,ecm,rasterLatch))
@@ -960,9 +929,10 @@ final class VIC(mem: Memory,
     	case 18 =>
           //Log.debug("VIC previous value of raster latch is %4X".format(rasterLatch))
           val rst8 = rasterLatch & 0x100
+          val prevRasterLatch = rasterLatch
           rasterLatch = value | rst8
-          if (rasterLatch > RASTER_LINES) rasterLatch &= 0xFF
-          //if (rasterLine == rasterLatch) rasterLineEqualsLatch
+          //if (rasterLatch > RASTER_LINES) rasterLatch &= 0xFF
+          if (prevRasterLatch != rasterLatch && rasterLine == rasterLatch) rasterLineEqualsLatch
           if (debug) Log.info("VIC raster latch set to %4X value=%2X".format(rasterLatch, value))
         //else Log.debug("VIC raster latch set to %4X value=%2X".format(rasterLatch,value))
         case 19 | 20 => // light pen ignored
@@ -977,7 +947,7 @@ final class VIC(mem: Memory,
         //Log.fine("Sprite enable register se to " + Integer.toBinaryString(spriteEnableRegister))
         case 22 =>
           //val clk = Clock.systemClock
-          //clk.schedule(new ClockEvent("$D016",clk.currentCycles + 2,(cycles) => {
+          //clk.schedule(new ClockEvent("$D016",clk.currentCycles + 1,(cycles) => {
           controlRegister2 = value
           xscroll = controlRegister2 & 7
           csel = (controlRegister2 & 8) >> 3
@@ -1007,9 +977,7 @@ final class VIC(mem: Memory,
           if (debug) Log.info(s"VIC base pointer set to ${Integer.toBinaryString(vicBaseAddress)} video matrix=${videoMatrixAddress} char address=${characterAddress} bitmap address=${bitmapAddress}")
         //Log.info(s"VIC base pointer set to ${Integer.toBinaryString(vicBaseAddress)} video matrix=${videoMatrixAddress} char address=${characterAddress} bitmap address=${bitmapAddress} raster=${rasterLine}")          
         case 25 =>
-//          val tmp = if ((value & 0x80) != 0) 0xFF else value
-//          interruptControlRegister &= 0xFF ^ tmp
-          interruptControlRegister &= ~interruptControlRegister & 0x0F
+          interruptControlRegister &= ~value & 0x0F
           // check if we must clear interrupt
           if ((interruptControlRegister & interruptMaskRegister & 0x0f) == 0) {
             //Log.debug("VIC clearing interrupt...")
@@ -1087,108 +1055,90 @@ final class VIC(mem: Memory,
   
   private[this] var ref = 0
   
+  @inline private def setBaLow(low:Boolean) {
+    if (low != _baLow) {
+      _baLow = low
+      baLow(low)
+    }
+  }
+  
   final def clock(cycles: Long) {
-    isBlank = rasterLine <= BLANK_TOP_LINE || rasterLine >= BLANK_BOTTOM_LINE || rasterCycle <= BLANK_LEFT_CYCLE || rasterCycle >= BLANK_RIGHT_CYCLE
-    val badLine = isBadLine
+    val outOfScreen = rasterLine <= BLANK_TOP_LINE || rasterLine >= BLANK_BOTTOM_LINE
+    isBlank = outOfScreen || rasterCycle <= BLANK_LEFT_CYCLE || rasterCycle >= BLANK_RIGHT_CYCLE
 
     if (badLine) isInDisplayState = true
 
-    if (rasterLine == 0) {
-      ref = 0xFF
-      vcbase = 0
-      vc = 0
-    }
-
-    //Log.fine(s"VIC rasterLine=${rasterLine} vicCycle=${rasterCycle} vcbase=${vcbase} vc=${vc} vmli=${vmli} mainFF=${mainBorderFF} verticalFF=${verticalBorderFF} displayState=${isInDisplayState} Xcoord=${xCoord}")
-    // check sprite cycle
-    // check sprite ba
-//    val baSprite = SPRITE_BA_CYCLE(rasterCycle)
-//    if (baSprite >= 0 && sprites(baSprite).dma) baLow(cycles + BA_CYCLES_PER_SPRITE - 1)
-    
-    (rasterCycle: @switch) match {
-      case 0 =>
+    //if (!outOfScreen)
+    (rasterCycle: @switch) match {       
+      case 1 =>
         // check raster line with raster latch if irq enabled     
         if (rasterLine > 0 && rasterLine == rasterLatch) rasterLineEqualsLatch
         // check den on $30
         if (rasterLine == 0x30) denOn30 = den
-        //badLine = isBadLine
-        sprites(2).readMemoryData(cycles,false)
-        //if (sprites(4).dma) baLow(true)
-        baLow(sprites(2).dma || sprites(3).dma || sprites(4).dma)
-        drawCycle(-1)
-      // ---------------------------------------------------------------  
-      case 1 =>
-        // check raster line with raster latch if irq enabled    
-        if (rasterLine == 0 && rasterLine == rasterLatch) rasterLineEqualsLatch
-        sprites(3).readMemoryData(cycles,true)
-        //if (!sprites(3).dma && !sprites(4).dma) baLow(false)
-        baLow(sprites(3).dma || sprites(4).dma)
+        badLine = isBadLine        
+        sprites(3).readMemoryData(true)
+        setBaLow((spriteDMAon & 0x18) > 0) // 3,4
         drawCycle(-1)
       case 2 =>
-        sprites(3).readMemoryData(cycles,false)
-        //if (sprites(5).dma) baLow(true)
-        baLow(sprites(3).dma || sprites(4).dma || sprites(5).dma)
+        // check raster line with raster latch if irq enabled    
+        if (rasterLine == 0 && rasterLine == rasterLatch) rasterLineEqualsLatch
+        sprites(3).readMemoryData(false)
+        setBaLow((spriteDMAon & 0x38) > 0) // 3,4,5
         drawCycle(-1)
       case 3 =>
-        sprites(4).readMemoryData(cycles,true)
-        //if (!sprites(4).dma && !sprites(5).dma) baLow(false)
-        baLow(sprites(4).dma || sprites(5).dma)
+        sprites(4).readMemoryData(true)
+        setBaLow((spriteDMAon & 0x30) > 0) // 4,5
         drawCycle(-1)
       case 4 =>
-        sprites(4).readMemoryData(cycles,false)
-        //if (sprites(6).dma) baLow(true)
-        baLow(sprites(4).dma || sprites(5).dma || sprites(6).dma)
+        sprites(4).readMemoryData(false)
+        setBaLow((spriteDMAon & 0x70) > 0) // 4,5,6
         drawCycle(-1)
       case 5 =>
-        sprites(5).readMemoryData(cycles,true)
-        //if (!sprites(5).dma && !sprites(6).dma) baLow(false)
-        baLow(sprites(5).dma || sprites(6).dma)
+        sprites(5).readMemoryData(true)
+        setBaLow((spriteDMAon & 0x60) > 0) // 5,6
         drawCycle(-1)
       case 6 =>
-        sprites(5).readMemoryData(cycles,false)
-        //if (sprites(7).dma) baLow(true)
-        baLow(sprites(5).dma || sprites(6).dma || sprites(7).dma)
+        sprites(5).readMemoryData(false)
+        setBaLow((spriteDMAon & 0xE0) > 0) // 5,6,7
         drawCycle(-1)
       case 7 =>
-        sprites(6).readMemoryData(cycles,true)
-        //if (!sprites(6).dma && !sprites(7).dma) baLow(false)
-        baLow(sprites(6).dma || sprites(7).dma)
+        sprites(6).readMemoryData(true)
+        setBaLow((spriteDMAon & 0xC0) > 0) // 6,7
         drawCycle(-1)
       case 8 =>
-        sprites(6).readMemoryData(cycles,false)
-        baLow(sprites(6).dma || sprites(7).dma)
+        sprites(6).readMemoryData(false)
         drawCycle(-1)
       case 9 =>
-        sprites(7).readMemoryData(cycles,true)
-        //if (!sprites(7).dma) baLow(false)
-        baLow(sprites(7).dma)
+        sprites(7).readMemoryData(true)
+        setBaLow((spriteDMAon & 0x80) > 0) // 7
         drawCycle(-1)
       case 10 =>
-        sprites(7).readMemoryData(cycles,false)
-        baLow(sprites(7).dma)
+        sprites(7).readMemoryData(false)
+        setBaLow((spriteDMAon & 0x80) > 0) // 7
         drawCycle(-1)
       case 11 =>
         mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
-        baLow(false)
+        setBaLow(false)
         drawCycle(-1)
       // ---------------------------------------------------------------
       case 55 =>
         spriteCheck
-        //if (sprites(0).dma) baLow(true) else baLow(false)
-        baLow(sprites(0).dma)
-        drawCycle(-1)
+        setBaLow((spriteDMAon & 0x01) > 0) // 0
+        if (isInDisplayState) {
+          // g-access
+          drawCycle(readCharFromMemory)          
+          vc = (vc + 1) & 0x3FF //% 1024
+          vmli += 1 
+        }
+        else drawCycle(mem.read(if (ecm) 0x39ff else 0x3fff))
       case 56 =>
         mem.read(0x3FFF)
         spriteCheck
-        //if (sprites(0).dma) baLow(true)
-        baLow(sprites(0).dma)
+        setBaLow((spriteDMAon & 0x01) > 0) // 0
         drawCycle(-1)
       case 57 =>
         mem.read(0x3FFF)
-        //spriteCheck
-        //if (sprites(1).dma) baLow(true)
-        baLow(sprites(0).dma || sprites(1).dma)
-        
+        setBaLow((spriteDMAon & 0x03) > 0)  // 0,1        
         drawCycle(-1)	
       // ---------------------------------------------------------------
       case 58 =>     
@@ -1202,34 +1152,52 @@ final class VIC(mem: Memory,
           rc = (rc + 1) & 7
           isInDisplayState = true
         }
-        sprites(0).readMemoryData(cycles,true)
-        baLow(sprites(0).dma || sprites(1).dma)
+        sprites(0).readMemoryData(true)
+        setBaLow((spriteDMAon & 0x03) > 0) // 0,1
         drawCycle(-1)
       // ---------------------------------------------------------------
       case 59 =>        
-        sprites(0).readMemoryData(cycles,false)
-        //if (sprites(2).dma) baLow(true)
-        baLow(sprites(0).dma || sprites(1).dma || sprites(2).dma)
+        sprites(0).readMemoryData(false)
+        setBaLow((spriteDMAon & 0x07) > 0) // 0,1,2
         drawCycle(-1)
       case 60 =>
-        sprites(1).readMemoryData(cycles,true)
-        //if (!sprites(1).dma && !sprites(2).dma) baLow(false)
-        baLow(sprites(1).dma || sprites(2).dma)
+        sprites(1).readMemoryData(true)
+        setBaLow((spriteDMAon & 0x06) > 0) // 1,2
         drawCycle(-1)
       case 61 =>
-        sprites(1).readMemoryData(cycles,false)
-        //if (sprites(3).dma) baLow(true)
-        baLow(sprites(1).dma || sprites(2).dma || sprites(3).dma)
+        sprites(1).readMemoryData(false)
+        setBaLow((spriteDMAon & 0x0E) > 0) // 1,2,3
         drawCycle(-1)
       case 62 =>
-        sprites(2).readMemoryData(cycles,true)
-        //if (!sprites(2).dma && !sprites(3).dma) baLow(false)
-        baLow(sprites(2).dma || sprites(3).dma)
+        sprites(2).readMemoryData(true)
+        setBaLow((spriteDMAon & 0x0C) > 0) // 2,3       
+        drawCycle(-1)
+      // ---------------------------------------------------------------
+      case 63 =>        
+        sprites(2).readMemoryData(false)
+        setBaLow((spriteDMAon & 0x1C) > 0) // 2,3,4
         GFXShifter.reset
         drawCycle(-1)
       // ---------------------------------------------------------------
       case _ => // 12 - 54
-        baLow(badLine)
+        setBaLow(badLine) 
+        if (isInDisplayState && rasterCycle >= 16) {
+          //if (badLine) readAndStoreVideoMemory
+                    
+          // g-access
+          drawCycle(readCharFromMemory)          
+          vc = (vc + 1) & 0x3FF //% 1024
+          vmli += 1
+          // c-access
+          if (_baLow) readAndStoreVideoMemory
+        } 
+        else 
+        if (!isInDisplayState && rasterCycle >= 16) {
+          //vml_c(vmli) = 0
+          drawCycle(mem.read(if (ecm) 0x39ff else 0x3fff))
+          //drawCycle(0)
+        } 
+        else drawCycle(-1)
         (rasterCycle : @switch) match {
           case 12 =>
             mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
@@ -1241,33 +1209,17 @@ final class VIC(mem: Memory,
             vmli = 0
             if (badLine) rc = 0
           case 15 =>
-            spriteCheck
             mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+            // c-access
+            if (_baLow) readAndStoreVideoMemory
           case 16 =>
             spriteCheck
           case _ =>
-        }
-        
-        if (isInDisplayState && rasterCycle >= 15) {
-          if (badLine) readAndStoreVideoMemory
-          
-          // g-access
-          drawCycle(readCharFromMemory)
-          vc = (vc + 1) & 0x3FF //% 1024
-          vmli += 1
-        } 
-        else 
-        if (!isInDisplayState && rasterCycle >= 15) {
-          //vml_c(vmli) = 0
-          drawCycle(mem.read(if (ecm) 0x39ff else 0x3fff))
-          //drawCycle(0)
-        } 
-        else drawCycle(-1)
+        }               
     }
-    // at the end increase the cycle
-    rasterCycle += 1
-    if (rasterCycle == RASTER_CYCLES) rasterCycle = 0
-    if (rasterCycle == 0) {
+    
+    if (rasterCycle == RASTER_CYCLES) {
+      rasterCycle = 1
       rasterLine += 1
       if (rasterLine == RASTER_LINES) rasterLine = 0
       // update the 8th bit of raster in control register 1
@@ -1277,8 +1229,12 @@ final class VIC(mem: Memory,
         display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
         firstModPixelX = -1
         lastModPixelX = -1
+        ref = 0xFF
+        vcbase = 0
+        vc = 0
       }
     }
+    else rasterCycle += 1
   }
   
   @inline private[this] def tracePixel(pixel: Int, x: Int) {
@@ -1312,7 +1268,7 @@ final class VIC(mem: Memory,
     if (isBlank) return
 
     val y = rasterLine
-    val x = rasterCycle << 3
+    val x = (rasterCycle - 1) << 3
     var s, i = 0
 
     // --------------------- GFX -------------------------
@@ -1354,7 +1310,7 @@ final class VIC(mem: Memory,
         }
         s -= 1
       }
-      val gfxPixel = if (gdata < 0) PIXEL_BLACK else gfxPixels(i)
+      val gfxPixel = if (verticalBorderFF) backgroundColor(0) else if (gdata < 0) PIXEL_BLACK else gfxPixels(i)
       if (!verticalBorderFF && (gfxPixel & 0x10) > 0 && (pixel & PIXEL_TRANSPARENT) == 0) spriteDataCollision((pixel >> 6) & 7) // sprite-data collision detected
       if ((pixel & PIXEL_TRANSPARENT) > 0 || ((gfxPixel & 0x10) > 0 && (pixel & PIXEL_SPRITE_PRIORITY) > 0)) pixel = gfxPixel
       if ((borderPixels(i) & PIXEL_TRANSPARENT) == 0) drawPixel(x + i, y, borderPixels(i))
@@ -1383,13 +1339,13 @@ final class VIC(mem: Memory,
   }
 
   @inline private def rasterLineEqualsLatch {
-//    if ((interruptControlRegister & 1) == 0) {
+    if ((interruptControlRegister & 1) == 0) {
       interruptControlRegister |= 1
       if ((interruptMaskRegister & 1) == 1) {
         //Log.debug(s"VIC - raster interrupt request raster=${rasterLine}")
         irqRequest
       }
-//    }
+    }
   }
 
   @inline private def spriteSpriteCollision(i: Int, j: Int) {
@@ -1426,7 +1382,7 @@ final class VIC(mem: Memory,
     //Log.fine(s"Reading video memory at ${videoMatrixAddress + offset}: charCode=${charCode} color=${color}")
   }
   
-  @inline private def readCharFromMemory = {
+  @inline private def readCharFromMemory : Int = {
     if (bmm) {
       val offset = bitmapAddress | ((vc & 0x3ff) << 3) | rc
       val bitmap = mem.read(offset)
@@ -1452,19 +1408,21 @@ final class VIC(mem: Memory,
    * Get the x coordinate based on current raster cycle.
    */
   @inline private def xCoord = {
-    var xcoord = (rasterCycle - CYCLE_FOR_FIRST_XCOORD) << 3
-    if (xcoord < 0) xcoord += PIXELS_PER_LINE
-    xcoord
+    if (rasterCycle >= CYCLE_FOR_FIRST_XCOORD) (rasterCycle - CYCLE_FOR_FIRST_XCOORD) << 3
+    else 0x198 + (rasterCycle - 1) << 3
+//    var xcoord = (rasterCycle - CYCLE_FOR_FIRST_XCOORD) << 3
+//    if (xcoord < 0) xcoord += PIXELS_PER_LINE
+//    xcoord
   }
 
   @inline private def checkBorderFF(xcoord: Int) = {
     // 1
     if (xcoord == LEFT_RIGHT_FF_COMP(csel)(1)) mainBorderFF = true
     // 2
-    if (rasterCycle == RASTER_CYCLES - 1 && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(1)) verticalBorderFF = true
+    if (rasterCycle == RASTER_CYCLES && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(1)) verticalBorderFF = true
     else
     // 3
-    if (rasterCycle == RASTER_CYCLES - 1 && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(0) && den) verticalBorderFF = false
+    if (rasterCycle == RASTER_CYCLES && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(0) && den) verticalBorderFF = false
     // 4
     if (xcoord == LEFT_RIGHT_FF_COMP(csel)(0) && rasterLine == TOP_BOTTOM_FF_COMP(rsel)(1)) verticalBorderFF = true
     else
@@ -1473,7 +1431,7 @@ final class VIC(mem: Memory,
     // 6
     if (xcoord == LEFT_RIGHT_FF_COMP(csel)(0) && !verticalBorderFF) mainBorderFF = false
     
-    mainBorderFF || verticalBorderFF
+    mainBorderFF// || verticalBorderFF
   }
 
   def enableTraceRasterLine(enabled: Boolean) = traceRasterLineInfo = enabled

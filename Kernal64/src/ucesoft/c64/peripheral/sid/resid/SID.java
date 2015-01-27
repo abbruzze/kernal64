@@ -17,7 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
- * @author Ken Händel
+ * @author Ken Handel
  *
  */
 package ucesoft.c64.peripheral.sid.resid;
@@ -143,7 +143,7 @@ public class SID {
 	/**
 	 * Read/Write State.
 	 * 
-	 * @author Ken Händel
+	 * @author Ken Handel
 	 * 
 	 */
 	public class State {

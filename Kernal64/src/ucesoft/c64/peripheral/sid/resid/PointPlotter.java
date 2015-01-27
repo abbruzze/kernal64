@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
- * @author Ken Händel
+ * @author Ken Handel
  *
  */
 package ucesoft.c64.peripheral.sid.resid;
@@ -24,7 +24,7 @@ package ucesoft.c64.peripheral.sid.resid;
 /**
  * Class for plotting integers into an array.
  * 
- * @author Ken Händel
+ * @author Ken Handel
  * 
  */
 public class PointPlotter {
