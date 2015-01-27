@@ -143,7 +143,7 @@ class VIADiskControl(var cpu: CPU6510,
           isWriting = true
           gcrIndexFromToWrite = gcrIndex + 1
         }
-        else isWriting = false                  
+        else isWriting = false
       case PB =>
         // led
         val ledOn = (value & 0x08) > 0
@@ -159,8 +159,8 @@ class VIADiskControl(var cpu: CPU6510,
         // check the head step indication
         val oldStepHead = regs(PB) & 0x03
         val stepHead = value & 0x03
-        if (oldStepHead == ((stepHead + 1) & 0x03) && track > 1) moveHead(moveOut = true)
-        else if (oldStepHead == ((stepHead - 1) & 0x03) && track < TOTAL_TRACKS) moveHead(moveOut = false)
+        if (motorOn && oldStepHead == ((stepHead + 1) & 0x03) && track > 1) moveHead(moveOut = true)
+        else if (motorOn && oldStepHead == ((stepHead - 1) & 0x03) && track < TOTAL_TRACKS) moveHead(moveOut = false)
       case _ =>
     }
     // write on register
@@ -171,7 +171,7 @@ class VIADiskControl(var cpu: CPU6510,
     if (moveOut) trackSteps -= 1 else trackSteps += 1
     val isOnTrack = (trackSteps & 1) == 0
     if (isOnTrack) {
-      track = trackSteps / 2
+      track = trackSteps >> 1/// 2
       sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
       sector = 0            
       byteCycleWait = rotationCyclesForByte(track)
