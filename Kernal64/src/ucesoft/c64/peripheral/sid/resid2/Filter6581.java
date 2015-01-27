@@ -6,7 +6,7 @@ package ucesoft.c64.peripheral.sid.resid2;
  * 
  * Java port by Antti S. Lankila
  * 
- * @author Ken Händel
+ * @author Ken Handel
  * @author Dag Lem
  * @author Antti Lankila
  */

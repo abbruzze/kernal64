@@ -18,7 +18,7 @@
  * ---------------------------------------------------------------------------
  * Filter distortion code written by Antti S. Lankila 2007 - 2008.
  * 
- * @author Ken Händel
+ * @author Ken Handel
  *
  */
 package ucesoft.c64.peripheral.sid.resid2;
@@ -26,7 +26,7 @@ package ucesoft.c64.peripheral.sid.resid2;
 /** 
  * SID filter base class
  * 
- * @author Ken Händel
+ * @author Ken Handel
  * @author Dag Lem
  * @author Antti Lankila
  */

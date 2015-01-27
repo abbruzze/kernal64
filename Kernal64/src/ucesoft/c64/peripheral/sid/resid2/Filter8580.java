@@ -9,7 +9,7 @@ package ucesoft.c64.peripheral.sid.resid2;
  * of BP output has been inverted. I saw samplings on the internet
  * that indicated it would genuinely happen like this.
  * 
- * @author Ken Händel
+ * @author Ken Handel
  * @author Dag Lem
  * @author Antti Lankila
  */

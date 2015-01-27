@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
- * @author Ken Händel
+ * @author Ken Handel
  *
  */
 package ucesoft.c64.peripheral.sid.resid2;
@@ -25,7 +25,7 @@ package ucesoft.c64.peripheral.sid.resid2;
 /**
  * Representation of SID voice block.
  * 
- * @author Ken Händel
+ * @author Ken Handel
  * @author Dag Lem
  * @author Antti Lankila
  */

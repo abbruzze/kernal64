@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
- * @author Ken Händel
+ * @author Ken Handel
  *
  */
 package ucesoft.c64.peripheral.sid.resid2;
@@ -32,7 +32,7 @@ package ucesoft.c64.peripheral.sid.resid2;
  * yields BJT base-emitter and emitter-base impedances sufficiently low to produce additional low-pass and high-pass 3dB-frequencies in the order of hundreds of kHz. This calls for a sampling
  * frequency of several MHz, which is far too high for practical use.
  * 
- * @author Ken Händel
+ * @author Ken Handel
  * @author Dag Lem
  * @author Antti Lankila
  */

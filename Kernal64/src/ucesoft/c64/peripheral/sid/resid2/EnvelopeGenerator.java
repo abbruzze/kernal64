@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
- * @author Ken Händel
+ * @author Ken Handel
  *
  */
 package ucesoft.c64.peripheral.sid.resid2;
@@ -29,7 +29,7 @@ package ucesoft.c64.peripheral.sid.resid2;
  * In addition, another counter is used to implement the exponential envelope decay, in effect further dividing the clock to the envelope counter. The period of this counter is set to 1, 2, 4, 8, 16,
  * 30 at the envelope counter values 255, 93, 54, 26, 14, 6, respectively.
  * 
- * @author Ken Händel
+ * @author Ken Handel
  * @author Dag Lem
  * @author Antti Lankila
  */
