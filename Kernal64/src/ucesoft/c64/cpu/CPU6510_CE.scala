@@ -1508,7 +1508,11 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	    push(SR | B_FLAG)
 		sei
 		// CHECK NMI
-		state = O_BRK4
+    if (nmiOnNegativeEdge) {
+      nmiOnNegativeEdge = false
+      state = NMI_STATE_6      
+    }
+    else state = O_BRK4
 	  }
 	  case O_BRK4 => () => {
 	    irqFirstCycle += 1
