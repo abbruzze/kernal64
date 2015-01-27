@@ -59,6 +59,8 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
   def isStartedAndInContinousMode = started && !oneShot
   
   def init {}
+  
+  import Clock.systemClock
 
   def reset {
     latch = 0xFFFF
@@ -72,6 +74,7 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
     started = false
     reload = false
     countExternal = false
+    systemClock.cancel(EVENT_ID)
   }
   
   override def getProperties = {
@@ -81,9 +84,7 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
     properties.setProperty("One shot",oneShot.toString)
     properties.setProperty("Count external",countExternal.toString)
     properties
-  }
-
-  import Clock.systemClock
+  }  
 
   final def writeLo(lo: Int) {
     latch = (latch & 0xFF00) | (lo & 0xFF)
@@ -124,13 +125,18 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
   protected def handleCR567 {}
 
   private def enableTimer(enabled: Boolean) {
-    if (!started & enabled) {
+    if (!started && enabled) {
       if (!countExternal) {
-        systemClock.schedule(new ClockEvent(EVENT_ID,/*systemClock.currentCycles + 2*/systemClock.nextCycles, executeCount _))
+        systemClock.schedule(new ClockEvent(EVENT_ID,systemClock.currentCycles + 2/*systemClock.nextCycles*/, executeCount _))
         //println(s"${ciaName}-${id} started counter=${counter} latch=${latch}")
       }
     } 
     else 
+    if (started && enabled) {
+      systemClock.cancel(EVENT_ID)
+      systemClock.schedule(new ClockEvent(EVENT_ID,systemClock.currentCycles + 2, executeCount _))
+    }
+    else
     if (!enabled) systemClock.cancel(EVENT_ID)
 
     started = enabled
