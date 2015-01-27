@@ -44,9 +44,12 @@ class VIAIECBus(driveID:Int,
     super.write(address,value,chipID)
     address - startAddress match {
       case PB|DDRB =>        
-        data_out = if ((regs(DDRB) & 0x02) > 0 && (regs(PB) & 0x02) > 0) IECBus.GROUND else IECBus.VOLTAGE
+        val busValue = ~regs(DDRB) | regs(PB)
+        //data_out = if ((regs(DDRB) & 0x02) > 0 && (regs(PB) & 0x02) > 0) IECBus.GROUND else IECBus.VOLTAGE
+        data_out = if ((busValue & 0x02) > 0) IECBus.GROUND else IECBus.VOLTAGE
         bus.setLine(busid,IECBusLine.DATA,data_out)
-        val clock_out = (regs(DDRB) & 0x08) > 0 && (regs(PB) & 0x08) > 0
+        //val clock_out = (regs(DDRB) & 0x08) > 0 && (regs(PB) & 0x08) > 0
+        val clock_out = (busValue & 0x08) > 0
         bus.setLine(busid,IECBusLine.CLK,if (clock_out) IECBus.GROUND else IECBus.VOLTAGE)
         
         autoacknwoledgeData
@@ -55,7 +58,8 @@ class VIAIECBus(driveID:Int,
   }
   
   private def autoacknwoledgeData {
-    val atna = (regs(DDRB) & 0x10) > 0 && (regs(PB) & 0x10) > 0
+    //val atna = (regs(DDRB) & 0x10) > 0 && (regs(PB) & 0x10) > 0
+    val atna = ((~regs(DDRB) | regs(PB)) & 0x10) > 0
     val dataOut = (bus.atn == IECBus.GROUND) ^ atna
     if (dataOut) bus.setLine(busid,IECBusLine.DATA,IECBus.GROUND) else bus.setLine(busid,IECBusLine.DATA,data_out)
   }
