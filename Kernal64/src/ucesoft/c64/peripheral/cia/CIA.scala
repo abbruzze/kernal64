@@ -133,7 +133,8 @@ class CIA(val name:String,
       actualTime.reset
       latchTime.reset
       alarmTime.reset
-      Clock.systemClock.schedule(new ClockEvent(name + "_TOD",Clock.systemClock.nextCycles,tick _))
+      Clock.systemClock.cancel(componentID)
+      Clock.systemClock.schedule(new ClockEvent(componentID,Clock.systemClock.nextCycles,tick _))
     }
     
     def tick(cycles:Long) { // every 1/10 seconds
@@ -141,7 +142,7 @@ class CIA(val name:String,
       if (!actualTime.freezed) actualTime.tick     
       if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
       // reschedule tick
-      Clock.systemClock.schedule(new ClockEvent(name + "_TOD",Clock.systemClock.nextCycles + 100000,tick _))
+      Clock.systemClock.schedule(new ClockEvent(componentID,Clock.systemClock.nextCycles + 100000,tick _))
     }
     
     def readHour = {
@@ -209,6 +210,7 @@ class CIA(val name:String,
     icr = 0
     sdr = 0
     icrMask = 0
+    sdrIndex = 0
   }
   
   def setFlagLow = irqHandling(IRQ_FLAG)
@@ -251,11 +253,11 @@ class CIA(val name:String,
         }
       }
       if (timerB.timerUnderflowOnPortB) {
-        timerA.toggleMode match {
+        timerB.toggleMode match {
           case true => 
-            if (timerA.flipFlop) portB |= 0x80 else portB &= 0x7F
+            if (timerB.flipFlop) portB |= 0x80 else portB &= 0x7F
           case false =>
-            if (timerA.toggleValue) portB |= 0x80 else portB &= 0x7F
+            if (timerB.toggleValue) portB |= 0x80 else portB &= 0x7F
         }
       }
       portB
@@ -326,7 +328,10 @@ class CIA(val name:String,
         icr |= 0x80
         irqAction(true)
       }
-      else irqAction(false)
+      else {
+        icr &= 0x7F
+        irqAction(false)
+      }
       Log.debug(s"${name} ICR's value is ${Integer.toBinaryString(value)} => ICR = ${Integer.toBinaryString(icrMask)}")
     case CRA => timerA.writeCR(value)
     case CRB => timerB.writeCR(value)
