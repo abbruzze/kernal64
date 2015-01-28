@@ -6,7 +6,15 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int) extends AudioDriverDevic
   private[this] val dataLine = {
     val af = new AudioFormat(sampleRate, 16, 1, true, false)
     val dli = new DataLine.Info(classOf[SourceDataLine], af, bufferSize)
-    val dataLine = AudioSystem.getLine(dli).asInstanceOf[SourceDataLine]
+    val dataLine = try {
+      AudioSystem.getLine(dli).asInstanceOf[SourceDataLine] 
+    }
+    catch {
+      case t:Throwable =>
+        println("Warning: no audio available. Cause: " + t)
+        null
+    }
+    
     if (dataLine != null) dataLine.open(dataLine.getFormat,bufferSize)
     dataLine    
   }
@@ -15,19 +23,20 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int) extends AudioDriverDevic
   private[this] var soundOn = true
   
   setMasterVolume(100)
-  dataLine.start()
+  if (dataLine != null) dataLine.start()
   
-  def available = dataLine.available
   def getMasterVolume = vol
   def setMasterVolume(v:Int) {
-    val max = volume.getMaximum
-    val min = volume.getMinimum / 2f
-    if (volume != null) volume.setValue((v / 100.0f) * (max - min) + min)//-10.0f + 0.1f * v)
-    vol = v
+    if (volume != null) {
+      val max = volume.getMaximum
+      val min = volume.getMinimum / 2f
+      volume.setValue((v / 100.0f) * (max - min) + min)
+      vol = v
+    }
   }
   final def write(buffer:Array[Byte]) {
     val bsize = buffer.length
-    if (dataLine.available < bsize) return
+    if (dataLine == null || dataLine.available < bsize) return
     
     if (!soundOn) {
       var i = 0
