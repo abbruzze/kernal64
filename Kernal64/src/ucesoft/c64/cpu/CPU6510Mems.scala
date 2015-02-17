@@ -54,10 +54,12 @@ object CPU6510Mems {
   }
 
   // --------------------------------------
+  
+  private[this] val JIFFYDOS_ENABLED = System.getProperty("jiffydos") != null
 
   class BASIC_ROM(ram: Memory) extends ROM(ram, "BASIC", M_BASIC, 8192, "roms/basic.rom")
 
-  class KERNAL_ROM(ram: Memory) extends ROM(ram, "KERNAL", M_KERNAL, 8192, "roms/kernal.rom")
+  class KERNAL_ROM(ram: Memory) extends ROM(ram, "KERNAL", M_KERNAL, 8192, if (JIFFYDOS_ENABLED) "roms/JiffyDOS_C64_Kernal_6.01.rom" else "roms/kernal.rom")
   
   class CHARACTERS_ROM(ram: Memory) extends ROM(ram, "CHARACTERS", M_CHARACTERS, 4096, "roms/chargen.rom")
 
@@ -154,11 +156,12 @@ object CPU6510Mems {
     
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       val selectedROM = if (isROML) getExpansionPort.ROML else getExpansionPort.ROMH
-      if (selectedROM != null) selectedROM.read(address,chipID)      
+      if (selectedROM != null) selectedROM.read(address,chipID)
       else ram.read(address,chipID)
     }
     final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
-      if (!getExpansionPort.isUltimax) ram.write(address,value,chipID)
+      //if (!getExpansionPort.isUltimax) ram.write(address,value,chipID)
+      ram.write(address,value,chipID)
     }
   }
 
@@ -185,7 +188,7 @@ object CPU6510Mems {
     // cache
     private[this] val banksStart = banks map { _.startAddress }
     private[this] val banksEnd = banks map { _.endAddress }
-    private[this] val minAddress = banksStart min
+    private[this] val minAddress = banksStart.min
 
     
     private[this] var LORAM = true
@@ -196,6 +199,8 @@ object CPU6510Mems {
     private[this] var lastCycle1Written6,lastCycle1Written7 = 0L
     private[this] val CAPACITOR_FADE_CYCLES = 200000
     private[this] var datassette : Datassette = _
+    
+    def getRAM : Memory = ram
     
     def setDatassette(datassette:Datassette) = this.datassette = datassette
     
