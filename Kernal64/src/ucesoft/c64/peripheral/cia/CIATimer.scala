@@ -49,7 +49,6 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
   var flipFlop = true
   var toggleValue = false
   private[this] var started = false
-  private[this] var reload = false
   private[this] var countExternal = false
   private[this] var serialActionCallback : Option[() => Unit] = None
   protected var countSystemClock = true
@@ -72,7 +71,6 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
     flipFlop = true
     toggleValue = false
     started = false
-    reload = false
     countExternal = false
     systemClock.cancel(EVENT_ID)
   }
@@ -88,13 +86,14 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
 
   final def writeLo(lo: Int) {
     latch = (latch & 0xFF00) | (lo & 0xFF)
+    if ((cr & 0x10) > 0) counter = (counter & 0xFF00) | lo & 0xFF
     Log.debug(s"${ciaName}-${id} set counter lo to ${lo} latch=${latch}")
     //println(s"${ciaName}-${id} set counter lo to ${lo} latch=${latch} prev=${prev}")
   }
 
   final def writeHi(hi: Int) {
     latch = ((hi & 0xFF) << 8) | (latch & 0x00FF)
-    if (!started) counter = latch
+    if (!started || (cr & 0x10) > 0) counter = latch
     Log.debug(s"${ciaName}-${id} set counter hi to ${hi} latch=${latch}")
     //println(s"${ciaName}-${id} set counter hi to ${hi} latch=${latch} prev=${prev}")
   }
@@ -102,7 +101,7 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
   final def readLo = counter & 0xFF
   final def readHi = (counter >> 8) & 0xFF
 
-  final def readCR = (cr & 0xFE) | (if (started) 1 else 0)
+  final def readCR = (cr & 0xEE) | (if (started) 1 else 0) // we mask the reload bit
   final def writeCR(value: Int) {
     cr = value
     val startTimer = (cr & 1) == 1
@@ -115,7 +114,6 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
     handleCR567
     enableTimer(startTimer)
     if (reload) {
-      this.reload = true
       counter = latch // reload immediately
     }
     Log.debug(s"${ciaName}-${id} control register set to ${cr} latch=${latch}")
@@ -142,7 +140,7 @@ class CIATimerA(ciaName: String, id: String, irqAction: (String) => Unit, timerT
     started = enabled
   }
 
-  private def externalNotify = if (countExternal) executeCount(systemClock.currentCycles)//systemClock.schedule(new ClockEvent(EVENT_ID, systemClock.nextCycles, executeCount _))
+  private def externalNotify = if (countExternal && started) executeCount(systemClock.currentCycles)//systemClock.schedule(new ClockEvent(EVENT_ID, systemClock.nextCycles, executeCount _))
   protected def setCountExternal(enabled: Boolean) {
     countExternal = enabled
     Log.debug(s"${ciaName}-${id} countExternal=${enabled}")
