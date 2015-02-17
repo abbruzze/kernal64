@@ -17,22 +17,22 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   private[this] var stepCallBack: (String) => Unit = _
   private[this] val syncObject = new Object
   // --------------- Registers ----------------
-  private[this] val FLAG_# = "00100000".b
-  private[this] val N_FLAG = "10000000".b
-  private[this] val V_FLAG = "01000000".b
-  private[this] val B_FLAG = "00010000".b
-  private[this] val NOT_B_FLAG = "11101111".b
-  private[this] val D_FLAG = "00001000".b
-  private[this] val I_FLAG = "00000100".b
-  private[this] val Z_FLAG = "00000010".b
-  private[this] val C_FLAG = "00000001".b
+  final private[this] val FLAG_# = "00100000".b
+  final private[this] val N_FLAG = "10000000".b
+  final private[this] val V_FLAG = "01000000".b
+  final private[this] val B_FLAG = "00010000".b
+  final private[this] val NOT_B_FLAG = "11101111".b
+  final private[this] val D_FLAG = "00001000".b
+  final private[this] val I_FLAG = "00000100".b
+  final private[this] val Z_FLAG = "00000010".b
+  final private[this] val C_FLAG = "00000001".b
   
-  private[this] val A_REG = 0
-  private[this] val X_REG = 1
-  private[this] val Y_REG = 2
-  private[this] val SP_REG = 3
-  private[this] val SR_REG = 4
-  private[this] val FLAGS = "CZIDB#VN"
+  final private[this] val A_REG = 0
+  final private[this] val X_REG = 1
+  final private[this] val Y_REG = 2
+  final private[this] val SP_REG = 3
+  final private[this] val SR_REG = 4
+  final private[this] val FLAGS = "CZIDB#VN"
 
   private[this] var PC = 0
   private[this] var CURRENT_OP_PC = 0
@@ -93,13 +93,13 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   @inline private[this] def sec { SREG |= C_FLAG }
   @inline private[this] def clc { SREG &= (~C_FLAG & 0xFF) }
 
-  @inline private[this] def isNegative = (SREG & N_FLAG) == N_FLAG
-  @inline private[this] def isOverflow = (SREG & V_FLAG) == V_FLAG
-  @inline private[this] def isBreak = (SREG & B_FLAG) == B_FLAG
-  @inline private[this] def isDecimal = (SREG & D_FLAG) == D_FLAG
-  @inline private[this] def isInterrupt = (SREG & I_FLAG) == I_FLAG
-  @inline private[this] def isZero = (SREG & Z_FLAG) == Z_FLAG
-  @inline private[this] def isCarry = (SREG & C_FLAG) == C_FLAG
+  @inline private[this] def isNegative = (SREG & N_FLAG) > 0
+  @inline private[this] def isOverflow = (SREG & V_FLAG) > 0
+  @inline private[this] def isBreak = (SREG & B_FLAG) > 0
+  @inline private[this] def isDecimal = (SREG & D_FLAG) > 0
+  @inline private[this] def isInterrupt = (SREG & I_FLAG) > 0
+  @inline private[this] def isZero = (SREG & Z_FLAG) > 0
+  @inline private[this] def isCarry = (SREG & C_FLAG) > 0
 
   /**
    * SO of 6502 used by 1541
