@@ -84,7 +84,8 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   
   def reset {
     events = null
-    resetThrottleMeasurement
+    lastCorrectionTime = System.currentTimeMillis
+    lastCorrectionCycles = cycles
   }
       
   final override def run {
@@ -116,18 +117,14 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     }
   }
   
-  def resetThrottleMeasurement {
+  @inline private def setupNextMeasurement {
     lastCorrectionTime = System.currentTimeMillis
     lastCorrectionCycles = cycles
-  }
-  
-  private def setupNextMeasurement {
-    resetThrottleMeasurement
     throttleStartedAt = cycles
     nextPerformanceMeasurementTime = System.currentTimeMillis + PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS
   }
   
-  private def throttle {
+  @inline private def throttle {
     if (lastCorrectionTime == 0) setupNextMeasurement
     else {
       if (!_maximumSpeed) {
@@ -160,7 +157,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   }
   
   final def schedule(e:ClockEvent) {
-    require(e.when > cycles,"Can't schedule an event in the past " + e.when + "(" + cycles + ")")
+    //require(e.when > cycles,"Can't schedule an event in the past " + e.when + "(" + cycles + ")")
     if (events == null) {
       events = new EventList(e)
     }
