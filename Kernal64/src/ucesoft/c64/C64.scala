@@ -53,7 +53,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "0.9.9L"
+  private[this] val VERSION = "0.9.9M"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -63,7 +63,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   private[this] var cpu = CPU6510.make(mem)  
   private[this] var cpuExact = cpu.isExact
   private[this] var vicChip : vic.VIC = _
-  private[this] val sid : SIDDevice = new ucesoft.c64.peripheral.sid.SID
+  private[this] val sid : SIDDevice = if (System.getProperty("sid2") != null) new ucesoft.c64.peripheral.sid.SID2 else new ucesoft.c64.peripheral.sid.SID
   private[this] var display : vic.Display = _
   private[this] val nmiSwitcher = new NMISwitcher
   private[this] val irqSwitcher = new IRQSwitcher
@@ -838,7 +838,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   
   private def loadCartridgeFile(file:File) {
     try {          
-      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.expPortIRQ _,nmiSwitcher.expansionPortNMI _)
+      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.expPortIRQ _,nmiSwitcher.expansionPortNMI _,mem.getRAM)
       println(ep)
       if (ep.isFreezeButtonSupported) cartMenu.setVisible(true)
       ExpansionPort.setExpansionPort(ep)
