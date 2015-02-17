@@ -9,6 +9,8 @@ object CIA2Connectors {
     val componentID = "CIA2 Port A Connector"
     override val isController = true
     val busid = "CIA2_PortA"
+    
+    private[this] var bank = 0
       
     bus.registerListener(this)
       
@@ -16,11 +18,12 @@ object CIA2Connectors {
     final def read = {
       //latch
       import bus._
-      (~((clk << 6) | (data << 7)) & 0xC0) | (latch & 0x3F)
+      (~((clk << 6) | (data << 7)) & 0xC0) | (latch & 0x3C) | bank
     }
     final protected def performWrite(data:Int) = {
       val value = data | ~ddr // WHY ??
-      mem.setBank(value & 3)
+      bank = value & 3
+      mem.setBank(bank)
       
       bus.setLine(busid,IECBusLine.ATN,if ((value & 8) > 0) GROUND else VOLTAGE)
       bus.setLine(busid,IECBusLine.CLK,if ((value & 16) > 0) GROUND else VOLTAGE)
