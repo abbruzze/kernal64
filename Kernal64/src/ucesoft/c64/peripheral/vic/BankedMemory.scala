@@ -17,7 +17,7 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
   private[this] var memLastByteRead = 0
   
   def getBank = bank
-  def getBankAddress = bank * 16384
+  def getBankAddress = bank << 14
   
   def init {
     Log.info("Initialaizing banked memory ...")
@@ -25,8 +25,8 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
   val isActive = true
 
   def setBank(bank: Int) {
-    this.bank = 3 - (bank & 3)
-    baseAddress = this.bank * 16384
+    this.bank = ~bank & 3
+    baseAddress = this.bank << 14
     Log.debug(s"Set VIC bank to ${bank}. Internal bank is ${this.bank}")
   }
   
@@ -48,6 +48,7 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
     }
     * 
     */
+    
     val realAddress = baseAddress | address
     memLastByteRead =
     if ((realAddress & 0x7000) == 0x1000) charROM.read(0xD000 | (address & 0x0FFF),chipID)//(address + 0xC000,chipID)
