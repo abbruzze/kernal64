@@ -152,11 +152,11 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       if (cpuExact) {
         checkPC(cycles)
         cpu.fetchAndExecute
-        cycleFrac += CYCLE_ADJ
-        if (cycleFrac >= 1) {
-          cycleFrac -= 1
-          cpu.fetchAndExecute
-        }
+//        cycleFrac += CYCLE_ADJ
+//        if (cycleFrac >= 1) {
+//          cycleFrac -= 1
+//          cpu.fetchAndExecute
+//        }
       } else {
         if (cycles > cpuWaitUntil) {
           checkPC(cycles)
