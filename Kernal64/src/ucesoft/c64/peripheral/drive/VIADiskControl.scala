@@ -126,7 +126,7 @@ class VIADiskControl(var cpu: CPU6510,
       (super.read(address, chipID) & ~(WRITE_PROTECT_SENSE | SYNC_DETECTION_LINE)) |
         (if (isSync) 0x00 else SYNC_DETECTION_LINE) |
         (if (diskChanged) 0x00 else WRITE_PROTECT_SENSE)
-    case PA =>
+    case PA|PA2 =>
       super.read(address, chipID)
       val headByte = if (gcrSector == null) 0 else gcrSector(gcrIndex)
       updateTrackSectorLabelProgress
