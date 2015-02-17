@@ -51,8 +51,8 @@ class CIA(val name:String,
   val isActive = true
   val id = ChipID.CIA
     
-  private[this] val timerB = new CIATimerB(name,IRQ_SRC_TB,irqHandling _)
-  private[this] val timerA = new CIATimerA(name,IRQ_SRC_TA,irqHandling _,Some(timerB))
+  private[this] val timerB = new CIATimerB2(name,IRQ_SRC_TB,irqHandling _)
+  private[this] val timerA = new CIATimerA2(name,IRQ_SRC_TA,irqHandling _,Some(timerB))
   private[this] val tod = new TOD2//new TOD((timerB.readCR & 0x80) == 0)
   private[this] var icr = 0
   private[this] var sdr = 0
