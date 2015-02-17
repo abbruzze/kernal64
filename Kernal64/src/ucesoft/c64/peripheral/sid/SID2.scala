@@ -31,7 +31,7 @@ class SID2 extends Chip with RAMComponent with SIDDevice {
   private[this] val sid = {
     val sid = new RESID
     sid.setChipModel(resid2.ChipModel.MOS6581)
-    sid.setSamplingParameters(CPU_FREQ,resid2.SamplingMethod.DECIMATE,SAMPLE_RATE,20000)
+    sid.setSamplingParameters(CPU_FREQ,resid2.SamplingMethod.RESAMPLE,SAMPLE_RATE,20000)
     sid
   }
   private[this] val POTX_OFS = 0x19
