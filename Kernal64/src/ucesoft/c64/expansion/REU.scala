@@ -335,16 +335,8 @@ object REU {
     }
     
     @inline private def incrementAddresses {
-      (addressControlRegister >> 6) match {
-        case 0x00 => // increments both addresses
-          c64Address = (c64Address + 1) & 0xFFFF
-          reuAddress = (reuAddress + 1) & REU_WRAP_ADDRESS
-        case 0x01 => // REU address is fixed
-          c64Address = (c64Address + 1) & 0xFFFF
-        case 0x02 => // the C64 address is fixed
-          reuAddress = (reuAddress + 1) & REU_WRAP_ADDRESS
-        case 0x03 => // both are fixed
-      }
+      if ((addressControlRegister & 0x80) == 0) c64Address = (c64Address + 1) & 0xFFFF
+      if ((addressControlRegister & 0x40) == 0) reuAddress = (reuAddress + 1) & REU_WRAP_ADDRESS
     }    
   }      
 }
