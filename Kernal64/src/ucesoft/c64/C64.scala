@@ -42,6 +42,8 @@ import ucesoft.c64.util.VolumeSettingsPanel
 import ucesoft.c64.expansion.REU
 import ucesoft.c64.trace.BreakType
 import ucesoft.c64.peripheral.sid.SIDDevice
+import ucesoft.c64.util.DriveSpeedSettingsPanel
+import ucesoft.c64.peripheral.rs232._
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -53,7 +55,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "0.9.9M"
+  private[this] val VERSION = "0.9.9N"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -106,8 +108,13 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   private[this] var drive : Drive = c1541_real
   private[this] val driveLed = new DriveLed
   private[this] val diskProgressPanel = new DriveLoadProgressPanel
+  private[this] val diskSpeedDialog : JDialog = DriveSpeedSettingsPanel.getDialog(displayFrame,drive)
   // -------------------- TAPE -----------------
   private[this] var datassette : Datassette = _
+  // ----------------- RS-232 ------------------
+  private[this] val rs232 = BridgeRS232
+  private[this] var activeRs232 : Option[RS232] = None 
+  private[this] val AVAILABLE_RS232 : Array[RS232] = Array(TelnetRS232,TCPRS232,FileRS232)
   // -------------------- PRINTER --------------
   private[this] var printerEnabled = false
   private[this] var printerGraphicsDriver = new MPS803GFXDriver(new MPS803ROM)
@@ -478,9 +485,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     add(controlPortB)
     add(bus)
     add(expansionPort)
+    add(rs232)    
     // -----------------------
     val bankedMemory = new vic.BankedMemory(mem,mem.CHAR_ROM,mem.COLOR_RAM)    
     ExpansionPort.setMemoryForEmptyExpansionPort(bankedMemory)
+    ExpansionPort.addConfigurationListener(bankedMemory)
     import cia._
     // control ports
     val cia1CP1 = new CIA1Connectors.PortAConnector(keyb,controlPortA)
@@ -494,8 +503,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     				   cia1CP1,
     				   cia1CP2,
     				   irqSwitcher.ciaIRQ _)
-    val cia2CP1 = new CIA2Connectors.PortAConnector(bankedMemory,bus)
-    val cia2CP2 = CIA2Connectors.PortBConnector
+    val cia2CP1 = new CIA2Connectors.PortAConnector(bankedMemory,bus,rs232)
+    val cia2CP2 = new CIA2Connectors.PortBConnector(rs232)
     add(cia2CP1)
     add(cia2CP2)
     add(nmiSwitcher)    
@@ -504,7 +513,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     				   cia2CP1,
     				   cia2CP2,
     				   nmiSwitcher.cia2NMIAction _)
-    vicChip = new vic.VIC(bankedMemory,mem.COLOR_RAM,irqSwitcher.vicIRQ _,baLow _)    
+    rs232.setCIA(cia2)
+    vicChip = new vic.VIC(bankedMemory,mem.COLOR_RAM,irqSwitcher.vicIRQ _,baLow _)        
     // mapping I/O chips in memory
     val io = mem.IO    
     io.addBridge(cia1)
@@ -696,15 +706,23 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
         Clock.systemClock.play
       case "SWAP_JOY" =>
         swapJoysticks
+      case "DISK_RO" =>
+        drive.setReadOnly(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
       case "DISK_TRUE_EMU" =>
         val trueEmu = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         bus.reset
         drive.setActive(false)
-        drive = if (trueEmu) c1541_real else c1541
+        drive = if (trueEmu) c1541_real 
+        else {
+          isDiskActive = true
+          c1541
+        }
         drive.setActive(true)
       case "DISK_CAN_GO_SLEEP" =>
         val canGoSleep = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         drive.setCanSleep(canGoSleep)
+      case "DISK_SPEED" =>
+        diskSpeedDialog.setVisible(true)
       case "NO_PEN" =>
         lightPenButtonEmulation = LIGHT_PEN_NO_BUTTON
         keypadControlPort.setLightPenEmulation(false)
@@ -761,24 +779,85 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
         ExpansionPort.setExpansionPort(REU.getREU(REU.REU_1750,mem,setDMA _,irqSwitcher.expPortIRQ _,None))
       case "REU_16M" => 
         val fc = new JFileChooser
-	    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-	    fc.setFileView(new C64FileView)
-	    fc.setFileFilter(new FileFilter {
-	      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".REU")
-	      def getDescription = "REU files"
-	    })
-	    fc.showOpenDialog(displayFrame) match {
-	      case JFileChooser.APPROVE_OPTION => 
-	        try {
-	          val reu = REU.getREU(REU.REU_16M,mem,setDMA _,irqSwitcher.expPortIRQ _,Some(fc.getSelectedFile))	          
-	          ExpansionPort.setExpansionPort(reu)
-	        }
-	        catch {
-	          case t:Throwable =>
-	            JOptionPane.showMessageDialog(displayFrame,t.toString, "REU loading error",JOptionPane.ERROR_MESSAGE)
-	        }
-	      case _ =>
-	    }	          
+  	    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+  	    fc.setFileView(new C64FileView)
+  	    fc.setFileFilter(new FileFilter {
+  	      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".REU")
+  	      def getDescription = "REU files"
+  	    })
+  	    fc.showOpenDialog(displayFrame) match {
+  	      case JFileChooser.APPROVE_OPTION => 
+  	        try {
+  	          val reu = REU.getREU(REU.REU_16M,mem,setDMA _,irqSwitcher.expPortIRQ _,Some(fc.getSelectedFile))	          
+  	          ExpansionPort.setExpansionPort(reu)
+  	        }
+  	        catch {
+  	          case t:Throwable =>
+  	            JOptionPane.showMessageDialog(displayFrame,t.toString, "REU loading error",JOptionPane.ERROR_MESSAGE)
+  	        }
+  	      case _ =>
+  	    }	   
+      case "MAKE_DISK" =>
+        makeDisk
+      case "RS232" =>
+        manageRS232
+    }
+  }
+  
+  private def manageRS232 {
+    val choices = Array.ofDim[Object](AVAILABLE_RS232.length + 1)
+    choices(0) = "None"
+    Array.copy(AVAILABLE_RS232,0,choices,1,AVAILABLE_RS232.length)
+    val currentChoice = activeRs232 match {
+      case None => choices(0)
+      case Some(rs) => rs
+    }
+    val choice = JOptionPane.showInputDialog(displayFrame,"Choose an rs-232 implementation","RS-232",JOptionPane.QUESTION_MESSAGE,null,choices,currentChoice)
+    if (choice == choices(0) && activeRs232.isDefined) {
+      activeRs232.get.setEnabled(false)
+      activeRs232 = None
+    }
+    else
+    if (choice != null) {
+      val rs = choice.asInstanceOf[RS232]
+      val conf = JOptionPane.showInputDialog(displayFrame,s"<html><b>${rs.getDescription}</b><br>Type the configuration string:</html>", s"${rs.componentID}'s configuration",JOptionPane.QUESTION_MESSAGE)
+      if (conf != null) {
+        try {
+          rs.setConfiguration(conf)
+          activeRs232 foreach { _.setEnabled(false) }
+          rs.setEnabled(true)          
+          activeRs232 = Some(rs)
+          rs232.setRS232(rs)
+        }
+        catch {
+          case t:Throwable =>
+            JOptionPane.showMessageDialog(displayFrame,t.toString, "RS-232 configuration error",JOptionPane.ERROR_MESSAGE)
+        }
+      }
+    }
+  }
+  
+  private def makeDisk {
+    val fc = new JFileChooser
+    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+    fc.setFileView(new C64FileView)
+    fc.showSaveDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION => 
+        try {
+          val diskLabel = JOptionPane.showInputDialog(displayFrame,"Insert disk label", "New Disk label",JOptionPane.QUESTION_MESSAGE)
+          if (diskLabel != null) {
+            var emptyFile = fc.getSelectedFile.toString
+            if (!emptyFile.toUpperCase.endsWith(".D64")) emptyFile += ".d64"
+            val emptyD64 = new D64(emptyFile,true)
+            emptyD64.format(s"N:${diskLabel.toUpperCase},00")
+            emptyD64.close
+          }
+        }
+        catch {
+          case t:Throwable => 
+            JOptionPane.showMessageDialog(displayFrame,t.toString, "Disk making error",JOptionPane.ERROR_MESSAGE)
+        }
+      case _ =>
     }
   }
   
@@ -1172,6 +1251,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     
     fileMenu.addSeparator
     
+    val makeDiskItem = new JMenuItem("Make empty disk ...")
+    makeDiskItem.setActionCommand("MAKE_DISK")
+    makeDiskItem.addActionListener(this)
+    fileMenu.add(makeDiskItem)
+    
     val autorunDiskItem = new JMenuItem("Autorun disk ...")
     autorunDiskItem.setActionCommand("AUTORUN_DISK")
     autorunDiskItem.addActionListener(this)
@@ -1368,23 +1452,44 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     
     optionMenu.addSeparator
     
+    val diskItem = new JMenu("Drive")
+    optionMenu.add(diskItem)
+    
+    val diskReadOnlyItem = new JCheckBoxMenuItem("Read only disk")
+    diskReadOnlyItem.setSelected(false)
+    diskReadOnlyItem.setActionCommand("DISK_RO")
+    diskReadOnlyItem.addActionListener(this)    
+    diskItem.add(diskReadOnlyItem)
+    
     val diskTrueEmuItem = new JCheckBoxMenuItem("1541 True emulation")
     diskTrueEmuItem.setSelected(true)
     diskTrueEmuItem.setActionCommand("DISK_TRUE_EMU")
     diskTrueEmuItem.addActionListener(this)    
-    optionMenu.add(diskTrueEmuItem)
+    diskItem.add(diskTrueEmuItem)
     
     val diskCanSleepItem = new JCheckBoxMenuItem("1541 can go sleeping")
     diskCanSleepItem.setSelected(true)
     diskCanSleepItem.setActionCommand("DISK_CAN_GO_SLEEP")
     diskCanSleepItem.addActionListener(this)    
-    optionMenu.add(diskCanSleepItem)
+    diskItem.add(diskCanSleepItem)
+    
+    val diskSpeedItem = new JMenuItem("1541 speed ...")
+    diskSpeedItem.setActionCommand("DISK_SPEED")
+    diskSpeedItem.addActionListener(this)    
+    diskItem.add(diskSpeedItem)
     
     val busSnooperActiveItem = new JCheckBoxMenuItem("Bus snoop active")
     busSnooperActiveItem.setSelected(false)
     busSnooperActiveItem.setActionCommand("BUS_SNOOP")
     busSnooperActiveItem.addActionListener(this)    
     optionMenu.add(busSnooperActiveItem)
+    
+    optionMenu.addSeparator
+    
+    val rs232Item = new JMenuItem("RS-232 ...")
+    rs232Item.setActionCommand("RS232")
+    rs232Item.addActionListener(this)    
+    optionMenu.add(rs232Item)
     
     optionMenu.addSeparator
     
