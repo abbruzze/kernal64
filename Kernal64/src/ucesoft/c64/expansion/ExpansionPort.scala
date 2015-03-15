@@ -38,7 +38,7 @@ abstract class ExpansionPort extends RAMComponent {
     properties
   }
 
-  final def notifyMemoryConfigurationChange = ExpansionPort.updateListeners
+  final def notifyMemoryConfigurationChange = ExpansionPort.updateListeners(GAME,EXROM)
 
   def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = 0
   def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
@@ -92,13 +92,13 @@ object ExpansionPort {
     listeners = l :: listeners
   }
 
-  private def updateListeners = for (l <- listeners) l.expansionPortConfigurationChanged
+  private def updateListeners(game:Boolean,exrom:Boolean) = for (l <- listeners) l.expansionPortConfigurationChanged(game,exrom)
 
   def getExpansionPort = proxyExpansionPort
   def setMemoryForEmptyExpansionPort(mem:LastByteReadMemory) = memoryForEmptyExpansionPort = mem
   def setExpansionPort(expansionPort: ExpansionPort) = {
     this.expansionPort = expansionPort
     Log.debug("Setting new expansion port: " + expansionPort.name + " listeners are " + listeners)
-    updateListeners
+    updateListeners(expansionPort.GAME,expansionPort.EXROM)
   }
 }
