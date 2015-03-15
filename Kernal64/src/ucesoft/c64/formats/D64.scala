@@ -57,7 +57,7 @@ object D64 {
   @inline private def absoluteSector(t: Int, s: Int) = (1 until t).foldLeft(0) { (acc, t) => acc + TRACK_ALLOCATION(t) } + s
 }
 
-class D64(val file: String) {
+class D64(val file: String,empty:Boolean = false) {
   import D64._
   private[this] val d64 = new RandomAccessFile(file, "rw")
   TOTAL_TRACKS // just to check for a valid track format
@@ -68,19 +68,19 @@ class D64(val file: String) {
     }
     gcr
   }
-  private[this] var _bam = bamInfo
+  private[this] var _bam : BamInfo = if (!empty) bamInfo else null
   
   def TOTAL_TRACKS = d64.length match {
     case DISK_SIZE_35_TRACKS => 35
     case DISK_SIZE_40_TRACKS => 40
-    case _ => throw new IllegalArgumentException("Unsupported D64 file format. size is " + d64.length)
+    case _ => if (empty) 35 else throw new IllegalArgumentException("Unsupported D64 file format. size is " + d64.length)
   }
   
   def bam = _bam
   
   // CONSTRUCTOR
   //println(directories.mkString("\n"))
-  loadGCRImage
+  if (!empty) loadGCRImage
   
   def gcrImageOf(t:Int,s:Int) = GCRImage(t - 1)(s)
   
