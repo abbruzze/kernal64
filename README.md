@@ -1,4 +1,4 @@
-kernal64 ver 0.9.9M
+kernal64 ver 0.9.9N
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
 
@@ -10,7 +10,7 @@ Here the main features:
 * Cycle based: exact cycle emulation using the PAL frequency
 * VIC emulation based on the Christian Bauer's article: "The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64". I know that it's incomplete (and in some cases buggy). I tried to close some issues by myself. Some others,Sprite Crunch for instance, are still open. With the current implementation most of the games run properly. Some demos run with "strange" effects, naturally.
 * 6510 CPU full emulation (with illegal opcodes too). The user can choose between a cycle exact cpu and a faster cpu not cycle exact.
-* CIA1, CIA2 chips emulation: almost full. RS-232 lines are not emulated
+* CIA1, CIA2 chips emulation: almost full.
 * IEC Serial Bus
 * Keyboard: for key mapping I'll provide documentation
 * SID chip: for this chip I used the RSID Java library by Ken Händel
@@ -27,6 +27,7 @@ Here the main features:
 * Drag & Drop support
 * REU support (128,256,512,16M)
 * JiffyDOS support (use -Djiffydos environment variable)
+* RS-232 3-way UserPort implementations useful to connect with BBS on internet. The Telnet implementation can be used to connect to a telnet server (like BBSs); the TCP implementation can be used to connect with a generic TCP/IP server. The File implementation can be used to read/write to local files.
 * ... and more
 
 In the meanwhile you can download the dist/kernal64_install.zip file to try it out: be sure to have Java installed.
