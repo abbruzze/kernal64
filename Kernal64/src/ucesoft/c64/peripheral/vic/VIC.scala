@@ -123,7 +123,7 @@ final class VIC(mem: Memory,
   final val SCREEN_HEIGHT = RASTER_LINES
   final private[this] val PIXELS_PER_LINE = RASTER_CYCLES * 8
   final private[this] val LEFT_RIGHT_FF_COMP = Array(Array(0x1F, 0x14F), Array(0x18, 0x158)) // first index is CSEL's value 0 or 1, second index is 0=left, 1=right 
-  final private[this] val TOP_BOTTOM_FF_COMP = Array(Array(0x37, 0xF7), Array(0x33, 0xFB)) // first index is RSEL's value 0 or 1, second index is 0=left, 1=right
+  final private[this] val TOP_BOTTOM_FF_COMP = Array(Array(0x37, 0xF7), Array(0x33, 0xFB)) // first index is RSEL's value 0 or 1, second index is 0=top, 1=bottom
   final private[this] val COLOR_ADDRESS = 0xD800
   final private[this] val BLANK_TOP_LINE = 15
   final private[this] val BLANK_BOTTOM_LINE = 300
@@ -438,13 +438,6 @@ final class VIC(mem: Memory,
       }
     }
 
-    final def setData(gdata: Int) {
-      this.gdata = gdata
-      counter = 0
-      //Log.debug(s"Sprite #${index} reset pixels!!")
-      hasPixels = false
-    }
-
     @inline final def isFinished = {
       val finished = counter == (if (xexp) 48 else 24)
       if (finished) {
@@ -500,7 +493,8 @@ final class VIC(mem: Memory,
           gdata |= (mem.read(memoryPointer + mc) & 0xFF) << 8
           mc += 1
           gdata |= (mem.read(memoryPointer + mc) & 0xFF)
-          setData(gdata)
+          counter = 0
+          hasPixels = false
         } 
         mc += 1
       }
@@ -909,7 +903,7 @@ final class VIC(mem: Memory,
         //Log.fine((for(i <- 0 to 7) yield "Sprite x updated to" + sprites(i).x) mkString("\n"))
         case 17 =>
           //val clk = Clock.systemClock
-          //clk.schedule(new ClockEvent("$D011",clk.currentCycles + 2,(cycles) => {
+          //clk.schedule(new ClockEvent("$D011",clk.currentCycles + 1,(cycles) => {
             controlRegister1 = value
             val prevRasterLatch = rasterLatch
             if ((controlRegister1 & 128) == 128) rasterLatch |= 0x100 else rasterLatch &= 0xFF
@@ -991,7 +985,6 @@ final class VIC(mem: Memory,
           interruptMaskRegister = value & 0x0F
           // check if we must set interrupt
           if ((interruptControlRegister & interruptMaskRegister & 0x0f) != 0) {
-            interruptControlRegister |= 0x80
             //Log.debug("VIC#26 setting interrupt...")
             irqRequest
           } else {
@@ -1115,6 +1108,7 @@ final class VIC(mem: Memory,
       case 10 =>
         sprites(7).readMemoryData(false)
         setBaLow((spriteDMAon & 0x80) > 0) // 7
+        //setBaLow(false) // ***
         drawCycle(-1)
       case 11 =>
         mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
@@ -1138,7 +1132,7 @@ final class VIC(mem: Memory,
         drawCycle(-1)
       case 57 =>
         mem.read(0x3FFF)
-        setBaLow((spriteDMAon & 0x03) > 0)  // 0,1        
+        setBaLow((spriteDMAon & 0x03) > 0)  // 0,1
         drawCycle(-1)	
       // ---------------------------------------------------------------
       case 58 =>     
@@ -1310,7 +1304,7 @@ final class VIC(mem: Memory,
         }
         s -= 1
       }
-      val gfxPixel = if (verticalBorderFF) backgroundColor(0) else if (gdata < 0) PIXEL_BLACK else gfxPixels(i)
+      val gfxPixel = if (verticalBorderFF) backgroundColor(0) else if (gdata < 0) backgroundColor(0) else gfxPixels(i)
       if (!verticalBorderFF && (gfxPixel & 0x10) > 0 && (pixel & PIXEL_TRANSPARENT) == 0) spriteDataCollision((pixel >> 6) & 7) // sprite-data collision detected
       if ((pixel & PIXEL_TRANSPARENT) > 0 || ((gfxPixel & 0x10) > 0 && (pixel & PIXEL_SPRITE_PRIORITY) > 0)) pixel = gfxPixel
       if ((borderPixels(i) & PIXEL_TRANSPARENT) == 0) drawPixel(x + i, y, borderPixels(i))
@@ -1332,10 +1326,10 @@ final class VIC(mem: Memory,
   }
 
   @inline private def irqRequest {
-    interruptControlRegister |= 128
-    //Log.debug(s"Requesting IRQ raster=${rasterLine} interruptControlRegister=${Integer.toBinaryString(interruptControlRegister)}")
-    //println(s"Requesting IRQ raster=${rasterLine} rasterLatch=${rasterLatch} interruptControlRegister=${Integer.toBinaryString(interruptControlRegister)}")
-    irqAction(true)
+   if ((interruptControlRegister & 0x80) == 0) {
+      interruptControlRegister |= 0x80
+      irqAction(true)
+   }
   }
 
   @inline private def rasterLineEqualsLatch {
@@ -1350,8 +1344,9 @@ final class VIC(mem: Memory,
 
   @inline private def spriteSpriteCollision(i: Int, j: Int) {
     val mask = (1 << i) | (1 << j)
-    if ((spriteSpriteCollision & mask) == 0) {
-      spriteSpriteCollision |= mask
+    val ssCollision = spriteSpriteCollision
+    spriteSpriteCollision |= mask
+    if (ssCollision == 0) {     
       interruptControlRegister |= 4
       if ((interruptMaskRegister & 4) == 4) {
         //Log.debug(s"Sprite-sprite collision detected between ${i} and ${j} ss=${Integer.toBinaryString(spriteSpriteCollision)} icr=${Integer.toBinaryString(interruptControlRegister)}")
@@ -1361,8 +1356,9 @@ final class VIC(mem: Memory,
   }
   @inline private def spriteDataCollision(i: Int) {
     val mask = (1 << i)
-    if ((spriteBackgroundCollision & mask) == 0) {
-      spriteBackgroundCollision |= (1 << i)
+    val sbc = spriteBackgroundCollision
+    spriteBackgroundCollision |= (1 << i)
+    if (sbc == 0) {      
       interruptControlRegister |= 2
       if ((interruptMaskRegister & 2) == 2) {
         //Log.debug(s"Sprite-data collision detected for ${i} sd=${Integer.toBinaryString(spriteBackgroundCollision)} icr=${Integer.toBinaryString(interruptControlRegister)}")
