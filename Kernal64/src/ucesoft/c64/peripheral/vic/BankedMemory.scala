@@ -5,8 +5,9 @@ import ucesoft.c64.Log
 import ucesoft.c64.ChipID
 import ucesoft.c64.cpu.CPU6510Mems
 import ucesoft.c64.expansion.LastByteReadMemory
+import ucesoft.c64.expansion.ExpansionPortConfigurationListener
 
-class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory with LastByteReadMemory {
+class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory with LastByteReadMemory with ExpansionPortConfigurationListener {
   val name = "VIC-Memory"
   val isRom = false
   val startAddress = 0
@@ -15,6 +16,7 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
   private[this] var bank = 0
   private[this] var baseAddress = 0
   private[this] var memLastByteRead = 0
+  private[this] var ultimax = false
   
   def getBank = bank
   def getBankAddress = bank << 14
@@ -31,6 +33,10 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
   }
   
   def lastByteRead = memLastByteRead
+  
+  def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
+    ultimax = !game && exrom
+  }
   
   def read(address: Int, chipID: ChipID.ID = ChipID.VIC): Int = { 
     /*
@@ -51,7 +57,7 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
     
     val realAddress = baseAddress | address
     memLastByteRead =
-    if ((realAddress & 0x7000) == 0x1000) charROM.read(0xD000 | (address & 0x0FFF),chipID)//(address + 0xC000,chipID)
+    if ((realAddress & 0x7000) == 0x1000 && !ultimax) charROM.read(0xD000 | (address & 0x0FFF),chipID)//(address + 0xC000,chipID)
     else mem.read(realAddress,chipID)
     
     memLastByteRead
