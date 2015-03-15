@@ -14,4 +14,10 @@ trait Drive extends C64Component {
   def setDriveReader(driveReader:D64)
   def clock(cycles:Long)
   def changeCPU(cycleExact:Boolean) {}
+  def setReadOnly(readOnly:Boolean) {}
+  
+  def getSpeedHz = -1  
+  def setSpeedHz(speed:Int) {}
+  val MIN_SPEED_HZ = 0
+  val MAX_SPEED_HZ = 0
 }

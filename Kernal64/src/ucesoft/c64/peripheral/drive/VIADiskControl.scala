@@ -18,6 +18,8 @@ class VIADiskControl(var cpu: CPU6510,
   private[this] var TOTAL_TRACKS = 0
   private[this] var isWriting = false
   private[this] var isDiskChanged = true
+  private[this] var isDiskChanging = false
+  private[this] var isReadOnly = false
   private[this] var diskChangedAtClockCycle = 0L
   private[this] var motorOn = false
   private[this] var canSetByteReady = false
@@ -72,22 +74,20 @@ class VIADiskControl(var cpu: CPU6510,
   def awake {
     if (isDiskChanged) diskChangedAtClockCycle = Clock.systemClock.currentCycles
   }
+  
+  def setReadOnly(readOnly:Boolean) = isReadOnly = readOnly
 
   def setDriveReader(driveReader: D64) {
     d64 = Some(driveReader)
     TOTAL_TRACKS = d64.get.TOTAL_TRACKS
     gcrSector = driveReader.gcrImageOf(track, sector)
-//    isDiskChanged = true
-//    diskChangedAtClockCycle = Clock.systemClock.currentCycles
     isDiskChanged = true
+    isDiskChanging = true
     Clock.systemClock.schedule(new ClockEvent("DiskRemoving",Clock.systemClock.currentCycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
       isDiskChanged = false
       Clock.systemClock.schedule(new ClockEvent("DiskWaitingInserting",cycles + REMOVING_DISK_WAIT, cycles => {
         isDiskChanged = true
         diskChangedAtClockCycle = cycles
-//        Clock.systemClock.schedule(new ClockEvent("DiskInserting",cycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
-//          isDiskChanged = false      
-//        }))
       }))
     }))
   }
@@ -119,13 +119,14 @@ class VIADiskControl(var cpu: CPU6510,
 
   override def read(address: Int, chipID: ChipID.ID) = address - startAddress match {
     case PB =>
-      val diskChanged = isDiskChanged
-      if (diskChanged && Clock.systemClock.currentCycles - diskChangedAtClockCycle > WRITE_PROTECT_SENSE_WAIT) {
+      val wps = if (isDiskChanging) isDiskChanged else isReadOnly
+      if (isDiskChanging && isDiskChanged && Clock.systemClock.currentCycles - diskChangedAtClockCycle > WRITE_PROTECT_SENSE_WAIT) {
         isDiskChanged = false
+        isDiskChanging = false
       }
       (super.read(address, chipID) & ~(WRITE_PROTECT_SENSE | SYNC_DETECTION_LINE)) |
         (if (isSync) 0x00 else SYNC_DETECTION_LINE) |
-        (if (diskChanged) 0x00 else WRITE_PROTECT_SENSE)
+        (if (wps) 0x00 else WRITE_PROTECT_SENSE)
     case PA|PA2 =>
       super.read(address, chipID)
       val headByte = if (gcrSector == null) 0 else gcrSector(gcrIndex)

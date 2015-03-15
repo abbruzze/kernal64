@@ -14,6 +14,9 @@ import ucesoft.c64.trace.BreakType
 
 class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends TraceListener with Drive {
   val componentID = "C1541 Disk Drive"
+  override val MIN_SPEED_HZ = 985248
+  override val MAX_SPEED_HZ = 1000000
+  
   private[this] val LOAD_ROUTINE = 0xD7B4
   private[this] val FORMAT_ROUTINE = 0xC8C6
   private[this] val FORMAT_ROUTINE_OK = 0xC8EF
@@ -21,7 +24,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] val WAIT_LOOP_ROUTINE = 0xEC9B //0xEBFF//0xEC9B
   private[this] val WAIT_CYCLES_FOR_STOPPING = 2000000
   private[this] val GO_SLEEPING_MESSAGE_CYCLES = 3000000
-  private[this] val CYCLE_ADJ = (1000000.0 - 985248.0) / 985248.0
+  private[this] var CYCLE_ADJ = 0.0 //(MAX_SPEED_MHZ - MIN_SPEED_MHZ) / MIN_SPEED_MHZ.toDouble
+  private[this] var currentSpeedHz = MIN_SPEED_HZ
   private[this] var cycleFrac = 0.0
   private[this] val mem = new C1541Mems.C1541_RAM
   private[this] var cpu = CPU6510.make(mem,true,ChipID.CPU_1541)
@@ -54,7 +58,18 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     }
   }
   
+  override def setReadOnly(readOnly:Boolean) = viaDisk.setReadOnly(readOnly)
+  
+  override def setSpeedHz(speed:Int) {
+    currentSpeedHz = speed
+    CYCLE_ADJ = (speed - MIN_SPEED_HZ) / MIN_SPEED_HZ.toDouble
+  }
+  
+  override def getSpeedHz = currentSpeedHz
+  
   override def getProperties = {
+    properties.setProperty("Speed Hz",currentSpeedHz.toString)
+    properties.setProperty("Cycle adjustment",CYCLE_ADJ.toString)
     properties.setProperty("Running", running.toString)
     val channels = mem.getChannelsState
     for (i <- 0 to 15) {
@@ -152,11 +167,13 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       if (cpuExact) {
         checkPC(cycles)
         cpu.fetchAndExecute
-//        cycleFrac += CYCLE_ADJ
-//        if (cycleFrac >= 1) {
-//          cycleFrac -= 1
-//          cpu.fetchAndExecute
-//        }
+        if (CYCLE_ADJ > 0) {
+          cycleFrac += CYCLE_ADJ
+          if (cycleFrac >= 1) {
+            cycleFrac -= 1
+            cpu.fetchAndExecute
+          }
+        }
       } else {
         if (cycles > cpuWaitUntil) {
           checkPC(cycles)
