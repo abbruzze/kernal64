@@ -90,7 +90,7 @@ class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timer
 
   final def writeLo(lo: Int) {
     latch = (latch & 0xFF00) | (lo & 0xFF)
-    if ((cr & 0x10) > 0) counter = (counter & 0xFF00) | lo & 0xFF
+    //if ((cr & 0x10) > 0) counter = (counter & 0xFF00) | lo & 0xFF
     Log.debug(s"${ciaName}-${id} set counter lo to ${lo} latch=${latch}")
     //println(s"${ciaName}-${id} set counter lo to ${lo} latch=${latch} prev=${prev}")
   }
