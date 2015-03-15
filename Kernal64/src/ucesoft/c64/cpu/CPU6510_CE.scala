@@ -64,7 +64,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   final def irqRequest(low: Boolean) {
     if (tracing) Log.debug(s"IRQ request low=${low}")
     irqLow = low
-    if (irqLow && irqFirstCycle == 0) irqFirstCycle = clk.currentCycles
+    if (irqLow/* && irqFirstCycle == 0*/) irqFirstCycle = clk.currentCycles
   }
   final def nmiRequest(low: Boolean) {
     if (!nmiLow && low) {
