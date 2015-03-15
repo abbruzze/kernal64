@@ -53,8 +53,10 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   private[this] val suspendedLock = new Object
   
   // ------ PERFORMANCE MANAGEMENT -------------
-  private[this] val C64_CLOCK_HZ = 985248.0
-  private[this] val PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS = 1 * 1000
+  final private[this] val C64_CLOCK_HZ = 985248.0
+  final private[this] val C64_CLOCK_HZ_DIV_1000 = 985248.0 / 1000
+  final private[this] val C64_CLOCK_HZ_INV_BY_1000 = 1000 / 985248.0
+  final private[this] val PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS = 1 * 1000
   
   private[this] var _maximumSpeed = false
   private[this] var lastCorrectionTime = 0L
@@ -130,9 +132,9 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       if (!_maximumSpeed) {
         val timeDiff = System.currentTimeMillis - lastCorrectionTime
         val cyclesDiff = cycles - lastCorrectionCycles
-        val expectedCycles = timeDiff * C64_CLOCK_HZ / 1000
+        val expectedCycles = timeDiff * C64_CLOCK_HZ_DIV_1000
         if (cyclesDiff > expectedCycles) {
-          val waitTime = (1000 * (cyclesDiff - expectedCycles) / C64_CLOCK_HZ).asInstanceOf[Int]
+          val waitTime = (C64_CLOCK_HZ_INV_BY_1000 * (cyclesDiff - expectedCycles)).asInstanceOf[Int]
           Thread.sleep(waitTime)
         }
       }
