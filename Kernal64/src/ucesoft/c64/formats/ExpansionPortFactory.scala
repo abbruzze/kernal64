@@ -156,19 +156,21 @@ object ExpansionPortFactory {
   }
 
   private class Type19CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+    private[this] var reg = 0
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
-      val target = address - startAddress
-      if (target == 0) {
-        romlBankIndex = value & 0x7F
-      }
+      reg = value
+      romlBankIndex = value & 0x3F
+      exrom = (value & 0x80) > 0
+      notifyMemoryConfigurationChange
     }
+    override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = reg    
   }
   private class Type5CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
       val target = address - startAddress
       if (target == 0) {
-        val bank = value & 0x3F
-        crt.kbSize match {
+        val bank = value & 0x3F        
+        crt.kbSize match {          
           case 256 =>
             if (bank < 16) romlBankIndex = bank else romhBankIndex = bank - 16
           case _ =>
