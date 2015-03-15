@@ -240,11 +240,11 @@ object CPU6510Mems {
       CHAREN = if ((ddr & 4) > 0) (pr & 4) == 4 else true
       if (_LORAM != LORAM || _HIRAM != HIRAM || _CHAREN != CHAREN) {
         Log.debug(s"Memory DDR=${Integer.toBinaryString(ddr)} PR=${Integer.toBinaryString(pr)}. LORAM=${LORAM} HIRAM=${HIRAM} CHAREN=${CHAREN}")
-        expansionPortConfigurationChanged
+        expansionPortConfigurationChanged(false,false) // values are ignored
       }
     }
     
-    def expansionPortConfigurationChanged {
+    def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
       val expansionPort = ExpansionPort.getExpansionPort
       val EXROM = expansionPort.EXROM
       val GAME = expansionPort.GAME
@@ -299,7 +299,7 @@ object CPU6510Mems {
     }
     
     override def afterInitHook {
-      expansionPortConfigurationChanged
+      expansionPortConfigurationChanged(false,false) // values are ignored
     }
     
     def reset {
@@ -310,17 +310,17 @@ object CPU6510Mems {
       HIRAM = true
       CHAREN = true
       ULTIMAX = false
-      expansionPortConfigurationChanged
+      expansionPortConfigurationChanged(false,false) // values are ignored
     }
     
     @inline final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (isForwardRead) forwardReadTo.read(address)
       if (ULTIMAX) {
         if (chipID == ChipID.VIC) {
-          if (address >= 0x3000 && address < 0x4000) return ROMH.read(0xF000 + address - 0x3000,chipID)
-          if (address >= 0x7000 && address < 0x8000) return ROMH.read(0xF000 + address - 0x7000,chipID)
-          if (address >= 0xB000 && address < 0xC000) return ROMH.read(0xF000 + address - 0xB000,chipID)
-          if (address >= 0xF000 && address < 0x10000) return ROMH.read(0xF000 + address - 0xF000,chipID)
+          if (address >= 0x3000 && address < 0x4000) return ROMH_ULTIMAX.read(0xF000 + address - 0x3000,chipID)
+          if (address >= 0x7000 && address < 0x8000) return ROMH_ULTIMAX.read(0xF000 + address - 0x7000,chipID)
+          if (address >= 0xB000 && address < 0xC000) return ROMH_ULTIMAX.read(0xF000 + address - 0xB000,chipID)
+          if (address >= 0xF000 && address < 0x10000) return ROMH_ULTIMAX.read(0xF000 + address - 0xF000,chipID)
         }
       }
       if (chipID == ChipID.VIC) ram.read(address, chipID)
