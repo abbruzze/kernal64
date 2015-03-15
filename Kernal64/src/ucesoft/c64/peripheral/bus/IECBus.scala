@@ -65,6 +65,17 @@ class IECBus extends C64Component {
     updateLines(id)
   }
   
+  final def setLine(id:String,atnValue:Int,dataValue:Int,clockValue:Int) {
+    var l = lines
+    while (l != Nil && l.head.listener.busid != id) l = l.tail
+    if (l == Nil) throw new IllegalArgumentException(s"${id} listener not found as IECBus listener")
+    
+    l.head.atn = atnValue
+    l.head.clk = clockValue
+    l.head.data = dataValue
+    updateLines(id)
+  }
+  
   def init {}
   def reset {
     var l = lines
