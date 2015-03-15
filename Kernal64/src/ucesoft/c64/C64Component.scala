@@ -14,6 +14,7 @@ object C64ComponentType extends Enumeration {
   val INTERNAL = Value
   val TAPE = Value
   val PRINTER = Value
+  val USER_PORT = Value
 }
 
 trait C64Component {
