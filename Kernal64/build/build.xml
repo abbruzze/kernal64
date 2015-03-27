@@ -67,7 +67,7 @@
 	
 	<target name="pack" depends="deploy">
 		<copy todir="${dist.dir}/pack/kernal64/lib">
-			<fileset dir="${basedir}/lib/" includes="*jinput* scala-library.jar"/>
+			<fileset dir="${basedir}/lib/" includes="*jinput* *.jar" excludes="scala-compiler.jar"/>
 			<fileset dir="${dist.dir}" includes="*.jar"/>
 		</copy>
 		<copy todir="${dist.dir}/pack/kernal64">
