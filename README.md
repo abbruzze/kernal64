@@ -36,3 +36,6 @@ Here the main features:
 ###Installation
 Download and unzip https://github.com/abbruzze/kernal64/tree/master/Kernal64/dist on your computer.
 Be sure to have a jre (1.7 or above) in the path and launch the **kernal64.bat** or **kernal64.sh** batch file, depending on your operating system.
+
+###Wiki
+Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
