@@ -2,6 +2,7 @@ package ucesoft.c64.peripheral.bus
 
 import ucesoft.c64.formats.D64
 import scala.collection.mutable.ListBuffer
+import language.postfixOps
 
 object IECBusDevice {
   private val WAIT_BIT_TIMEOUT = 300
@@ -286,8 +287,8 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
         untalk
       case CLOSE =>
         if (role != NONE) {
-          channels(channel).close
           close
+          channels(channel).close          
           reset
         }
     }

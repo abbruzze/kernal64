@@ -38,6 +38,23 @@ object D64 {
       }
     }
   }
+  
+  def fileNameMatch(fileNameToSearch:String,fileName:String) : Boolean = {
+    var i = 0
+    while (i < fileNameToSearch.length) {
+      val a = fileNameToSearch.charAt(i)
+      if (a == '*') return true      
+      if (i >= fileName.length) return false
+      
+      val b = fileName.charAt(i)
+      if (a == '?') i += 1      
+      else
+      if (a == b) i += 1
+      else return false
+    }
+    
+    fileNameToSearch.length == fileName.length
+  }
 
   private val DISK_SIZE_40_TRACKS = 196608
   private val DISK_SIZE_35_TRACKS = 174848
@@ -226,23 +243,6 @@ class D64(val file: String,empty:Boolean = false) {
     FileData(entry.fileName, -1, data.toArray)
   }
   
-  private def fileNameMatch(fileNameToSearch:String,fileName:String) : Boolean = {
-    var i = 0
-    while (i < fileNameToSearch.length) {
-      val a = fileNameToSearch.charAt(i)
-      if (a == '*') return true      
-      if (i >= fileName.length) return false
-      
-      val b = fileName.charAt(i)
-      if (a == '?') i += 1      
-      else
-      if (a == b) i += 1
-      else return false
-    }
-    
-    fileNameToSearch.length == fileName.length
-  }
-
   def load(fileName: String,fileType:FileType.Value = FileType.PRG) = {
     val dpos = fileName.indexOf(":")
     val st = new StringTokenizer(if (dpos != -1) fileName.substring(dpos + 1) else fileName,",")

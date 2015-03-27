@@ -1,6 +1,7 @@
 package ucesoft.c64.peripheral.rs232
 
 import ucesoft.c64.peripheral.cia.CIA
+import RS232._
 
 abstract class AbstractRS232 extends RS232 with Runnable {
   private[this] var cia2 : CIA = _
@@ -15,9 +16,14 @@ abstract class AbstractRS232 extends RS232 with Runnable {
   private[this] var totalByteSent,totalByteReceived = 0
   private[this] var configurationString = ""
   private[this] var enabled = false
+  private[this] var statusListener : RS232StatusListener = _
   
   def isEnabled = enabled
-  def setEnabled(enabled:Boolean) = this.enabled = enabled
+  def setEnabled(enabled:Boolean) = {
+    this.enabled = enabled
+    if (statusListener != null) statusListener.setRS232Enabled(enabled)
+  }
+  def setRS232Listener(l:RS232StatusListener) = statusListener = l
   
   def init {}
   
@@ -36,7 +42,8 @@ abstract class AbstractRS232 extends RS232 with Runnable {
     //println(s"TXD: $txd rts=$rts n=$bitreceived buffer=$outbuffer")
     if (rts && high == 0 && bitreceived == 0) {
       // consumes start bit
-      bitreceived = 1      
+      bitreceived = 1    
+      if (statusListener != null) statusListener.update(TXD,1)
     }
     else
     if (rts && bitreceived > 0) {
@@ -49,6 +56,7 @@ abstract class AbstractRS232 extends RS232 with Runnable {
         bitreceived = 0
         totalByteSent += 1
         sendOutByte(outbuffer)
+        if (statusListener != null) statusListener.update(TXD,0)
         outbuffer = 0
       }
       else bitreceived += 1
@@ -74,6 +82,11 @@ abstract class AbstractRS232 extends RS232 with Runnable {
     // auto set cs
     cts = if (rts) CTS else 0 
     //println(s"RTS=$rts DTR=$dtr")
+    
+    if (statusListener != null) {
+      statusListener.update(RTS,others & RTS)
+      statusListener.update(DTR,others & DTR)
+    }    
   }
   
   def getOthers : Int = {        
@@ -96,6 +109,7 @@ abstract class AbstractRS232 extends RS232 with Runnable {
    * s space parity 
    */
   def setConfiguration(conf:String) {
+    configurationString = conf
     val parts = conf.split(",")
     if (parts.length != 3) throw new IllegalArgumentException("Bad configuration string")
     
@@ -126,10 +140,11 @@ abstract class AbstractRS232 extends RS232 with Runnable {
     cia2.setFlagLow
     bitsent = 1
     tmpParity = 0
+    if (statusListener != null) statusListener.update(RXD,1)
     //println("Sent start bit")
   }
   
-  private def sendBit {
+  private def sendBit {    
     val old_rxd = rxd
     if (bitsent == bits + 1 && parity != NO_PARITY) { // parity
       rxd = parity match {
@@ -138,7 +153,6 @@ abstract class AbstractRS232 extends RS232 with Runnable {
         case MARK_PARITY => RXD
         case SPACE_PARITY => 0
       }
-      println("Sent parity " + (if (rxd > 0) "1" else "0"))
     }
     else
     if (bitsent >= bits + 1) { // stop bits
@@ -156,6 +170,7 @@ abstract class AbstractRS232 extends RS232 with Runnable {
     if (bitsent == length) {
       dcd = 0      
       byteToSend = -1
+      if (statusListener != null) statusListener.update(RXD,0)
       //println("BYTE FINISHED")
     }
   }

@@ -16,39 +16,6 @@ object C1541Emu {
     val EMPTY = Value
   }
 
-  private class Cmd15Data(data: String) extends BusDataIterator {
-    private var index = 0
-    override def hasNext = index < data.length
-    override def isLast = index == data.length - 1
-    override def next = {
-      val c = data.charAt(index).toInt
-      index += 1
-      c
-    }
-    override def getPerc = (100 * index.toFloat / data.length).toInt
-    override def goto(pos: Int) {
-      index = pos
-    }
-  }
-
-  private class ChannelData(data: Array[Byte], sizeLimit: Option[Int] = None) extends BusDataIterator {
-    private var index = 0
-    override def hasNext = index < data.length
-    override def isLast = index == data.length - 1
-    override def next = {
-      val c = data(index).toInt
-      sizeLimit match {
-        case None => index += 1
-        case Some(limit) => index = (index + 1) % limit
-      }
-      c
-    }
-    override def getPerc = (100 * index.toFloat / data.length).toInt
-    override def goto(pos: Int) {
-      index = pos
-    }
-  }
-
   private val STATUS_OK = 0
   private val STATUS_SYNTAX_ERROR = 30
   private val STATUS_FILE_NOT_FOUND = 62
@@ -209,13 +176,14 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     val cmd = if (channels(channel).fileName.length > 0) channels(channel).fileName.toString else channels(channel).bufferToString
     if (cmd.length > 0) {
       executeCommand(cmd)
-      channels(channel).buffer.clear
-      sendStatus
+      channels(channel).buffer.clear      
     }
+    sendStatus
   }
 
   private def sendStatus {
-    channels(channel).dataToSend = Some(new Cmd15Data("%02d,%s,00,00".format(status, ERROR_CODES(status)) + 13.toChar))
+    import BusDataIterator._
+    channels(channel).dataToSend = Some(new StringDataIterator("%02d,%s,00,00".format(status, ERROR_CODES(status)) + 13.toChar))
   }
 
   private def setStatus(code: Int) {
@@ -315,7 +283,8 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
         else if (drive != 0) setStatus(STATUS_DRIVE_NOT_READY)
         else {
           // read block
-          channels(channel).dataToSend = Some(new ChannelData(driveReader.get.readBlock(track, sector), Some(256)))
+          import BusDataIterator._
+          channels(channel).dataToSend = Some(new ArrayDataIterator(driveReader.get.readBlock(track, sector), Some(256)))
           println(driveReader.get.readBlock(track, sector) mkString ",")
         }
       } catch {

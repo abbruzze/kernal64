@@ -7,9 +7,12 @@ object BridgeRS232 extends RS232 {
   private[this] var rs232 : RS232 = _
   private[this] var txd,others = 0
   private[this] var cia2 : CIA = _
+  private[this] var statusListener : RS232StatusListener = _
   
   def init {}
   def reset = if (rs232 != null) rs232.reset
+  
+  def setRS232Listener(l:RS232StatusListener) = statusListener = l
   
   override def getProperties = {
     if (rs232 == null) {
@@ -33,7 +36,8 @@ object BridgeRS232 extends RS232 {
   
   def setRS232(rs232:RS232) {
     this.rs232 = rs232
+    rs232.setRS232Listener(statusListener)
     rs232.setCIA(cia2)
-    rs232.setOthers(others)
-  }
+    rs232.setOthers(others)    
+  }    
 }

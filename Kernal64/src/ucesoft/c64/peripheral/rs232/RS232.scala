@@ -4,9 +4,7 @@ import ucesoft.c64.peripheral.cia.CIA
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 
-trait RS232 extends C64Component {
-  val componentType = C64ComponentType.USER_PORT
-  
+object RS232 {
   final val RXD = 1 << 0
   final val RTS = 1 << 1
   final val DTR = 1 << 2
@@ -14,12 +12,17 @@ trait RS232 extends C64Component {
   final val DCD = 1 << 4
   final val CTS = 1 << 6
   final val DSR = 1 << 7
+  final val TXD = 1 << 8
   
   final val NO_PARITY = 0
   final val ODD_PARITY = 1
   final val EVEN_PARITY = 2
   final val MARK_PARITY = 3
   final val SPACE_PARITY = 4
+}
+
+trait RS232 extends C64Component {
+  val componentType = C64ComponentType.USER_PORT
   
   def setTXD(high:Int)
   def getTXD : Int
@@ -51,4 +54,6 @@ trait RS232 extends C64Component {
   def setCIA(cia2:CIA)
   
   def getDescription : String
+  
+  def setRS232Listener(l:RS232StatusListener)
 }

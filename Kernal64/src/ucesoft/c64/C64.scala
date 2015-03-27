@@ -44,6 +44,11 @@ import ucesoft.c64.trace.BreakType
 import ucesoft.c64.peripheral.sid.SIDDevice
 import ucesoft.c64.util.DriveSpeedSettingsPanel
 import ucesoft.c64.peripheral.rs232._
+import ucesoft.c64.util.RS232StatusPanel
+import ucesoft.c64.peripheral.drive.LocalDrive
+import ucesoft.c64.util.DropBoxAuth
+import ucesoft.c64.peripheral.drive.DropboxDrive
+import ucesoft.c64.expansion.SwiftLink
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -55,7 +60,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "0.9.9N"
+  private[this] val VERSION = "0.9.9O"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -106,6 +111,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   private[this] val c1541 = new C1541Emu(bus,this)
   private[this] val c1541_real = new C1541(0x00,bus,this)
   private[this] var drive : Drive = c1541_real
+  private[this] var device9Drive : Drive = _
+  private[this] var device9DriveEnabled = false
   private[this] val driveLed = new DriveLed
   private[this] val diskProgressPanel = new DriveLoadProgressPanel
   private[this] val diskSpeedDialog : JDialog = DriveSpeedSettingsPanel.getDialog(displayFrame,drive)
@@ -114,7 +121,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   // ----------------- RS-232 ------------------
   private[this] val rs232 = BridgeRS232
   private[this] var activeRs232 : Option[RS232] = None 
-  private[this] val AVAILABLE_RS232 : Array[RS232] = Array(TelnetRS232,TCPRS232,FileRS232)
+  private[this] val AVAILABLE_RS232 : Array[RS232] = Array(TelnetRS232,
+                                                           TCPRS232,FileRS232,
+                                                           SwiftLink.getSL(nmiSwitcher.expansionPortNMI,None),
+                                                           SwiftLink.getSL(nmiSwitcher.expansionPortNMI _,Some(REU.getREU(REU.REU_1750,mem,setDMA _,irqSwitcher.expPortIRQ _,None))))
+  private[this] val rs232StatusPanel = new RS232StatusPanel
   // -------------------- PRINTER --------------
   private[this] var printerEnabled = false
   private[this] var printerGraphicsDriver = new MPS803GFXDriver(new MPS803ROM)
@@ -486,6 +497,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     add(bus)
     add(expansionPort)
     add(rs232)    
+    rs232.setRS232Listener(rs232StatusPanel)
     // -----------------------
     val bankedMemory = new vic.BankedMemory(mem,mem.CHAR_ROM,mem.COLOR_RAM)    
     ExpansionPort.setMemoryForEmptyExpansionPort(bankedMemory)
@@ -561,6 +573,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     val dummyPanel = new JPanel
     val tapePanel = new TapeState
     datassette.setTapeListener(tapePanel)
+    dummyPanel.add(rs232StatusPanel)
     dummyPanel.add(tapePanel)
     dummyPanel.add(tapePanel.progressBar)
     dummyPanel.add(diskProgressPanel)
@@ -604,6 +617,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     vicChip.clock(cycles)
     //DRIVES
     if (isDiskActive) drive.clock(cycles)
+    if (device9DriveEnabled) device9Drive.clock(cycles)
     // bus snoop
     if (busSnooperActive) busSnooper.clock(cycles)
     // printer
@@ -801,6 +815,47 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
         makeDisk
       case "RS232" =>
         manageRS232
+      case "DEVICE9_DISABLED" =>
+        device9DriveEnabled = false
+      case "LOCAL_DRIVE_ENABLED" =>        
+        device9Drive = new LocalDrive(bus,9)
+        device9DriveEnabled = true
+        changeLocalDriveDir
+      case "DROPBOX_DRIVE_ENABLED" =>
+        checkDropboxDrive
+    }
+  }
+  
+  private def checkDropboxDrive {
+    try {
+      if (DropBoxAuth.isAccessCodeRequested(configuration)) {                 
+        device9Drive = new DropboxDrive(bus,DropBoxAuth.getDbxClient(configuration),9)
+        device9DriveEnabled = true
+      }
+      else {
+        if (DropBoxAuth.requestAuthorization(configuration,displayFrame)) {          
+          device9Drive = new DropboxDrive(bus,DropBoxAuth.getDbxClient(configuration),9)
+          device9DriveEnabled = true
+        }
+      }
+    }
+    catch {
+        case t:Throwable =>
+          t.printStackTrace
+          device9DriveEnabled = false
+          JOptionPane.showMessageDialog(displayFrame,t.toString, "Dropbox init error",JOptionPane.ERROR_MESSAGE)
+      }
+  }
+  
+  private def changeLocalDriveDir {
+    val fc = new JFileChooser
+    fc.setCurrentDirectory(device9Drive.asInstanceOf[LocalDrive].getCurrentDir)
+    fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
+    fc.setDialogTitle("Choose the current device 9 local directory")
+    fc.showOpenDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        device9Drive.asInstanceOf[LocalDrive].setCurrentDir(fc.getSelectedFile)
+      case _ =>
     }
   }
   
@@ -824,10 +879,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
       if (conf != null) {
         try {
           rs.setConfiguration(conf)
-          activeRs232 foreach { _.setEnabled(false) }
-          rs.setEnabled(true)          
+          activeRs232 foreach { _.setEnabled(false) }                   
           activeRs232 = Some(rs)
           rs232.setRS232(rs)
+          rs232.setEnabled(true)
+          rs232StatusPanel.setVisible(true)
         }
         catch {
           case t:Throwable =>
@@ -1281,6 +1337,27 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     savePrgItem.setActionCommand("SAVEPRG")
     savePrgItem.addActionListener(this)
     fileMenu.add(savePrgItem)
+    
+    val localDriveItem = new JMenu("Drive on device 9 ...")
+    fileMenu.add(localDriveItem)
+    val group0 = new ButtonGroup
+    val noLocalDriveItem = new JRadioButtonMenuItem("Disabled")
+    noLocalDriveItem.setSelected(true)
+    noLocalDriveItem.setActionCommand("DEVICE9_DISABLED")
+    noLocalDriveItem.addActionListener(this)
+    group0.add(noLocalDriveItem)
+    localDriveItem.add(noLocalDriveItem)
+    val localDriveEnabled = new JRadioButtonMenuItem("Local drive ...")
+    localDriveEnabled.setActionCommand("LOCAL_DRIVE_ENABLED")
+    localDriveEnabled.addActionListener(this)
+    group0.add(localDriveEnabled)
+    localDriveItem.add(localDriveEnabled)
+    val dropboxDriveEnabled = new JRadioButtonMenuItem("Dropbox drive ...")
+    dropboxDriveEnabled.setActionCommand("DROPBOX_DRIVE_ENABLED")
+    dropboxDriveEnabled.addActionListener(this)
+    group0.add(dropboxDriveEnabled)
+    localDriveItem.add(dropboxDriveEnabled)
+    
     fileMenu.addSeparator
     
     val resetItem = new JMenuItem("Reset")
