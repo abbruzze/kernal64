@@ -4,6 +4,7 @@ import ucesoft.c64.ChipID
 import ucesoft.c64.Log
 import ucesoft.c64.Clock
 import ucesoft.c64.trace.BreakType
+import java.io.PrintWriter
 
 class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   override lazy val componentID = "6510_CE"
@@ -11,7 +12,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   private[this] var dma = false
   private[this] var ready = true
   // ------------- Tracing --------------------
-  private[this] var tracing = false
+  private[this] var tracing,tracingOnFile = false
+  private[this] var tracingFile : PrintWriter = _
   private[this] var breakType : BreakType = null
   private[this] var breakCallBack: (String) => Unit = _
   private[this] var stepCallBack: (String) => Unit = _
@@ -63,6 +65,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   final def getMem(address: Int) = mem.read(address)
   final def irqRequest(low: Boolean) {
     if (tracing) Log.debug(s"IRQ request low=${low}")
+    if (tracingOnFile && low) tracingFile.println("IRQ low")
     irqLow = low
     if (irqLow && irqFirstCycle == 0) irqFirstCycle = clk.currentCycles
   }
@@ -71,6 +74,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       nmiOnNegativeEdge = true
       nmiFirstCycle = clk.currentCycles
       if (tracing) Log.debug("NMI request on negative edge")
+      if (tracingOnFile && low) tracingFile.println("NMI low")
     }
     nmiLow = low
   }
@@ -126,6 +130,11 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   }).mkString
 
   // TRACING ---------------------------------------------
+  def setTraceOnFile(out:PrintWriter,enabled:Boolean) {
+    tracingOnFile = enabled
+    tracingFile = if (enabled) out else null
+  }
+  
   def setTrace(traceOn: Boolean) = tracing = traceOn
 
   def step(updateRegisters: (String) => Unit) {
@@ -1918,10 +1927,13 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       }
     }
     else {
-      if (tracing && state == 0) Log.debug(formatDebug)
+      val tracingNow = tracing && state == 0
+      if (tracingNow) Log.debug(formatDebug)
+      if (tracingOnFile && state == 0) tracingFile.println(formatDebug)
+      
       CURRENT_OP_PC = PC
       states(state)()
-      if (tracing && state == 0) {
+      if (tracingNow) {
         syncObject.synchronized { syncObject.wait }
         stepCallBack(toString)
       }

@@ -11,6 +11,7 @@ import ucesoft.c64.C64ComponentType
 import ucesoft.c64.C64Component
 import ucesoft.c64.cpu.CPU6510_CE
 import ucesoft.c64.trace.BreakType
+import java.io.PrintWriter
 
 class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends TraceListener with Drive {
   val componentID = "C1541 Disk Drive"
@@ -210,7 +211,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   }
 
   // ------------ TRACING -----------
-
+  def setTraceOnFile(out:PrintWriter,enabled:Boolean) {/* ignored */}
   def setTrace(traceOn: Boolean) = {
     tracing = traceOn
     if (tracing) awake

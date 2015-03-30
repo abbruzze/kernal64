@@ -1687,6 +1687,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   }
   
   // ------------------------------- TRACE LISTENER ------------------------------------------
+  def setTraceOnFile(out:PrintWriter,enabled:Boolean) = cpu.setTraceOnFile(out,enabled)
   def setTrace(traceOn:Boolean) = cpu.setTrace(traceOn)
   def step(updateRegisters: (String) => Unit) = cpu.step(updateRegisters)
   def setBreakAt(breakType:BreakType,callback:(String) => Unit) = cpu.setBreakAt(breakType,callback)

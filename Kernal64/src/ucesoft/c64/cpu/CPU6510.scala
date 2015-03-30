@@ -8,6 +8,7 @@ import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 import ucesoft.c64.ChipID
 import ucesoft.c64.trace.BreakType
+import java.io.PrintWriter
 
 object CPU6510 {
   class CPUJammedException extends Exception
@@ -1070,6 +1071,7 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   }
   
   // TRACING ---------------------------------------------
+  def setTraceOnFile(out:PrintWriter,enabled:Boolean) {/* ignored */}
   def setTrace(traceOn:Boolean) = tracing = traceOn
   
   def step(updateRegisters: (String) => Unit) {

@@ -1,5 +1,7 @@
 package ucesoft.c64.trace
 
+import java.io.PrintWriter
+
 sealed trait BreakType {
   def isBreak(address:Int,irq:Boolean,nmi:Boolean) : Boolean
 }
@@ -54,6 +56,7 @@ object BreakType {
 }
 
 trait TraceListener {
+  def setTraceOnFile(out:PrintWriter,enabled:Boolean)
   def setTrace(traceOn:Boolean)
   def step(updateRegisters: (String) => Unit)
   def setBreakAt(breakType:BreakType,callback:(String) => Unit)

@@ -15,6 +15,7 @@ import javax.swing.event.ChangeEvent
 import ucesoft.c64.peripheral.vic.Display
 import ucesoft.c64.peripheral.vic.VIC
 import ucesoft.c64.cpu.CPU6510Mems
+import java.io._
 
 object TraceDialog {
   def getTraceDialog(displayFrame: JFrame, mem: Memory, traceListener: TraceListener, display: Display, vic: VIC): TraceDialog = {
@@ -40,7 +41,9 @@ class TraceDialog private (displayFrame: JFrame,
   private val rasterLineSpinner = new JSpinner
   private val traceSR = new JLabel
   val logPanel = Log.getLogPanel
-  private var tracing = false
+  private[this] var tracing = false
+  private[this] var tracingFile : PrintWriter = _
+  
   private def s2a(address: String) = address(0) match {
     case '$' => Integer.parseInt(address.substring(1), 16)
     case '%' => Integer.parseInt(address.substring(1), 2)
@@ -153,6 +156,22 @@ class TraceDialog private (displayFrame: JFrame,
         logPanel.clear
       case "VICDUMP" =>
         Log.info("\n" + vic.get.dump)
+      case "TRACEFILE" =>
+        val button = e.getSource.asInstanceOf[JToggleButton]
+        if (!button.isSelected) {
+          tracingFile.close
+          traceListener.setTraceOnFile(null,false)
+        }
+        else {
+          val fc = new JFileChooser
+          fc.showOpenDialog(displayFrame) match {
+            case JFileChooser.APPROVE_OPTION =>
+              tracingFile = new PrintWriter(new BufferedOutputStream(new FileOutputStream(fc.getSelectedFile)))
+              traceListener.setTraceOnFile(tracingFile,true)
+            case _ =>  
+              button.setSelected(false)
+          }
+        }
     }
   }
 
@@ -175,15 +194,18 @@ class TraceDialog private (displayFrame: JFrame,
   write.addActionListener(this)
   notrace.setActionCommand("NOTRACE")
   notrace.addActionListener(this)
+  val traceFile = new JToggleButton("TraceFile")
+  traceFile.setActionCommand("TRACEFILE")
+  traceFile.addActionListener(this)
   val disa = new JButton("Dasm")
   disa.setActionCommand("DISA")
   disa.addActionListener(this)
   val asm = new JButton("Asm")
   asm.setActionCommand("ASM")
   asm.addActionListener(this)
-  val char = new JButton("CViewer")
-  char.setActionCommand("CHARVIEWER")
-  char.addActionListener(this)
+//  val char = new JButton("CViewer")
+//  char.setActionCommand("CHARVIEWER")
+//  char.addActionListener(this)
   val clear = new JButton("Clear")
   clear.setActionCommand("CLEAR")
   clear.addActionListener(this)
@@ -198,11 +220,12 @@ class TraceDialog private (displayFrame: JFrame,
   buttonPanel.add(read)
   buttonPanel.add(write)
   buttonPanel.add(notrace)
+  if (vic.isDefined) buttonPanel.add(traceFile)
   buttonPanel.add(disa)
   buttonPanel.add(asm)
   buttonPanel.add(clear)
   if (vic.isDefined) {
-    buttonPanel.add(char)
+    //buttonPanel.add(char)
     buttonPanel.add(vicDump)
     val showRasterCB = new JCheckBox("Show raster", false)
     showRasterCB.setActionCommand("SHOWRASTER")
