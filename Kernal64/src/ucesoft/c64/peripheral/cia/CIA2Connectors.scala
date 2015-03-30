@@ -31,7 +31,7 @@ object CIA2Connectors {
       bus.setLine(busid,if ((value & 8) > 0) GROUND else VOLTAGE,  // ATN
                         if ((value & 32) > 0) GROUND else VOLTAGE, // DATA
                         if ((value & 16) > 0) GROUND else VOLTAGE) // CLOCK
-      rs232.setTXD((data >> 2) & 1)
+      if ((ddr & 4) > 0) rs232.setTXD((data >> 2) & 1)
     }    
   }
   
