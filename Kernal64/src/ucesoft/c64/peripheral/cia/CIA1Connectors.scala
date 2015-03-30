@@ -19,7 +19,7 @@ object CIA1Connectors {
 	
 	class PortBConnector(kb:Keyboard,ctrlPort:ControlPort,lightPenTriggerHandler : () => Unit) extends Connector {
 	  val componentID = "CIA1 Port B Connector"
-	  private[this] var lastLP = 0x10
+	  private[this] var lastLPOn = false
 	  final def read = {
 	    val port = ctrlPort.readPort
 	    val reg = kb.readCol & (latch | ~ddr) & port	    
@@ -27,11 +27,9 @@ object CIA1Connectors {
 	  }
 	  final protected def performWrite(data:Int) {
 	    val port = ctrlPort.readPort
-	    val lpCheck = (data | ~ddr) & 0x10
-	    if (lpCheck != lastLP) {
-	      lastLP = lpCheck
-	      lightPenTriggerHandler()
-	    }
+	    val lpPressed = ((data | ~ddr) & 0x10) > 0
+	    if (!lastLPOn && lpPressed) lightPenTriggerHandler()	    
+      lastLPOn = lpPressed
 	    kb.selectCol((data | ~ddr) & port & 0xFF)
 	  }
 	}
