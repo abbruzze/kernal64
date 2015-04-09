@@ -330,7 +330,7 @@ class CIA(val name:String,
       }
       else {
         icr &= 0x7F
-        irqAction(false)
+        //irqAction(false)
       }
       Log.debug(s"${name} ICR's value is ${Integer.toBinaryString(value)} => ICR = ${Integer.toBinaryString(icrMask)}")
     case CRA => timerA.writeCR(value)
