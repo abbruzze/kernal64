@@ -14,7 +14,7 @@ object C1541Mems {
   
   private[this] val JIFFYDOS_ENABLED = System.getProperty("jiffydos") != null
   
-  private class DISK_KERNEL extends ROM(null,"C1541_KERNEL",KERNEL_M,16384,if (JIFFYDOS_ENABLED) "roms/JiffyDOS_1541_5.0.rom" else "roms/c1541.rom") {
+  private class DISK_KERNEL extends ROM(null,"C1541_KERNEL",KERNEL_M,16384,if (JIFFYDOS_ENABLED) "roms/JiffyDOS_1541_5.0.rom" else "roms/c1541II.rom") {
     final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
   }
   
