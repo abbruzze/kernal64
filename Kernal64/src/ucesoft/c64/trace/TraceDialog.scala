@@ -52,6 +52,10 @@ class TraceDialog private (displayFrame: JFrame,
   
   def forceTracing(on:Boolean) {
     tracing = on
+    vic match {
+      case Some(v) => v.setShowDebug(tracing)
+      case None =>
+    }
     traceListener.setTrace(tracing)
     if (!tracing) {
       traceListener.step(regs => traceSR.setText(regs))
@@ -128,7 +132,7 @@ class TraceDialog private (displayFrame: JFrame,
         }
       case "NOTRACE" =>
         tracing = !tracing
-        forceTracing(tracing)
+        forceTracing(tracing)        
       case "DISA" =>
         Option(JOptionPane.showInputDialog(this, "Disassemble from address to address:")) match {
           case Some(address) =>
