@@ -566,11 +566,11 @@ final class VIC(mem: Memory,
 
     final def producePixels {
       // optimization           
-//      drawBorder = !den ||
-//        rasterLine <= TOP_BOTTOM_FF_COMP(rsel)(0) ||
-//        rasterLine >= TOP_BOTTOM_FF_COMP(rsel)(1) ||
-//        (rasterCycle > 8 && rasterCycle < 17) || (rasterCycle > 53 && rasterCycle < 61)
-//      if (!drawBorder) return
+      drawBorder = !den ||
+        rasterLine <= TOP_BOTTOM_FF_COMP(rsel)(0) ||
+        rasterLine >= TOP_BOTTOM_FF_COMP(rsel)(1) ||
+        (rasterCycle > 8 && rasterCycle < 17) || (rasterCycle > 53 && rasterCycle < 61)
+      if (!drawBorder) return
       xcoord = xCoord
       color = borderColor
       if (traceRasterLineInfo) color |= PIXEL_DOX_B
@@ -1063,7 +1063,7 @@ final class VIC(mem: Memory,
 
     //if (!outOfScreen)
     (rasterCycle: @switch) match {       
-      case 1 =>
+      case 1 =>                
         // check raster line with raster latch if irq enabled     
         if (rasterLine > 0 && rasterLine == rasterLatch) rasterLineEqualsLatch
         // check den on $30
@@ -1213,22 +1213,34 @@ final class VIC(mem: Memory,
     }
     
     if (rasterCycle == RASTER_CYCLES) {
-      rasterCycle = 1
-      rasterLine += 1
-      if (rasterLine == RASTER_LINES) rasterLine = 0
-      // update the 8th bit of raster in control register 1
-      if (rasterLine > 0xFF) controlRegister1 |= 0x80 else controlRegister1 &= 0x7F
-      if (rasterLine == 0) {
-        canUpdateLightPenCoords = true
+      rasterCycle = 1 
+      updateRasterLine
+    }
+    else {
+      rasterCycle += 1
+      if (showDebug) {
         display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
-        firstModPixelX = -1
-        lastModPixelX = -1
-        ref = 0xFF
-        vcbase = 0
-        vc = 0
       }
     }
-    else rasterCycle += 1
+  }
+  
+  private[this] var showDebug = false
+  def setShowDebug(showDebug:Boolean) = this.showDebug = showDebug
+  
+  @inline private[this] def updateRasterLine {
+    rasterLine += 1
+    if (rasterLine == RASTER_LINES) rasterLine = 0
+    // update the 8th bit of raster in control register 1
+    if (rasterLine > 0xFF) controlRegister1 |= 0x80 else controlRegister1 &= 0x7F
+    if (rasterLine == 0) {
+      canUpdateLightPenCoords = true
+      display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
+      firstModPixelX = -1
+      lastModPixelX = -1
+      ref = 0xFF
+      vcbase = 0
+      vc = 0
+    }
   }
   
   @inline private[this] def tracePixel(pixel: Int, x: Int) {
