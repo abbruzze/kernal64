@@ -60,7 +60,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "0.9.9O"
+  private[this] val VERSION = "1.0.0"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -526,7 +526,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     				   cia2CP2,
     				   nmiSwitcher.cia2NMIAction _)
     rs232.setCIA(cia2)
-    vicChip = new vic.VIC(bankedMemory,mem.COLOR_RAM,irqSwitcher.vicIRQ _,baLow _)        
+    vicChip = new vic.VIC(bankedMemory,mem.COLOR_RAM,irqSwitcher.vicIRQ _,baLow _)      
+    mem.setLastByteReadMemory(bankedMemory)
     // mapping I/O chips in memory
     val io = mem.IO    
     io.addBridge(cia1)
@@ -973,6 +974,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   
   private def loadCartridgeFile(file:File) {
     try {          
+      if (Thread.currentThread != Clock.systemClock) clock.pause
       val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.expPortIRQ _,nmiSwitcher.expansionPortNMI _,mem.getRAM)
       println(ep)
       if (ep.isFreezeButtonSupported) cartMenu.setVisible(true)
@@ -1006,6 +1008,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
       if (autorun) {
         insertTextIntoKeyboardBuffer("LOAD\"*\",8,1" + 13.toChar + "RUN" + 13.toChar)
       }
+      driveLed.setToolTipText(file.toString)
     }
     catch {
       case t:Throwable =>
@@ -1148,6 +1151,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   private def detachCtr {
     if (ExpansionPort.getExpansionPort.isEmpty) JOptionPane.showMessageDialog(displayFrame,"No cartridge attached!", "Detach error",JOptionPane.ERROR_MESSAGE)
     else {
+      if (Thread.currentThread != Clock.systemClock) clock.pause
       ExpansionPort.getExpansionPort.eject
       ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
       reset(true)
