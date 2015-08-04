@@ -8,7 +8,7 @@ import ucesoft.c64.Clock
 import ucesoft.c64.ClockEvent
 
 object ExpansionPortFactory {
-  private class CartridgeExpansionPort(crt: Cartridge) extends ExpansionPort {
+  private class CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends ExpansionPort {
     class ROM(val name: String, val startAddress: Int, val length: Int, val data: Array[Int]) extends Memory {
       val isRom = true
       def isActive = true
@@ -19,7 +19,7 @@ object ExpansionPortFactory {
           else data(address - startAddress)
         } else data(address - startAddress)
       }
-      final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
+      final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) { ram.write(address,value,chipID) }
       override def toString = s"ROM(${name})[startAddress=${Integer.toHexString(startAddress)} length=${length}]"
     }
     val name = crt.name
@@ -44,8 +44,8 @@ object ExpansionPortFactory {
     }
     protected var romlBankIndex = 0
     protected var romhBankIndex = 0
-    protected var game = if (crt.GAME && crt.EXROM) false else crt.GAME
-    protected var exrom = if (crt.GAME && crt.EXROM) false else crt.EXROM
+    protected var game = /*if (crt.GAME && crt.EXROM) false else*/ crt.GAME
+    protected var exrom = /*if (crt.GAME && crt.EXROM) false else*/ crt.EXROM
 
     protected def convertBankNumber(bank: Int): Int = bank
 
@@ -57,7 +57,7 @@ object ExpansionPortFactory {
     override def toString = s"ExpansionPort{crt=${crt} game=${game} exrom=${exrom} romlBanks=${romlBanks.mkString("<", ",", ">")} romhBanks=${romhBanks.mkString("<", ",", ">")}}"
   }
   // ================================= CARTRIDGE IMPL ===================================================
-  private class SimonsBasicCartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class SimonsBasicCartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       val target = address - startAddress
       game = true
@@ -72,7 +72,7 @@ object ExpansionPortFactory {
       }
     }
   }
-  private class Comal80CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class Comal80CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
       if ((value & 0x80) > 0) {
         val bank = value & 0x3
@@ -82,7 +82,7 @@ object ExpansionPortFactory {
     }
   }
 
-  private class Type7CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class Type7CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override protected def convertBankNumber(bank: Int): Int = ((bank >> 3) & 7) | ((bank & 1) << 3)
 
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
@@ -101,7 +101,7 @@ object ExpansionPortFactory {
     }
   }
 
-  private class Type10CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class Type10CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       if (address == 0xDF18) {
         game = true
@@ -121,7 +121,7 @@ object ExpansionPortFactory {
     }
   }
 
-  private class Type13CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class Type13CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       if (address >= 0xDF00) { // IO2
         game = false
@@ -145,7 +145,7 @@ object ExpansionPortFactory {
     }
   }
 
-  private class Type8CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class Type8CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
       if (address == 0xDF00) {
         val bank = value & 0x03
@@ -160,8 +160,12 @@ object ExpansionPortFactory {
     }
   }
 
-  private class Type19CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class Type19CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     private[this] var reg = 0
+    
+    exrom = false
+    game = true
+    
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
       reg = value
       romlBankIndex = value & 0x3F
@@ -170,7 +174,7 @@ object ExpansionPortFactory {
     }
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = reg    
   }
-  private class Type5CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class Type5CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
       val target = address - startAddress
       if (target == 0) {
@@ -184,7 +188,7 @@ object ExpansionPortFactory {
       }
     }
   }
-  private class Type16CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class Type16CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       val offs = address - startAddress
@@ -209,14 +213,14 @@ object ExpansionPortFactory {
     }
   }
   
-  private class Type17CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class Type17CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       val bank = address - startAddress
       romlBankIndex = bank
       0
     }
   }
-  private class Type15CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class Type15CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       val bank = address - startAddress
       romlBankIndex = bank
@@ -227,7 +231,7 @@ object ExpansionPortFactory {
       romlBankIndex = bank
     }
   }
-  private class Type32CartridgeExpansionPort(crt: Cartridge) extends CartridgeExpansionPort(crt) {
+  private class Type32CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     private[this] val io2mem = Array.ofDim[Int](256)
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       val target = startAddress - address
@@ -250,7 +254,7 @@ object ExpansionPortFactory {
     }
   }
 
-  private class Type3CartridgeExpansionPort(crt: Cartridge, nmiAction: (Boolean) => Unit) extends CartridgeExpansionPort(crt) {
+  private class Type3CartridgeExpansionPort(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     private[this] var controlRegister = true
 
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
@@ -292,7 +296,7 @@ object ExpansionPortFactory {
     }
   }
   
-  private class Type1CartridgeExpansionPort(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) extends CartridgeExpansionPort(crt) {
+  private class Type1CartridgeExpansionPort(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     private[this] var isActive = true
     private[this] var exportRAM = false
     private[this] val romh = Array.ofDim[Memory](4)
@@ -355,27 +359,27 @@ object ExpansionPortFactory {
     val crt = new Cartridge(crtName)
     crt.ctrType match {
       case 1 => new Type1CartridgeExpansionPort(crt,nmiAction,ram)
-      case 3 => new Type3CartridgeExpansionPort(crt, nmiAction)
-      case 0 => new CartridgeExpansionPort(crt)
-      case 4 => new SimonsBasicCartridgeExpansionPort(crt)
-      case 21 => new Comal80CartridgeExpansionPort(crt)
-      case 19 => new Type19CartridgeExpansionPort(crt)
-      case 17 => new Type17CartridgeExpansionPort(crt)
-      case 15 => new Type15CartridgeExpansionPort(crt)
-      case 16 => new Type16CartridgeExpansionPort(crt)
-      case 32 => new Type32CartridgeExpansionPort(crt)
-      case 5 => new Type5CartridgeExpansionPort(crt)
-      case 7 => new Type7CartridgeExpansionPort(crt)
-      case 8 => new Type8CartridgeExpansionPort(crt)
-      case 10 => new Type10CartridgeExpansionPort(crt)
-      case 13 => new Type13CartridgeExpansionPort(crt)
+      case 3 => new Type3CartridgeExpansionPort(crt, nmiAction,ram)
+      case 0 => new CartridgeExpansionPort(crt,ram)
+      case 4 => new SimonsBasicCartridgeExpansionPort(crt,ram)
+      case 21 => new Comal80CartridgeExpansionPort(crt,ram)
+      case 19 => new Type19CartridgeExpansionPort(crt,ram)
+      case 17 => new Type17CartridgeExpansionPort(crt,ram)
+      case 15 => new Type15CartridgeExpansionPort(crt,ram)
+      case 16 => new Type16CartridgeExpansionPort(crt,ram)
+      case 32 => new Type32CartridgeExpansionPort(crt,ram)
+      case 5 => new Type5CartridgeExpansionPort(crt,ram)
+      case 7 => new Type7CartridgeExpansionPort(crt,ram)
+      case 8 => new Type8CartridgeExpansionPort(crt,ram)
+      case 10 => new Type10CartridgeExpansionPort(crt,ram)
+      case 13 => new Type13CartridgeExpansionPort(crt,ram)
       case _ => throw new IllegalArgumentException(s"Unsupported cartridge type ${crt.ctrType} for ${crt.name}")
     }
   }
 
   def main(args: Array[String]) {
     val crt = new Cartridge(args(0))
-    println(crt.ctrType + " -> " + new CartridgeExpansionPort(crt))
+    println(crt.ctrType + " -> " + new CartridgeExpansionPort(crt,null))
   }
 
 }
