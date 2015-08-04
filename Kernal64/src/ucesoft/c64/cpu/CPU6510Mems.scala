@@ -9,6 +9,7 @@ import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 import ucesoft.c64.peripheral.c2n.Datassette
 import ucesoft.c64.Clock
+import ucesoft.c64.expansion.LastByteReadMemory
 
 object CPU6510Mems {
   final val M_ROML = 0x8000
@@ -73,6 +74,9 @@ object CPU6510Mems {
     val length = 0x10000
 
     private[this] val mem = Array.fill(length)(0xFF)
+    private[CPU6510Mems] var ULTIMAX = false
+    private[CPU6510Mems] var lastByteReadMemory : LastByteReadMemory = _
+    
     final val isActive = true
     def init {
       Log.info("Initialaizing RAM memory ...")
@@ -91,8 +95,15 @@ object CPU6510Mems {
       }
     }
     
-    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address & 0xFFFF)
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address & 0xFFFF) = value & 0xff    
+    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
+      if (ULTIMAX && chipID == ChipID.CPU) {
+        if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return lastByteReadMemory.lastByteRead
+      }
+      mem(address & 0xFFFF)
+    }
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+      mem(address & 0xFFFF) = value & 0xff
+    }
   }
   
   class COLOR_RAM extends RAMComponent {
@@ -164,6 +175,11 @@ object CPU6510Mems {
       ram.write(address,value,chipID)
     }
   }
+  
+  private case class MemConfig(basic:Boolean,roml:Boolean,romh:Boolean,char:Boolean,kernal:Boolean,io:Boolean,romhultimax:Boolean) {
+    override def toString = s"basic=${b2i(basic)} roml=${b2i(roml)} romh=${b2i(romh)} char=${b2i(char)} kernal=${b2i(kernal)} io=${b2i(io)} rom_ultimax=${b2i(romhultimax)}"
+    @inline private def b2i(b:Boolean) = if (b) "1" else "0"
+  }
 
   class MAIN_MEMORY extends RAMComponent with ExpansionPortConfigurationListener {
     val componentID = "Main RAM"
@@ -191,24 +207,27 @@ object CPU6510Mems {
     private[this] val minAddress = banksStart.min
 
     
-    private[this] var LORAM = true
-    private[this] var HIRAM = true
-    private[this] var CHAREN = true
     private[this] var ULTIMAX = false
-    private[this] var ddr,pr = 0
+    private[this] var ddr = 0
+    private[this] var pr = 0
     private[this] var lastCycle1Written6,lastCycle1Written7 = 0L
     private[this] val CAPACITOR_FADE_CYCLES = 200000
     private[this] var datassette : Datassette = _
+    private[this] var lastByteReadMemory : LastByteReadMemory = _
+    private[this] var memConfig = -1
+    private[this] val MEM_CONFIG = Array.ofDim[MemConfig](32)
     
     def getRAM : Memory = ram
     
     def setDatassette(datassette:Datassette) = this.datassette = datassette
+    def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory) = {
+      this.lastByteReadMemory = lastByteReadMemory
+      ram.lastByteReadMemory = lastByteReadMemory
+    }
     
     override def getProperties = {
       super.getProperties
-      properties.setProperty("LORAM",LORAM.toString)
-      properties.setProperty("HIRAM",HIRAM.toString)
-      properties.setProperty("CHAREN",CHAREN.toString)
+      properties.setProperty("Mem config",MEM_CONFIG(memConfig).toString)
       properties.setProperty("$0",Integer.toHexString(ddr))
       properties.setProperty("$1",Integer.toHexString(read0001))
       properties
@@ -222,67 +241,80 @@ object CPU6510Mems {
       if ((ddr & 0x40) == 0 && clk - lastCycle1Written6 > CAPACITOR_FADE_CYCLES) pr &= 0xBF
       // bit 7
       if ((ddr & 0x80) == 0 && clk - lastCycle1Written7 > CAPACITOR_FADE_CYCLES) pr &= 0x7F
-      var one = pr & 0xEF | playSense  | ((ddr & 0x7) ^ 0x7) // pull up resistors
+      var one = pr & 0xEF | playSense | ((ddr & 0x7) ^ 0x7) // pull up resistors
       if ((ddr & 0x20) == 0) one &= 0xDF
       one
     }
 
     @inline private def check0001 {
+      val pr = read0001
       // check tape motor
       datassette.setMotor((ddr & 0x20) > 0 && (pr & 0x20) == 0)
       datassette.setWriteLine((ddr & 0x08) > 0 && (pr & 0x08) > 0)
-      val _LORAM = LORAM
-      val _HIRAM = HIRAM
-      val _CHAREN = CHAREN
-      //Log.debug(s"ddr0=${Integer.toBinaryString(ddr0)} 01=${Integer.toBinaryString(one)} p=${Integer.toBinaryString(p)}")
-      LORAM = if ((ddr & 1) > 0) (pr & 1) == 1 else true
-      HIRAM = if ((ddr & 2) > 0) (pr & 2) == 2 else true
-      CHAREN = if ((ddr & 4) > 0) (pr & 4) == 4 else true
-      if (_LORAM != LORAM || _HIRAM != HIRAM || _CHAREN != CHAREN) {
-        Log.debug(s"Memory DDR=${Integer.toBinaryString(ddr)} PR=${Integer.toBinaryString(pr)}. LORAM=${LORAM} HIRAM=${HIRAM} CHAREN=${CHAREN}")
-        expansionPortConfigurationChanged(false,false) // values are ignored
-      }
-    }
-    
-    def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
       val expansionPort = ExpansionPort.getExpansionPort
       val EXROM = expansionPort.EXROM
       val GAME = expansionPort.GAME
-      Log.debug(s"Reconfiguring memory map: LORAM=${LORAM} HIRAM=${HIRAM} CHAREN=${CHAREN} EXROM=${EXROM} GAME=${GAME}")
+      expansionPortConfigurationChanged(GAME,EXROM)
+    }
+    
+    def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
+      val newMemConfig = (~ddr | pr) & 0x7 | (if (game) 1 << 3 else 0) | (if (exrom) 1 << 4 else 0)
+      if (memConfig == newMemConfig) return
       
-      // PLA implementation
-      val BASIC = LORAM && HIRAM && GAME	// p0
-      val KERNAL = (HIRAM && GAME) || (HIRAM && !EXROM && !GAME) // p1 || p2
-      val CHARROM = (HIRAM && !CHAREN && GAME) 				||	// p3 
-      				(LORAM && !CHAREN && GAME) 				||	// p4
-      				(HIRAM && !CHAREN && !EXROM && !GAME)	 	// p5. p6, p7 are omitted
-      val IO = (HIRAM && CHAREN && GAME)			||	// p10
-      		   (LORAM && CHAREN && GAME)			||  // p12
-      		   (HIRAM && CHAREN && !EXROM && !GAME)	||  // p14
-      		   (LORAM && CHAREN && !EXROM && !GAME)	|| 	// p16
-      		   (EXROM && !GAME)							// p18
-      
-      val ROML = (LORAM && HIRAM && !EXROM) || (EXROM && !GAME)	// p19, p20
-      val ROMH = (HIRAM && !EXROM && !GAME) || (EXROM && !GAME) // p21,p22
-      // enabling/disabling ROMs
-      BASIC_ROM.setActive(BASIC)
-      KERNAL_ROM.setActive(KERNAL)
-      CHAR_ROM.setActive(CHARROM)
-      this.IO.setActive(IO)
-      this.ROML.setActive(ROML)
-      if (ROMH) {
-        if (EXROM && !GAME) {
-          this.ROMH.setActive(false)
-          ROMH_ULTIMAX.setActive(true)
+      memConfig = newMemConfig
+      val mc = MEM_CONFIG(memConfig)
+      ULTIMAX = mc.romhultimax
+      ram.ULTIMAX = ULTIMAX
+      BASIC_ROM.setActive(mc.basic)
+      ROML.setActive(mc.roml)
+      ROMH.setActive(mc.romh)
+      CHAR_ROM.setActive(mc.char)
+      KERNAL_ROM.setActive(mc.kernal)
+      IO.setActive(mc.io)
+      ROMH_ULTIMAX.setActive(mc.romhultimax)
+    }
+    
+    private def initMemConfigs {
+      Log.info("Initializing main memory configurations ...")
+      for(m <- 0 to 31) {
+        val mc = m match {
+          case 31 => 
+            MemConfig(basic=true,roml=false,romh=false,char=false,kernal=true,io=true,romhultimax=false)
+          case 30|14 =>
+            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=true,io=true,romhultimax=false)
+          case 29|13 =>
+            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=true,romhultimax=false)
+          case 28|24 =>
+            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=false,romhultimax=false)
+          case 27 =>
+            MemConfig(basic=true,roml=false,romh=false,char=true,kernal=true,io=false,romhultimax=false)
+          case 26|10 =>
+            MemConfig(basic=false,roml=false,romh=false,char=true,kernal=true,io=false,romhultimax=false)
+          case 25|9 =>
+            MemConfig(basic=false,roml=false,romh=false,char=true,kernal=false,io=false,romhultimax=false)
+          case 23|22|21|20|19|18|17|16 =>
+            MemConfig(basic=false,roml=true,romh=false,char=false,kernal=false,io=true,romhultimax=true)
+          case 15 =>
+            MemConfig(basic=true,roml=true,romh=false,char=false,kernal=true,io=true,romhultimax=false)
+          case 12|8|4|0 =>
+            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=false,romhultimax=false)
+          case 11 =>
+            MemConfig(basic=true,roml=true,romh=false,char=true,kernal=true,io=false,romhultimax=false)
+          case 7 =>
+            MemConfig(basic=false,roml=true,romh=true,char=false,kernal=true,io=true,romhultimax=false)
+          case 6 =>
+            MemConfig(basic=false,roml=false,romh=true,char=false,kernal=true,io=true,romhultimax=false)
+          case 5 =>
+            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=true,romhultimax=false)
+          case 3 =>
+            MemConfig(basic=false,roml=true,romh=true,char=true,kernal=true,io=false,romhultimax=false)
+          case 2 =>
+            MemConfig(basic=false,roml=false,romh=true,char=true,kernal=true,io=false,romhultimax=false)
+          case 1 =>
+            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=false,romhultimax=false)
         }
-        else {
-          this.ROMH.setActive(true)
-          ROMH_ULTIMAX.setActive(false)
-        }
-      }
-      ULTIMAX = !GAME && EXROM
-      Log.debug(s"Memory configuration is: BASIC=${BASIC} KERNAL=${KERNAL} CHARROM=${CHARROM} IO=${IO} ROML=${ROML} ROMH=${ROMH} GAME=${GAME} EXROM=${EXROM}")
-      //println(s"Memory configuration is: BASIC=${BASIC} KERNAL=${KERNAL} CHARROM=${CHARROM} IO=${IO} ROML=${ROML} ROMH=${ROMH} GAME=${GAME} EXROM=${EXROM}")
+        MEM_CONFIG(m) = mc
+      }      
     }
 
     def init {
@@ -296,31 +328,33 @@ object CPU6510Mems {
       add(ROML)
       add(ROMH)
       add(ROMH_ULTIMAX)
+      
+      initMemConfigs
     }
     
     override def afterInitHook {
-      expansionPortConfigurationChanged(false,false) // values are ignored
+      check0001
     }
     
     def reset {
       Log.info("Resetting main memory...")
       ddr = 0
-      pr = 0
-      LORAM = true
-      HIRAM = true
-      CHAREN = true
+      pr = read0001
+      memConfig = -1
       ULTIMAX = false
-      expansionPortConfigurationChanged(false,false) // values are ignored
+      ram.ULTIMAX = false
+      check0001
     }
     
     @inline final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (isForwardRead) forwardReadTo.read(address)
       if (ULTIMAX) {
         if (chipID == ChipID.VIC) {
-          if (address >= 0x3000 && address < 0x4000) return ROMH_ULTIMAX.read(0xF000 + address - 0x3000,chipID)
-          if (address >= 0x7000 && address < 0x8000) return ROMH_ULTIMAX.read(0xF000 + address - 0x7000,chipID)
-          if (address >= 0xB000 && address < 0xC000) return ROMH_ULTIMAX.read(0xF000 + address - 0xB000,chipID)
-          if (address >= 0xF000 && address < 0x10000) return ROMH_ULTIMAX.read(0xF000 + address - 0xF000,chipID)
+          val bank = address & 0xF000
+          if (bank == 0x3000) return ROMH_ULTIMAX.read(0xF000 + address - 0x3000,chipID)
+          if (bank == 0x7000) return ROMH_ULTIMAX.read(0xF000 + address - 0x7000,chipID)
+          if (bank == 0xB000) return ROMH_ULTIMAX.read(0xF000 + address - 0xB000,chipID)
+          if (bank == 0xF000) return ROMH_ULTIMAX.read(0xF000 + address - 0xF000,chipID)
         }
       }
       if (chipID == ChipID.VIC) ram.read(address, chipID)
@@ -363,6 +397,7 @@ object CPU6510Mems {
       val bank = if (!found) ram else banks(b)
       //Log.debug("Writing to %s %4X = %2X".format(bank.name,address,value))      
       if (!found && address < 2) {
+        ram.write(address,lastByteReadMemory.lastByteRead)
         if (address == 0) {          
           val clk = Clock.systemClock.currentCycles
           if ((ddr & 0x80) == 0 && (value & 0x80) > 0) lastCycle1Written7 = clk
