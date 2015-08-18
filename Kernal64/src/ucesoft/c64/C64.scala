@@ -54,6 +54,9 @@ object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
   val c64 = new C64
   c64.run
+  if (args.length > 0) {
+    c64.handleDND(new File(args(0)))
+  }
 }
 
 class C64 extends C64Component with ActionListener with DriveLedListener with TraceListener {
@@ -649,15 +652,6 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   }
   
   private def baLow(low:Boolean) {
-    /*
-    if (cycles > baLowUntil) {
-      baLowUntil = cycles
-      baLow = true
-      if (cpuExact) cpu.setBaLow(true)
-      expansionPort.setBaLow(true)
-      //Log.fine(s"BA low until ${cycles}")
-    }
-    */
     baLow = low
     if (cpuExact) cpu.setBaLow(low)
     expansionPort.setBaLow(low)
