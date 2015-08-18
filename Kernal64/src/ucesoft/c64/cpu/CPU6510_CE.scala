@@ -1932,11 +1932,11 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       if (tracingOnFile && state == 0) tracingFile.println(formatDebug)
       
       CURRENT_OP_PC = PC
-      states(state)()
       if (tracingNow) {
-        syncObject.synchronized { syncObject.wait }
         stepCallBack(toString)
+        syncObject.synchronized { syncObject.wait }        
       }
+      states(state)()
     }
     0
   }
