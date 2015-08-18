@@ -83,6 +83,7 @@ class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timer
     properties.setProperty("Control register",Integer.toHexString(readCR))
     properties.setProperty("Started",started.toString)
     properties.setProperty("Counter",Integer.toHexString(counter))
+    properties.setProperty("Latch",Integer.toHexString(latch))
     properties.setProperty("One shot",oneShot.toString)
     properties.setProperty("Count external",countExternal.toString)
     properties
@@ -150,12 +151,12 @@ class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timer
     else 
     if (started && enabled) {
       systemClock.cancel(EVENT_ID)
-      reschedule(START_DELAY)
+      if (!countExternal) reschedule(START_DELAY)
     }
     else
     if (!enabled) {
       systemClock.cancel(EVENT_ID)
-      if (started && !countExternal && countSystemClock) counter -= (systemClock.currentCycles - startCycle).toInt
+      if (started && !countExternal && countSystemClock) counter = (counter - (systemClock.currentCycles - startCycle).toInt) & 0xFFFF      
     }
 
     started = enabled
