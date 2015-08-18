@@ -42,7 +42,10 @@ class Keyboard(keyMapper: KeyboardMapper = DefaultKeyboardMapper, nmiAction: (Bo
             case None => //Log.debug("Unknown char: " + e)
             case Some((key,shift)) =>
               Log.debug("Char pressed: " + KeyEvent.getKeyText(e.getKeyCode) + " loc:" + e.getKeyLocation)
-              if (key == RESTORE) nmiAction(true)
+              if (key == RESTORE) {
+                nmiAction(true)
+                nmiAction(false) // clears immediately NMI
+              }
               else { 
                 keysPressed += key
                 if (shift) keysPressed += CKey.L_SHIFT 
@@ -50,7 +53,10 @@ class Keyboard(keyMapper: KeyboardMapper = DefaultKeyboardMapper, nmiAction: (Bo
           }           
         case Some(key) =>
           Log.debug("Pressed: " + KeyEvent.getKeyText(e.getKeyCode) + " loc:" + e.getKeyLocation)
-          if (key == RESTORE) nmiAction(true)
+          if (key == RESTORE) {
+            nmiAction(true)
+            nmiAction(false) // clears immediately NMI
+          }
           else keysPressed += key
       }
     }
@@ -65,7 +71,7 @@ class Keyboard(keyMapper: KeyboardMapper = DefaultKeyboardMapper, nmiAction: (Bo
                 keysPressed -= key 
                 if (shift) keysPressed -= CKey.L_SHIFT
               }
-              else nmiAction(false)
+              //else nmiAction(false)
         }
       case Some(key) =>
         if (key != RESTORE) keysPressed -= key else nmiAction(false)
