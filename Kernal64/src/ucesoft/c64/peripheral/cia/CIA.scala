@@ -63,14 +63,15 @@ class CIA(val name:String,
     val componentID = name + " TOD"
     val componentType = C64ComponentType.CHIP 
     
-    case class Time(var h:Int,var m:Int,var s:Int,var ts:Int,var am:Boolean,var freezed:Boolean = false) {
-      def reset {
-        h = 0
-        m = 0
-        s = 0
-        ts = 0
-        am = true
-        freezed = false
+    case class Time(var h:Int,var m:Int,var s:Int,var ts:Int,var am:Boolean) {
+      var freezed = false
+      def reset(hh:Int,mm:Int,ss:Int,tss:Int,amm:Boolean,f:Boolean) {
+        h = hh
+        m = mm
+        s = ss
+        ts = tss
+        am = amm
+        freezed = f
       }
       
       def setFrom(t:Time) {
@@ -80,10 +81,19 @@ class CIA(val name:String,
         ts = t.ts
         am = t.am
       }
-
+      
       private def incBCD(value: Int) = {
         var c1 = value & 0x0F
         var c2 = (value & 0xF0) >> 4
+        if (c1 == 0xF) {
+          c1 = 0
+          c2 += 1
+        }
+        else
+        if (c1 >= 0xA) {
+          c1 += 1
+        }
+        else
         if (c1 < 9) c1 += 1
         else {
           c1 = 0
@@ -91,6 +101,7 @@ class CIA(val name:String,
         }
         (c2 << 4) | c1
       }
+      
       
       def tick {
         // ts
@@ -115,14 +126,18 @@ class CIA(val name:String,
           }
         }
       }
+      
+      @inline private def bcd2dec(value:Int) = "" + (((value & 0xF0) >> 4) + '0').toChar + ((value & 0x0F)  + '0').toChar
+      override def toString = s"${bcd2dec(h)}:${bcd2dec(m)}:${bcd2dec(s)}:${bcd2dec(ts)}"
     }
     
     private val actualTime = Time(0,0,0,0,true)
-    private val latchTime = Time(0,0,0,0,true)
+    private val latchTime = Time(1,0,0,0,true)
     private val alarmTime = Time(0,0,0,0,true)
     
     override def getProperties = {
       properties.setProperty("Time",actualTime.toString)
+      properties.setProperty("Latch",latchTime.toString)
       properties.setProperty("Alarm",alarmTime.toString)
       properties
     }
@@ -130,19 +145,24 @@ class CIA(val name:String,
     def init = reset
     
     def reset {
-      actualTime.reset
-      latchTime.reset
-      alarmTime.reset
-      Clock.systemClock.cancel(componentID)
-      Clock.systemClock.schedule(new ClockEvent(componentID,Clock.systemClock.nextCycles,tick _))
+      actualTime.reset(0,0,0,0,true,false)
+      latchTime.reset(1,0,0,0,true,true)
+      alarmTime.reset(0,0,0,0,true,true)
+      reschedule
     }
     
     def tick(cycles:Long) { // every 1/10 seconds
       // increment actual time if not freezed
-      if (!actualTime.freezed) actualTime.tick     
-      if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
+      if (!actualTime.freezed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
+      if (!actualTime.freezed) actualTime.tick      
       // reschedule tick
-      Clock.systemClock.schedule(new ClockEvent(componentID,Clock.systemClock.nextCycles + 100000,tick _))
+      reschedule
+    }
+    
+    @inline def reschedule = {
+      val clk = Clock.systemClock
+      clk.cancel(componentID)
+      clk.schedule(new ClockEvent(componentID,Clock.systemClock.nextCycles + 98524,tick _))
     }
     
     def readHour = {
@@ -178,25 +198,26 @@ class CIA(val name:String,
         alarmTime.m = min & 0x7F
       }
       else 
-      if (actualTime.freezed) actualTime.m = min & 0x7F    
+      actualTime.m = min & 0x7F    
     }
     def writeSec(sec:Int) {
       if ((timerB.readCR & 0x80) > 0) { // set alarm
         alarmTime.s = sec & 0x7F
       }
       else 
-      if (actualTime.freezed) actualTime.s = sec & 0x7F      
+      actualTime.s = sec & 0x7F      
     }
     def writeTenthSec(tsec:Int) {
       if ((timerB.readCR & 0x80) > 0) { // set alarm
         alarmTime.ts = tsec & 0x0F        
       }
-      else 
-      if (actualTime.freezed) {
+      else {
         actualTime.ts = tsec  & 0x0F
         actualTime.freezed = false
+        // reschedule tick
+        reschedule
       }
-      if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
+      //if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
     }
   }
       
@@ -224,9 +245,8 @@ class CIA(val name:String,
       case IRQ_FLAG => 16
       case _ => 0
     }
-    icr |= bit
-    if ((icrMask & bit) > 0) {
-      icr |= 0x80
+    icr |= 0x80 | bit
+    if ((icrMask & bit) > 0) {      
       Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
       irqAction(true)
     }
@@ -327,10 +347,6 @@ class CIA(val name:String,
       if ((icrMask & icr & 0x1f) != 0) {
         icr |= 0x80
         irqAction(true)
-      }
-      else {
-        icr &= 0x7F
-        //irqAction(false)
       }
       Log.debug(s"${name} ICR's value is ${Integer.toBinaryString(value)} => ICR = ${Integer.toBinaryString(icrMask)}")
     case CRA => timerA.writeCR(value)
