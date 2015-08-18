@@ -144,7 +144,7 @@ final class VIC(mem: Memory,
   private[this] var rc = 0 // row counter
   private[this] var vmli = 0 // video matrix line index
   private[this] var isInDisplayState = false // display or idle state
-  //private[this] var badLine = false
+  //private[this] var spriteCrunch = false
   private[this] var yscroll = 0 // y scroll value 0-7
   private[this] var xscroll = 0 // x scroll value 0-7
   private[this] var rsel = 0 // 1 => 25 rows, 0 => 24 rows
@@ -382,10 +382,14 @@ final class VIC(mem: Memory,
     final def displayable = display
 
     final def yexp_=(v: Boolean) {
-      if (!v && !expansionFF) { // sprite crunch
-        if (rasterCycle == 15) mcbase = (0x2A & (mcbase & mc)) | (0x15 & (mcbase | mc)) // patch from VIC-Addentum
+      if (!v && !expansionFF) {
+        if (rasterCycle == 15) mc = (0x2A & (mcbase & mc)) | (0x15 & (mcbase | mc)) // patch from VIC-Addendum, sprite crunch
         expansionFF = true
       }
+//      if (!v && !expansionFF) { // sprite crunch
+//        if (rasterCycle == 15) mcbase = (0x2A & (mcbase & mc)) | (0x15 & (mcbase | mc)) // patch from VIC-Addentum
+//        expansionFF = true
+//      }
       _yexp = v
     }
 
@@ -491,12 +495,12 @@ final class VIC(mem: Memory,
         }
         else {
           gdata |= (mem.read(memoryPointer + mc) & 0xFF) << 8
-          mc += 1
+          mc = (mc + 1) & 0x3F
           gdata |= (mem.read(memoryPointer + mc) & 0xFF)
           counter = 0
           hasPixels = false
         } 
-        mc += 1
+        mc = (mc + 1) & 0x3F
       }
       else 
       if (!first) mem.read(0x3FFF) // idle access
@@ -1122,7 +1126,7 @@ final class VIC(mem: Memory,
           // g-access
           drawCycle(readCharFromMemory)          
           vc = (vc + 1) & 0x3FF //% 1024
-          vmli += 1 
+          vmli = (vmli + 1) & 0x3F 
         }
         else drawCycle(mem.read(if (ecm) 0x39ff else 0x3fff))
       case 56 =>
