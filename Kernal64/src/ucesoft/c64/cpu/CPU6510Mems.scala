@@ -60,7 +60,14 @@ object CPU6510Mems {
 
   class BASIC_ROM(ram: Memory) extends ROM(ram, "BASIC", M_BASIC, 8192, "roms/basic.rom")
 
-  class KERNAL_ROM(ram: Memory) extends ROM(ram, "KERNAL", M_KERNAL, 8192, if (JIFFYDOS_ENABLED) "roms/JiffyDOS_C64_Kernal_6.01.rom" else "roms/kernal.rom")
+  class KERNAL_ROM(ram: Memory) extends ROM(ram, "KERNAL", M_KERNAL, 8192, if (JIFFYDOS_ENABLED) "roms/JiffyDOS_C64_Kernal_6.01.rom" else "roms/kernal.rom") {
+    override def getProperties = {
+      super.getProperties
+      properties.setProperty("Version",read(0xFF80).toString)
+      properties.setProperty("JiffyDOS",if (JIFFYDOS_ENABLED) "yes" else "no")
+      properties
+    }
+  }
   
   class CHARACTERS_ROM(ram: Memory) extends ROM(ram, "CHARACTERS", M_CHARACTERS, 4096, "roms/chargen.rom")
 
@@ -102,6 +109,9 @@ object CPU6510Mems {
       mem(address & 0xFFFF)
     }
     final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+      if (ULTIMAX && chipID == ChipID.CPU) {
+        if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return
+      }
       mem(address & 0xFFFF) = value & 0xff
     }
   }
@@ -171,8 +181,9 @@ object CPU6510Mems {
       else ram.read(address,chipID)
     }
     final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
-      //if (!getExpansionPort.isUltimax) ram.write(address,value,chipID)
-      ram.write(address,value,chipID)
+      val selectedROM = if (isROML) getExpansionPort.ROML else getExpansionPort.ROMH
+      if (selectedROM == null) ram.write(address,value,chipID)
+      else selectedROM.write(address,value)
     }
   }
   
@@ -210,8 +221,10 @@ object CPU6510Mems {
     private[this] var ULTIMAX = false
     private[this] var ddr = 0
     private[this] var pr = 0
+    private[this] var exrom,game = false
     private[this] var lastCycle1Written6,lastCycle1Written7 = 0L
-    private[this] val CAPACITOR_FADE_CYCLES = 200000
+    private[this] var capacitor6,capacitor7 = false
+    private[this] val CAPACITOR_FADE_CYCLES = 350000
     private[this] var datassette : Datassette = _
     private[this] var lastByteReadMemory : LastByteReadMemory = _
     private[this] var memConfig = -1
@@ -230,6 +243,11 @@ object CPU6510Mems {
       properties.setProperty("Mem config",MEM_CONFIG(memConfig).toString)
       properties.setProperty("$0",Integer.toHexString(ddr))
       properties.setProperty("$1",Integer.toHexString(read0001))
+      properties.setProperty("pr",Integer.toHexString(pr))
+      properties.setProperty("exrom",exrom.toString)
+      properties.setProperty("game",game.toString)
+      properties.setProperty("capacitor 6",capacitor6.toString)
+      properties.setProperty("capacitor 7",capacitor7.toString)
       properties
     }
     
@@ -238,9 +256,21 @@ object CPU6510Mems {
       val clk = Clock.systemClock.currentCycles
       // check bit 6 & 7
       // bit 6
-      if ((ddr & 0x40) == 0 && clk - lastCycle1Written6 > CAPACITOR_FADE_CYCLES) pr &= 0xBF
+      if (capacitor6) {
+        if (clk - lastCycle1Written6 > CAPACITOR_FADE_CYCLES) {
+          pr &= 0xBF
+          capacitor6 = false
+        }
+        //else pr |= 0x40
+      }
       // bit 7
-      if ((ddr & 0x80) == 0 && clk - lastCycle1Written7 > CAPACITOR_FADE_CYCLES) pr &= 0x7F
+      if (capacitor7) {
+        if (clk - lastCycle1Written7 > CAPACITOR_FADE_CYCLES) {
+          pr &= 0x7F
+          capacitor7 = false
+        }
+        //else pr |= 0x80
+      }
       var one = pr & 0xEF | playSense | ((ddr & 0x7) ^ 0x7) // pull up resistors
       if ((ddr & 0x20) == 0) one &= 0xDF
       one
@@ -258,6 +288,9 @@ object CPU6510Mems {
     }
     
     def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
+      this.game = game
+      this.exrom = exrom
+      
       val newMemConfig = (~ddr | pr) & 0x7 | (if (game) 1 << 3 else 0) | (if (exrom) 1 << 4 else 0)
       if (memConfig == newMemConfig) return
       
@@ -398,26 +431,30 @@ object CPU6510Mems {
       //Log.debug("Writing to %s %4X = %2X".format(bank.name,address,value))      
       if (!found && address < 2) {
         ram.write(address,lastByteReadMemory.lastByteRead)
-        if (address == 0) {          
+        if (address == 0) { // $00
           val clk = Clock.systemClock.currentCycles
-          if ((ddr & 0x80) == 0 && (value & 0x80) > 0) lastCycle1Written7 = clk
-          if ((ddr & 0x40) == 0 && (value & 0x40) > 0) lastCycle1Written6 = clk
+          if ((ddr & 0x80) > 0 && (value & 0x80) == 0 && !capacitor7) {
+            lastCycle1Written7 = clk
+            capacitor7 = true
+          }
+          //else capacitor7 = false
+          if ((value & 0x80) > 0 && capacitor7) capacitor7 = false
+          if ((value & 0x40) > 0 && capacitor6) capacitor6 = false
+          if ((ddr & 0x40) > 0 && (value & 0x40) == 0 && !capacitor6) {
+            lastCycle1Written6 = clk
+            capacitor6 = true
+          }
+          //else capacitor6 = false
           ddr = value
         }
-        else { 
-        //if (pr != value) {
-          val clk = Clock.systemClock.currentCycles
-          val bit7 = if ((ddr & 0x80) > 0) {
-            lastCycle1Written7 = clk
-            value & 0x80 
+        else { // $01
+          pr = value & 0x3F | (pr & 0xC0)
+          if ((ddr & 0x80) > 0) {
+            if ((value & 0x80) > 0) pr |= 0x80 else pr &= 0x7F
           }
-          else pr & 0x80
-          val bit6 = if ((ddr & 0x40) > 0) {
-            lastCycle1Written6 = clk
-            value & 0x40 
+          if ((ddr & 0x40) > 0) {
+            if ((value & 0x40) > 0) pr |= 0x40 else pr &= 0xBF
           }
-          else pr & 0x40
-          pr = bit7 | bit6 | value & 0x3F            
         }
         check0001
       }
