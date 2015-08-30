@@ -35,14 +35,13 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] val viaBus = new VIAIECBus(jackID, bus, IRQSwitcher.viaBusIRQ _, () => awake)
   private[this] val viaDisk = new VIADiskControl(cpu, IRQSwitcher.viaDiskIRQ _, ledListener)
   private[this] var cpuWaitUntil = 0L
-  private[this] var diskWaitUntil = 0L
   private[this] var running = true
   private[this] var awakeCycles = 0L
   private[this] var goSleepingCycles = 0L
   private[this] var tracing = false
   private[this] var canSleep = true
 
-  def setDriveReader(driveReader: D64) = viaDisk.setDriveReader(driveReader)
+  def setDriveReader(driveReader: Floppy) = viaDisk.setDriveReader(driveReader)
   override def setActive(active: Boolean) = viaBus.setEnabled(active)
   override def setCanSleep(canSleep: Boolean) {
     this.canSleep = canSleep
@@ -95,6 +94,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     isRunningListener(true)
     awakeCycles = 0
     goSleepingCycles = 0
+    cycleFrac = 0.0
+    cpuWaitUntil = 0
     if (ledListener != null) ledListener.turnOn
   }
   
@@ -151,10 +152,13 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   @inline private def checkPC(cycles: Long) {
     val pc = cpu.getPC
     if (pc == LOAD_ROUTINE) setFilename
-    else if (pc == FORMAT_ROUTINE) {
+    else 
+    if (pc == FORMAT_ROUTINE) {
       setFilename
       if (viaDisk.formatDisk) cpu.jmpTo(FORMAT_ROUTINE_OK) else cpu.jmpTo(FORMAT_ROUTINE_NOK)
-    } else if (pc == WAIT_LOOP_ROUTINE && canSleep && !mem.isChannelActive && !viaDisk.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
+    } 
+    else 
+    if (pc == WAIT_LOOP_ROUTINE && canSleep && !mem.isChannelActive && !viaDisk.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
       running = false      
       viaBus.setActive(false)
       viaDisk.setActive(false)
@@ -173,6 +177,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
           if (cycleFrac >= 1) {
             cycleFrac -= 1
             cpu.fetchAndExecute
+            viaDisk.clock(cycles)
+            viaBus.clock(cycles)
           }
         }
       } else {
@@ -188,9 +194,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
         }        
       }
       
-      if (cycles > diskWaitUntil) {
-        diskWaitUntil = cycles + viaDisk.clock(cycles)
-      }
+      viaDisk.clock(cycles)
+      viaBus.clock(cycles)
     } else if (cycles - goSleepingCycles > GO_SLEEPING_MESSAGE_CYCLES) {
       ledListener.endLoading
       goSleepingCycles = Long.MaxValue
