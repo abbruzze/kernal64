@@ -32,7 +32,7 @@ object CPU6510Mems {
 
     def init {
       Log.info(s"Initialaizing ${name} memory ...")
-      Option(getClass.getClassLoader.getResourceAsStream(resourceName)) match {
+      Option(ClassLoader.getSystemClassLoader.getResourceAsStream(resourceName)) match {
         case None => throw new IOException(s"Can't find resource ${resourceName} for ROM ${name}")
         case Some(in) =>
           val buffer = Array.ofDim[Byte](length)
