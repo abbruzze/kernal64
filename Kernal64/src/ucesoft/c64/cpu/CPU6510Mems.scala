@@ -57,10 +57,11 @@ object CPU6510Mems {
   // --------------------------------------
   
   private[this] val JIFFYDOS_ENABLED = System.getProperty("jiffydos") != null
+  private[this] val KERNAL_ROM = System.getProperty("kernal")
 
   class BASIC_ROM(ram: Memory) extends ROM(ram, "BASIC", M_BASIC, 8192, "roms/basic.rom")
 
-  class KERNAL_ROM(ram: Memory) extends ROM(ram, "KERNAL", M_KERNAL, 8192, if (JIFFYDOS_ENABLED) "roms/JiffyDOS_C64_Kernal_6.01.rom" else "roms/kernal.rom") {
+  class KERNAL_ROM(ram: Memory) extends ROM(ram, "KERNAL", M_KERNAL, 8192, if (KERNAL_ROM != null) KERNAL_ROM else if (JIFFYDOS_ENABLED) "roms/JiffyDOS_C64_Kernal_6.01.rom" else "roms/kernal.rom") {
     override def getProperties = {
       super.getProperties
       properties.setProperty("Version",read(0xFF80).toString)
