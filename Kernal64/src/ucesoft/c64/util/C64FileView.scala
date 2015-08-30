@@ -10,6 +10,8 @@ class C64FileView extends FileView {
   override def getTypeDescription(f:File) = {
     if (f.getName.toUpperCase.endsWith(".D64")) "Commodore 64 disk image"
     else
+    if (f.getName.toUpperCase.endsWith(".G64")) "Commodore 64 GCR disk image"
+    else
     if (f.getName.toUpperCase.endsWith(".T64")) "Commodore 64 tape image"
     else
     if (f.getName.toUpperCase.endsWith(".TAP")) "Commodore 64 raw tape image"
@@ -24,6 +26,7 @@ class C64FileView extends FileView {
   override def getIcon(f:File) = {
     val name = f.getName.toUpperCase
     if (name.endsWith(".D64") || 
+        name.endsWith(".G64") ||
         name.endsWith(".T64") || 
         name.endsWith(".PRG") || 
         name.endsWith(".CRT") ||

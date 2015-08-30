@@ -20,7 +20,7 @@ class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with 
     val prop = e.getPropertyName
     if (JFileChooser.SELECTED_FILE_CHANGED_PROPERTY.equals(prop)) {
       val file = e.getNewValue.asInstanceOf[File]
-      if (file != null) readDir(file)        
+      if (file != null && file.getName.toUpperCase.endsWith(".D64")) readDir(file)        
       else clear
       repaint()
     }
