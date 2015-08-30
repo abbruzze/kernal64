@@ -73,6 +73,7 @@
 		<copy todir="${dist.dir}/pack/kernal64">
 			<fileset dir="${basedir}/build" includes="*.bat *.sh"/>
 		</copy>
+		<mkdir dir="${dist.dir}/pack/kernal64/roms"/>
 		<zip destfile="${c64.install}" basedir="${dist.dir}/pack"/>
 		<delete dir="${dist.dir}/pack"/>
 	</target>
