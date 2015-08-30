@@ -2,7 +2,6 @@ package ucesoft.c64.peripheral.drive
 
 import ucesoft.c64.peripheral.bus.IECBus
 import ucesoft.c64.peripheral.bus.IECBusDevice
-import ucesoft.c64.formats.D64
 import ucesoft.c64.peripheral.bus.BusDataIterator
 import scala.collection.mutable.ListBuffer
 
@@ -17,7 +16,7 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
   
   def isDeviceReady = true
   def init {}
-  def setDriveReader(driveReader: D64) {}
+  def setDriveReader(driveReader: Floppy) {}
   
   protected def setStatus(code: Int) = status = code
   protected def sendStatus {
