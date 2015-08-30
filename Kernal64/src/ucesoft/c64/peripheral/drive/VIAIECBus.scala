@@ -17,6 +17,12 @@ class VIAIECBus(driveID:Int,
   private[this] var driveEnabled = true
   
   bus.registerListener(this)
+  ParallelCable.pcCallback = onCB1 _
+  
+  override def reset {
+    super.reset
+    data_out = IECBus.VOLTAGE
+  }
   
   def setEnabled(enabled:Boolean) = driveEnabled = enabled
   
@@ -30,10 +36,17 @@ class VIAIECBus(driveID:Int,
     }
   }
   
+  private def onCB1 = irq_set(IRQ_CB1)
+  
   override def read(address: Int, chipID: ChipID.ID) = address - startAddress match {
     case PA|PA2 =>
       super.read(address,chipID)
-      0xFF
+      if (ParallelCable.enabled) {
+        val r = ParallelCable.read & ~regs(DDRA)
+        if ((regs(PCR) & 0xE) == 0xA) ParallelCable.onCA2
+        r
+      }
+      else 0xFF
     case PB =>
       (super.read(address,chipID) & 0x1A) | bus.data | bus.clk << 2 | bus.atn << 7 | IDJACK << 5
       
@@ -53,6 +66,11 @@ class VIAIECBus(driveID:Int,
         bus.setLine(busid,IECBusLine.CLK,if (clock_out) IECBus.GROUND else IECBus.VOLTAGE)
         
         autoacknwoledgeData
+      case PA|PA2 =>
+        if (ParallelCable.enabled) {
+          ParallelCable.write(value)
+          if ((regs(PCR) & 0xE) == 0xA) ParallelCable.onCA2
+        }
       case _ =>
     }         
   }
