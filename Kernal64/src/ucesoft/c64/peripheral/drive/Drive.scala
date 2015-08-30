@@ -1,6 +1,5 @@
 package ucesoft.c64.peripheral.drive
 
-import ucesoft.c64.formats.D64
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 
@@ -11,7 +10,7 @@ trait Drive extends C64Component {
   def setActive(active:Boolean) {}
   def setCanSleep(canSleep:Boolean) {}
   def setIsRunningListener(listener: (Boolean) => Unit) = isRunningListener = listener
-  def setDriveReader(driveReader:D64)
+  def setDriveReader(driveReader:Floppy)
   def clock(cycles:Long)
   def changeCPU(cycleExact:Boolean) {}
   def setReadOnly(readOnly:Boolean) {}
