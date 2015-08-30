@@ -7,6 +7,7 @@ import ucesoft.c64.peripheral.bus.BusDataIterator
 import java.util.StringTokenizer
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps 
+import ucesoft.c64.peripheral.drive.Floppy
 
 object D64 {
   object FileType extends Enumeration {
@@ -74,7 +75,7 @@ object D64 {
   @inline private def absoluteSector(t: Int, s: Int) = (1 until t).foldLeft(0) { (acc, t) => acc + TRACK_ALLOCATION(t) } + s
 }
 
-class D64(val file: String,empty:Boolean = false) {
+class D64(val file: String,empty:Boolean = false) extends Floppy {
   import D64._
   private[this] val d64 = new RandomAccessFile(file, "rw")
   TOTAL_TRACKS // just to check for a valid track format
@@ -385,4 +386,82 @@ class D64(val file: String,empty:Boolean = false) {
     }
     dirs.toList
   }
+  
+  // --------------------- Floppy -------------------------
+  val isReadOnly = false
+  val totalTracks = TOTAL_TRACKS
+  
+  private[this] var track = 1
+  private[this] var sector = 0
+  private[this] var gcrSector = gcrImageOf(track, sector)
+  private[this] var sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
+  private[this] var gcrIndex,gcrIndexFromToWrite = 0
+  private[this] var sectorModified = false
+  private[this] var trackChangeListener : Floppy#TrackListener = null
+  private[this] var bit = 1
+  
+  def reset {
+    track = 1
+    sector = 0
+    gcrSector = gcrImageOf(track, sector)
+    sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
+    gcrIndex = 0
+    gcrIndexFromToWrite = 0
+    sectorModified = false
+    bit = 1
+  }
+  
+  def nextBit = {
+    val b = (gcrSector(gcrIndex) >> (8 - bit)) & 1
+    if (bit == 8) rotate else bit += 1
+    b
+  }
+  def writeByte(value:Int) {
+    gcrSector(gcrIndex) = value
+    sectorModified = true
+  }
+  def prepareToWrite = gcrIndexFromToWrite = gcrIndex + 1  
+  def canWrite = gcrIndex >= gcrIndexFromToWrite
+  
+  @inline private def rotate {
+    bit = 1
+    gcrIndex += 1
+    if (gcrIndex >= gcrSector.length) { // end of current sector
+      if (sectorModified) {
+        sectorModified = false
+        writeGCRSector(track,sector,gcrSector)
+      }
+      gcrIndex = 0
+      sector = (sector + 1) % sectorsPerCurrentTrack        
+      gcrSector = gcrImageOf(track, sector)      
+    }
+  }
+  
+  @inline def notifyTrackSectorChangeListener = if (trackChangeListener != null) trackChangeListener(track,false,Some(sector))
+  def currentTrack = track
+  def currentSector = Some(sector)
+  /**
+   * tracksteps & 1 == 0 are valid tracks, the others are half tracks not used
+   * in the D64 format.
+   */
+  def changeTrack(trackSteps:Int) {
+    val isOnTrack = (trackSteps & 1) == 0
+    if (isOnTrack) {
+      if (sectorModified) {
+        sectorModified = false
+        writeGCRSector(track,sector,gcrSector)
+      } 
+      track = trackSteps >> 1
+      sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
+      sector = 0   
+      bit = 1
+      gcrSector = gcrImageOf(track, sector)
+      gcrIndex = gcrIndex % gcrSector.length
+      notifyTrackSectorChangeListener
+    }
+  }
+  
+  def setTrackChangeListener(l:Floppy#TrackListener) = trackChangeListener = l
+  
+  override def toString = s"D64 fileName=$file totalTracks=$TOTAL_TRACKS t=$track s=$sector"
 }
