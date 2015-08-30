@@ -66,8 +66,8 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
 
   def init {}
 
-  def setDriveReader(driveReader: D64) {
-    this.driveReader = Some(driveReader)
+  def setDriveReader(driveReader: Floppy) {
+    this.driveReader = Some(driveReader.asInstanceOf[D64])
   }
 
   private def blinkLed(cycles: Long) {
