@@ -1,4 +1,4 @@
-kernal64 ver 1.0.0
+kernal64 ver 1.1.0
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
 
@@ -18,7 +18,7 @@ Here the main features:
 * Commodore 1351 mouse emulation
 * Light pen emulation
 * Datassette: full emulation using TAP file (read/write)
-* 1541 Drive: exact cycle emulation (read/write) using 6502 CPU (1Mhz). Supports D64 format only. In the Settings menù it's possible to turn off the full drive emulation and turn on the faster one.
+* 1541 Drive: exact cycle emulation (read/write) using 6502 CPU (1Mhz). Supports D64 (r/w) and G64 (read only). In the Settings menù it's possible to turn off the full drive emulation and turn on the faster one.
 * Local drive emulation on device 9: choose a local directory and let it your drive 9.
 * **Dropbox** drive emulation on device 9: connect your Dropbox account to Kernal64 and let access it using device 9!
 * Cartridges emulation (some CRT types are not emulated). Supports CRT format.
@@ -29,6 +29,8 @@ Here the main features:
 * Drag & Drop support
 * REU support (128,256,512,16M)
 * JiffyDOS support (use -Djiffydos environment variable)
+* Support for external roms, both for C1541 kernal and C64 kernal. The roms must be put in the roms directory. Use the switches -Dkernal=rom name and -D1541_kernal=rom name
+* Support for 1541-VIA1 <-> CIA2 parallel cable, used by many fastloaders. Tested on Speed Dos.
 * RS-232 3-way UserPort implementations useful to connect with BBS on internet. The Telnet implementation can be used to connect to a telnet server (like BBSs); the TCP implementation can be used to connect with a generic TCP/IP server. The File implementation can be used to read/write to local files.
 * RS-232 **SwiftLink** cartridge implementation. Tried with NovaTerm 9.6 and other terminal software. 
 * ... and more
