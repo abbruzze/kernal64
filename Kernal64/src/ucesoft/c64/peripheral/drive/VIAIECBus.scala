@@ -39,11 +39,11 @@ class VIAIECBus(driveID:Int,
   private def onCB1 = irq_set(IRQ_CB1)
   
   override def read(address: Int, chipID: ChipID.ID) = address - startAddress match {
-    case PA|PA2 =>
+    case ad@(PA|PA2) =>
       super.read(address,chipID)
       if (ParallelCable.enabled) {
         val r = ParallelCable.read & ~regs(DDRA)
-        if ((regs(PCR) & 0xE) == 0xA) ParallelCable.onCA2
+        if (ad == PA && (regs(PCR) & 0xE) == 0xA) ParallelCable.onCA2
         r
       }
       else 0xFF
@@ -66,10 +66,10 @@ class VIAIECBus(driveID:Int,
         bus.setLine(busid,IECBusLine.CLK,if (clock_out) IECBus.GROUND else IECBus.VOLTAGE)
         
         autoacknwoledgeData
-      case PA|PA2 =>
+      case ad@(PA|PA2) =>
         if (ParallelCable.enabled) {
           ParallelCable.write(value)
-          if ((regs(PCR) & 0xE) == 0xA) ParallelCable.onCA2
+          if (ad == PA && (regs(PCR) & 0xE) == 0xA) ParallelCable.onCA2
         }
       case _ =>
     }         
