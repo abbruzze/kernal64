@@ -6,12 +6,11 @@ package ucesoft.c64.peripheral.drive
 trait Floppy {
   type TrackListener = (Int,Boolean,Option[Int]) => Unit
   val isReadOnly : Boolean
+  val isFormattable : Boolean
   val totalTracks : Int
   
   def nextBit : Int
-  def writeByte(value:Int)
-  def prepareToWrite
-  def canWrite : Boolean
+  def writeNextBit(bit:Boolean)
   
   def currentTrack : Int
   def currentSector : Option[Int]
@@ -34,13 +33,12 @@ trait Floppy {
 
 object EmptyFloppy extends Floppy {
   val isReadOnly = false
+  val isFormattable = false
   val totalTracks = 42
   private[this] var track = 1
   
   def nextBit = 0
-  def writeByte(value:Int) {}
-  def prepareToWrite {}
-  def canWrite = false
+  def writeNextBit(bit:Boolean) {}
   
   def currentTrack = track
   def currentSector = None
