@@ -40,8 +40,12 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] var goSleepingCycles = 0L
   private[this] var tracing = false
   private[this] var canSleep = true
+  private[this] var useTRAPFormat = false
 
-  def setDriveReader(driveReader: Floppy) = viaDisk.setDriveReader(driveReader)
+  def setDriveReader(driveReader: Floppy) = {
+    useTRAPFormat = !driveReader.isFormattable
+    viaDisk.setDriveReader(driveReader)
+  }
   override def setActive(active: Boolean) = viaBus.setEnabled(active)
   override def setCanSleep(canSleep: Boolean) {
     this.canSleep = canSleep
@@ -153,7 +157,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     val pc = cpu.getPC
     if (pc == LOAD_ROUTINE) setFilename
     else 
-    if (pc == FORMAT_ROUTINE) {
+    if (pc == FORMAT_ROUTINE && useTRAPFormat) {
       setFilename
       if (viaDisk.formatDisk) cpu.jmpTo(FORMAT_ROUTINE_OK) else cpu.jmpTo(FORMAT_ROUTINE_NOK)
     } 
