@@ -1,6 +1,7 @@
 package ucesoft.c64.peripheral.drive
 
 trait DriveLedListener {
+  def writeMode(enabled:Boolean)
   def turnOn
   def turnOff
   def isOn : Boolean
