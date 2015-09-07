@@ -8,10 +8,7 @@ private[formats] object GCR {
   final private[this] val HEADER_SIZE = 10
   final private[this] val GAP = 0x55
   final private[this] val HEADER_DATA_GAP_SIZE = 9  
-  final private[this] val DATA_SIZE = 325
-  //final private[this] val GAP_AFTER_DATA_SIZE = 8
-  //final private[this] val GCR_SECTOR_SIZE = SYNC_SIZE + HEADER_SIZE + HEADER_DATA_GAP_SIZE + SYNC_SIZE + DATA_SIZE + GAP_AFTER_DATA_SIZE
-  
+  final private[this] val DATA_SIZE = 325  
   final private[this] val INTER_SECTOR_GAPS_PER_ZONE = Array(9, 12, 17, 8) 
   
   @inline private def getZoneFrom(track:Int) = {
@@ -26,10 +23,21 @@ private[formats] object GCR {
    */
   def GCR2sector(gcrSector:Array[Int]) = {
     val ungcr = new UNGCR
-    val base = SYNC_SIZE + HEADER_SIZE + HEADER_DATA_GAP_SIZE + SYNC_SIZE - 1
+    val headerUngcr = new UNGCR
+    var base = 0
+    // skip 0xFF
+    while (gcrSector(base) != 0xFF) base += 1
+    while (gcrSector(base) == 0xFF) base += 1
+    for(i <- 0 until HEADER_SIZE) headerUngcr.add(gcrSector(base + i))
+    base += HEADER_SIZE
+    // skip GAP
+    while (gcrSector(base) == GAP) base += 1
+    // skip 0xFF
+    while (gcrSector(base) != 0xFF) base += 1
+    while (gcrSector(base) == 0xFF) base += 1
     for(i <- 0 until DATA_SIZE) {
       ungcr.add(gcrSector(base + i))
-    }
+    }    
     val bytes = ungcr.getBytes
     val sector = Array.ofDim[Int](256)
     Array.copy(bytes,1,sector,0,256)
@@ -59,10 +67,10 @@ private[formats] object GCR {
     // DATA
     for(_ <- 1 to SYNC_SIZE) gcr.add(SYNC)
     gcr.addAndConvertToGCR(0x07)
-    var dataChecksum = -1
+    var dataChecksum = 0
     for(i <- 0 until sectorData.length) {
       val b = sectorData(i).toInt & 0xFF
-      if (dataChecksum == -1) dataChecksum = b else dataChecksum ^= b
+      if (dataChecksum == 0) dataChecksum = b else dataChecksum ^= b
       gcr.addAndConvertToGCR(b)
     }
     gcr.addAndConvertToGCR(dataChecksum)
@@ -80,10 +88,10 @@ private[formats]class UNGCR {
   private[this] var index = 0
   
   private[this] val GCR_TO_NIBBLE = Array(
-      -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, 0x08, 0x00, 0x01, -1, 0x0c, 0x04, 0x05,
-      -1, -1, 0x02, 0x03, -1, 0x0f, 0x06, 0x07,
-      -1, 0x09, 0x0a, 0x0b, -1, 0x0d, 0x0e, -1
+      0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0x08, 0x00, 0x01, 0, 0x0c, 0x04, 0x05,
+      0, 0, 0x02, 0x03, 0, 0x0f, 0x06, 0x07,
+      0, 0x09, 0x0a, 0x0b, 0, 0x0d, 0x0e, 0
   )
   
   private def gcr2Byte(b:Int) = GCR_TO_NIBBLE((b >> 5) & 0x1F) << 4 | GCR_TO_NIBBLE(b & 0x1F)
