@@ -110,6 +110,9 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   def writeGCRSector(t:Int,s:Int,gcrSector:Array[Int]) {
     GCRImage(t - 1)(s) = gcrSector
     val sector = GCR.GCR2sector(gcrSector)
+    val byteSector = Array.ofDim[Byte](sector.length)
+    for(i <- 0 until byteSector.length) byteSector(i) = sector(i).asInstanceOf[Byte]
+    val gsector = GCR.sector2GCR(s,t,byteSector,bam.diskID)
     // write on disk
     d64.seek(absoluteSector(t,s) * BYTES_PER_SECTOR)
     for(i <- 0 until sector.length) {
@@ -117,7 +120,9 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
     }
   }
   
-  def close = d64.close          
+  def close = {
+    d64.close
+  }
   
   def format(formatCmd:String) {
     // N[0]:<diskname>,id
@@ -389,13 +394,14 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   
   // --------------------- Floppy -------------------------
   val isReadOnly = false
+  val isFormattable = false
   val totalTracks = TOTAL_TRACKS
   
   private[this] var track = 1
   private[this] var sector = 0
   private[this] var gcrSector = gcrImageOf(track, sector)
   private[this] var sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
-  private[this] var gcrIndex,gcrIndexFromToWrite = 0
+  private[this] var gcrIndex = 0
   private[this] var sectorModified = false
   private[this] var trackChangeListener : Floppy#TrackListener = null
   private[this] var bit = 1
@@ -406,7 +412,6 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
     gcrSector = gcrImageOf(track, sector)
     sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
     gcrIndex = 0
-    gcrIndexFromToWrite = 0
     sectorModified = false
     bit = 1
   }
@@ -416,12 +421,12 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
     if (bit == 8) rotate else bit += 1
     b
   }
-  def writeByte(value:Int) {
-    gcrSector(gcrIndex) = value
+  def writeNextBit(value:Boolean) {
     sectorModified = true
+    val mask = 1 << (8 - bit)
+    if (value) gcrSector(gcrIndex) |= mask else gcrSector(gcrIndex) &= ~mask
+    if (bit == 8) rotate else bit += 1
   }
-  def prepareToWrite = gcrIndexFromToWrite = gcrIndex + 1  
-  def canWrite = gcrIndex >= gcrIndexFromToWrite
   
   @inline private def rotate {
     bit = 1
