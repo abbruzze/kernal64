@@ -49,9 +49,14 @@ class VIADiskControl(var cpu: CPU6510,
   private[this] var rotationCycleCounter = 0.0  
   private[this] var bitCounter = 0
   private[this] var last10Bits,lastRead = 0
+  private[this] var lastWrite = 0x55
   
   override def reset {
     super.reset
+    resetFloppy
+  }
+  
+  private def resetFloppy {
     isWriting = false
     isDiskChanged = true
     isDiskChanging = false
@@ -68,6 +73,7 @@ class VIADiskControl(var cpu: CPU6510,
     rotationCycleCounter = 0.0
     last10Bits = 0
     lastRead = 0
+    lastWrite = 0x55
   }
   
   override def getProperties = {
@@ -86,6 +92,7 @@ class VIADiskControl(var cpu: CPU6510,
   def setReadOnly(readOnly:Boolean) = isReadOnly = readOnly
 
   def setDriveReader(driveReader:Floppy) {
+    if (!motorOn) resetFloppy
     floppy = driveReader    
     // reset the last track
     floppy.changeTrack(trackSteps)
@@ -132,6 +139,10 @@ class VIADiskControl(var cpu: CPU6510,
     case PA|PA2 =>
       super.read(address, chipID)
       floppy.notifyTrackSectorChangeListener
+      regs(PCR) & 0x0E match {
+        case 0xA|0x08 => canSetByteReady = true
+        case _ =>
+      }
       //println(s"READ ${Integer.toHexString(headByte)} ${track}/${sector} gcrIndex=${gcrIndex}")
       lastRead
     case ofs => super.read(address, chipID)
@@ -139,13 +150,21 @@ class VIADiskControl(var cpu: CPU6510,
 
   override def write(address: Int, value: Int, chipID: ChipID.ID) {
     address - startAddress match {
+      case PA =>
+        regs(PCR) & 0x0E match {
+          case 0xA|0x08 => canSetByteReady = true
+          case _ =>
+        }      
       case PCR =>
-        canSetByteReady = (value & 2) > 0
-        if ((value & 0x20) == 0) {
-          isWriting = true
-          floppy.prepareToWrite
+        //canSetByteReady = (value & 2) > 0
+        canSetByteReady = (value & 0x0A) == 0x0A
+        value & 0x0E match {
+          case 0xE => canSetByteReady = true        // 111 => Manual output mode high
+          case 0xC => canSetByteReady = false       // 110 => Manual output mode low
+          case _ =>            
         }
-        else isWriting = false
+        isWriting = (value & 0x20) == 0
+        ledListener.writeMode(isWriting)
       case PB =>
         // led
         val ledOn = (value & 0x08) > 0
@@ -199,21 +218,28 @@ class VIADiskControl(var cpu: CPU6510,
     if (rotationCycleCounter >= 1) {
       bitCounter += 1
       rotationCycleCounter -= 1
-      val bit = floppy.nextBit
-      last10Bits = ((last10Bits << 1) | bit) & 0x3FF
-      if (!isWriting && last10Bits == 0x3FF) bitCounter = 0
-    }
-    if (bitCounter < 8) return
-    bitCounter = 0
-    
-    if (isWriting && floppy.canWrite) {    
-      floppy.writeByte(regs(PA))
-    }
-
-    if (isWriting || !isSync) {
-      byteReady = true
-      lastRead = last10Bits & 0xFF
-      irq_set(IRQ_CA1)
+      if (isWriting) { // WRITING
+        floppy.writeNextBit((lastWrite & 0x80) > 0)
+        lastWrite <<= 1        
+        if (bitCounter == 8) {
+          bitCounter = 0
+          lastWrite = regs(PA)
+          byteReady = true
+          irq_set(IRQ_CA1)
+        }
+      }
+      else { // READING
+        val bit = floppy.nextBit
+        last10Bits = ((last10Bits << 1) | bit) & 0x3FF
+        if (last10Bits == 0x3FF) bitCounter = 0
+        if (bitCounter == 8) {
+          bitCounter = 0
+          lastWrite = lastRead
+          byteReady = true
+          lastRead = last10Bits & 0xFF      
+          irq_set(IRQ_CA1)
+        }
+      }      
     }
   }
 
@@ -224,6 +250,11 @@ class VIADiskControl(var cpu: CPU6510,
       if (byteReady && canSetByteReady) {
         cpu.setOverflowFlag
         byteReady = false
+        regs(PCR) & 0x0E match {
+          case 0xA|0x08 => canSetByteReady = false
+          case _ =>
+        }         
+        //irq_set(IRQ_CA1)
       }
     }
   }
