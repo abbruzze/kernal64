@@ -51,6 +51,7 @@ import ucesoft.c64.peripheral.drive.DropboxDrive
 import ucesoft.c64.expansion.SwiftLink
 import ucesoft.c64.peripheral.drive.Floppy
 import ucesoft.c64.peripheral.drive.ParallelCable
+import ucesoft.c64.peripheral.drive.C1541Mems
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -65,7 +66,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "1.1.0"
+  private[this] val VERSION = "1.2.0"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -420,10 +421,14 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   
   // ------------- DRIVE LED & PROGRESS BAR -------------------
   private[this] var driveLedOn = false
+  private[this] var driveWriteMode = false
   
   private class DriveLed extends JComponent with C64Component {
     val componentID = "Drive led"
     val componentType = C64ComponentType.INTERNAL
+    private[this] val LED_OFF = Color.DARK_GRAY
+    private[this] val LED_READ_ON = Color.RED
+    private[this] val LED_WRITE_ON = Color.ORANGE
     
     setPreferredSize(new Dimension(15,15))
     override def paint(g:Graphics) {
@@ -431,7 +436,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
       val g2 = g.asInstanceOf[Graphics2D]
       g2.setColor(Color.BLACK)
       g2.drawRect(0,0,size.width - 1,size.height - 1)
-      g2.setColor(if (driveLedOn) Color.RED else Color.DARK_GRAY)
+      val color = if (driveLedOn) {
+        if (driveWriteMode) LED_WRITE_ON else LED_READ_ON
+      }
+      else Color.DARK_GRAY
+      g2.setColor(color)
       g2.fillRect(1,1,size.width - 1,size.height - 1)
     }   
     
@@ -463,6 +472,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     def endLoading {
       setVisible(false)
     }
+  }
+  
+  override def writeMode(enabled:Boolean) = {
+    driveWriteMode = enabled
+    driveLed.repaint()
   }
   
   override def isOn = driveLedOn
@@ -760,6 +774,16 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
       case "PARALLEL_CABLE" =>
         val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         ParallelCable.enabled = enabled
+      case "DISK_EXP_RAM_2000" =>
+        C1541Mems.RAM_EXP_2000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+      case "DISK_EXP_RAM_4000" =>
+        C1541Mems.RAM_EXP_4000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+      case "DISK_EXP_RAM_6000" =>
+        C1541Mems.RAM_EXP_6000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+      case "DISK_EXP_RAM_8000" =>
+        C1541Mems.RAM_EXP_8000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+      case "DISK_EXP_RAM_A000" =>
+        C1541Mems.RAM_EXP_A000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
       case "DISK_SPEED" =>
         diskSpeedDialog.setVisible(true)
       case "NO_PEN" =>
@@ -922,17 +946,21 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileView(new C64FileView)
+    fc.setDialogTitle("Save a .d64 or .g64 empty disk")
     fc.showSaveDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION => 
-        try {
-          val diskLabel = JOptionPane.showInputDialog(displayFrame,"Insert disk label", "New Disk label",JOptionPane.QUESTION_MESSAGE)
-          if (diskLabel != null) {
-            var emptyFile = fc.getSelectedFile.toString
-            if (!emptyFile.toUpperCase.endsWith(".D64")) emptyFile += ".d64"
-            val emptyD64 = new D64(emptyFile,true)
-            emptyD64.format(s"N:${diskLabel.toUpperCase},00")
-            emptyD64.close
-          }
+        try {          
+          var emptyFile = fc.getSelectedFile.toString
+          if (emptyFile.toUpperCase.endsWith(".G64")) G64.makeEmptyDisk(emptyFile)
+          else {
+            val diskLabel = JOptionPane.showInputDialog(displayFrame,"Insert disk label", "New Disk label",JOptionPane.QUESTION_MESSAGE)
+            if (diskLabel != null) {
+              if (!emptyFile.toUpperCase.endsWith(".D64")) emptyFile += ".d64"
+              val emptyD64 = new D64(emptyFile,true)
+              emptyD64.format(s"N:${diskLabel.toUpperCase},00")
+              emptyD64.close
+            }
+          }          
         }
         catch {
           case t:Throwable => 
@@ -1593,6 +1621,35 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     diskSpeedItem.setActionCommand("DISK_SPEED")
     diskSpeedItem.addActionListener(this)    
     diskItem.add(diskSpeedItem)
+    
+    val expRAMItem = new JMenu("RAM Expansion")
+    diskItem.add(expRAMItem)
+    
+    val ramExp2000Item = new JCheckBoxMenuItem("$2000-$3FFF enabled")
+    ramExp2000Item.setSelected(false)
+    ramExp2000Item.setActionCommand("DISK_EXP_RAM_2000")
+    ramExp2000Item.addActionListener(this)    
+    expRAMItem.add(ramExp2000Item)
+    val ramExp4000Item = new JCheckBoxMenuItem("$4000-$5FFF enabled")
+    ramExp4000Item.setSelected(false)
+    ramExp4000Item.setActionCommand("DISK_EXP_RAM_4000")
+    ramExp4000Item.addActionListener(this)    
+    expRAMItem.add(ramExp4000Item)
+    val ramExp6000Item = new JCheckBoxMenuItem("$6000-$7FFF enabled")
+    ramExp6000Item.setSelected(false)
+    ramExp6000Item.setActionCommand("DISK_EXP_RAM_6000")
+    ramExp6000Item.addActionListener(this)    
+    expRAMItem.add(ramExp6000Item)
+    val ramExp8000Item = new JCheckBoxMenuItem("$8000-$9FFF enabled")
+    ramExp8000Item.setSelected(false)
+    ramExp8000Item.setActionCommand("DISK_EXP_RAM_8000")
+    ramExp8000Item.addActionListener(this)    
+    expRAMItem.add(ramExp8000Item)
+    val ramExpA000Item = new JCheckBoxMenuItem("$A000-$BFFF enabled")
+    ramExpA000Item.setSelected(false)
+    ramExpA000Item.setActionCommand("DISK_EXP_RAM_A000")
+    ramExpA000Item.addActionListener(this)    
+    expRAMItem.add(ramExpA000Item)
     
     val busSnooperActiveItem = new JCheckBoxMenuItem("Bus snoop active")
     busSnooperActiveItem.setSelected(false)
