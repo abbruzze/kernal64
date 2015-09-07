@@ -19,18 +19,19 @@ object CPU6510Mems {
   final val COLOR_RAM = 0xD800
   final val SID_RAM = 0xD400
     
-  abstract class ROM(ram: Memory, val name: String, val startAddress: Int, val length: Int, resourceName: String) extends RAMComponent {
+  abstract class ROM(ram: Memory, val name: String, val startAddress: Int, val length: Int, val resourceName: String) extends RAMComponent {
     val componentID = "ROM " + name
     val componentType = C64ComponentType.MEMORY 
     
     val isRom = true
-    private[this] val mem = Array.fill(length)(0)
+    private[this] var mem : Array[Int] = _
     private[this] var active = false
     
     final def isActive = active
     def setActive(active:Boolean) = this.active = active
 
     def init {
+      mem = Array.fill(length)(0)
       Log.info(s"Initialaizing ${name} memory ...")
       Option(ClassLoader.getSystemClassLoader.getResourceAsStream(resourceName)) match {
         case None => throw new IOException(s"Can't find resource ${resourceName} for ROM ${name}")
