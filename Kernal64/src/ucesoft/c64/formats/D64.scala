@@ -352,17 +352,20 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
     var dirs = new ListBuffer[DirEntry]
     var readNextSector = true
     val buffer = Array.ofDim[Byte](0x20)
-    while (readNextSector) {
+    while (readNextSector) {      
       d64.seek(absoluteSector(t, s) * BYTES_PER_SECTOR)
       var firstEntryOfSector = true
       var entryIndex = 0
       var readNextEntry = true
       while (readNextEntry) {
         d64.read(buffer)
+        val nextT = buffer(0)
         entryIndex += 1
-        if (entryIndex == 9 || buffer.forall(_ == 0)) readNextEntry = false // last+1 entry of this sector
-        else {
-          val nextT = buffer(0)
+        if (entryIndex == 9 || buffer.forall(_ == 0)) {
+          readNextEntry = false // last+1 entry of this sector
+          if (nextT == 0) readNextSector = false
+        }
+        else {          
           val nextS = buffer(1)
           if (firstEntryOfSector) {
             firstEntryOfSector = false
