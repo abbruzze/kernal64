@@ -56,14 +56,14 @@ class TraceDialog private (displayFrame: JFrame,
       case Some(v) => v.setShowDebug(tracing)
       case None =>
     }
+    traceListener.step(regs => traceSR.setText(regs))
     traceListener.setTrace(tracing)
     if (!tracing) {
       traceListener.step(regs => traceSR.setText(regs))
       Log.setInfo 
     }
     else Log.setDebug
-    notrace.setText("Tracing " + (if (!tracing) "on" else "off"))
-    traceListener.step(regs => traceSR.setText(regs))
+    notrace.setText("Tracing " + (if (!tracing) "on" else "off"))    
   }
   
   def actionPerformed(e: ActionEvent) {
