@@ -53,9 +53,10 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   private[this] val suspendedLock = new Object
   
   // ------ PERFORMANCE MANAGEMENT -------------
-  final private[this] val C64_CLOCK_HZ = 985248.0
-  final private[this] val C64_CLOCK_HZ_DIV_1000 = 985248.0 / 1000
-  final private[this] val C64_CLOCK_HZ_INV_BY_1000 = 1000 / 985248.0
+  final private[this] val DEFAULT_CLOCK_HZ = 985248.0
+  private[this] var C64_CLOCK_HZ = DEFAULT_CLOCK_HZ
+  private[this] var C64_CLOCK_HZ_DIV_1000 = DEFAULT_CLOCK_HZ / 1000
+  private[this] var C64_CLOCK_HZ_INV_BY_1000 = 1000 / DEFAULT_CLOCK_HZ
   final private[this] val PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS = 1 * 1000
   
   private[this] var _maximumSpeed = false
@@ -65,6 +66,16 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   private[this] var lastPerformance = 0
   private[this] var throttleStartedAt = 0L
   // -------------------------------------------
+  
+  def setDefaultClockHz = setClockHz(DEFAULT_CLOCK_HZ)
+  
+  def setClockHzSpeedFactor(f:Double) = setClockHz(DEFAULT_CLOCK_HZ * f)
+  
+  def setClockHz(hz:Double) {
+    C64_CLOCK_HZ = hz
+    C64_CLOCK_HZ_DIV_1000 = hz / 1000
+    C64_CLOCK_HZ_INV_BY_1000 = 1000 / hz
+  }
   
   private[this] var cycles = 0L
   
