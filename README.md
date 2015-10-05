@@ -1,6 +1,9 @@
-kernal64 ver 1.2.0
+kernal64 ver 1.2.1
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
+
+###What's new in 1.2.1
+* Added support for **CP/M** cartdrige (see wiki for details)
 
 ###An almost full Scala Commodore 64 emulator
 
