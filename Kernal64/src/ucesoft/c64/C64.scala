@@ -66,7 +66,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "1.2.0"
+  private[this] val VERSION = "1.2.1"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -105,6 +105,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   private[this] var cpuWaitUntil = -1L
   private[this] val expansionPort = ExpansionPort.getExpansionPort
   // -------------------- TRACE ----------------
+  private[this] var cpuTracer : TraceListener = cpu
   private[this] var traceDialog : TraceDialog = _
   private[this] var diskTraceDialog : TraceDialog = _
   private[this] var inspectDialog : JDialog = _
@@ -543,7 +544,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     // -----------------------
     val bankedMemory = new vic.BankedMemory(mem,mem.CHAR_ROM,mem.COLOR_RAM)    
     ExpansionPort.setMemoryForEmptyExpansionPort(bankedMemory)
-    ExpansionPort.addConfigurationListener(bankedMemory)
+    ExpansionPort.addConfigurationListener(bankedMemory)    
     import cia._
     // control ports
     val cia1CP1 = new CIA1Connectors.PortAConnector(keyb,controlPortA)
@@ -630,7 +631,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   }
   
   override def afterInitHook {
-	inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)
+	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)    
   }
   
   private def errorHandler(t:Throwable) {
@@ -864,6 +865,12 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
         makeDisk
       case "RS232" =>
         manageRS232
+      case "CP/M" =>
+        ExpansionPort.getExpansionPort.eject
+        if (e.getSource.asInstanceOf[JRadioButtonMenuItem].isSelected) {
+          ExpansionPort.setExpansionPort(new ucesoft.c64.expansion.cpm.CPMCartridge(mem,setDMA _,setTraceListener _))
+        }
+        else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
       case "DEVICE9_DISABLED" =>
         device9DriveEnabled = false
       case "LOCAL_DRIVE_ENABLED" =>        
@@ -1170,7 +1177,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
           while (strpos < str.length) {
             val size = if (len < str.length - strpos) len else str.length - strpos            
             for(i <- 0 until size) {
-              val c = str.charAt(strpos)
+              val c = str.charAt(strpos).toUpper
               mem.write(631 + i,if (c != '\n') c else 0x0D)
               strpos += 1
             }
@@ -1659,12 +1666,17 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     
     optionMenu.addSeparator
     
+    val IOItem = new JMenu("I/O")
+    optionMenu.add(IOItem)
+    
+    optionMenu.addSeparator
+    
     val rs232Item = new JMenuItem("RS-232 ...")
     rs232Item.setActionCommand("RS232")
     rs232Item.addActionListener(this)    
-    optionMenu.add(rs232Item)
+    IOItem.add(rs232Item)
     
-    optionMenu.addSeparator
+    IOItem.addSeparator
     
     val reuItem = new JMenu("REU")
     val group5 = new ButtonGroup
@@ -1695,9 +1707,14 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     group5.add(reu16MItem)
     reuItem.add(reu16MItem)
     
-    optionMenu.add(reuItem)
+    IOItem.add(reuItem)
     
-    optionMenu.addSeparator
+    IOItem.addSeparator
+    
+    val cpmItem = new JRadioButtonMenuItem("CP/M Cartdrige")
+    cpmItem.setActionCommand("CP/M")
+    cpmItem.addActionListener(this)
+    IOItem.add(cpmItem)
     
     val cpuItem = new JMenu("CPU")
     val group4 = new ButtonGroup
@@ -1782,11 +1799,17 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   }
   
   // ------------------------------- TRACE LISTENER ------------------------------------------
-  def setTraceOnFile(out:PrintWriter,enabled:Boolean) = cpu.setTraceOnFile(out,enabled)
-  def setTrace(traceOn:Boolean) = cpu.setTrace(traceOn)
-  def step(updateRegisters: (String) => Unit) = cpu.step(updateRegisters)
-  def setBreakAt(breakType:BreakType,callback:(String) => Unit) = cpu.setBreakAt(breakType,callback)
-  def jmpTo(pc:Int) = cpu.jmpTo(pc)
+  def setTraceOnFile(out:PrintWriter,enabled:Boolean) = cpuTracer.setTraceOnFile(out,enabled)
+  def setTrace(traceOn:Boolean) = cpuTracer.setTrace(traceOn)
+  def step(updateRegisters: (String) => Unit) = cpuTracer.step(updateRegisters)
+  def setBreakAt(breakType:BreakType,callback:(String) => Unit) = cpuTracer.setBreakAt(breakType,callback)
+  def jmpTo(pc:Int) = cpuTracer.jmpTo(pc)
+  private def setTraceListener(tl:Option[TraceListener]) {
+    tl match {
+      case None => cpuTracer = cpu
+      case Some(t) => cpuTracer = t
+    }
+  }
   // -----------------------------------------------------------------------------------------
   
   def run {
