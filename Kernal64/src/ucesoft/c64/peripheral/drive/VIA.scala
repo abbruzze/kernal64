@@ -112,6 +112,12 @@ abstract class VIA(val name:String,
    * Ignores DDRA & DDRB. Subclasses are in charge for this check
    */
   def write(address: Int, value: Int, chipID: ChipID.ID) = address - startAddress match {
+    case DDRA =>
+      regs(DDRA) = value
+      write(startAddress + PA,regs(PA) | ~value,chipID)
+    case DDRB =>
+      regs(DDRB) = value
+      write(startAddress + PB,regs(PB) | ~value,chipID)
     case PA|PA2 =>
       irq_clr(IRQ_CA1 | IRQ_CA2)
       regs(PA) = value
