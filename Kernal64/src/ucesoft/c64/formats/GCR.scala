@@ -11,6 +11,13 @@ private[formats] object GCR {
   final private[this] val DATA_SIZE = 325  
   final private[this] val INTER_SECTOR_GAPS_PER_ZONE = Array(9, 12, 17, 8) 
   
+  final private[this] val DOS_20_HEADER_DESC_BYTE_NOT_FOUND = 2
+  final private[this] val DOS_21_NO_SYNC_SEQ_FOUND = 3
+  final private[this] val DOS_27_CHECKSUM_ERROR_IN_HEADER_BLOCK = 9
+  final private[this] val DOS_29_DISK_SECTOR_ID_MISMATCH = 0x0B
+  final private[this] val DOS_22_DATA_DESC_BYTE_NOT_FOUND = 4
+  final private[this] val DOS_23_CHECKSUM_ERROR_IN_DATA_BLOCK = 5
+  
   @inline private def getZoneFrom(track:Int) = {
     if (track <= 17) 0
     else if (track <= 24) 1
@@ -47,15 +54,17 @@ private[formats] object GCR {
   /**
    * Convert a whole sector to a GCR sector.
    */
-  def sector2GCR(sector:Int,track:Int,sectorData:Array[Byte],diskID:String) = {
+  def sector2GCR(sector:Int,track:Int,sectorData:Array[Byte],diskID:String,sectorError:Option[Int]) = {
+    val sectorErrorCode = sectorError.getOrElse(0)
     val gcr = new GCR
     // SYNC
     for(_ <- 1 to SYNC_SIZE) gcr.add(SYNC)
     // HEADER
-    val diskIDHi = diskID.charAt(0).toInt
+    val diskIDHi = if (sectorErrorCode == DOS_29_DISK_SECTOR_ID_MISMATCH) 0xFF else diskID.charAt(0).toInt
     val diskIDLo = diskID.charAt(1).toInt
-    val headerChecksum = sector ^ track ^ diskIDHi ^ diskIDLo
-    gcr.addAndConvertToGCR(0x08)
+    var headerChecksum = sector ^ track ^ diskIDHi ^ diskIDLo
+    if (sectorErrorCode == DOS_27_CHECKSUM_ERROR_IN_HEADER_BLOCK) headerChecksum ^= 0xFF
+    gcr.addAndConvertToGCR(if (sectorErrorCode == DOS_20_HEADER_DESC_BYTE_NOT_FOUND) 0x00 else 0x08)
     gcr.addAndConvertToGCR(headerChecksum)
     gcr.addAndConvertToGCR(sector)
     gcr.addAndConvertToGCR(track)
@@ -66,13 +75,14 @@ private[formats] object GCR {
     for(_ <- 1 to HEADER_DATA_GAP_SIZE) gcr.add(GAP)
     // DATA
     for(_ <- 1 to SYNC_SIZE) gcr.add(SYNC)
-    gcr.addAndConvertToGCR(0x07)
+    gcr.addAndConvertToGCR(if (sectorErrorCode == DOS_22_DATA_DESC_BYTE_NOT_FOUND) 0x00 else 0x07)
     var dataChecksum = 0
     for(i <- 0 until sectorData.length) {
-      val b = sectorData(i).toInt & 0xFF
+      val b = if (sectorErrorCode == DOS_21_NO_SYNC_SEQ_FOUND) 0 else sectorData(i).toInt & 0xFF
       if (dataChecksum == 0) dataChecksum = b else dataChecksum ^= b
       gcr.addAndConvertToGCR(b)
     }
+    if (sectorErrorCode == DOS_23_CHECKSUM_ERROR_IN_DATA_BLOCK) dataChecksum ^= 0xFF
     gcr.addAndConvertToGCR(dataChecksum)
     gcr.addAndConvertToGCR(0x00,0x00)
     // SECTOR-HEADER GAP

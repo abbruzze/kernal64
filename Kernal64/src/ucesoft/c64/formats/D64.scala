@@ -59,6 +59,8 @@ object D64 {
 
   private val DISK_SIZE_40_TRACKS = 196608
   private val DISK_SIZE_35_TRACKS = 174848
+  private val DISK_SIZE_35_TRACKS_WITH_ERRORS = 175531
+  private val DISK_SIZE_40_TRACKS_WITH_ERRORS = 197376
   
   private val BYTES_PER_SECTOR = 256
   private val DIR_TRACK = 18
@@ -71,13 +73,14 @@ object D64 {
       else if (t >= 25 && t <= 30) (t, 18)
       else (t, 17)
     }).toMap
-  val TOTAL_AVAILABLE_SECTORS = 664
-  @inline private def absoluteSector(t: Int, s: Int) = (1 until t).foldLeft(0) { (acc, t) => acc + TRACK_ALLOCATION(t) } + s
+  val TOTAL_AVAILABLE_SECTORS = 664  
 }
 
 class D64(val file: String,empty:Boolean = false) extends Floppy {
   import D64._
   private[this] val d64 = new RandomAccessFile(file, "rw")
+  private[this] val absoluteSectorCache = new collection.mutable.HashMap[Int,Int]
+  
   TOTAL_TRACKS // just to check for a valid track format
   private[this] val GCRImage = {
     val gcr = Array.ofDim[Array[Array[Int]]](TOTAL_TRACKS)
@@ -88,9 +91,21 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   }
   private[this] var _bam : BamInfo = if (!empty) bamInfo else null
   
+  @inline private def absoluteSector(t: Int, s: Int) = {
+    val cacheIndex = t << 8 | s
+    absoluteSectorCache get cacheIndex match {
+      case None =>
+        val pos = (1 until t).foldLeft(0) { (acc, t) => acc + TRACK_ALLOCATION(t) } + s
+        absoluteSectorCache += cacheIndex -> pos
+        pos
+      case Some(pos) =>
+        pos
+    }    
+  }
+  
   def TOTAL_TRACKS = d64.length match {
-    case DISK_SIZE_35_TRACKS => 35
-    case DISK_SIZE_40_TRACKS => 40
+    case DISK_SIZE_35_TRACKS|DISK_SIZE_35_TRACKS_WITH_ERRORS => 35
+    case DISK_SIZE_40_TRACKS|DISK_SIZE_40_TRACKS_WITH_ERRORS => 40
     case _ => if (empty) 35 else throw new IllegalArgumentException("Unsupported D64 file format. size is " + d64.length)
   }
   
@@ -102,17 +117,26 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   
   def gcrImageOf(t:Int,s:Int) = GCRImage(t - 1)(s)
   
+  @inline private def getSectorError(t:Int,s:Int) : Option[Int] = {
+    d64.length match {
+      case DISK_SIZE_35_TRACKS|DISK_SIZE_40_TRACKS => None
+      case DISK_SIZE_35_TRACKS_WITH_ERRORS =>
+        d64.seek(DISK_SIZE_35_TRACKS + absoluteSector(t,s))
+        Some(d64.read)
+      case DISK_SIZE_40_TRACKS_WITH_ERRORS =>
+        d64.seek(DISK_SIZE_40_TRACKS + absoluteSector(t,s))
+        Some(d64.read)
+    }
+  }
+  
   private def loadGCRImage {
     for(t <- 1 to TOTAL_TRACKS;
-    	s <- 0 until TRACK_ALLOCATION(t)) GCRImage(t - 1)(s) = GCR.sector2GCR(s,t,readBlock(t,s),bam.diskID)    
+    	s <- 0 until TRACK_ALLOCATION(t)) GCRImage(t - 1)(s) = GCR.sector2GCR(s,t,readBlock(t,s),bam.diskID,getSectorError(t,s))    
   }
   
   def writeGCRSector(t:Int,s:Int,gcrSector:Array[Int]) {
     GCRImage(t - 1)(s) = gcrSector
     val sector = GCR.GCR2sector(gcrSector)
-    val byteSector = Array.ofDim[Byte](sector.length)
-    for(i <- 0 until byteSector.length) byteSector(i) = sector(i).asInstanceOf[Byte]
-    val gsector = GCR.sector2GCR(s,t,byteSector,bam.diskID)
     // write on disk
     d64.seek(absoluteSector(t,s) * BYTES_PER_SECTOR)
     for(i <- 0 until sector.length) {
