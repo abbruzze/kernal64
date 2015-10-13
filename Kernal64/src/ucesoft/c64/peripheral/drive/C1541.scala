@@ -14,7 +14,7 @@ import ucesoft.c64.trace.BreakType
 import java.io.PrintWriter
 
 class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends TraceListener with Drive {
-  val componentID = "C1541 Disk Drive"
+  val componentID = "C1541 Disk Drive " + jackID
   override val MIN_SPEED_HZ = 985248
   override val MAX_SPEED_HZ = 1000000
   
@@ -46,20 +46,28 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     useTRAPFormat = !driveReader.isFormattable
     viaDisk.setDriveReader(driveReader)
   }
-  override def setActive(active: Boolean) = viaBus.setEnabled(active)
+  override def setActive(active: Boolean) = {
+    viaBus.setEnabled(active)
+    running = active
+    isRunningListener(active)
+  }
   override def setCanSleep(canSleep: Boolean) {
     this.canSleep = canSleep
     awake
   }
   private def awake {
-    if (!running) {
+//    if (!running) {
       running = true
       isRunningListener(true)
       viaBus.setActive(true)
       viaDisk.setActive(true)
       awakeCycles = clk.currentCycles
       viaDisk.awake
-    }
+//    }
+  }
+  
+  def disconnect {
+    bus.unregisterListener(viaBus)
   }
   
   override def setReadOnly(readOnly:Boolean) = viaDisk.setReadOnly(readOnly)
@@ -167,7 +175,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       viaBus.setActive(false)
       viaDisk.setActive(false)
       goSleepingCycles = cycles
-      ledListener.beginLoadingOf("Disk go sleeping...")
+      //ledListener.beginLoadingOf("Disk go sleeping...")
     }
   }
 

@@ -7,23 +7,23 @@ import java.awt.BorderLayout
 import ucesoft.c64.peripheral.drive.Drive
 
 object DriveSpeedSettingsPanel {
-  def getDialog(frame:JFrame,drive:Drive) = {
+  def getDialog(frame:JFrame,drives:Array[Drive]) = {
     val dialog = new JDialog(frame,"Drive Speed settings")
-    dialog.getContentPane.add("Center",new DriveSpeedSettingsPanel(drive))
+    dialog.getContentPane.add("Center",new DriveSpeedSettingsPanel(drives))
     dialog.pack
     dialog.setResizable(false)
     dialog
   }
 }
 
-class DriveSpeedSettingsPanel(drive:Drive) extends JPanel with ChangeListener {
+class DriveSpeedSettingsPanel(drives:Array[Drive]) extends JPanel with ChangeListener {
   private[this] val slider = new JSlider
-  private[this] val speed = new JLabel(drive.getSpeedHz.toString + " Hz",SwingConstants.CENTER)
+  private[this] val speed = new JLabel(drives(0).getSpeedHz.toString + " Hz",SwingConstants.CENTER)
   
-  slider.setMinimum(drive.MIN_SPEED_HZ)
-  slider.setMaximum(drive.MAX_SPEED_HZ)
+  slider.setMinimum(drives(0).MIN_SPEED_HZ)
+  slider.setMaximum(drives(0).MAX_SPEED_HZ)
   
-  slider.setValue(drive.getSpeedHz)
+  slider.setValue(drives(0).getSpeedHz)
   slider.addChangeListener(this)
   //slider.setPaintLabels(true)
   slider.setPaintTicks(true)
@@ -37,7 +37,7 @@ class DriveSpeedSettingsPanel(drive:Drive) extends JPanel with ChangeListener {
   add("North",speed)
   
   def stateChanged(e:ChangeEvent) = if (!slider.getValueIsAdjusting) {
-    drive.setSpeedHz(slider.getValue)
-    speed.setText(drive.getSpeedHz.toString + " Hz")
+    drives foreach { _.setSpeedHz(slider.getValue) }
+    speed.setText(drives(0).getSpeedHz.toString + " Hz")
   }
 }

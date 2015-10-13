@@ -62,11 +62,11 @@ object C64 extends App {
   }
 }
 
-class C64 extends C64Component with ActionListener with DriveLedListener with TraceListener {
+class C64 extends C64Component with ActionListener with TraceListener {
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "1.2.1"
+  private[this] val VERSION = "1.2.2"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -93,7 +93,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   }
   // -------------- MENU ITEMS -----------------
   private[this] val maxSpeedItem = new JCheckBoxMenuItem("Maximum speed")
-  private[this] val loadFileItem = new JMenuItem("Load file from attached disk ...")
+  private[this] val loadFileItems = Array(new JMenuItem("Load file from attached disk 8 ..."), new JMenuItem("Load file from attached disk 9 ..."))
   private[this] val tapeMenu = new JMenu("Tape control...")
   private[this] val detachCtrItem = new JMenuItem("Detach cartridge")
   private[this] val cartMenu = new JMenu("Cartridge")
@@ -113,21 +113,24 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   private[this] val busSnooper = new BusSnoop(bus)
   private[this] var busSnooperActive = false
   // -------------------- DISK -----------------
-  private[this] var isDiskActive = true
-  private[this] var attachedDisk : Option[Floppy] = None
-  private[this] val c1541 = new C1541Emu(bus,this)
-  private[this] val c1541_real = new C1541(0x00,bus,this)
-  private[this] var drive : Drive = c1541_real
-  private[this] var device9Drive : Drive = _
-  private[this] var device9DriveEnabled = false
-  private[this] val driveLed = new DriveLed
-  private[this] val diskProgressPanel = new DriveLoadProgressPanel
-  private[this] val diskSpeedDialog : JDialog = DriveSpeedSettingsPanel.getDialog(displayFrame,drive)
-  private[this] val floppyComponent = new C64Component {
-    val componentID = "Mounted floppy"
+  private[this] var isDiskActive,isDiskActive9 = true
+  private[this] var attachedDisks : Array[Option[Floppy]] = Array(None,None)
+  private[this] val driveLeds = Array(new DriveLed,new DriveLed)
+  private[this] val diskProgressPanels = Array(new DriveLoadProgressPanel,new DriveLoadProgressPanel)
+  private[this] val c1541 = new C1541Emu(bus,DriveLed8Listener)
+  private[this] val c1541_real = new C1541(0x00,bus,DriveLed8Listener)
+  private[this] val c1541_real9 = new C1541(0x01,bus,DriveLed9Listener)
+  private[this] var drives : Array[Drive] = Array(c1541_real,c1541_real9)
+  private[this] var device10Drive : Drive = _
+  private[this] var device10DriveEnabled = false
+  private[this] val diskSpeedDialog : JDialog = DriveSpeedSettingsPanel.getDialog(displayFrame,drives)
+  
+  private class FloppyComponent(device:Int,floppy: => Option[Floppy]) extends C64Component {
+    val componentID = "Mounted floppy " + device
     val componentType = C64ComponentType.FLOPPY
     
     override def getProperties = {
+      val attachedDisk = floppy
       properties.setProperty("Floppy",if (attachedDisk.isDefined) attachedDisk.get.toString else "-")
       properties.setProperty("Track",if (attachedDisk.isDefined) attachedDisk.get.currentTrack.toString else "-")
       properties.setProperty("Sector",if (attachedDisk.isDefined && attachedDisk.get.currentSector.isDefined) attachedDisk.get.currentSector.get.toString else "N/A")
@@ -136,7 +139,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     }
     
     def init {}
-    def reset = attachedDisk match {
+    def reset = floppy match {
       case Some(d) => d.reset
       case None =>
     }
@@ -421,12 +424,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   }
   
   // ------------- DRIVE LED & PROGRESS BAR -------------------
-  private[this] var driveLedOn = false
-  private[this] var driveWriteMode = false
-  
   private class DriveLed extends JComponent with C64Component {
     val componentID = "Drive led"
     val componentType = C64ComponentType.INTERNAL
+    var driveLedOn,driveWriteMode = false
+    
     private[this] val LED_OFF = Color.DARK_GRAY
     private[this] val LED_READ_ON = Color.RED
     private[this] val LED_WRITE_ON = Color.ORANGE
@@ -475,45 +477,54 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     }
   }
   
-  override def writeMode(enabled:Boolean) = {
-    driveWriteMode = enabled
-    driveLed.repaint()
-  }
-  
-  override def isOn = driveLedOn
-  
-  override def turnOn {
-    if (!driveLedOn) {
-      driveLedOn = true
-      driveLed.repaint()
+  private abstract class AbstractDriveLedListener(led:DriveLed,progress:DriveLoadProgressPanel) extends DriveLedListener {
+    override def writeMode(enabled:Boolean) = {
+      led.driveWriteMode = enabled
+      led.repaint()
+    }
+    
+    override def isOn = led.driveLedOn
+    
+    override def turnOn {
+      if (!led.driveLedOn) {        
+        led.driveLedOn = true
+        led.repaint()
+      }
+    }
+    override def turnOff {
+      if (led.driveLedOn) {
+        led.driveLedOn = false
+        led.repaint()
+      }    
+    }
+    
+    override def beginLoadingOf(fileName:String,indeterminate:Boolean=false) {
+      progress.setIndeterminate(indeterminate)
+      progress.beginLoading(fileName)
+    }
+    override def updateLoading(perc:Int) {
+      progress.updateValue(perc)
+    }
+    override def endLoading {
+      progress.endLoading
+    }
+    override def beginSavingOf(fileName:String) {
+      progress.beginLoading(fileName)
+      progress.setIndeterminate(true)
+    }
+    override def endSaving {
+      progress.endLoading
+      progress.setIndeterminate(false)
     }
   }
-  override def turnOff {
-    if (driveLedOn) {
-      driveLedOn = false
-      driveLed.repaint()
-    }    
+  
+  private object DriveLed8Listener extends AbstractDriveLedListener(driveLeds(0),diskProgressPanels(0))
+  
+  private object DriveLed9Listener extends AbstractDriveLedListener(driveLeds(1),diskProgressPanels(1)) {
+    driveLeds(1).setVisible(false)
   }
   
-  override def beginLoadingOf(fileName:String,indeterminate:Boolean=false) {
-    diskProgressPanel.setIndeterminate(indeterminate)
-    diskProgressPanel.beginLoading(fileName)
-  }
-  override def updateLoading(perc:Int) {
-    diskProgressPanel.updateValue(perc)
-  }
-  override def endLoading {
-    diskProgressPanel.endLoading
-  }
-  override def beginSavingOf(fileName:String) {
-    diskProgressPanel.beginLoading(fileName)
-    diskProgressPanel.setIndeterminate(true)
-  }
-  override def endSaving {
-    diskProgressPanel.endLoading
-    diskProgressPanel.setIndeterminate(false)
-  }
-    
+  
   def reset {
     baLowUntil = 0
     cpuWaitUntil = 0
@@ -540,7 +551,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     add(expansionPort)
     add(rs232)    
     rs232.setRS232Listener(rs232StatusPanel)
-    add(floppyComponent)
+    add(new FloppyComponent(8,attachedDisks(0)))
+    add(new FloppyComponent(9,attachedDisks(1)))
     // -----------------------
     val bankedMemory = new vic.BankedMemory(mem,mem.CHAR_ROM,mem.COLOR_RAM)    
     ExpansionPort.setMemoryForEmptyExpansionPort(bankedMemory)
@@ -595,17 +607,20 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     display.addMouseMotionListener(mouse)
     traceDialog = TraceDialog.getTraceDialog(displayFrame,mem,this,display,vicChip)
     diskTraceDialog = TraceDialog.getTraceDialog(displayFrame,c1541_real.getMem,c1541_real)
-    // drive led
-    add(driveLed)        
+    // drive leds
+    add(driveLeds(0))        
+    add(driveLeds(1))
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }
       displayFrame.setLocation(xy(0),xy(1))
     }    
     configureJoystick
     // drive
-    c1541_real.setIsRunningListener(diskRunning => isDiskActive = diskRunning)
+    c1541_real.setIsRunningListener(diskRunning => isDiskActive = diskRunning)    
+    c1541_real9.setIsRunningListener(diskRunning => isDiskActive9 = diskRunning)
     add(c1541)
-    add(c1541_real)    
+    add(c1541_real) 
+    add(c1541_real9)
     Log.setOutput(traceDialog.logPanel.writer)
     // tape
     datassette = new Datassette(cia1.setFlagLow _)
@@ -616,15 +631,21 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     
     // info panel
     val infoPanel = new JPanel(new BorderLayout)
-    val dummyPanel = new JPanel
+    val rowPanel = new JPanel(new BorderLayout(0,0))
+    val row1Panel = new JPanel(new FlowLayout(FlowLayout.RIGHT))
+    val row2Panel = new JPanel(new FlowLayout(FlowLayout.RIGHT))
+    rowPanel.add("North",row1Panel)
+    rowPanel.add("South",row2Panel)
     val tapePanel = new TapeState
     datassette.setTapeListener(tapePanel)
-    dummyPanel.add(rs232StatusPanel)
-    dummyPanel.add(tapePanel)
-    dummyPanel.add(tapePanel.progressBar)
-    dummyPanel.add(diskProgressPanel)
-    dummyPanel.add(driveLed)
-    infoPanel.add("East",dummyPanel)
+    row1Panel.add(rs232StatusPanel)
+    row1Panel.add(tapePanel)
+    row1Panel.add(tapePanel.progressBar)
+    row1Panel.add(diskProgressPanels(0))
+    row1Panel.add(driveLeds(0))
+    row2Panel.add(diskProgressPanels(1))
+    row2Panel.add(driveLeds(1))
+    infoPanel.add("East",rowPanel)
     displayFrame.getContentPane.add("South",infoPanel)
     displayFrame.setTransferHandler(DNDHandler)
     Log.info(sw.toString)
@@ -632,6 +653,8 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
   
   override def afterInitHook {
 	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)    
+    // deactivate drive 9
+    c1541_real9.setActive(false)
   }
   
   private def errorHandler(t:Throwable) {
@@ -662,8 +685,9 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     // VIC PHI1
     vicChip.clock(cycles)
     //DRIVES
-    if (isDiskActive) drive.clock(cycles)
-    if (device9DriveEnabled) device9Drive.clock(cycles)
+    if (isDiskActive) drives(0).clock(cycles)
+    if (isDiskActive9) drives(1).clock(cycles)
+    if (device10DriveEnabled) device10Drive.clock(cycles)
     // bus snoop
     if (busSnooperActive) busSnooper.clock(cycles)
     // printer
@@ -725,16 +749,17 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
         sid.setFullSpeed(maxSpeedItem.isSelected)
         clock.play
       case "ADJUSTRATIO" =>
-        val dim = display.asInstanceOf[java.awt.Component].getSize
-        dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).toInt
-        display.setPreferredSize(dim) 
-        displayFrame.pack
+        adjustRatio
       case "AUTORUN_DISK" =>
-        attachDisk(true)
-      case "ATTACH_DISK" =>
-        attachDisk(false)
-      case "LOAD_FILE" =>
-        loadFileFromAttachedFile(true)
+        attachDisk(0,true)
+      case "ATTACH_DISK_0" =>
+        attachDisk(0,false)
+      case "ATTACH_DISK_1" =>
+        attachDisk(1,false)
+      case "LOAD_FILE_0" =>
+        loadFileFromAttachedFile(0,true)
+      case "LOAD_FILE_1" =>
+        loadFileFromAttachedFile(1,true)
       case "JOY" =>
         joySettings
       case "PASTE" =>
@@ -758,20 +783,20 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
       case "SWAP_JOY" =>
         swapJoysticks
       case "DISK_RO" =>
-        drive.setReadOnly(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
+        drives foreach { _.setReadOnly(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) }
       case "DISK_TRUE_EMU" =>
         val trueEmu = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         bus.reset
-        drive.setActive(false)
-        drive = if (trueEmu) c1541_real 
+        drives(0).setActive(false)
+        drives(0) = if (trueEmu) c1541_real 
         else {
           isDiskActive = true
           c1541
         }
-        drive.setActive(true)
+        drives(0).setActive(true)
       case "DISK_CAN_GO_SLEEP" =>
         val canGoSleep = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        drive.setCanSleep(canGoSleep)
+        drives foreach { _.setCanSleep(canGoSleep) }
       case "PARALLEL_CABLE" =>
         val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         ParallelCable.enabled = enabled
@@ -871,46 +896,58 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
           ExpansionPort.setExpansionPort(new ucesoft.c64.expansion.cpm.CPMCartridge(mem,setDMA _,setTraceListener _))
         }
         else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
-      case "DEVICE9_DISABLED" =>
-        device9DriveEnabled = false
+      case "DEVICE10_DISABLED" =>
+        device10DriveEnabled = false
       case "LOCAL_DRIVE_ENABLED" =>        
-        device9Drive = new LocalDrive(bus,9)
-        device9DriveEnabled = true
+        device10Drive = new LocalDrive(bus,10)
+        device10DriveEnabled = true
         changeLocalDriveDir
       case "DROPBOX_DRIVE_ENABLED" =>
         checkDropboxDrive
+      case "DRIVE_9_ENABLED" =>
+        val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        c1541_real9.setActive(enabled)
+        driveLeds(1).setVisible(enabled)
+        adjustRatio
     }
   }
+  
+  private def adjustRatio {
+    val dim = display.asInstanceOf[java.awt.Component].getSize
+    dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).toInt
+    display.setPreferredSize(dim) 
+    displayFrame.pack
+  } 
   
   private def checkDropboxDrive {
     try {
       if (DropBoxAuth.isAccessCodeRequested(configuration)) {                 
-        device9Drive = new DropboxDrive(bus,DropBoxAuth.getDbxClient(configuration),9)
-        device9DriveEnabled = true
+        device10Drive = new DropboxDrive(bus,DropBoxAuth.getDbxClient(configuration),10)
+        device10DriveEnabled = true
       }
       else {
         if (DropBoxAuth.requestAuthorization(configuration,displayFrame)) {          
-          device9Drive = new DropboxDrive(bus,DropBoxAuth.getDbxClient(configuration),9)
-          device9DriveEnabled = true
+          device10Drive = new DropboxDrive(bus,DropBoxAuth.getDbxClient(configuration),10)
+          device10DriveEnabled = true
         }
       }
     }
     catch {
         case t:Throwable =>
           t.printStackTrace
-          device9DriveEnabled = false
+          device10DriveEnabled = false
           JOptionPane.showMessageDialog(displayFrame,t.toString, "Dropbox init error",JOptionPane.ERROR_MESSAGE)
       }
   }
   
   private def changeLocalDriveDir {
     val fc = new JFileChooser
-    fc.setCurrentDirectory(device9Drive.asInstanceOf[LocalDrive].getCurrentDir)
+    fc.setCurrentDirectory(device10Drive.asInstanceOf[LocalDrive].getCurrentDir)
     fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
     fc.setDialogTitle("Choose the current device 9 local directory")
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-        device9Drive.asInstanceOf[LocalDrive].setCurrentDir(fc.getSelectedFile)
+        device10Drive.asInstanceOf[LocalDrive].setCurrentDir(fc.getSelectedFile)
       case _ =>
     }
   }
@@ -984,7 +1021,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     cpu.initComponent
     cpuExact = cycleExact
     change(oldCpu,cpu)
-    drive.changeCPU(cycleExact)
+    drives foreach { _.changeCPU(cycleExact) }
     
     reset(true)
   }
@@ -997,7 +1034,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
       clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => {
         if (name.endsWith(".PRG")) loadPRGFile(file,true)
 	    else    
-	    if (name.endsWith(".D64") || name.endsWith(".G64")) attachDiskFile(file,true)
+	    if (name.endsWith(".D64") || name.endsWith(".G64")) attachDiskFile(0,file,true)
 	    else
 	    if (name.endsWith(".TAP")) attachTapeFile(file,true)
       })
@@ -1053,26 +1090,27 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     }
   }
   
-  private def attachDiskFile(file:File,autorun:Boolean) {
+  private def attachDiskFile(driveID:Int,file:File,autorun:Boolean) {
     try {      
       val isD64 = file.getName.toUpperCase.endsWith(".D64")
-      if (drive == c1541 && !isD64) {
+      if (drives(driveID) == c1541 && !isD64) {
         JOptionPane.showMessageDialog(displayFrame,"G64 format not allowed on a 1541 not in true emulation mode", "Disk attaching error",JOptionPane.ERROR_MESSAGE)
         return
       }
       val disk = if (isD64) new D64(file.toString) else new G64(file.toString)
-      attachedDisk match {
+      attachedDisks(driveID) match {
         case Some(oldDisk) => oldDisk.close
         case None =>
       }
-      attachedDisk = Some(disk)
-      drive.setDriveReader(disk)
-      loadFileItem.setEnabled(isD64)
+      attachedDisks(driveID) = Some(disk)
+      drives(driveID).setDriveReader(disk)
+            
+      loadFileItems(driveID).setEnabled(isD64)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
       if (autorun) {
         insertTextIntoKeyboardBuffer("LOAD\"*\",8,1" + 13.toChar + "RUN" + 13.toChar)
       }
-      driveLed.setToolTipText(disk.toString)
+      driveLeds(driveID).setToolTipText(disk.toString)
     }
     catch {
       case t:Throwable =>
@@ -1239,7 +1277,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     }
   }
   
-  private def attachDisk(autorun:Boolean) {
+  private def attachDisk(driveID:Int,autorun:Boolean) {
     val fc = new JFileChooser
     fc.setAccessory(new javax.swing.JScrollPane(new D64Canvas(fc,mem.CHAR_ROM)))
     fc.setFileView(new C64FileView)
@@ -1250,13 +1288,13 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     })
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-        attachDiskFile(fc.getSelectedFile,autorun)
+        attachDiskFile(driveID,fc.getSelectedFile,autorun)
       case _ =>
     }
   }
   
-  private def loadFileFromAttachedFile(relocate:Boolean) {
-    attachedDisk match {
+  private def loadFileFromAttachedFile(driveID:Int,relocate:Boolean) {
+    attachedDisks(driveID) match {
       case None =>
         JOptionPane.showMessageDialog(displayFrame,"No disk attached!", "Loading error",JOptionPane.ERROR_MESSAGE)
       case Some(floppy) =>
@@ -1385,15 +1423,24 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     autorunDiskItem.addActionListener(this)
     fileMenu.add(autorunDiskItem)
     
-    val attachDiskItem = new JMenuItem("Attach disk ...")
-    attachDiskItem.setActionCommand("ATTACH_DISK")
-    attachDiskItem.addActionListener(this)
-    fileMenu.add(attachDiskItem)
+    val attachDisk0Item = new JMenuItem("Attach disk 8...")
+    attachDisk0Item.setActionCommand("ATTACH_DISK_0")
+    attachDisk0Item.addActionListener(this)
+    fileMenu.add(attachDisk0Item)
+    
+    val attachDisk1Item = new JMenuItem("Attach disk 9...")
+    attachDisk1Item.setActionCommand("ATTACH_DISK_1")
+    attachDisk1Item.addActionListener(this)
+    fileMenu.add(attachDisk1Item)
         
-    loadFileItem.setEnabled(false)
-    loadFileItem.setActionCommand("LOAD_FILE")
-    loadFileItem.addActionListener(this)
-    fileMenu.add(loadFileItem)    
+    loadFileItems(0).setEnabled(false)
+    loadFileItems(0).setActionCommand("LOAD_FILE_0")
+    loadFileItems(0).addActionListener(this)
+    fileMenu.add(loadFileItems(0)) 
+    loadFileItems(1).setEnabled(false)
+    loadFileItems(1).setActionCommand("LOAD_FILE_1")
+    loadFileItems(1).addActionListener(this)
+    fileMenu.add(loadFileItems(1))
     fileMenu.addSeparator
     
     val loadPrgItem = new JMenuItem("Load PRG file from local disk ...")
@@ -1406,12 +1453,18 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     savePrgItem.addActionListener(this)
     fileMenu.add(savePrgItem)
     
-    val localDriveItem = new JMenu("Drive on device 9 ...")
+    val drive9EnabledItem = new JCheckBoxMenuItem("Drive 9 enabled")
+    drive9EnabledItem.setSelected(false)
+    drive9EnabledItem.setActionCommand("DRIVE_9_ENABLED")
+    drive9EnabledItem.addActionListener(this)
+    fileMenu.add(drive9EnabledItem)
+    
+    val localDriveItem = new JMenu("Drive on device 10 ...")
     fileMenu.add(localDriveItem)
     val group0 = new ButtonGroup
     val noLocalDriveItem = new JRadioButtonMenuItem("Disabled")
     noLocalDriveItem.setSelected(true)
-    noLocalDriveItem.setActionCommand("DEVICE9_DISABLED")
+    noLocalDriveItem.setActionCommand("DEVICE10_DISABLED")
     noLocalDriveItem.addActionListener(this)
     group0.add(noLocalDriveItem)
     localDriveItem.add(noLocalDriveItem)
@@ -1787,10 +1840,11 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
       val out = new FileWriter(propsFile)
       configuration.store(out, "C64 configuration file")
       out.close
-      attachedDisk match {
-        case Some(d64) => d64.close
-        case None =>
-      }
+      for(attachedDisk <- attachedDisks)
+        attachedDisk match {
+          case Some(d64) => d64.close
+          case None =>
+        }
     }
     catch {
       case io:IOException =>
@@ -1820,6 +1874,7 @@ class C64 extends C64Component with ActionListener with DriveLedListener with Tr
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
       displayFrame.setSize(dim(0),dim(1))
+      adjustRatio
     }
     displayFrame.setVisible(true)
     clock.play

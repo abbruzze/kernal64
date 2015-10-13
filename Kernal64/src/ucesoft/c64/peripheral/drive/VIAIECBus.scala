@@ -9,7 +9,7 @@ import ucesoft.c64.Clock
 
 class VIAIECBus(driveID:Int,
 				bus:IECBus,
-				irqAction:(Boolean) => Unit,atnOn: () => Unit) extends VIA("VIA_IECBus",0x1800,irqAction) with IECBusListener {
+				irqAction:(Boolean) => Unit,atnOn: () => Unit) extends VIA("VIA_IECBus" + driveID,0x1800,irqAction) with IECBusListener {
   override lazy val componentID = "VIA1 (Bus)"
   val busid = name
   private[this] val IDJACK = driveID & 0x03
@@ -17,7 +17,7 @@ class VIAIECBus(driveID:Int,
   private[this] var driveEnabled = true
   
   bus.registerListener(this)
-  ParallelCable.pcCallback = onCB1 _
+  if (driveID == 0) ParallelCable.pcCallback = onCB1 _
   
   override def reset {
     super.reset
@@ -41,7 +41,7 @@ class VIAIECBus(driveID:Int,
   override def read(address: Int, chipID: ChipID.ID) = address - startAddress match {
     case ad@(PA|PA2) =>
       super.read(address,chipID)
-      if (ParallelCable.enabled) {
+      if (driveID == 0 && ParallelCable.enabled) {
         val r = ParallelCable.read & ~regs(DDRA)
         if (ad == PA && (regs(PCR) & 0xE) == 0xA) ParallelCable.onCA2
         r
@@ -67,7 +67,7 @@ class VIAIECBus(driveID:Int,
         
         autoacknwoledgeData
       case ad@(PA|PA2) =>
-        if (ParallelCable.enabled) {
+        if (driveID == 0 && ParallelCable.enabled) {
           ParallelCable.write(value)
           if (ad == PA && (regs(PCR) & 0xE) == 0xA) ParallelCable.onCA2
         }
@@ -75,7 +75,7 @@ class VIAIECBus(driveID:Int,
     }         
   }
   
-  private def autoacknwoledgeData {
+  @inline private def autoacknwoledgeData {
     //val atna = (regs(DDRB) & 0x10) > 0 && (regs(PB) & 0x10) > 0
     val atna = ((~regs(DDRB) | regs(PB)) & 0x10) > 0
     val dataOut = (bus.atn == IECBus.GROUND) ^ atna
