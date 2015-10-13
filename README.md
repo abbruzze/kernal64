@@ -1,6 +1,11 @@
-kernal64 ver 1.2.1
+kernal64 ver 1.2.2
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
+
+###What's new in 1.2.2
+* Added support for for dual drive (device 9)
+* Moved to device 10 local driver and Dropbox support
+* Added D64 extended format with errors
 
 ###What's new in 1.2.1
 * Added support for **CP/M** cartridge (see wiki for details)
@@ -23,8 +28,8 @@ Here the main features:
 * Datassette: full emulation using TAP file (read/write)
 * 1541 Drive: exact cycle emulation (read/write) using 6502 CPU (1Mhz). Supports D64 and G64. In the Settings menù it's possible to turn off the full drive emulation and turn on the faster one.
   Only the G64 format can be formatted by Dos, while for the D64, the emulator intercepts the format routine call and bypasses it, using a pre-formatted empty disk.
-* Local drive emulation on device 9: choose a local directory and let it your drive 9.
-* **Dropbox** drive emulation on device 9: connect your Dropbox account to Kernal64 and let access it using device 9!
+* Local drive emulation on device 10: choose a local directory and let it your drive 10.
+* **Dropbox** drive emulation on device 10: connect your Dropbox account to Kernal64 and let access it using device 10!
 * Cartridges emulation (some CRT types are not emulated). Supports CRT format.
 * MPS803 printer emulation. Preview panel updated while printing.
 * Fast program loading of PRG/T64 local file or D64's file entry.
