@@ -136,12 +136,14 @@ class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timer
 
   protected def handleCR567 {}
   
+  private[this] val underflowCallback = underflow _
+  
   @inline private def reschedule(delay:Int) {
     val cycles = systemClock.currentCycles
     startCycle = cycles + delay
     val zeroCycle = startCycle + latch
     
-    systemClock.schedule(new ClockEvent(EVENT_ID,zeroCycle, underflow _))
+    systemClock.schedule(new ClockEvent(EVENT_ID,zeroCycle,underflowCallback))
   }
 
   private def enableTimer(enabled: Boolean) {

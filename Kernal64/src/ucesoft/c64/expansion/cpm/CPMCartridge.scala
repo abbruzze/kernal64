@@ -47,7 +47,7 @@ class CPMCartridge(mem:Memory,
     setDMA(on)
     if (on && !z80Active) {
       z80Active = true
-      clk.schedule(new ClockEvent("Z80 clock",clk.nextCycles,z80Clock _))
+      clk.schedule(new ClockEvent("Z80 clock",clk.nextCycles,z80ClockCallback))
       traceListener(Some(z80))
       //clk.setClockHzSpeedFactor(3)
     }
@@ -76,8 +76,10 @@ class CPMCartridge(mem:Memory,
     }
   }
   
+  private[this] val z80ClockCallback = z80Clock _
+  
   private def z80Clock(cycles:Long) {
     z80.clock(cycles,2)
-    if (z80Active) clk.schedule(new ClockEvent("Z80 clock",clk.nextCycles,z80Clock _))
+    if (z80Active) clk.schedule(new ClockEvent("Z80 clock",clk.nextCycles,z80ClockCallback))
   }
 }

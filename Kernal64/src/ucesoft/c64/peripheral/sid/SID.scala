@@ -69,6 +69,8 @@ class SID extends Chip with SIDDevice {
     }    
   }
   
+  private[this] val sidEventCallBack = sidEvent _
+  
   private def sidEvent(cycles:Long) {
     var nextSample = cycles + CLOCKS_PER_SAMPLE
     nextRest += CLOCKS_PER_SAMPLE_REST
@@ -89,12 +91,12 @@ class SID extends Chip with SIDDevice {
       pos = 0
     }
     
-    if (!removeSample) Clock.systemClock.schedule(new ClockEvent("SID",nextSample,sidEvent _))
+    if (!removeSample) Clock.systemClock.schedule(new ClockEvent("SID",nextSample,sidEventCallBack))
   }
   
   def stop = removeSample = true
   def start {
-    Clock.systemClock.schedule(new ClockEvent("SID",Clock.systemClock.currentCycles + 5,sidEvent _))
+    Clock.systemClock.schedule(new ClockEvent("SID",Clock.systemClock.currentCycles + 5,sidEventCallBack))
     lastCycles = Clock.systemClock.currentCycles
     nextRest = 0
     pos = 0
