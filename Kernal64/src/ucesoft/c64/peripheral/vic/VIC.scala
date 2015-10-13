@@ -620,7 +620,7 @@ final class VIC(mem: Memory,
       reset
     }
     final def reset = firstPixel = true
-    @inline final protected def shift = {
+    @inline private def shift = {
       var pixel = if (isInvalidMode || isBlank || gdata < 0) PIXEL_BLACK
       else if (!bmm) { // text mode        
         val mc = (vml_c(vmli) & 8) == 8
