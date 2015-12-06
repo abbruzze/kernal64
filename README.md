@@ -1,9 +1,12 @@
-kernal64 ver 1.2.2
+kernal64 ver 1.2.3
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
 
+###What's new in 1.2.3 (Dic 6th 2015)
+* Added support for EasyFlash cart: eprom flashing is not emulated
+
 ###What's new in 1.2.2
-* Added support for for dual drive (device 9)
+* Added support for dual drive (device 9)
 * Moved to device 10 local driver and Dropbox support
 * Added D64 extended format with errors
 
