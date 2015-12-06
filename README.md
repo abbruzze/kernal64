@@ -7,7 +7,7 @@ kernal64 ver 1.2.3
 
 ###What's new in 1.2.2
 * Added support for dual drive (device 9)
-* Moved to device 10 local driver and Dropbox support
+* Local driver and Dropbox support moved to device 10 
 * Added D64 extended format with errors
 
 ###What's new in 1.2.1
