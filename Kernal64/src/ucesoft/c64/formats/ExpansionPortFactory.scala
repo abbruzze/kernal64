@@ -19,7 +19,9 @@ object ExpansionPortFactory {
           else data(address - startAddress)
         } else data(address - startAddress)
       }
-      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) { ram.write(address,value,chipID) }
+      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+        ram.write(address,value,chipID)
+      }
       override def toString = s"ROM(${name})[startAddress=${Integer.toHexString(startAddress)} length=${length}]"
     }
     val name = crt.name
@@ -233,26 +235,39 @@ object ExpansionPortFactory {
       }
     }
   }
+  
   private class Type32CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     private[this] val io2mem = Array.ofDim[Int](256)
+    
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
-      val target = startAddress - address
-      if (target == 0) {
-        (if (exrom) 2 else 0) | (if (game) 1 else 0)
-      } else if (target >= 0x100) io2mem(target - 0x100)
-      else 0
+      if (address >= 0xDF00) io2mem(address - 0xDF00) else 0
     }
+    
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
-      val target = startAddress - address
-      if (target == 0) {
-        exrom = (value & 2) == 2
-        game = (value & 1) == 1
-        println("Changed exrom & game: " + value)
-        notifyMemoryConfigurationChange
-      } else if (target == 2) {
-        romlBankIndex = value
-        romhBankIndex = value
-      } else if (target >= 0x100) io2mem(target - 0x100) = value
+      if (address >= 0xDF00) io2mem(address - 0xDF00) = value
+      else {
+        if ((address & 2) == 0) {//(address == 0xDE00) {
+          val bank = value & 0x3F
+          //println(s"Selecting bank $bank")
+          romlBankIndex = bank
+          romhBankIndex = bank
+        }
+        else 
+        /*if (address == 0xDE02)*/ {
+          //println(s"EasyFlash Control = $value")
+          val gameControlledViaBit0 = (value & 4) == 4
+          exrom = (value & 2) == 0
+          game = if (gameControlledViaBit0) (value & 1) == 0 else false
+          notifyMemoryConfigurationChange
+        }
+      }
+    }
+    
+    override def reset {
+      game = crt.GAME
+      exrom = crt.EXROM
+      romlBankIndex = 0
+      romhBankIndex = 0
     }
   }
 
