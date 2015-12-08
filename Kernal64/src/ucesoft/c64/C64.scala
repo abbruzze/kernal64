@@ -1151,8 +1151,9 @@ class C64 extends C64Component with ActionListener with TraceListener {
   
   private def zoom(f:Double) {
     val dim = new Dimension((vicChip.VISIBLE_SCREEN_WIDTH * f).toInt,(vicChip.VISIBLE_SCREEN_HEIGHT * f).toInt)
-    display.setPreferredSize(dim) 
-    displayFrame.invalidate
+    display.setPreferredSize(dim)
+    display.invalidate
+    display.repaint()
     displayFrame.pack
   }
   
