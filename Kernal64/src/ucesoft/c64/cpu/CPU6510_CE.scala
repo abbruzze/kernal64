@@ -67,6 +67,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     if (tracing) Log.debug(s"IRQ request low=${low}")
     if (tracingOnFile && low) tracingFile.println("IRQ low")
     irqLow = low
+    if (!irqLow) irqFirstCycle = 0
     if (irqLow && irqFirstCycle == 0) irqFirstCycle = clk.currentCycles
   }
   final def nmiRequest(low: Boolean) {
@@ -76,6 +77,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       if (tracing) Log.debug("NMI request on negative edge")
       if (tracingOnFile && low) tracingFile.println("NMI low")
     }
+    else nmiFirstCycle = 0
     nmiLow = low
   }
 
@@ -117,6 +119,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     properties.setProperty("Y", hex2(Y))
     properties.setProperty("S", hex2(SP))
     properties.setProperty("NV#BDIZC", sr2String)
+    properties.setProperty("irqFirstCycle",irqFirstCycle.toString)
     properties
   }
 
