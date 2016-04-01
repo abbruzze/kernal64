@@ -43,9 +43,7 @@ class IECBus extends C64Component {
   }
   
   final def unregisterListener(l:IECBusListener) {
-    println("Before: " + lines)
     lines = lines filterNot { s => s.listener == l }
-    println("After: " + lines)
   }
   
   final def registerListener(l:IECBusListener) {
