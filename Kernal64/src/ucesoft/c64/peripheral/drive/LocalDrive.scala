@@ -43,9 +43,10 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   }
     
   override protected def loadData(fileName: String) : Option[BusDataIterator] = {
-    if (fileName == "$") return Some(loadDirectory(currentDir.toString,currentDir.getName))
-
-    val found = currentDir.listFiles find { f => D64.fileNameMatch(fileName,f.getName.toUpperCase) }
+    if (fileName.startsWith("$")) return Some(loadDirectory(currentDir.toString,currentDir.getName))
+    val dp = fileName.indexOf(":")
+    val fn = if (dp != -1) fileName.substring(dp + 1) else fileName
+    val found = currentDir.listFiles find { f => D64.fileNameMatch(fn,f.getName.toUpperCase) }
     found match {
       case Some(file) =>
         val buffer = Array.ofDim[Byte](file.length.toInt)
@@ -135,6 +136,8 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
       if (newDir.isDirectory) currentDir = newDir
       else setStatus(STATUS_IO_ERROR)
     }
+    else
+    if (command.startsWith("I")) { setStatus(STATUS_OK)/* do nothing */ }
     else setStatus(STATUS_SYNTAX_ERROR)
   }
 }
