@@ -1,6 +1,9 @@
-kernal64 ver 1.2.3
+kernal64 ver 1.2.4
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
+
+###What's new in 1.2.4 (Apr 1st 2016)
+* Added support for stereo dual SID chip
 
 ###What's new in 1.2.3 (Dic 6th 2015)
 * Added support for EasyFlash cart: eprom flashing is not emulated
@@ -19,7 +22,7 @@ Written in the Scala language (http://www.scala-lang.org/) and available for any
 
 Here the main features:
 * Cycle based: exact cycle emulation using the PAL frequency
-* VIC emulation based on the Christian Bauer's article: "The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64". I know that it's incomplete (and in some cases buggy). I tried to close some issues by myself. Some others,Sprite Crunch for instance, are still open. With the current implementation most of the games run properly. Some demos run with "strange" effects, naturally.
+* VIC emulation based on the Christian Bauer's article: "The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64". I know that it's incomplete (and in some cases buggy). I tried to close some issues by myself. Some others,Sprite Crunch for instance, are still open.
 * 6510 CPU full emulation (with illegal opcodes too). The user can choose between a cycle exact cpu and a faster cpu not cycle exact.
 * CIA1, CIA2 chips emulation: almost full.
 * IEC Serial Bus
