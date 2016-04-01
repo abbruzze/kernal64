@@ -10,24 +10,21 @@ import ucesoft.c64.ClockEvent
 import ucesoft.c64.Log
 import ucesoft.c64.cpu.RAMComponent
 
-class SID extends Chip with SIDDevice {
-  override lazy val componentID = "SID"
-  private[this] val RESID_6581 = 1
+class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Option[AudioDriverDevice] = None) extends Chip with SIDDevice {
+  override lazy val componentID = "SID_" + sidID
   private[this] val SAMPLE_RATE = 44100
-  private[this] val BUFFER_SIZE = 256
   private[this] val CPU_FREQ = 985248
   private[this] val CLOCKS_PER_SAMPLE = CPU_FREQ / SAMPLE_RATE
   private[this] val CLOCKS_PER_SAMPLE_REST = ((CPU_FREQ * 1000L) / SAMPLE_RATE).toInt - CLOCKS_PER_SAMPLE * 1000
   
   val id = ChipID.SID
   val name = "SID"
-  val startAddress = 0xd400
+  //val startAddress = 0xd400
   val length = 1024
   val isRom = false
   
   val isActive = true
   
-  private[this] val buffer = Array.fill[Byte](BUFFER_SIZE * 2)(0)
   private[this] val sid = {
     val sid = new RESID
     sid.set_chip_model(ISIDDefs.chip_model.MOS6581)
@@ -41,16 +38,38 @@ class SID extends Chip with SIDDevice {
   
   private[this] var lastCycles = Clock.systemClock.currentCycles
   private[this] var nextRest = 0
-  private[this] var pos = 0
   private[this] var removeSample = false
-  private[this] val driver = new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE * 2)
+  private[this] var driver = externalDriver.getOrElse(new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE * 2))
+  private[this] val driverProxy : AudioDriverDevice = new AudioDriverDevice {
+    def getMasterVolume : Int = driver.getMasterVolume
+    def setMasterVolume(v:Int) = driver.setMasterVolume(v)
+    def setSoundOn(on:Boolean) = driver.setSoundOn(on)
+    def addSample(sample:Int) = driver.addSample(sample)
+    def reset = driver.reset
+    def discard = driver.discard
+  }
   
-  def getDriver = driver
+  def setStereo(isStereo:Boolean) {
+    externalDriver match {
+      case None =>
+        driver.discard
+        driver = new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE * 2,isStereo)
+      case Some(_) =>
+    }
+  }
+  
+  def getDriver = driverProxy
   def init = start
   def reset = {
+    driver.reset
     sid.reset
-    Clock.systemClock.cancel("SID")
+    Clock.systemClock.cancel(componentID)
     start
+  }
+  
+  def setModel(is6581:Boolean) {
+    if (is6581) sid.set_chip_model(ISIDDefs.chip_model.MOS6581)
+    else sid.set_chip_model(ISIDDefs.chip_model.MOS8580)
   }
   
   final def read(address: Int, chipID: ChipID.ID) = address - startAddress match {
@@ -83,23 +102,17 @@ class SID extends Chip with SIDDevice {
     lastCycles = cycles
     sid.clock(delta.toInt)
     
-    val sample = sid.output
-    buffer(pos) = (sample & 0xff).toByte ; pos += 1
-    buffer(pos) = ((sample >> 8)).toByte ; pos += 1
-    if (pos == buffer.length) {
-      driver.write(buffer)
-      pos = 0
-    }
+    driver.addSample(sid.output)
     
-    if (!removeSample) Clock.systemClock.schedule(new ClockEvent("SID",nextSample,sidEventCallBack))
+    if (!removeSample) Clock.systemClock.schedule(new ClockEvent(componentID,nextSample,sidEventCallBack))
   }
   
   def stop = removeSample = true
   def start {
-    Clock.systemClock.schedule(new ClockEvent("SID",Clock.systemClock.currentCycles + 5,sidEventCallBack))
+    Clock.systemClock.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 5,sidEventCallBack))
     lastCycles = Clock.systemClock.currentCycles
     nextRest = 0
-    pos = 0
+    driver.reset
     removeSample = false
   }
   def setFullSpeed(full:Boolean) = {

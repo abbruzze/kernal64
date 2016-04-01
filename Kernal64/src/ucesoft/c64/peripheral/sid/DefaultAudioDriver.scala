@@ -2,9 +2,9 @@ package ucesoft.c64.peripheral.sid
 
 import javax.sound.sampled._
 
-class DefaultAudioDriver(sampleRate:Int,bufferSize:Int) extends AudioDriverDevice {
+class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false) extends AudioDriverDevice {
   private[this] val dataLine = {
-    val af = new AudioFormat(sampleRate, 16, 1, true, false)
+    val af = new AudioFormat(sampleRate, 16,if (isStereo) 2 else 1, true, false)
     val dli = new DataLine.Info(classOf[SourceDataLine], af, bufferSize)
     val dataLine = try {
       AudioSystem.getLine(dli).asInstanceOf[SourceDataLine] 
@@ -19,8 +19,10 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int) extends AudioDriverDevic
     dataLine    
   }
   private[this] val volume : FloatControl = if (dataLine != null) dataLine.getControl(FloatControl.Type.MASTER_GAIN).asInstanceOf[FloatControl] else null
+  private[this] val mute : BooleanControl = if (dataLine != null) dataLine.getControl(BooleanControl.Type.MUTE).asInstanceOf[BooleanControl] else null
   private[this] var vol = 0
-  private[this] var soundOn = true
+  private[this] val buffer = Array.ofDim[Byte](256)
+  private[this] var pos = 0
   
   setMasterVolume(100)
   if (dataLine != null) dataLine.start()
@@ -34,18 +36,22 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int) extends AudioDriverDevic
       vol = v
     }
   }
-  final def write(buffer:Array[Byte]) {
-    val bsize = buffer.length
-    if (dataLine == null || dataLine.available < bsize) return
-    
-    if (!soundOn) {
-      var i = 0
-      while (i < buffer.length) {
-        buffer(i) = 0
-        i += 1
-      }
+  final def addSample(sample:Int) {
+    buffer(pos) = (sample & 0xff).toByte ; pos += 1
+    buffer(pos) = ((sample >> 8)).toByte ; pos += 1
+    if (pos == buffer.length) {      
+      pos = 0
+      val bsize = buffer.length
+      if (dataLine == null || dataLine.available < bsize) return
+      dataLine.write(buffer, 0, bsize)
     }
-    dataLine.write(buffer, 0, bsize)
   }
-  def setSoundOn(on:Boolean) = soundOn = on
+  final def reset = pos = 0
+  def discard {
+    if (dataLine != null) {
+      dataLine.stop
+      dataLine.flush
+    }
+  }
+  def setSoundOn(on:Boolean) = if (mute != null) mute.setValue(!on)
 }
