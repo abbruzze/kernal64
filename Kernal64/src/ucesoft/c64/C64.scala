@@ -52,6 +52,7 @@ import ucesoft.c64.expansion.SwiftLink
 import ucesoft.c64.peripheral.drive.Floppy
 import ucesoft.c64.peripheral.drive.ParallelCable
 import ucesoft.c64.peripheral.drive.C1541Mems
+import ucesoft.c64.expansion.DualSID
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -66,7 +67,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "1.2.3"
+  private[this] val VERSION = "1.2.4"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -76,7 +77,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   private[this] var cpu = CPU6510.make(mem)  
   private[this] var cpuExact = cpu.isExact
   private[this] var vicChip : vic.VIC = _
-  private[this] val sid : SIDDevice = if (System.getProperty("sid2") != null) new ucesoft.c64.peripheral.sid.SID2 else new ucesoft.c64.peripheral.sid.SID
+  private[this] val sid = new ucesoft.c64.peripheral.sid.SID
   private[this] var display : vic.Display = _
   private[this] val nmiSwitcher = new NMISwitcher
   private[this] val irqSwitcher = new IRQSwitcher
@@ -651,7 +652,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
     Log.info(sw.toString)
   }
   
-  override def afterInitHook {
+  override def afterInitHook {    
 	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)    
     // deactivate drive 9
     c1541_real9.setActive(false)
@@ -909,6 +910,22 @@ class C64 extends C64Component with ActionListener with TraceListener {
         c1541_real9.setActive(enabled)
         driveLeds(1).setVisible(enabled)
         adjustRatio
+      case "SID_6581" =>
+        sid.setModel(true)
+      case "SID_8580" =>
+        sid.setModel(false)
+      case "NO_DUAL_SID" =>
+        expansionPort.eject
+        sid.setStereo(false)
+        ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+      case "DUAL_SID_DE00" =>
+        expansionPort.eject
+        sid.setStereo(true)
+        ExpansionPort.setExpansionPort(new DualSID(sid,0xDE00))
+      case "DUAL_SID_DF00" =>
+        expansionPort.eject
+        sid.setStereo(true)
+        ExpansionPort.setExpansionPort(new DualSID(sid,0xDF00))        
     }
   }
   
@@ -1648,6 +1665,47 @@ class C64 extends C64Component with ActionListener with TraceListener {
     printerEnabledItem.setActionCommand("PRINTER_ENABLED")
     printerEnabledItem.addActionListener(this)
     optionMenu.add(printerEnabledItem)
+    
+    optionMenu.addSeparator
+    
+    val sidItem = new JMenu("SID")
+    optionMenu.add(sidItem)
+    val group7 = new ButtonGroup
+    val sidTypeItem = new JMenu("SID Type")
+    sidItem.add(sidTypeItem)
+    val sid6581Item = new JRadioButtonMenuItem("MOS 6581")
+    sid6581Item.setSelected(true)
+    sid6581Item.setActionCommand("SID_6581")
+    sid6581Item.addActionListener(this)
+    sidTypeItem.add(sid6581Item)
+    group7.add(sid6581Item)
+    val sid8580Item = new JRadioButtonMenuItem("MOS 8580")
+    sid8580Item.setSelected(false)
+    sid8580Item.setActionCommand("SID_8580")
+    sid8580Item.addActionListener(this)
+    sidTypeItem.add(sid8580Item)
+    group7.add(sid8580Item)
+    val sid2Item = new JMenu("Dual SID")
+    sidItem.add(sid2Item)
+    val group8 = new ButtonGroup
+    val nosid2Item = new JRadioButtonMenuItem("None")
+    sid2Item.add(nosid2Item)
+    nosid2Item.setSelected(true)
+    nosid2Item.setActionCommand("NO_DUAL_SID")
+    nosid2Item.addActionListener(this)
+    group8.add(nosid2Item)
+    val sid2DE00Item = new JRadioButtonMenuItem("$DE00")
+    sid2Item.add(sid2DE00Item)
+    sid2DE00Item.setSelected(false)
+    sid2DE00Item.setActionCommand("DUAL_SID_DE00")
+    sid2DE00Item.addActionListener(this)
+    group8.add(sid2DE00Item)
+    val sid2DF00Item = new JRadioButtonMenuItem("$DF00")
+    sid2Item.add(sid2DF00Item)
+    sid2DF00Item.setSelected(false)
+    sid2DF00Item.setActionCommand("DUAL_SID_DF00")
+    sid2DF00Item.addActionListener(this)
+    group8.add(sid2DF00Item)
     
     optionMenu.addSeparator
     
