@@ -799,7 +799,7 @@ final class VIC(mem: Memory,
     verticalBorderFF = false
     rasterCycle = 1
     spriteXCoord9thBit = 0
-    controlRegister1 = 0x9B
+    controlRegister1 = 0
     rasterLine = 0
     rasterLatch = 0
     spriteEnableRegister = 0
