@@ -23,12 +23,9 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
   protected def isDeviceReady = active
   protected def loadData(fileName:String) = None
   
-  def init {
-  }
+  def init {}
   
-  override def reset {
-    super.reset
-  }
+  def reset {}
   
   override def open_channel {
     channel match {
