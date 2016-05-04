@@ -14,6 +14,7 @@ trait Drive extends C64Component {
   def clock(cycles:Long)
   def changeCPU(cycleExact:Boolean) {}
   def setReadOnly(readOnly:Boolean) {}
+  def getFloppy : Floppy
   
   def getSpeedHz = -1  
   def setSpeedHz(speed:Int) {}
