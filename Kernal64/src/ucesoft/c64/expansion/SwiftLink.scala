@@ -68,6 +68,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   private[this] val inHpChecker = new HangupChecker
   private[this] val outHPChecker = new HangupChecker
   private[this] var statusListener : RS232StatusListener = _
+  private[this] var hostAndConf = ""
   
   final private[this] val SPEEDS = Array(10, 50, 75, 109.92, 134.58, 150, 300, 600, 1200, 1800,2400, 3600, 4800, 7200, 9600, 19200) map { _ * 2 } // SL
   
@@ -115,6 +116,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   def setOthers(value:Int) {}
   def getOthers = 0
   def setConfiguration(conf:String) {
+    hostAndConf = conf
     if (conf != "modem") {
       val pars = conf.split(":")
       if (pars.length != 2) throw new IllegalArgumentException("Bad configuration string, expected host:port")
@@ -127,6 +129,8 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
       in = modemIn
     }
   }
+  
+  def connectionInfo = hostAndConf
   
   def getConfiguration = host + ":" + port
   
@@ -220,7 +224,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
         if (receiverDataRegister == RECEIVER_DATA_REGISTER_FULL) overrun = OVERRUN else overrun = 0
         receiverDataRegister = RECEIVER_DATA_REGISTER_FULL
         if (isReceiverInterruptEnabled) nmi
-        println(s"RECEIVED $byteReceived ${byteReceived.toChar}")
+        //println(s"RECEIVED $byteReceived ${byteReceived.toChar}")
         if (inHpChecker.check(byteReceived.toChar)) hangUp
       }
       else statusListener.update(RS232.RXD,0)
@@ -283,7 +287,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
       else
       if (transmitterDataRegister == TRANSMITTER_DATA_REGISTER_EMPTY) {
         statusListener.update(RS232.TXD,1)
-        println(s"Sending $value ${value.toChar}")
+        //println(s"Sending $value ${value.toChar}")
         transmitterDataRegister = TRANSMITTER_DATA_REGISTER_FULL
         clk.schedule(new ClockEvent(RX_EVENT,clk.currentCycles + clockTicks,cycles => {
           statusListener.update(RS232.TXD,0)
