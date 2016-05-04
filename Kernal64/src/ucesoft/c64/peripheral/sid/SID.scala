@@ -72,13 +72,15 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     else sid.set_chip_model(ISIDDefs.chip_model.MOS8580)
   }
   
-  final def read(address: Int, chipID: ChipID.ID) = address - startAddress match {
+  @inline def decode(address:Int) = address & 0x1F
+  
+  final def read(address: Int, chipID: ChipID.ID) = decode(address) match {
     case POTX_OFS => potx
     case POTY_OFS => poty
     case ofs => sid.read(ofs)
   }
   final def write(address: Int, value: Int, chipID: ChipID.ID) = {
-    address - startAddress match {
+    decode(address) match {
       case POTX_OFS =>
         potx = value
       case POTY_OFS =>
