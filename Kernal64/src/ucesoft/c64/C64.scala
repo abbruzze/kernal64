@@ -53,6 +53,7 @@ import ucesoft.c64.peripheral.drive.Floppy
 import ucesoft.c64.peripheral.drive.ParallelCable
 import ucesoft.c64.peripheral.drive.C1541Mems
 import ucesoft.c64.expansion.DualSID
+import ucesoft.c64.peripheral.drive.FlyerIEC
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -67,7 +68,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "1.2.4"
+  private[this] val VERSION = "1.2.5"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -114,13 +115,16 @@ class C64 extends C64Component with ActionListener with TraceListener {
   private[this] val busSnooper = new BusSnoop(bus)
   private[this] var busSnooperActive = false
   // -------------------- DISK -----------------
-  private[this] var isDiskActive,isDiskActive9 = true
+  private[this] var isDiskActive = true
+  private[this] var isDiskActive9 = false
   private[this] var attachedDisks : Array[Option[Floppy]] = Array(None,None)
   private[this] val driveLeds = Array(new DriveLed,new DriveLed)
   private[this] val diskProgressPanels = Array(new DriveLoadProgressPanel,new DriveLoadProgressPanel)
   private[this] val c1541 = new C1541Emu(bus,DriveLed8Listener)
   private[this] val c1541_real = new C1541(0x00,bus,DriveLed8Listener)
   private[this] val c1541_real9 = new C1541(0x01,bus,DriveLed9Listener)
+  private[this] val flyerIEC = new FlyerIEC(bus,file => attachDiskFile(0,file,false))
+  private[this] var isFlyerEnabled = false
   private[this] var drives : Array[Drive] = Array(c1541_real,c1541_real9)
   private[this] var device10Drive : Drive = _
   private[this] var device10DriveEnabled = false
@@ -151,7 +155,8 @@ class C64 extends C64Component with ActionListener with TraceListener {
   private[this] val rs232 = BridgeRS232
   private[this] var activeRs232 : Option[RS232] = None 
   private[this] val AVAILABLE_RS232 : Array[RS232] = Array(TelnetRS232,
-                                                           TCPRS232,FileRS232,
+                                                           TCPRS232,
+                                                           FileRS232,
                                                            SwiftLink.getSL(nmiSwitcher.expansionPortNMI,None),
                                                            SwiftLink.getSL(nmiSwitcher.expansionPortNMI _,Some(REU.getREU(REU.REU_1750,mem,setDMA _,irqSwitcher.expPortIRQ _,None))))
   private[this] val rs232StatusPanel = new RS232StatusPanel
@@ -629,6 +634,8 @@ class C64 extends C64Component with ActionListener with TraceListener {
     add(datassette)
     // printer
     add(printer)
+    // Flyer
+    add(flyerIEC)
     
     // info panel
     val infoPanel = new JPanel(new BorderLayout)
@@ -693,6 +700,8 @@ class C64 extends C64Component with ActionListener with TraceListener {
     if (busSnooperActive) busSnooper.clock(cycles)
     // printer
     if (printerEnabled) printer.clock(cycles)
+    // Flyer
+    if (isFlyerEnabled) flyerIEC.clock(cycles)
     // CPU PHI2
     if (cpuExact) {
 //      if (baLow && cycles > baLowUntil) {
@@ -925,7 +934,20 @@ class C64 extends C64Component with ActionListener with TraceListener {
       case "DUAL_SID_DF00" =>
         expansionPort.eject
         sid.setStereo(true)
-        ExpansionPort.setExpansionPort(new DualSID(sid,0xDF00))        
+        ExpansionPort.setExpansionPort(new DualSID(sid,0xDF00))
+      case "FLYER ENABLED" =>
+        val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        if (enabled != isFlyerEnabled) flyerIEC.reset
+        isFlyerEnabled = enabled
+      case "FLYER DIR" =>
+        val fc = new JFileChooser
+        fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
+  	    fc.setCurrentDirectory(flyerIEC.getFloppyRepository)
+  	    fc.showOpenDialog(displayFrame) match {
+  	      case JFileChooser.APPROVE_OPTION =>
+  	        flyerIEC.setFloppyRepository(fc.getSelectedFile)
+  	      case _ =>
+        }
     }
   }
   
@@ -973,27 +995,28 @@ class C64 extends C64Component with ActionListener with TraceListener {
     val choices = Array.ofDim[Object](AVAILABLE_RS232.length + 1)
     choices(0) = "None"
     Array.copy(AVAILABLE_RS232,0,choices,1,AVAILABLE_RS232.length)
-    val currentChoice = activeRs232 match {
-      case None => choices(0)
-      case Some(rs) => rs
+    val (currentChoice,oldConfig) = activeRs232 match {
+      case None => (choices(0),"")
+      case Some(rs) => (rs,rs.connectionInfo)
     }
     val choice = JOptionPane.showInputDialog(displayFrame,"Choose an rs-232 implementation","RS-232",JOptionPane.QUESTION_MESSAGE,null,choices,currentChoice)
     if (choice == choices(0) && activeRs232.isDefined) {
-      activeRs232.get.setEnabled(false)
+      activeRs232.get.setEnabled(false)      
       activeRs232 = None
     }
     else
     if (choice != null) {
       val rs = choice.asInstanceOf[RS232]
-      val conf = JOptionPane.showInputDialog(displayFrame,s"<html><b>${rs.getDescription}</b><br>Type the configuration string:</html>", s"${rs.componentID}'s configuration",JOptionPane.QUESTION_MESSAGE)
+      val conf = JOptionPane.showInputDialog(displayFrame,s"<html><b>${rs.getDescription}</b><br>Type the configuration string:</html>", s"${rs.componentID}'s configuration",JOptionPane.QUESTION_MESSAGE,null,null,oldConfig)
       if (conf != null) {
         try {
-          rs.setConfiguration(conf)
+          rs.setConfiguration(conf.toString)
           activeRs232 foreach { _.setEnabled(false) }                   
           activeRs232 = Some(rs)
           rs232.setRS232(rs)
           rs232.setEnabled(true)
           rs232StatusPanel.setVisible(true)
+          adjustRatio
         }
         catch {
           case t:Throwable =>
@@ -1789,6 +1812,19 @@ class C64 extends C64Component with ActionListener with TraceListener {
     IOItem.add(rs232Item)
     
     IOItem.addSeparator
+    
+    val flyerItem = new JMenu("Flyer internet modem")
+    IOItem.add(flyerItem)
+    
+    val fylerEnabledItem = new JCheckBoxMenuItem("Flyer enabled on 7")
+    fylerEnabledItem.setSelected(false)
+    flyerItem.add(fylerEnabledItem)
+    fylerEnabledItem.setActionCommand("FLYER ENABLED")
+    fylerEnabledItem.addActionListener(this)
+    val flyerDirectoryItem = new JMenuItem("Set disks repository ...")
+    flyerItem.add(flyerDirectoryItem)
+    flyerDirectoryItem.setActionCommand("FLYER DIR")
+    flyerDirectoryItem.addActionListener(this)
     
     val reuItem = new JMenu("REU")
     val group5 = new ButtonGroup
