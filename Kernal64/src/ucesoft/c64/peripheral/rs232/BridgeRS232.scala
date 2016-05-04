@@ -33,6 +33,7 @@ object BridgeRS232 extends RS232 {
   def setEnabled(enabled:Boolean) = if (rs232 != null) rs232.setEnabled(enabled)
   def setCIA(cia2:CIA) = this.cia2 = cia2
   def getDescription : String = "No RS-232 attached"
+  def connectionInfo = if (rs232 != null) rs232.connectionInfo else ""
   
   def setRS232(rs232:RS232) {
     this.rs232 = rs232

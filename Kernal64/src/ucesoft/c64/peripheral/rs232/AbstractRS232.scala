@@ -12,11 +12,13 @@ abstract class AbstractRS232 extends RS232 with Runnable {
   protected var rts,dtr = false
   private[this] var rxd = RXD
   private[this] var outbuffer = 0
-  private[this] var bitreceived,bitsent,byteToSend,tmpParity = 0
+  private[this] var bitreceived,bitsent,tmpParity = 0
+  private[this] var byteToSend = -1
   private[this] var totalByteSent,totalByteReceived = 0
   private[this] var configurationString = ""
   private[this] var enabled = false
   private[this] var statusListener : RS232StatusListener = _
+  protected val sendingLock = new Object
   
   def isEnabled = enabled
   def setEnabled(enabled:Boolean) = {
@@ -26,6 +28,14 @@ abstract class AbstractRS232 extends RS232 with Runnable {
   def setRS232Listener(l:RS232StatusListener) = statusListener = l
   
   def init {}
+  
+  def reset {
+    setEnabled(false)
+    bitreceived = 0
+    outbuffer = 0
+    byteToSend = -1
+    dcd = 0
+  }
   
   override def getProperties = {
     properties.setProperty("Total bytes received",totalByteReceived.toString)
@@ -39,7 +49,7 @@ abstract class AbstractRS232 extends RS232 with Runnable {
   
   def setTXD(high:Int) {
     txd = high
-    //println(s"TXD: $txd rts=$rts n=$bitreceived buffer=$outbuffer")
+    //println(s"TXD: $txd rts=$rts n=$bitreceived buffer=$outbuffer bits=$bits length=$length")
     if (rts && high == 0 && bitreceived == 0) {
       // consumes start bit
       bitreceived = 1    
@@ -67,21 +77,28 @@ abstract class AbstractRS232 extends RS232 with Runnable {
     txd
   }
   
+  protected def checkRTSandDTRReset {
+    if (rts && dtr) { // reset
+      bitreceived = 0
+      outbuffer = 0
+      byteToSend = -1
+//      dcd = 0
+    }
+  }
+  
+  protected def checkCTS {
+    // auto set cs
+    cts = if (rts) CTS else 0
+  }
+  
   def setOthers(value:Int) {
     others = value
     rts = (others & RTS) > 0
     dtr = (others & DTR) > 0
     
-    if (rts && dtr) { // reset
-      bitreceived = 0
-      outbuffer = 0
-      byteToSend = -1
-      dcd = 0
-    }
-    
-    // auto set cs
-    cts = if (rts) CTS else 0 
-    //println(s"RTS=$rts DTR=$dtr")
+    checkRTSandDTRReset
+    checkCTS   
+    //println(s"RTS=$rts DTR=$dtr DCD=$dcd CTS=$cts")
     
     if (statusListener != null) {
       statusListener.update(RTS,others & RTS)
@@ -92,8 +109,12 @@ abstract class AbstractRS232 extends RS232 with Runnable {
   def getOthers : Int = {        
     //println(s"Read rxd=" + (if (rxd > 0) "1" else "0"))
     val ret = rxd | others & RTS | others & DTR | ri | dcd | cts | dsr
-    if (byteToSend != -1) sendBit
+    checkSendBit
     ret
+  }
+  
+  protected def checkSendBit {
+    if (byteToSend != -1) sendBit
   }
   
   def getConfiguration = configurationString
@@ -115,6 +136,7 @@ abstract class AbstractRS232 extends RS232 with Runnable {
     
     bits = parts(0).toInt
     stop = parts(2).toInt    
+    if (stop != 1 && stop != 2) throw new IllegalArgumentException("Stop bits must be 1 or 2")
     parity = parts(1).toUpperCase match {
       case "N" => NO_PARITY
       case "E" => EVEN_PARITY
@@ -136,7 +158,7 @@ abstract class AbstractRS232 extends RS232 with Runnable {
     byteToSend = byte
     // send start bit
     rxd = 0
-    dcd = DCD
+//    dcd = DCD
     cia2.setFlagLow
     bitsent = 1
     tmpParity = 0
@@ -144,8 +166,7 @@ abstract class AbstractRS232 extends RS232 with Runnable {
     //println("Sent start bit")
   }
   
-  private def sendBit {    
-    val old_rxd = rxd
+  protected def sendBit : Boolean = {    
     if (bitsent == bits + 1 && parity != NO_PARITY) { // parity
       rxd = parity match {
         case ODD_PARITY => if (tmpParity == 0) RXD else 0
@@ -166,12 +187,16 @@ abstract class AbstractRS232 extends RS232 with Runnable {
       //println("Sent " + (if (rxd > 0) "1" else "0"))
     }
     bitsent += 1
-    //if (old_rxd > 0 && rxd == 0) cia2.setFlagLow
     if (bitsent == length) {
-      dcd = 0      
+//      dcd = 0      
       byteToSend = -1
+      sendingLock.synchronized { sendingLock.notify }
       if (statusListener != null) statusListener.update(RXD,0)
       //println("BYTE FINISHED")
+      return true
     }
+    return false
   }
+  
+  def connectionInfo = getConfiguration
 }

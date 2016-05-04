@@ -47,6 +47,7 @@ trait RS232 extends C64Component {
   
   def setConfiguration(conf:String)
   def getConfiguration : String
+  def connectionInfo:String
   
   def isEnabled : Boolean
   def setEnabled(enabled:Boolean)

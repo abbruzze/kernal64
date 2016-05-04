@@ -10,9 +10,12 @@ abstract class StreamRS232 extends AbstractRS232 with Runnable {
   private[this] var thread : Thread = _
   
   override def setEnabled(enabled:Boolean) {
-    val lastEnabled = isEnabled
     super.setEnabled(enabled)
-    if (!lastEnabled && enabled) {
+    if (!enabled) {
+      if (thread != null) thread.interrupt      
+    }
+    else {
+      dcd = RS232.DCD
       thread = new Thread(this)
       thread.start
     }
@@ -28,6 +31,7 @@ abstract class StreamRS232 extends AbstractRS232 with Runnable {
   protected def sendOutByte(byte:Int) {
     try {
       out.write(byte)
+      //print(byte.toChar)
       out.flush
     }
     catch {
@@ -45,16 +49,20 @@ abstract class StreamRS232 extends AbstractRS232 with Runnable {
     }
   }
   
+  protected def canSend = rts && dtr
+  
   def run {
     while (isEnabled) {
       try {
         val byte = in.read
-        while (!(rts && dtr)) { Thread.sleep(1000) }
+        //println("<" + byte.toChar)
+        while (!canSend) { Thread.sleep(1) }
         
         if (byte != -1) {
           sendInByte(byte)
           val ts = System.currentTimeMillis
-          while (isSending && System.currentTimeMillis - ts < 1000) Thread.sleep(10)
+          while (isSending && System.currentTimeMillis - ts < 1000) Thread.sleep(1)
+          //if (isSending) sendingLock.synchronized { while (isSending) sendingLock.wait }
         }
       }
       catch {
