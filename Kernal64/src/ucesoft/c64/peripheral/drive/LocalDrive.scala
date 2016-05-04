@@ -35,6 +35,8 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   
   status = STATUS_WELCOME
   
+  def reset {}
+  
   def getCurrentDir = currentDir
   def setCurrentDir(dir:File) = currentDir = dir
   
