@@ -76,6 +76,8 @@ class VIADiskControl(var cpu: CPU6510,
     lastWrite = 0x55
   }
   
+  def getFloppy = floppy
+  
   override def getProperties = {
     properties.setProperty("Motor on",motorOn.toString)
     properties.setProperty("Writing",isWriting.toString)
