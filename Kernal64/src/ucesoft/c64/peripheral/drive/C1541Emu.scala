@@ -65,6 +65,8 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
   }
 
   def init {}
+  
+  def getFloppy = driveReader.getOrElse(EmptyFloppy)
 
   def setDriveReader(driveReader: Floppy) {
     this.driveReader = Some(driveReader.asInstanceOf[D64])
@@ -90,15 +92,14 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     if (status != STATUS_OK && status != STATUS_WELCOME) blinkLed(cycles)
   }
 
-  override def reset {
-    super.reset
+  def reset {
     job = EMPTY
   }
 
   override def unlisten {
     super.unlisten
     if (channel == 15) handleChannel15
-    reset
+    resetSignals
   }
 
   override def open {
@@ -131,7 +132,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
   }
 
   override protected def untalk {
-    reset
+    resetSignals
   }
 
   override def close {
