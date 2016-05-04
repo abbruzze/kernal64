@@ -173,7 +173,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
         else
         if (!atn) {
           if (role == LISTENER) setMode(IDLE)
-          else reset
+          else resetSignals
         }
       case READ =>
         if (atn && !lastAtn) {
@@ -209,7 +209,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
         }
         else {
           if (initNextByte) initByteToWrite(cycles)
-          if (writeByte(cycles,timeout)) reset
+          if (writeByte(cycles,timeout)) resetSignals
         }
     }
     
@@ -221,8 +221,8 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     bus.setLine(busid,line,value)
   }
   
-  protected def reset {
-    if (DEBUG) println("Resetting...")
+  protected def resetSignals {
+    if (DEBUG) println("resetting...")
     initNextByte = true
     setMode(IDLE)
     role = NONE
@@ -255,7 +255,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     CMD match {
       case LISTEN =>
         if (devOrSecAddr == device) role = LISTENER
-        else reset
+        else resetSignals
         listen
       case UNLISTEN =>
         set(DATA,VOLTAGE)
@@ -269,7 +269,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
           isReadingFileName = true       
           open
         }        
-        else reset
+        else resetSignals
       case OPEN_CHANNEL =>
         channel = devOrSecAddr
         isReadingFileName = false
@@ -286,10 +286,11 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
         role = NONE
         untalk
       case CLOSE =>
+        channel = devOrSecAddr
         if (role != NONE) {
           close
           channels(channel).close          
-          reset
+          resetSignals
         }
     }
   }
