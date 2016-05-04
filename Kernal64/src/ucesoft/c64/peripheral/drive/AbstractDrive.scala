@@ -17,15 +17,16 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
   def isDeviceReady = true
   def init {}
   def setDriveReader(driveReader: Floppy) {}
+  def getFloppy = EmptyFloppy
   
   protected def setStatus(code: Int) = status = code
   protected def sendStatus {
     import BusDataIterator._
-    channels(channel).dataToSend = Some(new StringDataIterator("%02d,%s,00,00".format(status, ERROR_CODES(status)) + 13.toChar))
+    channels(15).dataToSend = Some(new StringDataIterator("%02d,%s,00,00".format(status, ERROR_CODES(status)) + 13.toChar))
   }
   
-  override def reset {
-    super.reset
+  override def resetSignals {
+    super.resetSignals
   }
   
   protected def getDirectoryEntries(path:String) : List[DirEntry]
@@ -106,12 +107,12 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
   }
   
   override protected def untalk {
-    reset
+    resetSignals
   }
   
   override def unlisten {
     super.unlisten
     if (channel == 15) handleChannel15
-    reset
+    resetSignals
   }
 }
