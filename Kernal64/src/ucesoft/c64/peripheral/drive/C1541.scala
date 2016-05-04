@@ -41,6 +41,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] var tracing = false
   private[this] var canSleep = true
   private[this] var useTRAPFormat = false
+  
+  def getFloppy = viaDisk.getFloppy
 
   def setDriveReader(driveReader: Floppy) = {
     useTRAPFormat = !driveReader.isFormattable
