@@ -105,14 +105,20 @@ class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timer
 
   final def readLo = {
    val cycles = systemClock.currentCycles
-   val adjCycles = (if (!countExternal && started && cycles > startCycle) cycles - startCycle else 0).toInt
-   require(counter - adjCycles >= 0,"BAD COUNTER: " + EVENT_ID + " " + (counter - adjCycles) + " " + counter)
+   var adjCycles = (if (!countExternal && started && cycles > startCycle) cycles - startCycle else 0).toInt
+   if (counter - adjCycles < 0) {
+     println(s"[$EVENT_ID] BAD COUNTER: delta=${counter - adjCycles} counter=$counter startCycle=$startCycle cycle=$cycles")
+     adjCycles = counter
+   }
    (counter - adjCycles) & 0xFF 
   }
   final def readHi = {
     val cycles = systemClock.currentCycles
-    val adjCycles = (if (!countExternal && started && cycles > startCycle) cycles - startCycle else 0).toInt
-    require(counter - adjCycles >= 0,"BAD COUNTER: " + (counter - adjCycles))
+    var adjCycles = (if (!countExternal && started && cycles > startCycle) cycles - startCycle else 0).toInt
+    if (counter - adjCycles < 0) {
+     println(s"[$EVENT_ID] BAD COUNTER: delta=${counter - adjCycles} counter=$counter startCycle=$startCycle cycle=$cycles")
+     adjCycles = counter
+   }
     ((counter - adjCycles) >> 8) & 0xFF
   }
 
