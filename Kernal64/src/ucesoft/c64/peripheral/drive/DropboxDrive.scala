@@ -33,6 +33,8 @@ class DropboxDrive(bus: IECBus,dbxClient : DbxClient,device: Int = 9) extends Ab
   
   status = STATUS_WELCOME
   
+  def reset {}
+  
   protected def getDirectoryEntries(path:String) : List[DirEntry] = {
     try {
       val meta = dbxClient.getMetadataWithChildren(currentPath)
