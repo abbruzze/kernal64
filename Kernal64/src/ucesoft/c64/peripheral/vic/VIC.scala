@@ -18,89 +18,7 @@ import ucesoft.c64.C64ComponentType
 import ucesoft.c64.cpu.RAMComponent
 import annotation.switch
 
-/*
-object VIC extends App {
-  import CPU6510Mems._
-  import javax.swing._
-  System.setProperty("sun.java2d.opengl","true")
-  System.setProperty("sun.java2d.accthreshold","0")
-  val mem = new MAIN_MEMORY(true)
-  mem.init
-  var base = 1024
-  for(m <- 0 until 1000) if (m < 256) mem.write(base + m,m) else mem.write(base + m,32)
-  for(c <- 0xD800 until 0xD800 + 1000) mem.write(c,14)
-  val bankedMem = new BankedMemory(mem,mem.CHAR_ROM,mem.COLOR_RAM)
-  //Log.setDebug
-  val frame = new JFrame("Test")
-  frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
-  val vic = new VIC(bankedMem,x => {},x => {})
-  val display = new Display(vic.SCREEN_WIDTH,vic.SCREEN_HEIGHT,"C64",frame)
-  vic.setDisplay(display)
-  vic.write(0xD011,0x9B)
-  vic.write(0xD016,8)
-  vic.write(0xD018,0x14)
-  vic.write(0xD021,6)
-  vic.write(0xD022,1)
-  vic.write(0xD023,2)
-  vic.write(0xD020,14)
-  // sprite #x --------
-  for(i <- 0 to 7) mem.write(2040 + i,1)  
-  //for(i <- 0 to 62) mem.write(64+i,255)
-  
-  for(y <- 0 to 20) {
-    for(x <- 0 to 2) if (y == 0 || y == 20) mem.write(64 + y*3 + x,0x78) else mem.write(64 + y*3 + x,255)
-  }
-  
-  /*
-  for(y <- 0 to 20;x <- 0 to 2) x match {
-    case 0 => if (y == 0 || y == 20) mem.write(16 + y*3 + x,255) else mem.write(16 + y*3 + x,128)
-    case 1 => if (y == 0 || y == 20) mem.write(16 + y*3 + x,255) else mem.write(16 + y*3 + x,0)
-    case 2 => if (y == 0 || y == 20) mem.write(16 + y*3 + x,255) else mem.write(16 + y*3 + x,1)
-  }
-  */ 
-  for(y <- 0 to 20) println("%3d %3d %3d".format(mem.read(64 + y*3),mem.read(64 + y*3 + 1),mem.read(64 + y*3 + 2)))
-  var x = 24
-  var y = 229
-  for(i <- 0 to 0) {
-    vic.write(0xD000 + i*2,x)
-    vic.write(0xD000 + i*2 + 1,y)
-    x += 12
-    //y += 12
-  }
-  mem.write(base + 40 * 24,1)
-  /*
-  vic.write(0xD000,24)
-  vic.write(0xD001,51) 
-  vic.write(0xD002,49)
-  vic.write(0xD003,61)
-  */
-  vic.write(0xD01B,1)
-  //vic.write(0xD000,63)
-  //vic.write(0xD010,1)
-  vic.write(0xD015,255)  // #0+1
-  // colors
-  for(i <- 0 to 7) vic.write(0xD027 + i,i)
-  //vic.write(0xD017,1)
-  //vic.write(0xD01D,1)
-  vic.write(0xD01C,0) // multi
-  vic.write(0xD025,2)
-  vic.write(0xD026,3)
-  //vic.write(0xD01A,255)
-  // ------------------
-  frame.setSize(320,200)
-  val button = new JButton("Clock")
-  button.addActionListener(new java.awt.event.ActionListener {
-    def actionPerformed(e:java.awt.event.ActionEvent) { for(_ <- 1 to 63 * 8) vic.clock(0) }
-  })
-  frame.getContentPane.add("Center",display)
-  //frame.getContentPane.add("North",button)
-  frame.setVisible(true)
-  Clock.setSystemClock() { cycles =>
-    vic.clock(cycles)
-  }
-  Clock.systemClock.play
-}
-*/
+
 final class VIC(mem: Memory,
   colorMem:Memory,
   irqAction: (Boolean) => Unit,
@@ -768,7 +686,8 @@ final class VIC(mem: Memory,
       properties.setProperty("IRQ control register",Integer.toHexString(interruptControlRegister))
       properties.setProperty("IRQ mask register",Integer.toHexString(interruptMaskRegister))
       properties.setProperty("Raster latch",Integer.toHexString(rasterLatch))
-      properties.setProperty("Raster cycle",Integer.toHexString(rasterCycle))
+      properties.setProperty("Raster cycle",(if (rasterCycle == 1) RASTER_CYCLES else rasterCycle - 1).toString)
+      properties.setProperty("Badline",badLine.toString)
       properties.setProperty("Main border FF",mainBorderFF.toString)
       properties.setProperty("Vertical border FF",verticalBorderFF.toString)
       properties.setProperty("Den",den.toString)
@@ -837,7 +756,7 @@ final class VIC(mem: Memory,
     }
   }
 
-  @inline private def decodeAddress(address: Int) = (address - startAddress) % 64
+  @inline private def decodeAddress(address: Int) = address & 0x3F
 
   final def read(address: Int, chipID: ChipID.ID): Int = {
     val offset = decodeAddress(address)
@@ -1473,5 +1392,5 @@ final class VIC(mem: Memory,
     sb.append(s"Char address\t\t\t${Integer.toHexString(characterAddress)}\n")
     sb.append(s"Bitmap address\t\t\t${Integer.toHexString(bitmapAddress)}\n")
     sb.toString
-  }
+  }  
 }
