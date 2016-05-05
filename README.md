@@ -56,7 +56,7 @@ Here the main features:
 * ... and more
 
 ###Installation
-Download and unzip https://github.com/abbruzze/kernal64/tree/master/Kernal64/dist/kernal64_dist.zip on your computer.
+Download and unzip https://github.com/abbruzze/kernal64/tree/master/Kernal64/dist/kernal64_install.zip on your computer.
 Be sure to have a jre (1.7 or above) in the path and launch the **kernal64.bat** or **kernal64.sh** batch file, depending on your operating system.
 
 ###Wiki
