@@ -3,7 +3,7 @@ kernal64 ver 1.2.5
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
 
 ###What's new in 1.2.5 (May 5th 2016)
-* Added support for Flyer internet modem
+* Added support for Flyer internet modem (see Wiki)
 * Minor RS-232 improvements and fixes
 
 ###What's new in 1.2.4 (Apr 1st 2016)
