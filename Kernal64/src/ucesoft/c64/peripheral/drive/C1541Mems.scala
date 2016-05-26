@@ -12,10 +12,9 @@ import ucesoft.c64.cpu.RAMComponent
 object C1541Mems {
   val KERNEL_M = 0xC000
   
-  private[this] val JIFFYDOS_ENABLED = System.getProperty("jiffydos") != null
   private[this] val KERNAL_ROM = System.getProperty("1541kernal")
   
-  private class DISK_KERNEL extends ROM(null,"C1541_KERNEL",KERNEL_M,16384,if (KERNAL_ROM != null) KERNAL_ROM else if (JIFFYDOS_ENABLED) "roms/JiffyDOS_1541_5.0.rom" else "roms/c1541II.rom") {
+  private class DISK_KERNEL extends ROM(null,"C1541_KERNEL",KERNEL_M,16384,if (KERNAL_ROM != null) KERNAL_ROM else "roms/c1541II.rom") {
     private[this] val startAndLen = {
        Option(ClassLoader.getSystemClassLoader.getResourceAsStream(resourceName)) match {
         case None => (0,0) // the error will be thrown by the super class 
