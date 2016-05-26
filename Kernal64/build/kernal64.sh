@@ -10,5 +10,8 @@ if [ ! -x $JAVA_HOME/bin/java ]; then
 else
         JAVA=$JAVA_HOME/bin/java
 fi
-
-$JAVA -server -Xms64M -Xmx64M -cp $CP -Djava.library.path=$LIB ucesoft.c64.C64
+# to add custom Kernals set the variable below adding inside quotes -Dkernal=<kernal file> -D1541kernal=<1541 kernal file>
+# both kernal files must be placed under roms directory
+# example: KERNALS_ROM="-Dkernal=jiffydos_kernal.bin -D1541kernal=jiffydos1541_kernal.bin"
+KERNALS_ROMS=""
+$JAVA -server -Xms64M -Xmx64M -cp $CP -Djava.library.path=$LIB $KERNALS_ROMS ucesoft.c64.C64
