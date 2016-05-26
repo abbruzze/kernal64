@@ -13,7 +13,7 @@ import java.awt.event.MouseEvent
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 
-class Display(width: Int, height: Int, title: String, frame: JFrame) extends JComponent with MouseMotionListener with C64Component {
+class Display(width: Int,height: Int, title: String, frame: JFrame) extends JComponent with MouseMotionListener with C64Component {
   val componentID = "Display"
   val componentType = C64ComponentType.OUTPUT_DEVICE  
   private[this] val dimension = new Dimension(0, 0)
@@ -33,6 +33,8 @@ class Display(width: Int, height: Int, title: String, frame: JFrame) extends JCo
   private[this] var rasterLine = 0
   private[this] var lpX, lpY, mouseX, mouseY = 0
   private[this] var zoomFactorX,zoomFactorY = 0.0
+  private[this] var remote : ucesoft.c64.remote.RemoteC64 = _
+  private[this] var showRemotingLabel = true
   
   addMouseMotionListener(this)
   
@@ -53,6 +55,15 @@ class Display(width: Int, height: Int, title: String, frame: JFrame) extends JCo
   
   def getMouseX = mouseX
   def getMouseY = mouseY
+  
+  def getClipArea = clipArea
+  def setRemote(remote:Option[ucesoft.c64.remote.RemoteC64]) {
+    remote match {
+      case Some(r) => this.remote = r
+      case None => this.remote = null
+    }    
+  }
+  def getDisplayDimension = new Dimension(width,height)
 
   def setClipArea(x1: Int, y1: Int, x2: Int, y2: Int) {
     clipArea = (new Point(x1, y1), new Point(x2, y2))
@@ -89,8 +100,9 @@ class Display(width: Int, height: Int, title: String, frame: JFrame) extends JCo
   
   final def showFrame(x1: Int, y1: Int, x2: Int, y2: Int) {
     if (x1 != -1) {
-      displayImage.newPixels(x1, y1, x2, y2)
+      displayImage.newPixels(x1, y1, x2, y2)      
       repaint()
+      if (remote != null) remote.updateVideo(x1,y1,x2,y2)
     }
     else
     if (drawRasterLine) repaint()
@@ -101,8 +113,15 @@ class Display(width: Int, height: Int, title: String, frame: JFrame) extends JCo
       framePerSecond = math.round(frameCounter / ((now - ts) / 1000.0)).toInt
       ts = now
       frameCounter = 0
-      frame.setTitle(title + " - " + framePerSecond + "fps - " + Clock.systemClock.getLastPerformancePerc + "%")
-    }    
+      val remoting = if (remote == null) "" 
+                     else 
+                     if (remote.isConnected) { 
+                        showRemotingLabel = !showRemotingLabel
+                        if (showRemotingLabel) "(R) " else "    "
+                     }
+                     else "(?) "
+      frame.setTitle(title + " - " + remoting + framePerSecond + "fps - " + Clock.systemClock.getLastPerformancePerc + "%")
+    }
   }
 
   def lastFramePerSecondCounter = framePerSecond
