@@ -1,6 +1,10 @@
-kernal64 ver 1.2.5
+kernal64 ver 1.2.6
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
+
+###What's new in 1.2.6 (May 26th 2016)
+* Remoting (experimental) : share the emulator's screen with your friend on the network to play games in two-player mode
+* Removed jiffydos env variable: now the user must provide the JiffyDOS ROMS
 
 ###What's new in 1.2.5 (May 5th 2016)
 * Added support for [Flyer](http://www.retroswitch.com/products/flyer/) internet modem (see Wiki)
@@ -47,8 +51,7 @@ Here the main features:
 * Component panel: shows all internal components while running
 * Drag & Drop support
 * REU support (128,256,512,16M)
-* JiffyDOS support (use -Djiffydos environment variable)
-* Support for external roms, both for C1541 kernal and C64 kernal. The roms must be put in the roms directory. Use the switches -Dkernal=rom name and -D1541_kernal=rom name
+* Support for external roms, both for C1541 kernal and C64 kernal. The roms must be put in the roms directory. Use the switches -Dkernal=rom name and -D1541_kernal=rom name (you can put JiffyDOS ROMS here, for example, to use the fastloader).
 * Support for 1541-VIA1 <-> CIA2 parallel cable, used by many fastloaders. Tested on Speed Dos and Dolphin Dos 2.
 * Support for 1541's expanded memory (tested with Dolphin Dos 2).
 * RS-232 3-way UserPort implementations useful to connect with BBS on internet. The Telnet implementation can be used to connect to a telnet server (like BBSs); the TCP implementation can be used to connect with a generic TCP/IP server. The File implementation can be used to read/write to local files.
