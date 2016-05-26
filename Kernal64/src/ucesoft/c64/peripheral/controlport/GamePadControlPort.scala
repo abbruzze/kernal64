@@ -9,7 +9,7 @@ import Joysticks._
 class GamePadControlPort(configuration:Properties) extends ControlPort {
   private[this] var controller : Option[Controller] = None
   private[this] val controllerName = configuration.getProperty(CONFIG_CONTROLLER_NAME)
-  private[this] val controllerFireName = configuration.getProperty(CONFIF_CONTROLLER_FIRE_BUTTON,"1")
+  private[this] val controllerFireName = configuration.getProperty(CONFIG_CONTROLLER_FIRE_BUTTON,"1")
   private[this] var xAxisComponent : Option[Component] = None
   private[this] var yAxisComponent : Option[Component] = None
   private[this] var fireComponent : Option[Component] = None

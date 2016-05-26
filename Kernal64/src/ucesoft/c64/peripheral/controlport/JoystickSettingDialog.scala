@@ -9,16 +9,76 @@ import net.java.games.input.Controller
 import net.java.games.input.ControllerEnvironment
 import net.java.games.input.Component
 import Joysticks._
+import java.awt.event.KeyEvent
+import java.awt.event.KeyAdapter
+import java.awt.event.KeyListener
 
 class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends JDialog(parent, "Joystick settings", true) with ActionListener {
   private[this] var joyButtonSelected = ""
   private[this] var joystickDialog : JDialog = null
+  private[this] var keyboardDialog : JDialog = null
   private[this] val fireButtonLabel = new JLabel("...")
   private def setCombo(c:JComboBox[String],port:String) {
     configuration.getProperty(port) match {
       case CONFIGURATION_KEYPAD_VALUE => c.setSelectedIndex(0)
       case CONFIGURATION_JOYSTICK_VALUE => c.setSelectedIndex(1)
+      case CONFIGURATION_KEYBOARD_VALUE => c.setSelectedIndex(2)
       case _ => c.setSelectedIndex(2) 
+    }
+  }
+  
+  private val keybButtons = Array(new JButton("Up"),
+                              new JButton("Down"),
+                              new JButton("Left"),
+                              new JButton("Right"),
+                              new JButton("Up-Right"),
+                              new JButton("Up-Left"),
+                              new JButton("Down-Right"),
+                              new JButton("Down-Left"),
+                              new JButton("Fire"))
+                              
+  private val keybLabels = {
+    import ControlPort._
+    val labels = Array.fill[JLabel](9)(new JLabel)
+  
+    for(b <- keybButtons.zipWithIndex) {
+      val ac = b._2 match {
+        case 0 => CONFIGURATION_UD_JOYSTICK_UP 
+        case 1 => CONFIGURATION_UD_JOYSTICK_DOWN
+        case 2 => CONFIGURATION_UD_JOYSTICK_LEFT
+        case 3 => CONFIGURATION_UD_JOYSTICK_RIGHT
+        case 4 => CONFIGURATION_UD_JOYSTICK_UP_RIGHT
+        case 5 => CONFIGURATION_UD_JOYSTICK_UP_LEFT
+        case 6 => CONFIGURATION_UD_JOYSTICK_DOWN_RIGHT
+        case 7 => CONFIGURATION_UD_JOYSTICK_DOWN_LEFT
+        case 8 => CONFIGURATION_UD_JOYSTICK_FIRE
+      }
+      b._1.setActionCommand(ac)
+      b._1.addActionListener(this)
+      val labelText = Option(configuration.getProperty(ac)) match {
+        case Some(l) => KeyEvent.getKeyText(l.toInt)
+        case None => "Empty"
+      }
+      labels(b._2).setText(labelText)
+    }
+    labels
+  }
+  
+  private val keybBarLabel = new JLabel("Press the buttons and type the key")
+  private var keyIndex = 0
+  private var keyCmd = ""
+  
+  private val keybListener : KeyListener = new KeyAdapter{
+    override def keyPressed(e:KeyEvent) {
+      if (e.getKeyLocation == KeyEvent.KEY_LOCATION_NUMPAD) {
+        JOptionPane.showMessageDialog(keyboardDialog,"Invalid key location", "Bad key location",JOptionPane.ERROR_MESSAGE)
+      }
+      else {
+        removeKeyListener(keybListener)
+        keybLabels(keyIndex).setText(KeyEvent.getKeyText(e.getExtendedKeyCode))
+        for(i <- 0 until 9) keybButtons(i).setEnabled(true)
+        configuration.setProperty(keyCmd,e.getExtendedKeyCode.toString)
+      }
     }
   }
   
@@ -26,9 +86,9 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends J
   port1Panel.add(new JLabel("Port #1:", SwingConstants.RIGHT))
   val port2Panel = new JPanel
   port2Panel.add(new JLabel("Port #2:", SwingConstants.RIGHT))
-  val port1JoyCombo = new JComboBox(Array("Keyboard", "Gamepad", "None"))
+  val port1JoyCombo = new JComboBox(Array("Keypad", "Gamepad", "Keyboard", "None"))
   port1Panel.add(port1JoyCombo)
-  val port2JoyCombo = new JComboBox(Array("Keyboard", "Gamepad", "None"))
+  val port2JoyCombo = new JComboBox(Array("Keypad", "Gamepad", "Keyboard" , "None"))
   port2Panel.add(port2JoyCombo)
   
   setCombo(port1JoyCombo,CONFIGURATION_JOY_PORT_1)
@@ -41,7 +101,9 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends J
   val okButton = new JButton("Ok")
   val cancelButton = new JButton("Cancel")
   val gamepadButton = new JButton("GamePad configuration ...")
+  val keybButton = new JButton("Keyboard configuration ...")
   val buttonPanel = new JPanel
+  buttonPanel.add(keybButton)
   buttonPanel.add(gamepadButton)
   buttonPanel.add(okButton)
   buttonPanel.add(cancelButton)
@@ -51,6 +113,8 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends J
   cancelButton.setActionCommand("CANCEL")
   gamepadButton.addActionListener(this)
   gamepadButton.setActionCommand("GAMEPAD")
+  keybButton.addActionListener(this)
+  keybButton.setActionCommand("KEYB")
 
   getContentPane.add("Center", centerPanel)
   getContentPane.add("South", buttonPanel)
@@ -63,11 +127,13 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends J
     c.getSelectedIndex match {
       case 0 => configuration.setProperty(port,CONFIGURATION_KEYPAD_VALUE)
       case 1 => configuration.setProperty(port,CONFIGURATION_JOYSTICK_VALUE)
-      case 2 => configuration.remove(port)
+      case 2 => configuration.setProperty(port,CONFIGURATION_KEYBOARD_VALUE)
+      case 3 => configuration.remove(port)
     }
   }
 
   def actionPerformed(e: ActionEvent) {
+    import ControlPort._
     e.getActionCommand match {
       case "OK" =>
         updateConfigFor(port1JoyCombo,CONFIGURATION_JOY_PORT_1)
@@ -82,8 +148,43 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends J
         joystickDialog.dispose
       case "FIRE_OK" =>
         joystickDialog.dispose
+      case "KEYB" =>
+        keyboardConfig
+      // key buttons
+      case CONFIGURATION_UD_JOYSTICK_UP => listenKey(e.getActionCommand,0)
+      case CONFIGURATION_UD_JOYSTICK_DOWN => listenKey(e.getActionCommand,1)
+      case CONFIGURATION_UD_JOYSTICK_LEFT => listenKey(e.getActionCommand,2)
+      case CONFIGURATION_UD_JOYSTICK_RIGHT => listenKey(e.getActionCommand,3)
+      case CONFIGURATION_UD_JOYSTICK_UP_RIGHT => listenKey(e.getActionCommand,4)
+      case CONFIGURATION_UD_JOYSTICK_UP_LEFT => listenKey(e.getActionCommand,5)
+      case CONFIGURATION_UD_JOYSTICK_DOWN_RIGHT => listenKey(e.getActionCommand,6)
+      case CONFIGURATION_UD_JOYSTICK_DOWN_LEFT => listenKey(e.getActionCommand,7)
+      case CONFIGURATION_UD_JOYSTICK_FIRE => listenKey(e.getActionCommand,8)
     }
     
+  }
+  
+  private def listenKey(cmd:String,index:Int) {
+    keyCmd = cmd
+    keyIndex = index
+    keyboardDialog.requestFocus
+    keyboardDialog.addKeyListener(keybListener) 
+    for(i <- 0 until 9) keybButtons(i).setEnabled(false)
+  }  
+  
+  private def keyboardConfig {        
+    keyboardDialog = new JDialog(parent,"Keyboard keys selection",true)
+    val buttonPanel = new JPanel(new GridLayout(9,2,5,5))
+    for(i <- 0 until 9) {
+      buttonPanel.add(keybButtons(i))
+      buttonPanel.add(keybLabels(i))
+    }
+    keyboardDialog.getContentPane.add("Center",buttonPanel)
+    keyboardDialog.getContentPane.add("South",keybBarLabel)
+    keyboardDialog.pack
+    keyboardDialog.setResizable(false)
+    keyboardDialog.setLocation(parentLoc.x + (parentSize.width - keyboardDialog.getSize.width) / 2,parentLoc.y + (parentSize.height - keyboardDialog.getSize.height) / 2)
+    keyboardDialog.setVisible(true)
   }
   
   private def gamePadConfig {
@@ -124,12 +225,13 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends J
         }
         pollingThread.start
         joystickDialog.pack
+        joystickDialog.setResizable(false)
         joystickDialog.setLocation(parentLoc.x + (parentSize.width - joystickDialog.getSize.width) / 2,parentLoc.y + (parentSize.height - joystickDialog.getSize.height) / 2)
         joystickDialog.setVisible(true)
         pollingThread.interrupt
         if (joyButtonSelected != "") {
           configuration.setProperty(CONFIG_CONTROLLER_NAME,controller.getName)
-          configuration.setProperty(CONFIF_CONTROLLER_FIRE_BUTTON,joyButtonSelected)
+          configuration.setProperty(CONFIG_CONTROLLER_FIRE_BUTTON,joyButtonSelected)
         }
       }
     }
@@ -141,5 +243,5 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends J
 }
 
 object JoystickSettingDialog extends App {
-  new JoystickSettingDialog(new javax.swing.JFrame, new Properties).show
+  new JoystickSettingDialog(new javax.swing.JFrame, new Properties).setVisible(true)
 }
