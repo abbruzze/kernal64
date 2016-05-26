@@ -54,6 +54,7 @@ import ucesoft.c64.peripheral.drive.ParallelCable
 import ucesoft.c64.peripheral.drive.C1541Mems
 import ucesoft.c64.expansion.DualSID
 import ucesoft.c64.peripheral.drive.FlyerIEC
+import ucesoft.c64.remote.RemoteC64
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -68,7 +69,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "1.2.5"
+  private[this] val VERSION = "1.2.6"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -114,6 +115,8 @@ class C64 extends C64Component with ActionListener with TraceListener {
   private[this] var traceItem,traceDiskItem : JCheckBoxMenuItem = _
   private[this] val busSnooper = new BusSnoop(bus)
   private[this] var busSnooperActive = false
+  // ----------------- REMOTE ------------------
+  private[this] var remote : Option[RemoteC64] = None
   // -------------------- DISK -----------------
   private[this] var isDiskActive = true
   private[this] var isDiskActive9 = false
@@ -203,6 +206,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   // ------------ Control Port -----------------------
   private[this] val gameControlPort = new controlport.GamePadControlPort(configuration)
   private[this] val keypadControlPort = controlport.ControlPort.keypadControlPort
+  private[this] val keyboardControlPort = controlport.ControlPort.userDefinedKeyControlPort(configuration)
   private[this] val controlPortA = new controlport.ControlPortBridge(keypadControlPort,"Control Port 1")  
   private[this] val controlPortB = new controlport.ControlPortBridge(gameControlPort,"Control port 2")
   // -------------- Light Pen -------------------------
@@ -604,6 +608,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
     displayFrame.getContentPane.add("Center",display)
     displayFrame.addKeyListener(keyb)
     displayFrame.addKeyListener(keypadControlPort)
+    displayFrame.addKeyListener(keyboardControlPort)
     display.addMouseListener(keypadControlPort)    
     val lightPen = new LightPenButtonListener
     add(lightPen)
@@ -662,7 +667,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   override def afterInitHook {    
 	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)    
     // deactivate drive 9
-    c1541_real9.setActive(false)
+    c1541_real9.setActive(false)    
   }
   
   private def errorHandler(t:Throwable) {
@@ -947,6 +952,37 @@ class C64 extends C64Component with ActionListener with TraceListener {
   	      case JFileChooser.APPROVE_OPTION =>
   	        flyerIEC.setFloppyRepository(fc.getSelectedFile)
   	      case _ =>
+        }
+      case "REMOTE_OFF" =>
+        remote match {
+          case Some(rem) => 
+            rem.stopRemoting
+            display.setRemote(None)
+            remote = None
+          case None =>
+        }
+      case "REMOTE_ON" =>
+        val source = e.getSource.asInstanceOf[JRadioButtonMenuItem]
+        if (remote.isDefined) remote.get.stopRemoting
+        val listeningPort = JOptionPane.showInputDialog(displayFrame,"Listening port", "Remoting port configuration",JOptionPane.QUESTION_MESSAGE,null,null,"8064")
+        if (listeningPort == null) {
+          source.setSelected(false)
+          display.setRemote(None)
+        }
+        else {
+          try {
+            val clip = display.getClipArea
+            val remote = new ucesoft.c64.remote.RemoteC64Server(listeningPort.toString.toInt,keyboardControlPort :: keyb :: keypadControlPort :: Nil,display.displayMem,vicChip.SCREEN_WIDTH,vicChip.SCREEN_HEIGHT,clip._1.x,clip._1.y,clip._2.x,clip._2.y)
+            this.remote = Some(remote)            
+        	  display.setRemote(this.remote)
+        	  remote.start
+          }
+          catch {
+            case io:IOException =>
+              JOptionPane.showMessageDialog(displayFrame,io.toString, "Remoting init error",JOptionPane.ERROR_MESSAGE)
+              source.setSelected(false)
+              display.setRemote(None)
+          }
         }
     }
   }
@@ -1801,6 +1837,24 @@ class C64 extends C64Component with ActionListener with TraceListener {
     
     optionMenu.addSeparator
     
+    val remoteItem = new JMenu("Remoting")
+    optionMenu.add(remoteItem)
+    
+    val group10 = new ButtonGroup
+    val remoteDisabledItem = new JRadioButtonMenuItem("Off")
+    remoteDisabledItem.setSelected(true)
+    remoteDisabledItem.setActionCommand("REMOTE_OFF")
+    remoteDisabledItem.addActionListener(this)
+    group10.add(remoteDisabledItem)
+    remoteItem.add(remoteDisabledItem)
+    val remoteEnabledItem = new JRadioButtonMenuItem("On ...")
+    remoteEnabledItem.setActionCommand("REMOTE_ON")
+    remoteEnabledItem.addActionListener(this)
+    group10.add(remoteEnabledItem)
+    remoteItem.add(remoteEnabledItem)
+    
+    optionMenu.addSeparator
+    
     val IOItem = new JMenu("I/O")
     optionMenu.add(IOItem)
     
@@ -1901,6 +1955,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
     def getControlPortFor(id:String) = configuration.getProperty(id) match {
       case CONFIGURATION_KEYPAD_VALUE => keypadControlPort
       case CONFIGURATION_JOYSTICK_VALUE => gameControlPort
+      case CONFIGURATION_KEYBOARD_VALUE => keyboardControlPort
       case _ => controlport.ControlPort.emptyControlPort
     }
     
@@ -1913,6 +1968,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
     try {
       val dialog = new JoystickSettingDialog(displayFrame,configuration)
       dialog.setVisible(true)
+      configureJoystick
     }
     finally {
       Clock.systemClock.play
