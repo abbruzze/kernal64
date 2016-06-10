@@ -752,7 +752,8 @@ final class VIC(mem: Memory,
       lightPenXYCoord(1) = rasterLine & 0xFF
       interruptControlRegister |= 8
       // check if we must set interrupt
-      if ((interruptControlRegister & interruptMaskRegister & 0x0f) != 0) irqRequest
+      //if ((interruptControlRegister & interruptMaskRegister & 0x0f) != 0) irqRequest
+      checkAndSendIRQ
     }
   }
 
@@ -828,9 +829,8 @@ final class VIC(mem: Memory,
           //val clk = Clock.systemClock
           //clk.schedule(new ClockEvent("$D011",clk.currentCycles + 1,(cycles) => {
             controlRegister1 = value
-            val prevRasterLatch = rasterLatch
+            //checkRasterIRQ
             if ((controlRegister1 & 128) == 128) rasterLatch |= 0x100 else rasterLatch &= 0xFF
-            //if (prevRasterLatch != rasterLatch && rasterLine == rasterLatch) rasterLineEqualsLatch
             yscroll = controlRegister1 & 7
             rsel = (controlRegister1 & 8) >> 3
             den = (controlRegister1 & 16) == 16
@@ -845,9 +845,8 @@ final class VIC(mem: Memory,
     	case 18 =>
           //Log.debug("VIC previous value of raster latch is %4X".format(rasterLatch))
           val rst8 = rasterLatch & 0x100
-          val prevRasterLatch = rasterLatch
+          //checkRasterIRQ
           rasterLatch = value | rst8
-          //if (prevRasterLatch != rasterLatch && rasterLine == rasterLatch) rasterLineEqualsLatch
           if (debug) Log.info("VIC raster latch set to %4X value=%2X".format(rasterLatch, value))
         //else Log.debug("VIC raster latch set to %4X value=%2X".format(rasterLatch,value))
         case 19 | 20 => // light pen ignored
@@ -892,26 +891,28 @@ final class VIC(mem: Memory,
           if (debug) Log.info(s"VIC base pointer set to ${Integer.toBinaryString(vicBaseAddress)} video matrix=${videoMatrixAddress} char address=${characterAddress} bitmap address=${bitmapAddress}")
         //Log.info(s"VIC base pointer set to ${Integer.toBinaryString(vicBaseAddress)} video matrix=${videoMatrixAddress} char address=${characterAddress} bitmap address=${bitmapAddress} raster=${rasterLine}")          
         case 25 =>
-          interruptControlRegister &= ~value & 0x0F
+          interruptControlRegister &= (~value & 0x0F) | 0x80
           // check if we must clear interrupt
-          if ((interruptControlRegister & interruptMaskRegister & 0x0f) == 0) {
-            //Log.debug("VIC clearing interrupt...")
-            interruptControlRegister &= 0x7F
-            irqAction(false)
-          }
-          else interruptControlRegister |= 0x80
+//          if ((interruptControlRegister & interruptMaskRegister & 0x0f) == 0) {
+//            //Log.debug("VIC clearing interrupt...")
+//            interruptControlRegister &= 0x7F
+//            irqAction(false)
+//          }
+//          else interruptControlRegister |= 0x80
+          checkAndSendIRQ
         // light pen ignored
         //Log.debug("VIC interrupt control register set to " + Integer.toBinaryString(interruptControlRegister))
         case 26 =>
           interruptMaskRegister = value & 0x0F
           // check if we must set interrupt
-          if ((interruptControlRegister & interruptMaskRegister & 0x0f) != 0) {
-            //Log.debug("VIC#26 setting interrupt...")
-            irqRequest
-          } else {
-            interruptControlRegister &= 0x7F
-            irqAction(false)
-          }
+//          if ((interruptControlRegister & interruptMaskRegister & 0x0f) != 0) {
+//            //Log.debug("VIC#26 setting interrupt...")
+//            irqRequest
+//          } else {
+//            interruptControlRegister &= 0x7F
+//            irqAction(false)
+//          }
+          checkAndSendIRQ
 
         //Log.debug("VIC interrupt mask register set to " + Integer.toBinaryString(interruptMaskRegister))
         case 27 =>
@@ -976,6 +977,17 @@ final class VIC(mem: Memory,
     }
   }
   
+  private[this] var rasterIRQTriggered = false
+  @inline private def checkRasterIRQ {
+    if (rasterLine == rasterLatch) rasterLineEqualsLatch
+//      if (!rasterIRQTriggered) {
+//        rasterIRQTriggered = true
+//        rasterLineEqualsLatch
+//      }
+//    }
+//    else rasterIRQTriggered = false
+  }
+  
   final def clock(cycles: Long) {
     val outOfScreen = rasterLine <= BLANK_TOP_LINE || rasterLine >= BLANK_BOTTOM_LINE
     isBlank = outOfScreen || rasterCycle <= BLANK_LEFT_CYCLE || rasterCycle >= BLANK_RIGHT_CYCLE
@@ -986,7 +998,9 @@ final class VIC(mem: Memory,
     (rasterCycle: @switch) match {       
       case 1 =>                
         // check raster line with raster latch if irq enabled     
-        if (rasterLine > 0 && rasterLine == rasterLatch) rasterLineEqualsLatch
+        if (rasterLine > 0) {
+          checkRasterIRQ
+        }        
         // check den on $30
         if (rasterLine == 0x30) denOn30 = den
         badLine = isBadLine        
@@ -995,7 +1009,9 @@ final class VIC(mem: Memory,
         drawCycle(-1)
       case 2 =>
         // check raster line with raster latch if irq enabled    
-        if (rasterLine == 0 && rasterLine == rasterLatch) rasterLineEqualsLatch
+        if (rasterLine == 0) {
+          checkRasterIRQ
+        }
         sprites(3).readMemoryData(false)
         setBaLow((spriteDMAon & 0x38) > 0) // 3,4,5
         drawCycle(-1)
@@ -1257,21 +1273,33 @@ final class VIC(mem: Memory,
 
     //if (debug) { display.showFrame }
   }
-
-  @inline private def irqRequest {
-   if ((interruptControlRegister & 0x80) == 0) {
+  
+  @inline private def checkAndSendIRQ {
+    if ((interruptControlRegister & interruptMaskRegister & 0x0f) == 0) {
+      interruptControlRegister &= 0x7f
+      irqAction(false)
+    }
+    else {
       interruptControlRegister |= 0x80
       irqAction(true)
-   }
+    }
   }
+
+//  @inline private def irqRequest {
+//   if ((interruptControlRegister & 0x80) == 0) {
+//      interruptControlRegister |= 0x80
+//      irqAction(true)
+//   }
+//  }
 
   @inline private def rasterLineEqualsLatch {
     if ((interruptControlRegister & 1) == 0) {
       interruptControlRegister |= 1
-      if ((interruptMaskRegister & 1) == 1) {
-        //Log.debug(s"VIC - raster interrupt request raster=${rasterLine}")
-        irqRequest
-      }
+//      if ((interruptMaskRegister & 1) == 1) {
+//        //Log.debug(s"VIC - raster interrupt request raster=${rasterLine}")
+//        irqRequest
+//      }
+      checkAndSendIRQ
     }
   }
 
@@ -1281,10 +1309,11 @@ final class VIC(mem: Memory,
     spriteSpriteCollision |= mask
     if (ssCollision == 0) {     
       interruptControlRegister |= 4
-      if ((interruptMaskRegister & 4) == 4) {
-        //Log.debug(s"Sprite-sprite collision detected between ${i} and ${j} ss=${Integer.toBinaryString(spriteSpriteCollision)} icr=${Integer.toBinaryString(interruptControlRegister)}")
-        irqRequest
-      }
+//      if ((interruptMaskRegister & 4) == 4) {
+//        //Log.debug(s"Sprite-sprite collision detected between ${i} and ${j} ss=${Integer.toBinaryString(spriteSpriteCollision)} icr=${Integer.toBinaryString(interruptControlRegister)}")
+//        irqRequest
+//      }
+      checkAndSendIRQ
     }
   }
   @inline private def spriteDataCollision(i: Int) {
@@ -1293,10 +1322,11 @@ final class VIC(mem: Memory,
     spriteBackgroundCollision |= (1 << i)
     if (sbc == 0) {      
       interruptControlRegister |= 2
-      if ((interruptMaskRegister & 2) == 2) {
-        //Log.debug(s"Sprite-data collision detected for ${i} sd=${Integer.toBinaryString(spriteBackgroundCollision)} icr=${Integer.toBinaryString(interruptControlRegister)}")
-        irqRequest
-      }
+//      if ((interruptMaskRegister & 2) == 2) {
+//        //Log.debug(s"Sprite-data collision detected for ${i} sd=${Integer.toBinaryString(spriteBackgroundCollision)} icr=${Integer.toBinaryString(interruptControlRegister)}")
+//        irqRequest
+//      }
+      checkAndSendIRQ
     }
   }
 
