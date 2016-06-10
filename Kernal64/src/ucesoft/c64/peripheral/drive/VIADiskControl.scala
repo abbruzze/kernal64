@@ -94,7 +94,7 @@ class VIADiskControl(var cpu: CPU6510,
   def setReadOnly(readOnly:Boolean) = isReadOnly = readOnly
 
   def setDriveReader(driveReader:Floppy) {
-    if (!motorOn) resetFloppy
+    //if (!motorOn) resetFloppy
     floppy = driveReader    
     // reset the last track
     floppy.changeTrack(trackSteps)
