@@ -277,7 +277,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
     private[this] var vicIRQLow = false
     private[this] var expPortIRQLow = false
     
-    private def handleIRQ = {
+    @inline private def handleIRQ = {
       //Log.debug(s"Handling IRQ ciaIRQ=${ciaIRQLow} vicIRQ=${vicIRQLow}")
       cpu.irqRequest(ciaIRQLow || vicIRQLow || expPortIRQLow)
     }
@@ -1179,7 +1179,9 @@ class C64 extends C64Component with ActionListener with TraceListener {
         case None =>
       }
       attachedDisks(driveID) = Some(disk)
+      clock.pause
       drives(driveID).setDriveReader(disk)
+      clock.play
             
       loadFileItems(driveID).setEnabled(isD64)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
