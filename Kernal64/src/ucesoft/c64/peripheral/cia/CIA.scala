@@ -119,16 +119,17 @@ class CIA(val name:String,
               // h
               h = incBCD(h)
               if (h == 0x12) {
-                h = 0
+                //h = 0
                 am = !am
               }
+              else h = h % 0x12
             }
           }
         }
       }
       
       @inline private def bcd2dec(value:Int) = "" + (((value & 0xF0) >> 4) + '0').toChar + ((value & 0x0F)  + '0').toChar
-      override def toString = s"${bcd2dec(h)}:${bcd2dec(m)}:${bcd2dec(s)}:${bcd2dec(ts)}"
+      override def toString = s"${bcd2dec(h)}:${bcd2dec(m)}:${bcd2dec(s)}:${bcd2dec(ts)} [$freezed]"
     }
     
     private val actualTime = Time(0,0,0,0,true)
@@ -145,9 +146,9 @@ class CIA(val name:String,
     def init = reset
     
     def reset {
-      actualTime.reset(0,0,0,0,true,false)
-      latchTime.reset(1,0,0,0,true,true)
-      alarmTime.reset(0,0,0,0,true,true)
+      actualTime.reset(1,0,0,0,true,true)
+      latchTime.reset(1,0,0,0,true,false)
+      alarmTime.reset(0,0,0,0,true,false)
       reschedule
     }
     
@@ -164,7 +165,7 @@ class CIA(val name:String,
     @inline def reschedule = {
       val clk = Clock.systemClock
       clk.cancel(componentID)
-      clk.schedule(new ClockEvent(componentID,Clock.systemClock.nextCycles + 98524,tickCallback))
+      clk.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 98524,tickCallback))
     }
     
     def readHour = {
@@ -193,6 +194,7 @@ class CIA(val name:String,
         actualTime.freezed = true
         actualTime.h = hour & 0x7F
         actualTime.am = (hour & 0x80) == 0
+        if (actualTime.h == 0x12) actualTime.am = !actualTime.am        
       }
     }
     def writeMin(min:Int) {
@@ -216,6 +218,7 @@ class CIA(val name:String,
       else {
         actualTime.ts = tsec  & 0x0F
         actualTime.freezed = false
+        if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
         // reschedule tick
         reschedule
       }
