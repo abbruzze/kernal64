@@ -190,7 +190,9 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     }
   }
   
-  def pause = {
+  def pause {
+    if (Thread.currentThread == this) return
+    
     suspendedLock.synchronized { suspended = true }
     while (!suspendedConfim) { Thread.sleep(10) }
   }
