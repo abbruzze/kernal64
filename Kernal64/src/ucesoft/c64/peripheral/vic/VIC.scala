@@ -829,8 +829,12 @@ final class VIC(mem: Memory,
           //val clk = Clock.systemClock
           //clk.schedule(new ClockEvent("$D011",clk.currentCycles + 1,(cycles) => {
             controlRegister1 = value
-            //checkRasterIRQ
+            val prevRasterLatch = rasterLatch
             if ((controlRegister1 & 128) == 128) rasterLatch |= 0x100 else rasterLatch &= 0xFF
+            if (prevRasterLatch != rasterLatch) {
+              val clk = Clock.systemClock
+              clk.schedule(new ClockEvent("$D017",clk.nextCycles,(cycles) => checkRasterIRQ))              
+            }
             yscroll = controlRegister1 & 7
             rsel = (controlRegister1 & 8) >> 3
             den = (controlRegister1 & 16) == 16
@@ -845,8 +849,12 @@ final class VIC(mem: Memory,
     	case 18 =>
           //Log.debug("VIC previous value of raster latch is %4X".format(rasterLatch))
           val rst8 = rasterLatch & 0x100
-          //checkRasterIRQ
+          val prevRasterLatch = rasterLatch
           rasterLatch = value | rst8
+          if (prevRasterLatch != rasterLatch) {
+              val clk = Clock.systemClock
+              clk.schedule(new ClockEvent("$D018",clk.nextCycles,(cycles) => checkRasterIRQ))              
+            }
           if (debug) Log.info("VIC raster latch set to %4X value=%2X".format(rasterLatch, value))
         //else Log.debug("VIC raster latch set to %4X value=%2X".format(rasterLatch,value))
         case 19 | 20 => // light pen ignored
