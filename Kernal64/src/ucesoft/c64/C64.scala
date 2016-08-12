@@ -69,7 +69,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "1.2.6"
+  private[this] val VERSION = "1.2.7"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -696,7 +696,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   
   private def mainLoop(cycles:Long) {
     // VIC PHI1
-    vicChip.clock(cycles)
+    vicChip.clock
     //DRIVES
     if (isDiskActive) drives(0).clock(cycles)
     if (isDiskActive9) drives(1).clock(cycles)
@@ -708,20 +708,8 @@ class C64 extends C64Component with ActionListener with TraceListener {
     // Flyer
     if (isFlyerEnabled) flyerIEC.clock(cycles)
     // CPU PHI2
-    if (cpuExact) {
-//      if (baLow && cycles > baLowUntil) {
-//        cpu.setBaLow(false)
-//        expansionPort.setBaLow(false)
-//        baLow = false
-//      }
-      cpu.fetchAndExecute
-    }
+    if (cpuExact) cpu.fetchAndExecute
     else {
-//      if (baLow && cycles > baLowUntil) {
-//        expansionPort.setBaLow(false)
-//        baLow = false
-//      }
-      //val canExecCPU = cycles > cpuWaitUntil && cycles > baLowUntil && !dma
       val canExecCPU = cycles > cpuWaitUntil && !baLow && !dma
       if (canExecCPU) cpuWaitUntil = cycles + cpu.fetchAndExecute
     }
