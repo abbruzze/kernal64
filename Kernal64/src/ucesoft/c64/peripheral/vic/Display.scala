@@ -74,7 +74,10 @@ class Display(width: Int,height: Int, title: String, frame: JFrame) extends JCom
   }
 
   def setDrawRasterLine(drawRasterLine: Boolean) = this.drawRasterLine = drawRasterLine
-  def setRasterLineAt(rasterLine: Int) = this.rasterLine = rasterLine
+  def setRasterLineAt(rasterLine: Int) = {
+    this.rasterLine = rasterLine
+    repaint()
+  }
   def getRasterLine = rasterLine
 
   override final def paint(g: Graphics) {
