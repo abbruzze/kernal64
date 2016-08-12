@@ -26,41 +26,30 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
   }
   val isActive = true
 
-  def setBank(bank: Int) {
+  final def setBank(bank: Int) {
     this.bank = ~bank & 3
     baseAddress = this.bank << 14
-    Log.debug(s"Set VIC bank to ${bank}. Internal bank is ${this.bank}")
+    //Log.debug(s"Set VIC bank to ${bank}. Internal bank is ${this.bank}")
   }
   
-  def lastByteRead = memLastByteRead
+  final def lastByteRead = memLastByteRead
   
   def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
     ultimax = !game && exrom
   }
   
-  def read(address: Int, chipID: ChipID.ID = ChipID.VIC): Int = { 
-    /*
-    memLastByteRead =
-    // check if we have to read CHAR ROM
-    if (address >= 4096 && address < 8192 && (bank == 0 || bank == 2)) {
-      val offset = address + 0xC000 //- 4096 + CPU6510Mems.M_CHARACTERS
-      //Log.fine("VIC reading character ROM at offset %4X".format(offset))
-      charROM.read(offset,chipID)
-    }
-    else {      
-      val realAddress = baseAddress | address
-      //Log.fine("VIC reading RAM at %4X".format(realAddress))
-      mem.read(realAddress,chipID)
-    }
-    * 
-    */
-    
-    val realAddress = baseAddress | address
-    memLastByteRead =
-    if ((realAddress & 0x7000) == 0x1000 && !ultimax) charROM.read(0xD000 | (address & 0x0FFF),chipID)//(address + 0xC000,chipID)
-    else mem.read(realAddress,chipID)
-    
+  final def read(address: Int, chipID: ChipID.ID = ChipID.VIC): Int = {     
+    memLastByteRead = readPhi1(address)    
     memLastByteRead
   }
-  def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = { /* ignored for VIC */}
+  
+  final def readPhi2(address:Int) : Int = readPhi1(address)
+  
+  @inline private def readPhi1(address: Int) : Int = {
+    val realAddress = baseAddress | address
+    if ((realAddress & 0x7000) == 0x1000 && !ultimax) charROM.read(0xD000 | (address & 0x0FFF),ChipID.VIC)
+    else mem.read(realAddress,ChipID.VIC)
+  }
+  
+  final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = { /* ignored for VIC */}
 }
