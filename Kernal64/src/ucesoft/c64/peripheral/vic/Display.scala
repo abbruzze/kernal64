@@ -26,7 +26,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame) extends JCom
   private[this] var debugImage: Image = _
   private[this] val screen = {
     displayImage.setAnimated(true);
-    displayImage.setFullBufferUpdates(true)
+    displayImage.setFullBufferUpdates(false)
     createImage(displayImage)
   }
   private[this] var drawRasterLine = false

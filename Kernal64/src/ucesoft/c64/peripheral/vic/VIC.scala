@@ -47,8 +47,8 @@ final class VIC(mem: BankedMemory,
   final private[this] val BLANK_BOTTOM_LINE = 300
   final private[this] val BLANK_LEFT_CYCLE = 9
   final private[this] val BLANK_RIGHT_CYCLE = 61
-  final private[this] val BA_CYCLES_FOR_CHARS = 40
-  final private[this] val BA_CYCLES_PER_SPRITE = 3
+  final private[this] val X_LEFT_CLIP = (BLANK_LEFT_CYCLE + 1) * 8 - 3
+  final private[this] val X_RIGHT_CLIP = 480
   final val VISIBLE_SCREEN_WIDTH = 403//(BLANK_RIGHT_CYCLE - BLANK_LEFT_CYCLE - 1) * 8
   final val VISIBLE_SCREEN_HEIGHT = BLANK_BOTTOM_LINE - BLANK_TOP_LINE - 1
   final val SCREEN_ASPECT_RATIO = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
@@ -84,10 +84,10 @@ final class VIC(mem: BankedMemory,
   private[this] var display: Display = null // the display
   private[this] var displayMem: Array[Int] = null
   private[this] var firstModPixelX, firstModPixelY = 0 // first x,y pixel coordinate modified
-  private[this] var lastModPixelX, lastModPixelY = 0 // last x,y pixel coordinate modified
+  final private[this] val lastModPixelX = X_RIGHT_CLIP
+  private[this] var lastModPixelY = 0 // last y pixel coordinate modified
   private[this] var lightPenEnabled = false
   private[this] var _baLow = false
-  private[this] var baLowCycle = 0
   // --------------------- DEBUG --------------------------------------------------------------------------
   private[this] var traceRasterLineInfo = false
   final private[this] val traceRasterLineBuffer = Array.fill(SCREEN_WIDTH)("")
@@ -448,38 +448,6 @@ final class VIC(mem: BankedMemory,
       }
       else display = false
     }
-
-//    final def checkForCycle(cycle: Int) = (cycle : @switch) match {
-//      case 16 =>
-//        if (expansionFF) {
-//          mcbase = mc          
-//          if (mcbase == 63) {
-//            dma = false
-//            spriteDMAon &= ~DMA_INDEX
-//          }
-//        }
-//      case 55|56 =>
-//        if (cycle == 55 && _yexp) expansionFF = !expansionFF
-//        if (_enabled && y == (rasterLine & 0xFF) && !dma) {
-//          dma = true
-//          spriteDMAon |= DMA_INDEX
-//          mcbase = 0
-//          if (_yexp) expansionFF = false
-//          //Log.debug(s"Sprite #${index}. " + this)
-//          //println(s"Sprite #${index} DMA=true on rasterLine=${rasterLine}")
-//        }
-//      case 58 =>
-//        mc = mcbase
-//        if (dma) {
-//          if (_enabled && y == (rasterLine & 0xFF)) {
-//            display = true
-//            spritesDisplayedMask |= DMA_INDEX
-//          }          
-//        }
-//        else display = false 
-//        
-//      case _ => // do nothing
-//    }
   }
   final private[this] val sprites = Array(new Sprite(0), new Sprite(1), new Sprite(2), new Sprite(3), new Sprite(4), new Sprite(5), new Sprite(6), new Sprite(7))
   private[this] var spritesDisplayedMask = 0
@@ -735,7 +703,7 @@ final class VIC(mem: BankedMemory,
     this.display = display
     displayMem = display.displayMem
     if (clip)
-      display.setClipArea((BLANK_LEFT_CYCLE + 1) * 8 - 3, BLANK_TOP_LINE + 1, 480, BLANK_BOTTOM_LINE)
+      display.setClipArea(X_LEFT_CLIP, BLANK_TOP_LINE + 1,X_RIGHT_CLIP, BLANK_BOTTOM_LINE)
   }
 
   def enableLightPen(enabled: Boolean) = lightPenEnabled = enabled
@@ -954,7 +922,6 @@ final class VIC(mem: BankedMemory,
   
   @inline private def setBaLow(low:Boolean) {
     if (low != _baLow) {
-      baLowCycle = rasterCycle
       _baLow = low
       baLow(low)
     }
@@ -1156,7 +1123,6 @@ final class VIC(mem: BankedMemory,
       canUpdateLightPenCoords = true
       display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
       firstModPixelX = -1
-      lastModPixelX = -1
       ref = 0xFF
       vcbase = 0
       vc = 0
@@ -1180,11 +1146,10 @@ final class VIC(mem: BankedMemory,
     if (displayMem(index) != color) {
       displayMem(index) = color
       if (firstModPixelX == -1) {
-        firstModPixelX = x
+        firstModPixelX = X_LEFT_CLIP
         firstModPixelY = y
       }
 
-      lastModPixelX = x
       lastModPixelY = y
     }
     if (traceRasterLineInfo && y == traceRasterLine) tracePixel(pixel, x)
@@ -1309,17 +1274,11 @@ final class VIC(mem: BankedMemory,
    * To be called on bad lines
    */
   @inline private def readAndStoreVideoMemory {
-    if (rasterCycle - baLowCycle < 3) {
-      vml_p(vmli) = 0xff
-      vml_c(vmli) = 0xff
-    }
-    else {
-      val charCode = mem.readPhi2(videoMatrixAddress | vc)
-      val color = colorMem.read(COLOR_ADDRESS | vc) & 0x0F
-      vml_p(vmli) = charCode
-      vml_c(vmli) = color
-      //Log.fine(s"Reading video memory at ${videoMatrixAddress + offset}: charCode=${charCode} color=${color}")
-    }
+    val charCode = mem.readPhi2(videoMatrixAddress | vc)
+    val color = colorMem.read(COLOR_ADDRESS | vc) & 0x0F
+    vml_p(vmli) = charCode
+    vml_c(vmli) = color
+    //Log.fine(s"Reading video memory at ${videoMatrixAddress + offset}: charCode=${charCode} color=${color}")
   }
   
   @inline private def readCharFromMemory : Int = {
