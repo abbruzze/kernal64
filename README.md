@@ -1,6 +1,9 @@
-kernal64 ver 1.2.6
+kernal64 ver 1.2.7
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
+
+###What's new in 1.2.7 (Aug 15th 2016)
+* Improved CPU & VIC timings. Now nufli images can be displayed properly as well as nuvie videos.
 
 ###What's new in 1.2.6 (May 26th 2016)
 * Remoting (experimental) : share the emulator's screen with your friend on the network to play games in two-player mode
