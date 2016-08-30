@@ -33,7 +33,7 @@ Written in the Scala language (http://www.scala-lang.org/) and available for any
 
 Here the main features:
 * Cycle based: exact cycle emulation using the PAL frequency
-* VIC emulation based on the Christian Bauer's article: "The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64". I know that it's incomplete (and in some cases buggy). I tried to close some issues by myself. Some others,Sprite Crunch for instance, are still open.
+* VIC emulation based on the Christian Bauer's article: "The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64" and the VIC-Addendum.
 * 6510 CPU full emulation (with illegal opcodes too). The user can choose between a cycle exact cpu and a faster cpu not cycle exact.
 * CIA1, CIA2 chips emulation: almost full.
 * IEC Serial Bus
