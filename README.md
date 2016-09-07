@@ -65,5 +65,9 @@ Here the main features:
 Download and unzip https://github.com/abbruzze/kernal64/tree/master/Kernal64/dist/kernal64_install.zip on your computer.
 Be sure to have a jre (1.7 or above) in the path and launch the **kernal64.bat** or **kernal64.sh** batch file, depending on your operating system.
 
+The scripts start java with the -server option for performance reason. It could happen that your Java installation does not support the server option. In this case edit the script and remove the -server option.
+
+If you want to load a 16M REU modify the memory settings inside the start scripts: for example, you could set -Xmx128M.
+
 ###Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
