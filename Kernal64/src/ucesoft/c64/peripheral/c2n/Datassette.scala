@@ -5,6 +5,10 @@ import ucesoft.c64.C64ComponentType
 import ucesoft.c64.Clock
 import ucesoft.c64.ClockEvent
 import ucesoft.c64.formats.TAP
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
+import javax.swing.JOptionPane
 
 class Datassette(ciaFlagLow : () => Unit) extends C64Component {
   val componentID = "Datassette 1530"
@@ -151,5 +155,13 @@ class Datassette(ciaFlagLow : () => Unit) extends C64Component {
           }
       }
     }
+  }
+  
+  // state
+  protected def saveState(out:ObjectOutputStream) {}
+  protected def loadState(in:ObjectInputStream) {}
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = {
+    if (motorOn) JOptionPane.showMessageDialog(parent,"Can't load/save state if datassette is playing or recording","State error",JOptionPane.ERROR_MESSAGE)
+    !motorOn
   }
 }
