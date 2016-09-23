@@ -5,6 +5,10 @@ import ucesoft.c64.ChipID
 import ucesoft.c64.Log
 import ucesoft.c64.cpu.RAMComponent
 import ucesoft.c64.C64ComponentType
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
+import javax.swing.JOptionPane
 
 abstract class ExpansionPort extends RAMComponent {
   val componentID = "ExpansionPort"
@@ -45,6 +49,14 @@ abstract class ExpansionPort extends RAMComponent {
   
   def freezeButton {}
   def isFreezeButtonSupported = false
+  
+  // state
+  protected def saveState(out:ObjectOutputStream) {}
+  protected def loadState(in:ObjectInputStream) {}
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = {
+    JOptionPane.showMessageDialog(parent,s"Loading/storing of cartridge's state is not supported [$componentID].","State error",JOptionPane.ERROR_MESSAGE)
+    false
+  }
 }
 
 object ExpansionPort {
@@ -66,6 +78,7 @@ object ExpansionPort {
     val ROMH = EmptyROM: Memory
     override def isEmpty = true
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = memoryForEmptyExpansionPort.lastByteRead
+    override protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   private val proxyExpansionPort : ExpansionPort = new ExpansionPort {
     val name = "Proxy Expansion Port"
@@ -82,6 +95,10 @@ object ExpansionPort {
     final override def freezeButton = expansionPort.freezeButton
     final override def isFreezeButtonSupported = expansionPort.isFreezeButtonSupported
     final override def eject = expansionPort.eject
+    // state
+    final override protected def saveState(out:ObjectOutputStream) = expansionPort.saveState(out)
+    final override protected def loadState(in:ObjectInputStream) = expansionPort.loadState(in)
+    final override protected def allowsStateRestoring(parent:JFrame) : Boolean = expansionPort.allowsStateRestoring(parent)
   }
 
   private[this] var expansionPort = emptyExpansionPort

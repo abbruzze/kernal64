@@ -11,6 +11,10 @@ import ucesoft.c64.peripheral.rs232.RS232
 import ucesoft.c64.peripheral.cia.CIA
 import ucesoft.c64.peripheral.rs232.RS232StatusListener
 import ucesoft.c64.C64ComponentType
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
+import javax.swing.JOptionPane
 
 object SwiftLink {
   def getSL(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort]) : ExpansionPort with RS232 = {
@@ -350,5 +354,12 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
       }
     }
     else modemIn.append("MODEM COMMAND ERROR" + 13.toChar)
+  }
+  // state
+  override protected def saveState(out:ObjectOutputStream) {}
+  override protected def loadState(in:ObjectInputStream) {}
+  override protected def allowsStateRestoring(parent:JFrame) : Boolean = {
+    JOptionPane.showMessageDialog(parent,"Loading/storing of cartridge's state is not supported [SwiftLink].","State error",JOptionPane.ERROR_MESSAGE)
+    false
   }
 }
