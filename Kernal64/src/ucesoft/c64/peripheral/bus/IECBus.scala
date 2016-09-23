@@ -3,6 +3,10 @@ package ucesoft.c64.peripheral.bus
 import ucesoft.c64.Log
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
+import java.io.IOException
 
 trait IECBusListener {
   val isController = false
@@ -19,8 +23,8 @@ object IECBusLine extends Enumeration {
 }
 
 object IECBus {
-  val GROUND = 1
-  val VOLTAGE = 0
+  final val GROUND = 1
+  final val VOLTAGE = 0
 }
 
 class IECBus extends C64Component {
@@ -109,17 +113,11 @@ class IECBus extends C64Component {
     }
     if (preATN != ATN) {
       var l = lines
-	  while (l != Nil) {
-	    l.head.listener.atnChanged(preATN,ATN)
-	    l = l .tail
-	  }
+  	  while (l != Nil) {
+  	    l.head.listener.atnChanged(preATN,ATN)
+  	    l = l .tail
+  	  }
     }
-    //println(s"${id} " + this)
-    /*
-    if (preATN != ATN || preCLK != CLK || preDATA != DATA) {
-      Log.info(s"IEC lines[${id}]: atn=${ATN} clk=${CLK} data=${DATA}")
-    }
-    */
   }
   
   final def atn = ATN
@@ -127,4 +125,28 @@ class IECBus extends C64Component {
   final def data = DATA
   
   override def toString = s"IECBus ATN=${ATN} CLK=${CLK} DATA=${DATA}"  
+  
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    for(l <- lines) {
+      out.writeObject(l.listener.busid)
+      out.writeInt(l.atn)
+      out.writeInt(l.data)
+      out.writeInt(l.clk)
+    }
+  }
+  protected def loadState(in:ObjectInputStream) {
+    for(i <- 0 until lines.length) {
+      val id = in.readObject.asInstanceOf[String]
+      lines find { _.listener.busid == id } match {
+        case Some(l) =>
+          l.atn = in.readInt
+          l.data = in.readInt
+          l.clk = in.readInt
+        case None =>
+          throw new IOException(s"Can't find busid $id")
+      }
+    }
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
