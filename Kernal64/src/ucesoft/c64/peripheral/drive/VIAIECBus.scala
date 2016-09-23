@@ -6,6 +6,8 @@ import ucesoft.c64.peripheral.bus.IECBus
 import ucesoft.c64.peripheral.bus.IECBusLine
 import ucesoft.c64.Log
 import ucesoft.c64.Clock
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
 
 class VIAIECBus(driveID:Int,
 				bus:IECBus,
@@ -80,5 +82,16 @@ class VIAIECBus(driveID:Int,
     val atna = ((~regs(DDRB) | regs(PB)) & 0x10) > 0
     val dataOut = (bus.atn == IECBus.GROUND) ^ atna
     if (dataOut) bus.setLine(busid,IECBusLine.DATA,IECBus.GROUND) else bus.setLine(busid,IECBusLine.DATA,data_out)
+  }
+  // state
+  override protected def saveState(out:ObjectOutputStream) {
+    super.saveState(out)
+    out.writeInt(data_out)
+    out.writeBoolean(driveEnabled)
+  }
+  override protected def loadState(in:ObjectInputStream) {
+    super.loadState(in)
+    data_out = in.readInt
+    driveEnabled = in.readBoolean
   }
 }

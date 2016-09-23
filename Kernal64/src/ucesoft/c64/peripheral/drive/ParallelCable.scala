@@ -2,6 +2,9 @@ package ucesoft.c64.peripheral.drive
 
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 /**
  * VIA#1  User port plug 
@@ -41,4 +44,13 @@ object ParallelCable extends C64Component {
     properties.setProperty("Value",cableValue.toString)
     properties
   }
+  
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeInt(cableValue)
+  }
+  protected def loadState(in:ObjectInputStream) {
+    cableValue = in.readInt()
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }

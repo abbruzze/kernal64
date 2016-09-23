@@ -6,6 +6,9 @@ import ucesoft.c64.Log
 import ucesoft.c64.Clock
 import ucesoft.c64.ClockEvent
 import ucesoft.c64.cpu.RAMComponent
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 abstract class VIA(val name:String,
 				   val startAddress:Int,
@@ -14,9 +17,7 @@ abstract class VIA(val name:String,
   val length = 0x10
   val isActive = true
   val id = ChipID.VIA
-  
-  private[this] val UPDATE_CLOCKS = 20
-  
+    
   protected[this] val regs = Array.ofDim[Int](length)
   private[this] var paLatch = 0
   private[this] var pbLatch = 0
@@ -175,7 +176,7 @@ abstract class VIA(val name:String,
     //if (active) clock.schedule(new ClockEvent(name,cycles + UPDATE_CLOCKS,update _))
   }
   
-  private def updateT1 {
+  @inline private def updateT1 {
     var counter = regs(T1LC) | regs(T1HC) << 8
     //Log.debug(s"T1[${name}] counter = ${counter}")
     counter -= 1//UPDATE_CLOCKS
@@ -195,7 +196,7 @@ abstract class VIA(val name:String,
     regs(T1HC) = (counter >> 8) & 0xFF
   }
   
-  private def updateT2 {
+  @inline private def updateT2 {
     if (!is_set(ACR,0x20)) {	// DO NOT count pulses on PB6
       var counter = regs(T2LC) | regs(T2HC) << 8
       counter -= 1//UPDATE_CLOCKS
@@ -210,4 +211,22 @@ abstract class VIA(val name:String,
     properties.setProperty("T2 counter",Integer.toHexString(regs(T2LC) | regs(T2HC) << 8))
     super.getProperties
   }
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeInt(paLatch)
+    out.writeInt(pbLatch)
+    out.writeInt(t2ll)
+    out.writeInt(PB7)
+    out.writeBoolean(active)
+    out.writeObject(regs)
+  }
+  protected def loadState(in:ObjectInputStream) {
+    paLatch = in.readInt
+    pbLatch = in.readInt
+    t2ll = in.readInt
+    PB7 = in.readInt
+    active = in.readBoolean
+    loadMemory[Int](regs,in)
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }

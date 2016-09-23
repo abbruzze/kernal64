@@ -3,6 +3,10 @@ package ucesoft.c64.peripheral.drive
 import ucesoft.c64.peripheral.bus._
 import ucesoft.c64.formats.D64
 import java.io.FileNotFoundException
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
+import javax.swing.JOptionPane
 
 object C1541Emu {
   private val BLINK_TIMEOUT = 100000
@@ -68,7 +72,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
   
   def getFloppy = driveReader.getOrElse(EmptyFloppy)
 
-  def setDriveReader(driveReader: Floppy) {
+  def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) {
     this.driveReader = Some(driveReader.asInstanceOf[D64])
   }
 
@@ -292,5 +296,17 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
         case _: NumberFormatException => setStatus(STATUS_SYNTAX_ERROR)
       }
     } else setStatus(STATUS_SYNTAX_ERROR)
+  }
+  
+  // state
+  protected def saveState(out:ObjectOutputStream) {}
+  protected def loadState(in:ObjectInputStream) {}
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = {
+    driveReader match {
+      case Some(d64) =>
+        JOptionPane.showMessageDialog(parent,s"Warning: 1541 emulation is active with $d64. The disk will not be saved/loaded.","State warning",JOptionPane.WARNING_MESSAGE)
+      case None =>
+    }
+    true
   }
 }

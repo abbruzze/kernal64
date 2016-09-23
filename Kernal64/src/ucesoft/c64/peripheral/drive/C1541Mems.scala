@@ -8,6 +8,10 @@ import ucesoft.c64.cpu.BridgeMemory
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 import ucesoft.c64.cpu.RAMComponent
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
+import java.io.IOException
 
 object C1541Mems {
   val KERNEL_M = 0xC000
@@ -60,6 +64,15 @@ object C1541Mems {
         if (value != 0xFF) channelActive |= 1 << channel else channelActive &= ~(1 << channel)
       }
     }
+    protected def saveState(out:ObjectOutputStream) {
+      out.writeObject(mem)
+      out.writeInt(channelActive)
+    }
+    protected def loadState(in:ObjectInputStream) {
+      loadMemory[Int](mem,in)
+      channelActive = in.readInt
+    }
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   
   class EXP_RAM(baseAddress:Int) extends RAMComponent {
@@ -86,6 +99,16 @@ object C1541Mems {
     final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
       if (isActive) mem(address - baseAddress) = value & 0xff
     }
+    // state
+    protected def saveState(out:ObjectOutputStream) {
+      out.writeObject(mem)
+      out.writeBoolean(isActive)
+    }
+    protected def loadState(in:ObjectInputStream) {
+      loadMemory[Int](mem,in)
+      isActive = in.readBoolean
+    }
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   
   private[this] val KERNEL = new DISK_KERNEL
@@ -123,5 +146,9 @@ object C1541Mems {
     def getChannelsState = RAM.getChannelsState
     
     override def defaultValue(address:Int) = Some(address >> 8)
+    // state
+    protected def saveState(out:ObjectOutputStream) {}
+    protected def loadState(in:ObjectInputStream) {}
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
 }

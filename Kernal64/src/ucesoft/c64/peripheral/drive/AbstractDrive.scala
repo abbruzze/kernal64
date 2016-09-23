@@ -4,6 +4,9 @@ import ucesoft.c64.peripheral.bus.IECBus
 import ucesoft.c64.peripheral.bus.IECBusDevice
 import ucesoft.c64.peripheral.bus.BusDataIterator
 import scala.collection.mutable.ListBuffer
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(bus, device) with Drive {
   protected var status = 0
@@ -16,7 +19,7 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
   
   def isDeviceReady = true
   def init {}
-  def setDriveReader(driveReader: Floppy) {}
+  def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) {}
   def getFloppy = EmptyFloppy
   
   protected def setStatus(code: Int) = status = code
@@ -115,4 +118,9 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
     if (channel == 15) handleChannel15
     resetSignals
   }
+  
+  // state
+  protected def saveState(out:ObjectOutputStream) {}
+  protected def loadState(in:ObjectInputStream) {}
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
