@@ -5,6 +5,9 @@ import ucesoft.c64.Log
 import ucesoft.c64.Clock
 import ucesoft.c64.trace.BreakType
 import java.io.PrintWriter
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   override lazy val componentID = "6510_CE"
@@ -1907,7 +1910,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     }
     
     // check interrupts
-    if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - nmiFirstCycle >= 2) {
+    if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - nmiFirstCycle >= 1) {
       nmiFirstCycle = 0
       nmiOnNegativeEdge = false
       state = NMI_STATE
@@ -1919,7 +1922,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       }
     } 
     else 
-    if (irqLow && !isInterrupt && state == 0 && clk.currentCycles - irqFirstCycle >= 2) {    
+    if (irqLow && !isInterrupt && state == 0 && clk.currentCycles - irqFirstCycle >= 1) {    
       irqFirstCycle = 0
       state = IRQ_STATE
       if (breakType != null && breakType.isBreak(PC,true,false)) {
@@ -1945,4 +1948,50 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   }
   
   protected def formatDebug = s"[${id.toString}] ${CPU6510.disassemble(mem,PC).toString} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeBoolean(baLow)
+    out.writeBoolean(dma)
+    out.writeBoolean(ready)
+    out.writeInt(PC)
+    out.writeInt(SP)
+    out.writeInt(A)
+    out.writeInt(X)
+    out.writeInt(Y)
+    out.writeInt(SREG)
+    out.writeBoolean(nmiOnNegativeEdge)
+    out.writeBoolean(irqLow)
+    out.writeBoolean(nmiLow)
+    out.writeLong(irqFirstCycle)
+    out.writeLong(nmiFirstCycle)
+    out.writeInt(op)
+    out.writeInt(state)
+    out.writeInt(ar)
+    out.writeInt(ar2)
+    out.writeInt(data)
+    out.writeInt(rdbuf)
+  }
+  protected def loadState(in:ObjectInputStream) {
+    baLow = in.readBoolean
+    dma = in.readBoolean
+    ready = in.readBoolean
+    PC = in.readInt
+    SP = in.readInt
+    A = in.readInt
+    X = in.readInt
+    Y = in.readInt
+    SREG = in.readInt
+    nmiOnNegativeEdge = in.readBoolean
+    irqLow = in.readBoolean
+    nmiLow = in.readBoolean
+    irqFirstCycle = in.readLong
+    nmiFirstCycle = in.readLong
+    op = in.readInt
+    state = in.readInt
+    ar = in.readInt
+    ar2 = in.readInt
+    data = in.readInt
+    rdbuf = in.readInt
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
