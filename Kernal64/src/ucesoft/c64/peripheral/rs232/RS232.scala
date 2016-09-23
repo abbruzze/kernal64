@@ -3,6 +3,10 @@ package ucesoft.c64.peripheral.rs232
 import ucesoft.c64.peripheral.cia.CIA
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
+import javax.swing.JOptionPane
 
 object RS232 {
   final val RXD = 1 << 0
@@ -57,4 +61,11 @@ trait RS232 extends C64Component {
   def getDescription : String
   
   def setRS232Listener(l:RS232StatusListener)
+  // state
+  protected def saveState(out:ObjectOutputStream) {}
+  protected def loadState(in:ObjectInputStream) {}
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = {
+    if (isEnabled) JOptionPane.showMessageDialog(parent,"Warning: an RS-232 device is enabled.","State warning",JOptionPane.WARNING_MESSAGE)
+    true
+  }
 }
