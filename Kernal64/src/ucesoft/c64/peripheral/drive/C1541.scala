@@ -12,6 +12,9 @@ import ucesoft.c64.C64Component
 import ucesoft.c64.cpu.CPU6510_CE
 import ucesoft.c64.trace.BreakType
 import java.io.PrintWriter
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends TraceListener with Drive {
   val componentID = "C1541 Disk Drive " + jackID
@@ -44,9 +47,9 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   
   def getFloppy = viaDisk.getFloppy
 
-  def setDriveReader(driveReader: Floppy) = {
+  def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) = {
     useTRAPFormat = !driveReader.isFormattable
-    viaDisk.setDriveReader(driveReader)
+    viaDisk.setDriveReader(driveReader,emulateInserting)
   }
   override def setActive(active: Boolean) = {
     viaBus.setEnabled(active)
@@ -58,14 +61,12 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     awake
   }
   private def awake {
-//    if (!running) {
-      running = true
-      isRunningListener(true)
-      viaBus.setActive(true)
-      viaDisk.setActive(true)
-      awakeCycles = clk.currentCycles
-      viaDisk.awake
-//    }
+    running = true
+    isRunningListener(true)
+    viaBus.setActive(true)
+    viaDisk.setActive(true)
+    awakeCycles = clk.currentCycles
+    viaDisk.awake
   }
   
   def disconnect {
@@ -159,6 +160,16 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       viaBusIRQLow = false
       viaDiskIRQLow = false
     }
+    // state
+    protected def saveState(out:ObjectOutputStream) {
+      out.writeBoolean(viaBusIRQLow)
+      out.writeBoolean(viaDiskIRQLow)
+    }
+    protected def loadState(in:ObjectInputStream) {
+      viaBusIRQLow = in.readBoolean
+      viaDiskIRQLow = in.readBoolean
+    }
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
 
   def getMem = mem
@@ -239,4 +250,30 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   def step(updateRegisters: (String) => Unit) = cpu.step(updateRegisters)
   def setBreakAt(breakType:BreakType,callback:(String) => Unit) = cpu.setBreakAt(breakType,callback)
   def jmpTo(pc: Int) = cpu.jmpTo(pc)
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    if (ledListener != null) out.writeBoolean(ledListener.isOn)
+    out.writeDouble(CYCLE_ADJ)
+    out.writeInt(currentSpeedHz)
+    out.writeDouble(cycleFrac)
+    out.writeBoolean(running)
+    out.writeLong(awakeCycles)
+    out.writeLong(goSleepingCycles)
+    out.writeBoolean(canSleep)
+    out.writeBoolean(useTRAPFormat)
+  }
+  protected def loadState(in:ObjectInputStream) {
+    if (ledListener != null) {
+      if (in.readBoolean) ledListener.turnOn else ledListener.turnOff
+    }
+    CYCLE_ADJ = in.readDouble
+    currentSpeedHz = in.readInt
+    cycleFrac = in.readDouble
+    running = in.readBoolean
+    awakeCycles = in.readLong
+    goSleepingCycles = in.readLong
+    canSleep = in.readBoolean
+    useTRAPFormat = in.readBoolean
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
