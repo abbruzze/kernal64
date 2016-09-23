@@ -4,6 +4,9 @@ import ucesoft.c64.ChipID
 import ucesoft.c64.Clock
 import ucesoft.c64.cpu.CPU6510
 import ucesoft.c64.ClockEvent
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 class VIADiskControl(var cpu: CPU6510,
   					 irqAction: (Boolean) => Unit,
@@ -64,8 +67,8 @@ class VIADiskControl(var cpu: CPU6510,
     motorOn = false
     canSetByteReady = false
     byteReady = false
-    var trackSteps = 2
-    var track = 1
+    trackSteps = 2
+    track = 1
     currentFilename = ""
     bitCounter = 0
     speedZone = 3
@@ -93,21 +96,24 @@ class VIADiskControl(var cpu: CPU6510,
   
   def setReadOnly(readOnly:Boolean) = isReadOnly = readOnly
 
-  def setDriveReader(driveReader:Floppy) {
+  def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
     //if (!motorOn) resetFloppy
     floppy = driveReader    
-    // reset the last track
-    floppy.changeTrack(trackSteps)
-    floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
-    isDiskChanged = true
-    isDiskChanging = true
-    Clock.systemClock.schedule(new ClockEvent("DiskRemoving",Clock.systemClock.currentCycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
-      isDiskChanged = false
-      Clock.systemClock.schedule(new ClockEvent("DiskWaitingInserting",cycles + REMOVING_DISK_WAIT, cycles => {
-        isDiskChanged = true
-        diskChangedAtClockCycle = cycles
+    if (emulateInserting) {
+      // reset the last track
+      floppy.changeTrack(trackSteps) 
+      floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
+      isDiskChanged = true
+      isDiskChanging = true
+      Clock.systemClock.schedule(new ClockEvent("DiskRemoving",Clock.systemClock.currentCycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
+        isDiskChanged = false
+        Clock.systemClock.schedule(new ClockEvent("DiskWaitingInserting",cycles + REMOVING_DISK_WAIT, cycles => {
+          isDiskChanged = true
+          diskChangedAtClockCycle = cycles
+        }))
       }))
-    }))
+    }
+    else floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
   }
   
   def setCurrentFilename(fn:String) = currentFilename = fn
@@ -141,9 +147,12 @@ class VIADiskControl(var cpu: CPU6510,
     case PA|PA2 =>
       super.read(address, chipID)
       floppy.notifyTrackSectorChangeListener
-      regs(PCR) & 0x0E match {
-        case 0xA|0x08 => canSetByteReady = true
-        case _ =>
+//      regs(PCR) & 0x0E match {
+//        case 0xA|0x08 => canSetByteReady = true
+//        case _ =>
+//      }
+      if ((regs(PCR) & 0x0C) == 0x08) {
+        canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
       }
       //println(s"READ ${Integer.toHexString(headByte)} ${track}/${sector} gcrIndex=${gcrIndex}")
       lastRead
@@ -153,17 +162,19 @@ class VIADiskControl(var cpu: CPU6510,
   override def write(address: Int, value: Int, chipID: ChipID.ID) {
     address - startAddress match {
       case PA =>
-        regs(PCR) & 0x0E match {
-          case 0xA|0x08 => canSetByteReady = true
-          case _ =>
-        }      
+//        regs(PCR) & 0x0E match {
+//          case 0xA|0x08 => canSetByteReady = true
+//          case _ =>
+//        }   
+        if ((regs(PCR) & 0x0C) == 0x08) {
+          canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
+        }
       case PCR =>
-        //canSetByteReady = (value & 2) > 0
-        canSetByteReady = (value & 0x0A) == 0x0A
+        //canSetByteReady = (value & 0x0A) == 0x0A
         value & 0x0E match {
           case 0xE => canSetByteReady = true        // 111 => Manual output mode high
           case 0xC => canSetByteReady = false       // 110 => Manual output mode low
-          case _ =>            
+          case _ => canSetByteReady = true 
         }
         isWriting = (value & 0x20) == 0
         ledListener.writeMode(isWriting)
@@ -259,5 +270,48 @@ class VIADiskControl(var cpu: CPU6510,
         //irq_set(IRQ_CA1)
       }
     }
+  }
+  // state
+  override protected def saveState(out:ObjectOutputStream) {
+    super.saveState(out)
+    out.writeBoolean(isWriting)
+    out.writeBoolean(isDiskChanged)
+    out.writeBoolean(isDiskChanging)
+    out.writeBoolean(isReadOnly)
+    out.writeLong(diskChangedAtClockCycle)
+    out.writeBoolean(motorOn)
+    out.writeBoolean(canSetByteReady)
+    out.writeBoolean(byteReady)
+    out.writeInt(trackSteps)
+    out.writeInt(track)
+    out.writeObject(currentFilename)
+    out.writeInt(speedZone)
+    out.writeDouble(bitCycleWait)
+    out.writeDouble(rotationCycleCounter)
+    out.writeInt(bitCounter)
+    out.writeInt(last10Bits)
+    out.writeInt(lastRead)
+    out.writeInt(lastWrite)
+  }
+  override protected def loadState(in:ObjectInputStream) {
+    super.loadState(in)
+    isWriting = in.readBoolean
+    isDiskChanged = in.readBoolean
+    isDiskChanging = in.readBoolean
+    isReadOnly = in.readBoolean
+    diskChangedAtClockCycle = in.readLong
+    motorOn = in.readBoolean
+    canSetByteReady = in.readBoolean
+    byteReady = in.readBoolean
+    trackSteps = in.readInt
+    track = in.readInt
+    currentFilename = in.readObject.asInstanceOf[String]
+    speedZone = in.readInt
+    bitCycleWait = in.readDouble
+    rotationCycleCounter = in.readDouble
+    bitCounter = in.readInt
+    last10Bits = in.readInt
+    lastRead = in.readInt
+    lastWrite = in.readInt
   }
 }
