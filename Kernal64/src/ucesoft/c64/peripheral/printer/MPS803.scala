@@ -7,6 +7,9 @@ import ucesoft.c64.util.CBMCanvas
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 import scala.collection.mutable.ListBuffer
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevice(bus,device) with C64Component {
   val componentID = "Commodore MPS803"
@@ -34,13 +37,17 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
     }
   }
   
-  override def close {
-    println("CLOSE")
-  }
-  
   override protected def byteJustRead(byte:Int,isLast:Boolean) {
     //println("MPS803: byte read " + Integer.toHexString(byte) + " " + byte.toChar + " last=" + isLast) 
     channels(channel).clear
     driver.print(byte)
   }
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeBoolean(active)
+  }
+  protected def loadState(in:ObjectInputStream) {
+    active = in.readBoolean
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
