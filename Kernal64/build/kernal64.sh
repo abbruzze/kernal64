@@ -14,4 +14,4 @@ fi
 # both kernal files must be placed under roms directory
 # example: KERNALS_ROM="-Dkernal=jiffydos_kernal.bin -D1541kernal=jiffydos1541_kernal.bin"
 KERNALS_ROMS=""
-$JAVA -server -Xms64M -Xmx64M -cp $CP -Djava.library.path=$LIB $KERNALS_ROMS ucesoft.c64.C64 $*
+$JAVA -server -Xms64M -Xmx128M -cp $CP -Djava.library.path=$LIB $KERNALS_ROMS ucesoft.c64.C64 $*
