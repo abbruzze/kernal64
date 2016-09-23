@@ -6,6 +6,9 @@ import CKey._
 import ucesoft.c64.Log
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 class Keyboard(keyMapper: KeyboardMapper = DefaultKeyboardMapper, nmiAction: (Boolean) => Unit = x => {}) extends KeyListener with C64Component {
   val componentID = "Keyboard"
@@ -110,4 +113,17 @@ class Keyboard(keyMapper: KeyboardMapper = DefaultKeyboardMapper, nmiAction: (Bo
     } 
     else 0xFF
   }  
+  
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeObject(rowSelector)
+    out.writeObject(colSelector)
+    out.writeBoolean(enabled)
+  }
+  protected def loadState(in:ObjectInputStream) {
+    loadMemory[Boolean](rowSelector,in)
+    loadMemory[Boolean](colSelector,in)
+    enabled = in.readBoolean
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
