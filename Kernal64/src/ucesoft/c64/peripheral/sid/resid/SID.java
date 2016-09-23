@@ -22,6 +22,8 @@
  */
 package ucesoft.c64.peripheral.sid.resid;
 
+import java.io.Serializable;
+
 public class SID {
 
 	/**
@@ -146,7 +148,7 @@ public class SID {
 	 * @author Ken Handel
 	 * 
 	 */
-	public class State {
+	public static class State implements Serializable {
 		public char sid_register[] = new char[0x20];
 
 		public int /* reg8 */bus_value;

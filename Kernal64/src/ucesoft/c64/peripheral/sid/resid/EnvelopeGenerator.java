@@ -35,7 +35,7 @@ package ucesoft.c64.peripheral.sid.resid;
  */
 public class EnvelopeGenerator {
 
-  public enum State {
+  public static enum State {
     ATTACK, DECAY_SUSTAIN, RELEASE
   };
 
