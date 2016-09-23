@@ -1,6 +1,12 @@
-kernal64 ver 1.2.7
+kernal64 ver 1.3.0
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
+
+###What's new in 1.3.0 (Sep 23th 2016)
+* Fixed VIC xcoord bug: now sprites can be viewed properly on sideborders
+* Fixed IRQ delay cycles that caused image flickering
+* Fixed display size
+* New feature: now it ca be possible to save and reload the emulator's state.
 
 ###What's new in 1.2.7 (Aug 15th 2016)
 * Improved CPU & VIC timings. Now nufli images can be displayed properly as well as nuvie videos.
