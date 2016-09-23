@@ -9,6 +9,9 @@ import ucesoft.c64.Clock
 import ucesoft.c64.ClockEvent
 import ucesoft.c64.Log
 import ucesoft.c64.cpu.RAMComponent
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Option[AudioDriverDevice] = None) extends Chip with SIDDevice {
   override lazy val componentID = "SID_" + sidID
@@ -109,8 +112,12 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     if (!removeSample) Clock.systemClock.schedule(new ClockEvent(componentID,nextSample,sidEventCallBack))
   }
   
-  def stop = removeSample = true
+  def stop = {
+    removeSample = true
+    driver.setSoundOn(false)
+  }
   def start {
+    driver.setSoundOn(true)
     Clock.systemClock.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 5,sidEventCallBack))
     lastCycles = Clock.systemClock.currentCycles
     nextRest = 0
@@ -118,7 +125,16 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     removeSample = false
   }
   def setFullSpeed(full:Boolean) = {
-    //driver.setFullSpeed(full)
     if (full) stop else start
   }
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeObject(sid.read_state)
+  }
+  protected def loadState(in:ObjectInputStream) {
+    sid.write_state(in.readObject.asInstanceOf[ucesoft.c64.peripheral.sid.resid.SID.State])
+    Clock.systemClock.cancel(componentID)
+    start
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
