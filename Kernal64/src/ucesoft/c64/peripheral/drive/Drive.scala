@@ -10,7 +10,7 @@ trait Drive extends C64Component {
   def setActive(active:Boolean) {}
   def setCanSleep(canSleep:Boolean) {}
   def setIsRunningListener(listener: (Boolean) => Unit) = isRunningListener = listener
-  def setDriveReader(driveReader:Floppy)
+  def setDriveReader(driveReader:Floppy,emulateInserting:Boolean)
   def clock(cycles:Long)
   def changeCPU(cycleExact:Boolean) {}
   def setReadOnly(readOnly:Boolean) {}
