@@ -42,7 +42,6 @@ import ucesoft.c64.util.VolumeSettingsPanel
 import ucesoft.c64.expansion.REU
 import ucesoft.c64.trace.BreakType
 import ucesoft.c64.peripheral.sid.SIDDevice
-import ucesoft.c64.util.DriveSpeedSettingsPanel
 import ucesoft.c64.peripheral.rs232._
 import ucesoft.c64.util.RS232StatusPanel
 import ucesoft.c64.peripheral.drive.LocalDrive
@@ -69,7 +68,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "1.2.7"
+  private[this] val VERSION = "1.3.0"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -131,11 +130,11 @@ class C64 extends C64Component with ActionListener with TraceListener {
   private[this] var drives : Array[Drive] = Array(c1541_real,c1541_real9)
   private[this] var device10Drive : Drive = _
   private[this] var device10DriveEnabled = false
-  private[this] val diskSpeedDialog : JDialog = DriveSpeedSettingsPanel.getDialog(displayFrame,drives)
   
   private class FloppyComponent(device:Int,floppy: => Option[Floppy]) extends C64Component {
     val componentID = "Mounted floppy " + device
     val componentType = C64ComponentType.FLOPPY
+    final private[this] val deviceID = device - 8 
     
     override def getProperties = {
       val attachedDisk = floppy
@@ -151,6 +150,24 @@ class C64 extends C64Component with ActionListener with TraceListener {
       case Some(d) => d.reset
       case None =>
     }
+    // state
+    protected def saveState(out:ObjectOutputStream) {
+      Floppy.save(out,floppy)
+    }
+    protected def loadState(in:ObjectInputStream) {
+      Floppy.load(in) match {
+        case Some(floppy) =>
+          attachedDisks(deviceID) match {
+            case Some(oldDisk) => oldDisk.close
+            case None =>
+          }
+          attachedDisks(deviceID) = Some(floppy)
+          drives(deviceID).setDriveReader(floppy,false)
+          driveLeds(deviceID).setToolTipText(floppy.file)
+        case None =>
+      }
+    }
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   // -------------------- TAPE -----------------
   private[this] var datassette : Datassette = _
@@ -165,9 +182,9 @@ class C64 extends C64Component with ActionListener with TraceListener {
   private[this] val rs232StatusPanel = new RS232StatusPanel
   // -------------------- PRINTER --------------
   private[this] var printerEnabled = false
-  private[this] var printerGraphicsDriver = new MPS803GFXDriver(new MPS803ROM)
-  private[this] var printer = new MPS803(bus,printerGraphicsDriver)  
-  private[this] var printerDialog = {
+  private[this] val printerGraphicsDriver = new MPS803GFXDriver(new MPS803ROM)
+  private[this] val printer = new MPS803(bus,printerGraphicsDriver)  
+  private[this] val printerDialog = {
     val dialog = new JDialog(displayFrame,"Print preview")
     val sp = new JScrollPane(printerGraphicsDriver)
     sp.getViewport.setBackground(Color.BLACK)
@@ -238,6 +255,10 @@ class C64 extends C64Component with ActionListener with TraceListener {
     
     def init {}
     def reset {}
+    // state
+    protected def saveState(out:ObjectOutputStream) {}
+    protected def loadState(in:ObjectInputStream) {}
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   
   private[this] class Mouse1351 extends MouseAdapter with C64Component {
@@ -267,6 +288,10 @@ class C64 extends C64Component with ActionListener with TraceListener {
     
     def init {}
     def reset {}
+    // state
+    protected def saveState(out:ObjectOutputStream) {}
+    protected def loadState(in:ObjectInputStream) {}
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   // -------------------------------------------------
   private class IRQSwitcher extends C64Component {
@@ -312,6 +337,18 @@ class C64 extends C64Component with ActionListener with TraceListener {
       vicIRQLow = false
       expPortIRQLow = false
     }
+    // state
+    protected def saveState(out:ObjectOutputStream) {
+      out.writeBoolean(ciaIRQLow)
+      out.writeBoolean(vicIRQLow)
+      out.writeBoolean(expPortIRQLow)
+    }
+    protected def loadState(in:ObjectInputStream) {
+      ciaIRQLow = in.readBoolean
+      vicIRQLow = in.readBoolean
+      expPortIRQLow = in.readBoolean
+    }
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
 
   class NMISwitcher extends C64Component {
@@ -351,6 +388,18 @@ class C64 extends C64Component with ActionListener with TraceListener {
       cia2NMILow = false
       expPortNMILow = false
     }
+    // state
+    protected def saveState(out:ObjectOutputStream) {
+      out.writeBoolean(keyboardNMILow)
+      out.writeBoolean(cia2NMILow)
+      out.writeBoolean(expPortNMILow)
+    }
+    protected def loadState(in:ObjectInputStream) {
+      keyboardNMILow = in.readBoolean
+      cia2NMILow = in.readBoolean
+      expPortNMILow = in.readBoolean
+    }
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   
   // ------------------------------------ Drag and Drop ----------------------------
@@ -464,6 +513,10 @@ class C64 extends C64Component with ActionListener with TraceListener {
     
     def init {}
     def reset {}
+    // state
+    protected def saveState(out:ObjectOutputStream) {}
+    protected def loadState(in:ObjectInputStream) {}
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   
   private class DriveLoadProgressPanel extends JProgressBar {
@@ -748,9 +801,9 @@ class C64 extends C64Component with ActionListener with TraceListener {
       case "MAXSPEED" =>
         val maxSpeedItem = e.getSource.asInstanceOf[JCheckBoxMenuItem]
         clock.maximumSpeed = maxSpeedItem.isSelected
-        clock.pause
+        //clock.pause
         sid.setFullSpeed(maxSpeedItem.isSelected)
-        clock.play
+        //clock.play
       case "ADJUSTRATIO" =>
         adjustRatio
       case "AUTORUN_DISK" =>
@@ -813,8 +866,10 @@ class C64 extends C64Component with ActionListener with TraceListener {
         C1541Mems.RAM_EXP_8000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
       case "DISK_EXP_RAM_A000" =>
         C1541Mems.RAM_EXP_A000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-      case "DISK_SPEED" =>
-        diskSpeedDialog.setVisible(true)
+      case "DISK_MIN_SPEED" =>
+        for(d <- drives) d.setSpeedHz(d.MIN_SPEED_HZ)
+      case "DISK_MAX_SPEED" =>
+        for(d <- drives) d.setSpeedHz(d.MAX_SPEED_HZ)
       case "NO_PEN" =>
         lightPenButtonEmulation = LIGHT_PEN_NO_BUTTON
         keypadControlPort.setLightPenEmulation(false)
@@ -972,12 +1027,91 @@ class C64 extends C64Component with ActionListener with TraceListener {
               display.setRemote(None)
           }
         }
+      case "SAVE_STATE" =>
+        saveState
+      case "LOAD_STATE" =>
+        loadState
+    }
+  }
+  
+  private def loadState {
+    clock.pause
+    var in : ObjectInputStream = null
+    try {
+      val canLoad = allowsState(displayFrame)
+      if (!canLoad) {
+        JOptionPane.showMessageDialog(displayFrame,"Can't load state", "State saving error",JOptionPane.ERROR_MESSAGE)
+        return
+      }
+      val fc = new JFileChooser
+      fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+	    fc.setFileFilter(new FileFilter {
+	      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
+	      def getDescription = "Kernal64 state files"
+	    })
+      fc.setDialogTitle("Choose a state file to load")
+      val fn = fc.showOpenDialog(displayFrame) match {
+        case JFileChooser.APPROVE_OPTION =>
+          fc.getSelectedFile
+        case _ =>
+          return
+      }
+      in = new ObjectInputStream(new FileInputStream(fn))
+      reset(false)
+      load(in)
+    }
+    catch {
+      case t:Throwable =>
+        JOptionPane.showMessageDialog(displayFrame,"Can't load state. Unexpected error occurred: " + t, "State loading error",JOptionPane.ERROR_MESSAGE)
+        t.printStackTrace
+        reset(false)
+    }
+    finally {
+      if (in != null) in.close
+      clock.play
+    }
+  }
+  
+  private def saveState {
+    clock.pause
+    var out : ObjectOutputStream = null
+    try {
+      val canSave = allowsState(displayFrame)
+      if (!canSave) {
+        JOptionPane.showMessageDialog(displayFrame,"Can't save state", "State saving error",JOptionPane.ERROR_MESSAGE)
+        return
+      }
+      val fc = new JFileChooser
+      fc.setDialogTitle("Choose where to save current state")
+      fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+	    fc.setFileFilter(new FileFilter {
+	      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
+	      def getDescription = "Kernal64 state files"
+	    })
+      val fn = fc.showSaveDialog(displayFrame) match {
+        case JFileChooser.APPROVE_OPTION =>
+          if (fc.getSelectedFile.getName.toUpperCase.endsWith(".K64")) fc.getSelectedFile.toString else fc.getSelectedFile.toString + ".k64" 
+        case _ =>
+          return
+      }
+      out = new ObjectOutputStream(new FileOutputStream(fn))
+      save(out)
+      out.close
+    }
+    catch {
+      case t:Throwable =>
+        JOptionPane.showMessageDialog(displayFrame,"Can't save state. Unexpected error occurred: " + t, "State saving error",JOptionPane.ERROR_MESSAGE)
+        t.printStackTrace
+    }
+    finally {
+      if (out != null) out.close
+      clock.play
     }
   }
   
   private def adjustRatio {
     val dim = display.asInstanceOf[java.awt.Component].getSize
-    dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).toInt
+    dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).round.toInt
     display.setPreferredSize(dim) 
     displayFrame.pack
   } 
@@ -1168,7 +1302,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
       }
       attachedDisks(driveID) = Some(disk)
       clock.pause
-      drives(driveID).setDriveReader(disk)
+      drives(driveID).setDriveReader(disk,true)
       clock.play
             
       loadFileItems(driveID).setEnabled(isD64)
@@ -1433,6 +1567,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
     val menuBar = new JMenuBar
     val fileMenu = new JMenu("File")
     val editMenu = new JMenu("Edit")
+    val stateMenu = new JMenu("State")
     val traceMenu = new JMenu("Trace")
     val optionMenu = new JMenu("Settings")
     val helpMenu = new JMenu("Help")    
@@ -1440,6 +1575,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
     
     menuBar.add(fileMenu)
     menuBar.add(editMenu)
+    menuBar.add(stateMenu)
     menuBar.add(traceMenu)
     menuBar.add(optionMenu)         
     menuBar.add(cartMenu)
@@ -1580,6 +1716,16 @@ class C64 extends C64Component with ActionListener with TraceListener {
     pasteItem.setActionCommand("PASTE")
     pasteItem.addActionListener(this)
     editMenu.add(pasteItem)
+    
+    //state
+    val saveStateItem = new JMenuItem("Save state ...")
+    saveStateItem.setActionCommand("SAVE_STATE")
+    saveStateItem.addActionListener(this)    
+    stateMenu.add(saveStateItem)
+    val loadStateItem = new JMenuItem("Load state ...")
+    loadStateItem.setActionCommand("LOAD_STATE")
+    loadStateItem.addActionListener(this)    
+    stateMenu.add(loadStateItem)
     
     // trace
     
@@ -1785,9 +1931,19 @@ class C64 extends C64Component with ActionListener with TraceListener {
     parallelCableItem.addActionListener(this)    
     diskItem.add(parallelCableItem)
     
-    val diskSpeedItem = new JMenuItem("1541 speed ...")
-    diskSpeedItem.setActionCommand("DISK_SPEED")
-    diskSpeedItem.addActionListener(this)    
+    val diskSpeedItem = new JMenu("1541 speed")
+    val group11 = new ButtonGroup 
+    val diskMinSpeedItem = new JRadioButtonMenuItem("Min speed")
+    diskMinSpeedItem.setSelected(true)
+    diskMinSpeedItem.setActionCommand("DISK_MIN_SPEED")
+    diskMinSpeedItem.addActionListener(this)  
+    diskSpeedItem.add(diskMinSpeedItem)
+    group11.add(diskMinSpeedItem)
+    val diskMaxSpeedItem = new JRadioButtonMenuItem("Max speed")
+    diskMaxSpeedItem.setActionCommand("DISK_MAX_SPEED")
+    diskMaxSpeedItem.addActionListener(this)  
+    diskSpeedItem.add(diskMaxSpeedItem)
+    group11.add(diskMaxSpeedItem)
     diskItem.add(diskSpeedItem)
     
     val expRAMItem = new JMenu("RAM Expansion")
@@ -2005,6 +2161,30 @@ class C64 extends C64Component with ActionListener with TraceListener {
       case Some(t) => cpuTracer = t
     }
   }
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeChars("KERNAL64")
+    out.writeObject(VERSION)
+    out.writeLong(System.currentTimeMillis)
+    out.writeBoolean(isDiskActive)
+    out.writeBoolean(isDiskActive9)
+    out.writeBoolean(printerEnabled)
+  }
+  protected def loadState(in:ObjectInputStream) {
+    val header = "KERNAL64"
+    for(i <- 0 until header.length) if (in.readChar != header(i)) throw new IOException("Bad header")
+    val ver = in.readObject.asInstanceOf[String]
+    val ts = in.readLong
+    isDiskActive = in.readBoolean
+    isDiskActive9 = in.readBoolean
+    printerEnabled = in.readBoolean 
+    val msg = s"<html><b>Version:</b> $ver<br><b>Date:</b> ${new java.util.Date(ts)}</html>"
+    JOptionPane.showConfirmDialog(displayFrame,msg,"State loading confirmation",JOptionPane.YES_NO_OPTION,JOptionPane.QUESTION_MESSAGE) match {
+      case JOptionPane.YES_OPTION =>
+      case _ => throw new IOException("State loading aborted")
+    }
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   // -----------------------------------------------------------------------------------------
   
   def run {
