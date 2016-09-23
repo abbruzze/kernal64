@@ -6,8 +6,15 @@ import ucesoft.c64.ChipID
 import ucesoft.c64.cpu.CPU6510Mems
 import ucesoft.c64.expansion.LastByteReadMemory
 import ucesoft.c64.expansion.ExpansionPortConfigurationListener
+import ucesoft.c64.cpu.RAMComponent
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
+import ucesoft.c64.C64ComponentType
 
-class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory with LastByteReadMemory with ExpansionPortConfigurationListener {
+class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends RAMComponent with LastByteReadMemory with ExpansionPortConfigurationListener {
+  val componentID = "VIC Banked Memory"
+  val componentType = C64ComponentType.MEMORY
   val name = "VIC-Memory"
   val isRom = false
   val startAddress = 0
@@ -23,6 +30,12 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
   
   def init {
     Log.info("Initialaizing banked memory ...")
+  }
+  def reset {
+    bank = 0
+    baseAddress = 0
+    memLastByteRead = 0
+    ultimax = false
   }
   val isActive = true
 
@@ -52,4 +65,19 @@ class BankedMemory(mem: Memory,charROM:Memory,colorRam:Memory) extends Memory wi
   }
   
   final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = { /* ignored for VIC */}
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeInt(bank)
+    out.writeInt(baseAddress)
+    out.writeInt(memLastByteRead)
+    out.writeBoolean(ultimax)
+    
+  }
+  protected def loadState(in:ObjectInputStream) {
+    bank = in.readInt
+    baseAddress = in.readInt
+    memLastByteRead = in.readInt
+    ultimax = in.readBoolean
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }

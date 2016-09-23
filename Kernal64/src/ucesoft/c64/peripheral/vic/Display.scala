@@ -12,6 +12,8 @@ import java.awt.event.MouseMotionListener
 import java.awt.event.MouseEvent
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
 
 class Display(width: Int,height: Int, title: String, frame: JFrame) extends JComponent with MouseMotionListener with C64Component {
   val componentID = "Display"
@@ -88,7 +90,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame) extends JCom
       Log.debug(s"New screen dimension ${dimension.width} x ${dimension.height}")      
       zoomFactorX = dimension.width.toDouble / (if (clipArea != null) clipArea._2.x - clipArea._1.x else screen.getWidth(this))
       zoomFactorY = dimension.height.toDouble / (if (clipArea != null) clipArea._2.y - clipArea._1.y else screen.getHeight(this))
-      println(s"New screen dimension ${dimension.width} x ${dimension.height} ${zoomFactorX} x ${zoomFactorY}")
+      println(s"New screen dimension ${dimension.width} x ${dimension.height} width/height=${dimension.width.toDouble/dimension.height}")
     }
     val srcImage = if (drawRasterLine) {
       val dg = debugImage.getGraphics
@@ -134,4 +136,9 @@ class Display(width: Int,height: Int, title: String, frame: JFrame) extends JCom
     paint(snap.getGraphics)
     ImageIO.write(snap, "png", file)
   }
+  
+  // state
+  protected def saveState(out:ObjectOutputStream) {}
+  protected def loadState(in:ObjectInputStream) {}
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
