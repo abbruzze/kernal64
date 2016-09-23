@@ -2,6 +2,9 @@ package ucesoft.c64.peripheral
 
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 abstract class Connector extends C64Component {
   val componentType = C64ComponentType.INTERNAL
@@ -32,12 +35,15 @@ abstract class Connector extends C64Component {
     properties.setProperty("Latch",Integer.toHexString(latch))
     properties
   }
-}
-
-object Connector {
-  def createEmptyConnector(readValue:Int) = new Connector {
-    val componentID = "Dummy connector"
-	def read = readValue
-	def performWrite(data:Int) {}
+  
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeInt(dir)
+    out.writeInt(latch)
   }
+  protected def loadState(in:ObjectInputStream) {
+    dir = in.readInt
+    latch = in.readInt
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
