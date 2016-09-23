@@ -5,6 +5,10 @@ import ucesoft.c64.ClockEvent
 import ucesoft.c64.Log
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
+
 /*
 object CIATimer extends App {
   var prev = 0L
@@ -35,12 +39,15 @@ object CIATimer extends App {
 }
 */
 class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timerToNotify: Option[CIATimerA2] = None) extends C64Component {
-  val componentID = ciaName + " " + id
+  val componentID = ciaName + id
   val componentType = C64ComponentType.CHIP 
   
-  final private[this] val EVENT_ID = ciaName + id
+  final private[this] val EVENT_ID = componentID
   final private[this] val START_DELAY = 2
   final private[this] val START_CONT_DELAY = 1
+  //state
+  final private[this] val UNDERFLOW_SUBID = 1
+  final private[this] val TOGGLE_TO_FALSE_SUBID = 2
 
   private[this] var latch = 0xFFFF
   private[this] var counter = 0xFFFF
@@ -82,7 +89,7 @@ class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timer
   override def getProperties = {
     properties.setProperty("Control register",Integer.toHexString(readCR))
     properties.setProperty("Started",started.toString)
-    properties.setProperty("Counter",Integer.toHexString(counter))
+    properties.setProperty("Counter",Integer.toHexString(readLo | readHi << 8))
     properties.setProperty("Latch",Integer.toHexString(latch))
     properties.setProperty("One shot",oneShot.toString)
     properties.setProperty("Count external",countExternal.toString)
@@ -143,13 +150,14 @@ class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timer
   protected def handleCR567 {}
   
   private[this] val underflowCallback = underflow _
+  private[this] val toggleToFalse = (cycles:Long) => { toggleValue = false }
   
   @inline private def reschedule(delay:Int) {
     val cycles = systemClock.currentCycles
     startCycle = cycles + delay
     val zeroCycle = startCycle + latch
     
-    systemClock.schedule(new ClockEvent(EVENT_ID,zeroCycle,underflowCallback))
+    systemClock.schedule(new ClockEvent(EVENT_ID,zeroCycle,underflowCallback,UNDERFLOW_SUBID))
   }
 
   private def enableTimer(enabled: Boolean) {
@@ -191,7 +199,7 @@ class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timer
       if (toggleMode) flipFlop = !flipFlop
       else {
         toggleValue = true
-        systemClock.schedule(new ClockEvent(EVENT_ID,cycles + 2, (c) => { toggleValue = false }))
+        systemClock.schedule(new ClockEvent(EVENT_ID,cycles + 2, toggleToFalse,TOGGLE_TO_FALSE_SUBID))
       }
     }
     timerToNotify match {
@@ -203,7 +211,43 @@ class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timer
     if (oneShot) started = false
     else if (!countExternal) reschedule(START_CONT_DELAY)
   }
-
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeInt(latch)
+    out.writeInt(counter)
+    out.writeInt(cr)
+    out.writeBoolean(oneShot)
+    out.writeBoolean(timerUnderflowOnPortB)
+    out.writeBoolean(toggleMode)
+    out.writeBoolean(flipFlop)
+    out.writeBoolean(toggleValue)
+    out.writeBoolean(started)
+    out.writeBoolean(countExternal)
+    out.writeBoolean(countSystemClock)
+    out.writeLong(startCycle)  
+    saveClockEvents(out)
+  }
+  protected def loadState(in:ObjectInputStream) {
+    latch = in.readInt
+    counter = in.readInt
+    cr = in.readInt
+    oneShot = in.readBoolean
+    timerUnderflowOnPortB = in.readBoolean
+    toggleMode = in.readBoolean
+    flipFlop = in.readBoolean
+    toggleValue = in.readBoolean
+    started = in.readBoolean
+    countExternal = in.readBoolean
+    countSystemClock = in.readBoolean
+    startCycle = in.readLong
+    loadClockEvents(in) {
+      case (UNDERFLOW_SUBID,w) =>
+        new ClockEvent(EVENT_ID,w,underflowCallback,UNDERFLOW_SUBID)
+      case (TOGGLE_TO_FALSE_SUBID,w) =>
+        new ClockEvent(EVENT_ID,w, toggleToFalse,TOGGLE_TO_FALSE_SUBID)
+    }
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
 
 class CIATimerB2(ciaName: String, id: String, irqAction: (String) => Unit) extends CIATimerA2(ciaName, id, irqAction) {

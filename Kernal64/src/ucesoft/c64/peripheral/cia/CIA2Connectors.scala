@@ -5,6 +5,8 @@ import ucesoft.c64.peripheral.bus._
 import ucesoft.c64.peripheral.Connector
 import ucesoft.c64.peripheral.rs232.RS232
 import ucesoft.c64.peripheral.drive.ParallelCable
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
 
 object CIA2Connectors {
   class PortAConnector(mem:BankedMemory,bus:IECBus,rs232:RS232) extends Connector with IECBusListener {
@@ -30,7 +32,16 @@ object CIA2Connectors {
                         if ((value & 32) > 0) GROUND else VOLTAGE, // DATA
                         if ((value & 16) > 0) GROUND else VOLTAGE) // CLOCK
       if ((ddr & 4) > 0) rs232.setTXD((data >> 2) & 1)      
-    }    
+    }
+    // state
+    override protected def saveState(out:ObjectOutputStream) {
+      super.saveState(out)
+      out.writeInt(bank)
+    }
+    override protected def loadState(in:ObjectInputStream) {
+      super.loadState(in)
+      bank = in.readInt
+    }
   }
   
   class PortBConnector(rs232:RS232) extends Connector {
