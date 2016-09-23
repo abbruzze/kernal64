@@ -9,6 +9,9 @@ import ucesoft.c64.peripheral.Connector
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 import ucesoft.c64.cpu.RAMComponent
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 object CIA {
   val PRA = 0
@@ -62,6 +65,7 @@ class CIA(val name:String,
   private class TOD2 extends C64Component {
     val componentID = name + " TOD"
     val componentType = C64ComponentType.CHIP 
+    final private[this] val TICK_SUBID = 1
     
     case class Time(var h:Int,var m:Int,var s:Int,var ts:Int,var am:Boolean) {
       var freezed = false
@@ -128,6 +132,23 @@ class CIA(val name:String,
         }
       }
       
+      def saveState(out:ObjectOutputStream) {
+        out.writeBoolean(freezed)
+        out.writeInt(h)
+        out.writeInt(m)
+        out.writeInt(s)
+        out.writeInt(ts)
+        out.writeBoolean(am)
+      }
+      def loadState(in:ObjectInputStream) {
+        freezed = in.readBoolean
+        h = in.readInt
+        m = in.readInt
+        s = in.readInt
+        ts = in.readInt
+        am = in.readBoolean
+      }
+      
       @inline private def bcd2dec(value:Int) = "" + (((value & 0xF0) >> 4) + '0').toChar + ((value & 0x0F)  + '0').toChar
       override def toString = s"${bcd2dec(h)}:${bcd2dec(m)}:${bcd2dec(s)}:${bcd2dec(ts)} [$freezed]"
     }
@@ -165,7 +186,7 @@ class CIA(val name:String,
     @inline def reschedule = {
       val clk = Clock.systemClock
       clk.cancel(componentID)
-      clk.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 98524,tickCallback))
+      clk.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 98524,tickCallback,TICK_SUBID))
     }
     
     def readHour = {
@@ -224,6 +245,23 @@ class CIA(val name:String,
       }
       //if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
     }
+    // state
+    protected def saveState(out:ObjectOutputStream) {
+      actualTime.saveState(out)
+      latchTime.saveState(out)
+      alarmTime.saveState(out)
+      saveClockEvents(out)
+    }
+    protected def loadState(in:ObjectInputStream) {
+      actualTime.loadState(in)
+      latchTime.loadState(in)
+      alarmTime.loadState(in)
+      loadClockEvents(in) {
+        case (TICK_SUBID,w) =>
+          new ClockEvent(componentID,w,tickCallback,TICK_SUBID)        
+      }
+    }
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
       
   def init {
@@ -250,8 +288,9 @@ class CIA(val name:String,
       case IRQ_FLAG => 16
       case _ => 0
     }
-    icr |= 0x80 | bit
-    if ((icrMask & bit) > 0) {      
+    icr |= bit //0x80 | bit
+    if ((icrMask & bit) > 0) {
+      icr |= 0x80
       Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
       irqAction(true)
     }
@@ -376,4 +415,18 @@ class CIA(val name:String,
   
   // TODO
   protected def sendSerialBit(on:Boolean) {}
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeInt(icr)
+    out.writeInt(sdr)
+    out.writeInt(sdrIndex)
+    out.writeInt(icrMask)
+  }
+  protected def loadState(in:ObjectInputStream) {
+    icr = in.readInt
+    sdr = in.readInt
+    sdrIndex = in.readInt
+    icrMask = in.readInt
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
