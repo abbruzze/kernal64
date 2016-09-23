@@ -7,6 +7,9 @@ import java.awt.event.MouseEvent
 import ucesoft.c64.C64Component
 import ucesoft.c64.C64ComponentType
 import java.util.Properties
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 abstract class ControlPort extends C64Component {
   val componentType = C64ComponentType.INPUT_DEVICE
@@ -38,6 +41,10 @@ abstract class ControlPort extends C64Component {
   
   def setLightPenEmulation(enabled:Boolean) = lightPenEmulationEnabled = enabled
   def isLightPenEmulationEnabled = lightPenEmulationEnabled
+  // state
+  protected def saveState(out:ObjectOutputStream) {}
+  protected def loadState(in:ObjectInputStream) {}
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
 
 object ControlPort {
