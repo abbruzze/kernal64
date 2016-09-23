@@ -144,15 +144,21 @@ class CBMCanvas(charRom: Memory) extends JComponent {
   }
 
   private def convertCode(c: Int) =
+//    if (c >= 64 && c <= 95) c - 64
+//    else if (c >= 96 && c <= 127) c - 32
+//    else if (c >= 128 && c <= 191) c - 64
+//    else if (c >= 192 && c <= 223) c - 192 + 96 - 32
+//    else if (c >= 224 && c <= 254) c - 224 + 160 - 32
+//    /*
+//    else if (c >= 192 && c <= 254) c - 128
+//    */
     if (c >= 64 && c <= 95) c - 64
     else if (c >= 96 && c <= 127) c - 32
-    else if (c >= 128 && c <= 191) c - 64
-    else if (c >= 192 && c <= 223) c - 192 + 96 - 32
-    else if (c >= 224 && c <= 254) c - 224 + 160 - 32
-    /*
-    else if (c >= 192 && c <= 254) c - 128
-    */
-    else if (c == 255) 126 - 32
+    else if (c >= 128 && c <= 159) c + 64
+    else if (c >= 160 && c <= 191) c - 64
+    else if (c >= 192 && c <= 223) c - 128
+    else if (c >= 224 && c <= 254) c - 128
+    else if (c == 255) 94
     else if (c > 255) c & 0xFF
     else c
 
