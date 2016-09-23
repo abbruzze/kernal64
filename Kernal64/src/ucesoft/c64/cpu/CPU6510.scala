@@ -9,6 +9,9 @@ import ucesoft.c64.C64ComponentType
 import ucesoft.c64.ChipID
 import ucesoft.c64.trace.BreakType
 import java.io.PrintWriter
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 object CPU6510 {
   class CPUJammedException extends Exception
@@ -1088,4 +1091,8 @@ private[cpu] class CPU6510Impl(mem: Memory,val id : ChipID.ID) extends CPU6510 {
   def jmpTo(pc:Int) {
     PC = pc
   }
+  // state
+  protected def saveState(out:ObjectOutputStream) {}
+  protected def loadState(in:ObjectInputStream) {}
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = false
 }

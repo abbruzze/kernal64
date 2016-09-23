@@ -10,6 +10,9 @@ import ucesoft.c64.C64ComponentType
 import ucesoft.c64.peripheral.c2n.Datassette
 import ucesoft.c64.Clock
 import ucesoft.c64.expansion.LastByteReadMemory
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 object CPU6510Mems {
   final val M_ROML = 0x8000
@@ -53,6 +56,16 @@ object CPU6510Mems {
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address - startAddress)    
     def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = ram.write(address,value,chipID)
     final def patch(address:Int,value:Int) = mem(address - startAddress) = value
+    // state
+    protected def saveState(out:ObjectOutputStream) {
+      out.writeBoolean(active)
+      out.writeObject(mem)
+    }
+    protected def loadState(in:ObjectInputStream) {
+      active = in.readBoolean
+      loadMemory[Int](mem,in)
+    }
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
 
   // --------------------------------------
@@ -114,6 +127,17 @@ object CPU6510Mems {
       }
       mem(address & 0xFFFF) = value & 0xff
     }
+    
+    // state
+    protected def saveState(out:ObjectOutputStream) {
+      out.writeObject(mem)
+      out.writeBoolean(ULTIMAX)
+    }
+    protected def loadState(in:ObjectInputStream) {
+      loadMemory[Int](mem,in)
+      ULTIMAX = in.readBoolean
+    }
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   
   class COLOR_RAM extends RAMComponent {
@@ -133,7 +157,15 @@ object CPU6510Mems {
     }
     
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address - startAddress)
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address - startAddress) = value & 0xff    
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address - startAddress) = value & 0xff
+    // state
+    protected def saveState(out:ObjectOutputStream) {
+      out.writeObject(mem)
+    }
+    protected def loadState(in:ObjectInputStream) {
+      loadMemory[Int](mem,in)
+    }
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
 
   class IO(ram: Memory,colorRam:Memory) extends BridgeMemory {
@@ -158,6 +190,10 @@ object CPU6510Mems {
       //addBridge(ram,SID_RAM,1024)
       addBridge(ExpansionPort.getExpansionPort)
     }
+    // state
+    protected def saveState(out:ObjectOutputStream) {}
+    protected def loadState(in:ObjectInputStream) {}
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   
   private class ExtendedROM(ram: Memory,val name:String,val startAddress:Int) extends RAMComponent {    
@@ -185,6 +221,10 @@ object CPU6510Mems {
       if (selectedROM == null) ram.write(address,value,chipID)
       else selectedROM.write(address,value)
     }
+    // state
+    protected def saveState(out:ObjectOutputStream) {}
+    protected def loadState(in:ObjectInputStream) {}
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   
   private case class MemConfig(basic:Boolean,roml:Boolean,romh:Boolean,char:Boolean,kernal:Boolean,io:Boolean,romhultimax:Boolean) {
@@ -462,5 +502,23 @@ object CPU6510Mems {
     }
     
     override def toString = ram.toString + banks.map(_.toString).mkString("[",",","]")
+    // state
+    protected def saveState(out:ObjectOutputStream) {
+      out.writeBoolean(ULTIMAX)
+      out.writeInt(ddr)
+      out.writeInt(pr)
+      out.writeBoolean(exrom)
+      out.writeBoolean(game)
+      out.writeInt(memConfig)
+    }
+    protected def loadState(in:ObjectInputStream) {
+      ULTIMAX = in.readBoolean
+      ddr = in.readInt
+      pr = in.readInt
+      exrom = in.readBoolean
+      game = in.readBoolean
+      memConfig = in.readInt
+    }
+    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
 }
