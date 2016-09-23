@@ -1,10 +1,13 @@
 package ucesoft.c64
 
 import scala.collection.mutable.ListBuffer
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
-class ClockEvent (val id : String,val when : Long,val execute: (Long) => Unit) {
+class ClockEvent (val id : String,val when : Long,val execute: (Long) => Unit,val subid : Int = 0) {
   var canceled = false
-  override def toString = s"${id}(${when})"
+  override def toString = s"${id}(${when} canceled=$canceled)"
 }
 
 object Clock extends App {
@@ -105,21 +108,22 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     running = true      
     while (running) {
       try {
-    	if (suspended) {
-    	  while (suspended) suspendedLock.synchronized {
-    	    suspendedConfim = true
-    	    suspendedLock.wait 
-    	  } 
-    	}
-    	while (events != null && cycles >= events.e.when) {
-    	  if (!events.e.canceled) events.e.execute(cycles)
-    	  val next = events.next
-    	  events.next = null 	// cut from list
-    	  events = next
-    	}
-    	mainLoop(cycles)
-    	cycles += 1  
-    	throttle
+      	if (suspended) {
+      	  while (suspended) suspendedLock.synchronized {
+      	    suspendedConfim = true
+      	    suspendedLock.wait 
+      	  } 
+      	}
+      	
+      	mainLoop(cycles)
+      	while (events != null && cycles >= events.e.when) {
+      	  if (!events.e.canceled) events.e.execute(cycles)
+      	  val next = events.next
+      	  events.next = null 	// cut from list
+      	  events = next
+      	}
+      	cycles += 1  
+      	throttle
       }
       catch {
         case t:Throwable => errorHandler match {
@@ -138,22 +142,19 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   }
   
   @inline private def throttle {
-    if (lastCorrectionTime == 0) setupNextMeasurement
-    else {
-      if (!_maximumSpeed) {
-        val timeDiff = System.currentTimeMillis - lastCorrectionTime
-        val cyclesDiff = cycles - lastCorrectionCycles
-        val expectedCycles = timeDiff * C64_CLOCK_HZ_DIV_1000
-        if (cyclesDiff > expectedCycles) {
-          val waitTime = (C64_CLOCK_HZ_INV_BY_1000 * (cyclesDiff - expectedCycles)).asInstanceOf[Int]
-          Thread.sleep(waitTime)
-        }
+    if (!_maximumSpeed) {
+      val timeDiff = System.currentTimeMillis - lastCorrectionTime
+      val cyclesDiff = cycles - lastCorrectionCycles
+      val expectedCycles = timeDiff * C64_CLOCK_HZ_DIV_1000
+      if (cyclesDiff > expectedCycles) {
+        val waitTime = (C64_CLOCK_HZ_INV_BY_1000 * (cyclesDiff - expectedCycles)).asInstanceOf[Int]
+        Thread.sleep(waitTime)
       }
-      if (System.currentTimeMillis > nextPerformanceMeasurementTime) {
-        val executed = cycles - throttleStartedAt
-        lastPerformance = math.round(100.0 * executed / C64_CLOCK_HZ / (PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS / 1000)).toInt
-        setupNextMeasurement
-      }
+    }
+    if (System.currentTimeMillis > nextPerformanceMeasurementTime) {
+      val executed = cycles - throttleStartedAt
+      lastPerformance = math.round(100.0 * executed / C64_CLOCK_HZ / (PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS / 1000)).toInt
+      setupNextMeasurement
     }
   }
   
@@ -204,4 +205,26 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   }
   def halt = running = false
   def printEvents { println(if (events != null) events else "No events") }
+  
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    out.writeLong(cycles)
+  }
+  protected def loadState(in:ObjectInputStream) {
+    cycles = in.readLong
+    events = null
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  
+  def getSubIdListFor(id:String) : List[(Int,Long)] = {
+    var ids : List[(Int,Long)] = Nil
+    if (events != null) {
+      var ptr = events
+      while (ptr != null) {
+        if (ptr.e.id == id && !ptr.e.canceled) ids = (ptr.e.subid,ptr.e.when) :: ids
+        ptr = ptr.next
+      }
+    }
+    ids
+  }
 }
