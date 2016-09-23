@@ -383,21 +383,21 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
       var readNextEntry = true
       while (readNextEntry) {
         d64.read(buffer)
-        val nextT = buffer(0)
+        if (firstEntryOfSector) {
+          firstEntryOfSector = false
+          val nextT = buffer(0)
+          val nextS = buffer(1)          
+          if (nextT != 0) {
+            t = nextT
+            s = nextS
+          } 
+          else readNextSector = false
+        }                
         entryIndex += 1
         if (entryIndex == 9 || buffer.forall(_ == 0)) {
           readNextEntry = false // last+1 entry of this sector
-          if (nextT == 0) readNextSector = false
         }
-        else {          
-          val nextS = buffer(1)
-          if (firstEntryOfSector) {
-            firstEntryOfSector = false
-            if (nextT != 0) {
-              t = nextT
-              s = nextS
-            } else readNextSector = false
-          }
+        else {                              
           val fileType = FileType(buffer(2) & 3)
           val track = buffer(3)
           val sector = buffer(4)
@@ -496,4 +496,21 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   def setTrackChangeListener(l:Floppy#TrackListener) = trackChangeListener = l
   
   override def toString = s"D64 fileName=$file totalTracks=$TOTAL_TRACKS t=$track s=$sector"
+  // state
+  def save(out:ObjectOutputStream) {    
+    out.writeInt(track)
+    out.writeInt(sector)
+    out.writeInt(gcrIndex)
+    out.writeInt(bit)
+    out.writeBoolean(sectorModified)
+  }
+  def load(in:ObjectInputStream) {
+    track = in.readInt
+    sector = in.readInt
+    gcrIndex = in.readInt
+    bit = in.readInt
+    sectorModified = in.readBoolean
+    sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
+    gcrSector = gcrImageOf(track, sector)
+  }
 }

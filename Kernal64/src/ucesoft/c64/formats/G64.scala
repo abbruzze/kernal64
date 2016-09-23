@@ -4,6 +4,8 @@ import ucesoft.c64.peripheral.drive.Floppy
 import java.io.RandomAccessFile
 import java.io.File
 import java.nio.file._
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
 
 object G64 {
   def makeEmptyDisk(file:String) {
@@ -14,7 +16,7 @@ object G64 {
 }
 
 
-class G64(file:String) extends Floppy {
+class G64(val file:String) extends Floppy {
   private[this] var tracks : Array[Array[Int]] = _
   private[this] var trackOffsets : Array[Int] = _
   private[this] var speedZones : Array[Int] = _
@@ -116,4 +118,17 @@ class G64(file:String) extends Floppy {
   def close = g64.close
   
   override def toString = s"G64 $file total tracks=$totalTracks"
+  // state
+  def save(out:ObjectOutputStream) {
+    out.writeInt(trackIndex)
+    out.writeInt(track)
+    out.writeInt(bit)
+    out.writeBoolean(trackIndexModified)
+  }
+  def load(in:ObjectInputStream) {
+    trackIndex = in.readInt
+    track = in.readInt
+    bit = in.readInt
+    trackIndexModified = in.readBoolean
+  }
 }
