@@ -49,7 +49,7 @@ final class VIC(mem: BankedMemory,
   final private[this] val BLANK_RIGHT_CYCLE = 59//61
   final private[this] val X_LEFT_CLIP = BLANK_LEFT_CYCLE * 8//(BLANK_LEFT_CYCLE + 1) * 8 - 3
   final private[this] val X_RIGHT_CLIP = BLANK_RIGHT_CYCLE * 8 //480
-  final val VISIBLE_SCREEN_WIDTH = 387//394//403//(BLANK_RIGHT_CYCLE - BLANK_LEFT_CYCLE - 1) * 8
+  final val VISIBLE_SCREEN_WIDTH = 384//394//403//(BLANK_RIGHT_CYCLE - BLANK_LEFT_CYCLE - 1) * 8
   final val VISIBLE_SCREEN_HEIGHT = BLANK_BOTTOM_LINE - BLANK_TOP_LINE - 1
   final val SCREEN_ASPECT_RATIO = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
   // ----------------------- INTERNAL REGISTERS -----------------------------------------------------------
