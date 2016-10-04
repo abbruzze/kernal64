@@ -147,6 +147,7 @@ class IECBus extends C64Component {
           throw new IOException(s"Can't find busid $id")
       }
     }
+    updateLines("LOADING")
   }
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
