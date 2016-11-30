@@ -1,3 +1,5 @@
+[![Build Status](https://drone.io/github.com/abbruzze/kernal64/status.png)](https://drone.io/github.com/abbruzze/kernal64/latest)
+
 kernal64 ver 1.3.0
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
