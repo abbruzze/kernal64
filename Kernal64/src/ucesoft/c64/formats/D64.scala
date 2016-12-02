@@ -469,7 +469,7 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
     }
   }
   
-  @inline def notifyTrackSectorChangeListener = if (trackChangeListener != null) trackChangeListener(track,false,Some(sector))
+  def notifyTrackSectorChangeListener = if (trackChangeListener != null) trackChangeListener(track,false,Some(sector))
   def currentTrack = track
   def currentSector = Some(sector)
   /**
