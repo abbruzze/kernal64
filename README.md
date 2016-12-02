@@ -6,7 +6,7 @@ Kernal64 ver 1.3.1
 
 ###What's new in 1.3.1 (Dic 2nd 2016)
 * New ZIP format: now you can open directly zip files containing C64 files, like D64, PRG, CRT ...
-* New "game jukebox" feature: a new plug & play components used to collect games, demos, intros, etc. from internet and play with them easily and immetiately. Out of the box you can find Gamebase component and Pouet (demo) component.
+* New "game jukebox" feature: a new plug & play components used to collect games, demos, intros, etc. from internet and play with them easily and immetiately. Out of the box you can find Gamebase (http://www.gb64.com/) component and Pouet demo (http://www.pouet.net/)  component.
 
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/pouet.jpg" width="724" height="427" alt="Pouet demos"/>
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/gamebase.jpg" width="724" height="427" alt="Gamebase"/>
