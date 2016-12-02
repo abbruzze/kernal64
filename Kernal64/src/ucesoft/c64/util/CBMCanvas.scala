@@ -7,6 +7,7 @@ import java.awt.Dimension
 import scala.collection.mutable.ListBuffer
 import ucesoft.c64.peripheral.vic.Palette
 import java.awt.Graphics
+import scala.language.postfixOps
 
 object CBMCanvas extends App {  
   val f = new JFrame
