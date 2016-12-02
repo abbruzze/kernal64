@@ -78,18 +78,18 @@ abstract class VIA(val name:String,
     //if ((regs(IFR) & 0x7F) == 0) regs(IFR) = 0 // if no more irq are set clear 7th bit
     checkIRQ
   }
-  @inline protected def checkIRQ = {
+  @inline private def checkIRQ = {
     val irq = (regs(IFR) & regs(IER)) > 0
     if (irq) regs(IFR) |= 0x80 else regs(IFR) &= 0x7F
     irqAction(irq)  
   }
   
-  @inline protected def is_set(reg:Int,bits:Int) = (regs(reg) & bits) > 0
+  @inline private def is_set(reg:Int,bits:Int) = (regs(reg) & bits) > 0
   
   /*
    * Ignores DDRA & DDRB. Subclasses are in charge for this check
    */
-  def read(address: Int, chipID: ChipID.ID) = address - startAddress match {
+  def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
     case PA|PA2 =>
       irq_clr(IRQ_CA1 | IRQ_CA2)
       Log.debug(s"Cleared IRQ_CA1: IFR=${Integer.toBinaryString(regs(IFR))} IER=${Integer.toBinaryString(regs(IER))}")
@@ -112,7 +112,7 @@ abstract class VIA(val name:String,
   /*
    * Ignores DDRA & DDRB. Subclasses are in charge for this check
    */
-  def write(address: Int, value: Int, chipID: ChipID.ID) = address - startAddress match {
+  def write(address: Int, value: Int, chipID: ChipID.ID) = (address & 0x0F) match {
     case DDRA =>
       regs(DDRA) = value
       write(startAddress + PA,regs(PA) | ~value,chipID)
