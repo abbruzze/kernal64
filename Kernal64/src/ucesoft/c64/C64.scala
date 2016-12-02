@@ -54,6 +54,11 @@ import ucesoft.c64.peripheral.drive.C1541Mems
 import ucesoft.c64.expansion.DualSID
 import ucesoft.c64.peripheral.drive.FlyerIEC
 import ucesoft.c64.remote.RemoteC64
+import ucesoft.c64.game.GamePlayer
+import java.util.ServiceLoader
+import ucesoft.c64.game.GameUI
+import scala.util.Success
+import scala.util.Failure
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -64,11 +69,10 @@ object C64 extends App {
   }
 }
 
-class C64 extends C64Component with ActionListener with TraceListener {
+class C64 extends C64Component with ActionListener with TraceListener with GamePlayer {
   val componentID = "Commodore 64"
   val componentType = C64ComponentType.INTERNAL
   
-  private[this] val VERSION = "1.3.0"
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
@@ -84,7 +88,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   private[this] val irqSwitcher = new IRQSwitcher
   private[this] val keyb = new keyboard.Keyboard(keyboard.DefaultKeyboardMapper,nmiSwitcher.keyboardNMIAction _)	// key listener
   private[this] val displayFrame = {
-    val f = new JFrame("Kernal64 emulator ver. " + VERSION)
+    val f = new JFrame("Kernal64 emulator ver. " + ucesoft.c64.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
       override def windowClosing(e:WindowEvent) {
         close
@@ -417,25 +421,35 @@ class C64 extends C64Component with ActionListener with TraceListener {
           import scala.collection.JavaConversions._
           t.getTransferData(DataFlavor.javaFileListFlavor).asInstanceOf[java.util.List[File]].headOption match {
             case None =>
+              false
             case Some(f) =>
               val name = f.getName.toUpperCase
               if (name.endsWith(".D64") ||
                   name.endsWith(".G64") ||
                   name.endsWith(".TAP") || 
                   name.endsWith(".PRG") || 
-                  name.endsWith(".CRT")) {
+                  name.endsWith(".CRT") ||
+                  name.endsWith(".T64")) {
                 handleDND(f)
-                return true
+                true
               }
-              return false
+              else
+              if (name.endsWith(".ZIP")) {
+                ZIP.zipEntries(f) match {
+                  case Success(entries) if entries.size > 0 =>
+                    handleDND(f)
+                    true
+                  case _ =>
+                    false
+                }                
+              }
+              else false
           }
         } 
         catch {
           case t:Throwable =>
-            return false
+            false
         }
-
-        true
     }
   }
   
@@ -1031,6 +1045,8 @@ class C64 extends C64Component with ActionListener with TraceListener {
         saveState
       case "LOAD_STATE" =>
         loadState
+      case "ZIP" =>
+        attachZip
     }
   }
   
@@ -1224,20 +1240,51 @@ class C64 extends C64Component with ActionListener with TraceListener {
     reset(true)
   }
   
+  // GamePlayer interface
+  def play(file:File) = {
+    ExpansionPort.getExpansionPort.eject
+    ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+    handleDND(file)
+  }
+  def attachDevice(file:File) : Unit = attachDevice(file,false)
+  
   private def handleDND(file:File) {
     val name = file.getName.toUpperCase
     if (name.endsWith(".CRT")) loadCartridgeFile(file)
     else {
       reset(false)
-      clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => {
-        if (name.endsWith(".PRG")) loadPRGFile(file,true)
-	    else    
-	    if (name.endsWith(".D64") || name.endsWith(".G64")) attachDiskFile(0,file,true)
-	    else
-	    if (name.endsWith(".TAP")) attachTapeFile(file,true)
-      })
-      )
+      clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => { attachDevice(file,true) }))
       clock.play
+    }
+  }
+  
+  private def attachDevice(file:File,autorun:Boolean) {
+    val name = file.getName.toUpperCase
+    
+    if (name.endsWith(".PRG")) loadPRGFile(file,autorun)
+    else    
+    if (name.endsWith(".D64") || name.endsWith(".G64")) attachDiskFile(0,file,autorun)
+    else
+    if (name.endsWith(".TAP")) attachTapeFile(file,autorun)
+    else
+    if (name.endsWith(".T64")) attachT64File(file,autorun)
+    else
+    if (name.endsWith(".ZIP")) attachZIPFile(file,autorun)
+    else
+    if (name.endsWith(".CRT")) loadCartridgeFile(file)
+  }
+  
+  private def attachZip {
+    val fc = new JFileChooser
+    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+    fc.setFileFilter(new FileFilter {
+      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".ZIP")
+      def getDescription = "ZIP files"
+    })
+    fc.showOpenDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>                
+        attachZIPFile(fc.getSelectedFile,false)
+      case _ =>        
     }
   }
   
@@ -1324,8 +1371,8 @@ class C64 extends C64Component with ActionListener with TraceListener {
     tapeMenu.setEnabled(true)
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
     if (autorun) {
-        insertTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar)
-      }
+      insertTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar)
+    }
   }
   // -------------------------------------------------
   
@@ -1345,7 +1392,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   }
   
   private def showAbout {
-    val about = new AboutCanvas(mem.CHAR_ROM,VERSION)
+    val about = new AboutCanvas(mem.CHAR_ROM,ucesoft.c64.Version.VERSION.toUpperCase + " (" + ucesoft.c64.Version.BUILD_DATE.toUpperCase + ")")
     JOptionPane.showMessageDialog(displayFrame,about,"About",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))    
   }
   
@@ -1524,21 +1571,49 @@ class C64 extends C64Component with ActionListener with TraceListener {
     })
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-        val tape = new T64(fc.getSelectedFile.toString)
-        try {
-          val values = tape.entries map { e => e.asInstanceOf[Object] }
-          JOptionPane.showInputDialog(displayFrame,"Select file to open:","Open file in " + fc.getSelectedFile.getName,JOptionPane.INFORMATION_MESSAGE,null,values,values(0)) match {
-            case null =>
-            case entry:T64Entry =>
-              tape.loadInMemory(mem,entry)
-              configuration.setProperty(CONFIGURATION_LASTDISKDIR,fc.getSelectedFile.getParentFile.toString)
-          }
-        }
-        finally {
-          tape.close
-        }
+        attachT64File(new File(fc.getSelectedFile.toString),false)
       case _ =>
     }
+  }
+  
+  private def attachT64File(file:File,autorun:Boolean) {
+    val tape = new T64(file.toString)
+    try {
+      val values = tape.entries map { e => e.asInstanceOf[Object] }
+      JOptionPane.showInputDialog(displayFrame,"Select file to open:","Open file in " + file,JOptionPane.INFORMATION_MESSAGE,null,values,values(0)) match {
+        case null =>
+        case entry:T64Entry =>
+          tape.loadInMemory(mem,entry)
+          configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
+          if (autorun) {
+            insertTextIntoKeyboardBuffer("RUN" + 13.toChar)
+          }
+      }
+    }
+    finally {
+      tape.close
+    }
+  }
+  
+  private def attachZIPFile(file:File,autorun:Boolean) {
+    ZIP.zipEntries(file) match {
+      case Success(entries) =>
+        if (entries.size > 0) {
+          val values = entries map { e => e.asInstanceOf[Object] } toArray
+          
+          JOptionPane.showInputDialog(displayFrame,"Select file to open:","Open file in " + file,JOptionPane.INFORMATION_MESSAGE,null,values,values(0)) match {
+            case null =>
+            case e@ZIP.ArchiveEntry(_,_,_) =>
+              ZIP.extractEntry(e,new File(scala.util.Properties.tmpDir)) match {
+                case Some(f) =>
+                  attachDevice(f,autorun)
+                case None =>
+              }          
+          } 
+        }
+      case Failure(t) =>
+        JOptionPane.showMessageDialog(displayFrame,t.toString,s"Error while opening zip file $file",JOptionPane.ERROR_MESSAGE)
+    }    
   }
   
   private def attachTape {
@@ -1570,6 +1645,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
     val stateMenu = new JMenu("State")
     val traceMenu = new JMenu("Trace")
     val optionMenu = new JMenu("Settings")
+    val gamesMenu = new JMenu("Games")
     val helpMenu = new JMenu("Help")    
     cartMenu.setVisible(false)
     
@@ -1579,7 +1655,13 @@ class C64 extends C64Component with ActionListener with TraceListener {
     menuBar.add(traceMenu)
     menuBar.add(optionMenu)         
     menuBar.add(cartMenu)
+    menuBar.add(gamesMenu)
     menuBar.add(helpMenu)
+    
+    val zipItem = new JMenuItem("Attach zip ...")
+    zipItem.setActionCommand("ZIP")
+    zipItem.addActionListener(this)
+    fileMenu.add(zipItem)
     
     val tapeItem = new JMenuItem("Load file from tape ...")
     tapeItem.setActionCommand("TAPE")
@@ -2087,12 +2169,44 @@ class C64 extends C64Component with ActionListener with TraceListener {
     cartButtonItem.addActionListener(this)
     cartMenu.add(cartButtonItem)
     
-    // help
+    // games
+    val loader = ServiceLoader.load(classOf[ucesoft.c64.game.GameProvider])
+    var providers = loader.iterator
+    try {
+      if (!providers.hasNext) providers = java.util.Arrays.asList((new ucesoft.c64.game.GameBaseSpi).asInstanceOf[ucesoft.c64.game.GameProvider],(new ucesoft.c64.game.PouetDemoSpi).asInstanceOf[ucesoft.c64.game.GameProvider]).iterator
+      val names = new collection.mutable.HashSet[String]
+      while (providers.hasNext) {
+        val provider = providers.next
+        Log.info(s"Loaded ${provider.name} provider")
+        if (!names.contains(provider.name)) {
+          names += provider.name
+          val item = new JCheckBoxMenuItem(provider.name)
+          gamesMenu.add(item)
+          item.addActionListener(new ActionListener {
+            def actionPerformed(e:ActionEvent) {
+              try {
+                val ui = GameUI.getUIFor(item,displayFrame,provider,C64.this)
+                ui.setVisible(item.isSelected)
+              }
+              catch {
+                case t:Throwable =>
+                  JOptionPane.showMessageDialog(displayFrame,t.toString,s"Error while contacting provider ${provider.name}'s server",JOptionPane.ERROR_MESSAGE)
+              }
+            }
+          })
+        }
+      }
+    }
+    catch {
+      case t:Throwable =>
+        t.printStackTrace
+    }
     
+    // help    
     val aboutItem = new JMenuItem("About")
     aboutItem.setActionCommand("ABOUT")
     aboutItem.addActionListener(this)
-    helpMenu.add(aboutItem)        
+    helpMenu.add(aboutItem)
     
     displayFrame.setJMenuBar(menuBar)
   }
@@ -2164,7 +2278,7 @@ class C64 extends C64Component with ActionListener with TraceListener {
   // state
   protected def saveState(out:ObjectOutputStream) {
     out.writeChars("KERNAL64")
-    out.writeObject(VERSION)
+    out.writeObject(ucesoft.c64.Version.VERSION)
     out.writeLong(System.currentTimeMillis)
     out.writeBoolean(isDiskActive)
     out.writeBoolean(isDiskActive9)
