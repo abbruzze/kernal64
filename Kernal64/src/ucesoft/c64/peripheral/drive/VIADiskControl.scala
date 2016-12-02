@@ -134,7 +134,7 @@ class VIADiskControl(var cpu: CPU6510,
 
   @inline private def isSync = !isWriting && motorOn && last10Bits == 0x3FF  
 
-  override def read(address: Int, chipID: ChipID.ID) = address - startAddress match {
+  override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
     case PB =>
       val wps = if (isDiskChanging) isDiskChanged else isReadOnly | floppy.isReadOnly
       if (isDiskChanging && isDiskChanged && Clock.systemClock.currentCycles - diskChangedAtClockCycle > WRITE_PROTECT_SENSE_WAIT) {
@@ -160,7 +160,7 @@ class VIADiskControl(var cpu: CPU6510,
   }
 
   override def write(address: Int, value: Int, chipID: ChipID.ID) {
-    address - startAddress match {
+    (address & 0x0F) match {
       case PA =>
 //        regs(PCR) & 0x0E match {
 //          case 0xA|0x08 => canSetByteReady = true
