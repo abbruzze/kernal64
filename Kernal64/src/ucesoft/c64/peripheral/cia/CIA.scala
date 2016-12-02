@@ -183,7 +183,7 @@ class CIA(val name:String,
     
     private[this] val tickCallback = tick _
     
-    @inline def reschedule = {
+    @inline private def reschedule = {
       val clk = Clock.systemClock
       clk.cancel(componentID)
       clk.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 98524,tickCallback,TICK_SUBID))
