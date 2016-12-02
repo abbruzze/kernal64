@@ -18,6 +18,7 @@ import java.io.StringReader
 import javax.swing.JOptionPane
 import java.awt.Color
 import javax.swing.JScrollPane
+import scala.language.postfixOps
 
 class AssemblerException(msg: String) extends Exception(msg)
 
