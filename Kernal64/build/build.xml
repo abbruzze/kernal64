@@ -79,6 +79,7 @@
 			</manifest>
 			<service type="ucesoft.c64.game.GameProvider">
 			    <provider classname="ucesoft.c64.game.GameBaseSpi"/>
+				<provider classname="ucesoft.c64.game.PouetDemoSpi"/>
 			</service>
 		</jar>
 	</target>
