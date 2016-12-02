@@ -1,8 +1,15 @@
 [![Build Status](https://drone.io/github.com/abbruzze/kernal64/status.png)](https://drone.io/github.com/abbruzze/kernal64/latest)
 
-kernal64 ver 1.3.0
+Kernal64 ver 1.3.1
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
+
+###What's new in 1.3.1 (Dic 2nd 2016)
+* New ZIP format: now you can open directly zip files containing C64 files, like D64, PRG, CRT ...
+* New "game jukebox" feature: a new plug & play components used to collect games, demos, intros, etc. from internet and play with them easily and immetiately. Out of the box you can find Gamebase component and Pouet (demo) component.
+
+<img src="https://github.com/abbruzze/kernal64/blob/master/images/pouet.jpg" width="724" height="427" alt="Pouet demos"/>
+<img src="https://github.com/abbruzze/kernal64/blob/master/images/gamebase.jpg" width="724" height="427" alt="Gamebase"/>
 
 ###What's new in 1.3.0 (Sep 23th 2016)
 * Fixed VIC xcoord bug: now sprites can be viewed properly on sideborders
