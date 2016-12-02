@@ -5,6 +5,7 @@ import ucesoft.c64.cpu.Memory
 import ucesoft.c64.ChipID
 import ucesoft.c64.expansion.ExpansionPort
 import ucesoft.c64.Log
+import scala.language.postfixOps
 
 class Cartridge(file:String) {
   class Chip {
