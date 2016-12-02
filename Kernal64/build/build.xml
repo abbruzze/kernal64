@@ -6,11 +6,23 @@
 	<property name="c64.jar" value="${dist.dir}/kernal64.jar"/>
 	<property name="c64.install" value="${dist.dir}/kernal64_install.zip"/>
 	
+	<!-- VERSION -->
+	<property name="VERSION" value="13.1"/> 
+	
 	<condition property="optimise" value="yes">
 		<not>
 			<isset property="optimise"/>
 		</not>
 	</condition>
+	
+	<!-- label is set only if ant is executed by Drone CI -->
+ 	<condition property="DRONE_BUILD_NUMBER" value="?">
+		<not>
+			<isset property="DRONE_BUILD_NUMBER"/>
+		</not>
+	</condition>
+	
+	<property name="version" value="${VERSION} b${DRONE_BUILD_NUMBER}"/>
 
 	<target name="scala-init">
 		<property name="scala-library.jar" value="${lib.dir}/scala-library.jar" />
@@ -32,7 +44,10 @@
 	</target>
 
 	<target name="compile" depends="scala-init">
+		<tstamp/>
+		<echo message="Building version ${version}"/>
 		<mkdir dir="${build.dir}"/>		
+		<echo file="${sources.dir}/ucesoft/c64/Version.scala" message='package ucesoft.c64 ; object Version { val VERSION = "${version}" ; val BUILD_DATE="${TODAY}"}'/>
 		<echo message="Optimise is set to ${optimise}"/>
 		<javac srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/c64/peripheral/sid/resid/*.java ucesoft/c64/peripheral/sid/resid2/*.java">
 			<classpath refid="build.classpath"/>
@@ -62,6 +77,9 @@
 			<manifest>
 				<attribute name="Main-Class" value="ucesoft.c64.C64"/>
 			</manifest>
+			<service type="ucesoft.c64.game.GameProvider">
+			    <provider classname="ucesoft.c64.game.GameBaseSpi"/>
+			</service>
 		</jar>
 	</target>
 	
