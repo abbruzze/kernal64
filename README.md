@@ -5,6 +5,7 @@ Kernal64 ver 1.3.1
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
 
 ###What's new in 1.3.1 (Dic 2nd 2016)
+* RS-232 improvements. Added baud rate in the configuration parameters
 * New ZIP format: now you can open directly zip files containing C64 files, like D64, PRG, CRT ...
 * New "game jukebox" feature: a new plug & play components used to collect games, demos, intros, etc. from internet and play with them easily and immetiately. Out of the box you can find Gamebase (http://www.gb64.com/) component and Pouet demo (http://www.pouet.net/)  component.
 
