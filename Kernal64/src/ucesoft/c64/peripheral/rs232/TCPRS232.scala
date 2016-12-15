@@ -13,17 +13,17 @@ class TCPRS232 extends StreamRS232 {
   private[this] var socket : Socket = _
   private[this] var hostAndConf = ""
   
-  def getDescription = "Connects to a tcp server. Connection String syntax: host:port,bits,parity,stops"
+  def getDescription = "Connects to a tcp server. Connection String syntax: host:port,baud,bits,parity,stops"
   
   override def connectionInfo = hostAndConf
   
   /**
-   * Syntax: host:port,bits,parity,stops
+   * Syntax: host:port,baud,bits,parity,stops
    */
   override def setConfiguration(conf:String) {
     hostAndConf = conf
     val parts = conf.split(",")
-    if (parts.length != 4) throw new IllegalArgumentException("Bad TCP RS-232 configuration string. Expected <host>:<port>,<bits>,<parity>,<stops>")
+    if (parts.length != 5) throw new IllegalArgumentException("Bad TCP RS-232 configuration string. Expected <host>:<port>,<baud>,<bits>,<parity>,<stops>")
     
     super.setConfiguration(conf.substring(conf.indexOf(",") + 1))
 

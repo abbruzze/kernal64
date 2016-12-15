@@ -9,15 +9,16 @@ object TelnetRS232 extends StreamRS232 {
   private[this] var client = new TelnetClient
   private[this] var host = ""
   private[this] var port = 0
+  private[this] var config = ""
   
-  def getDescription = "Connects to a telnet server. Connection String syntax: host:port,bits,parity,stops"
+  def getDescription = "Connects to a telnet server. Connection String syntax: host:port,baud,bits,parity,stops"
   
   /**
-   * Syntax: host:port,bits,parity,stops
+   * Syntax: host:baud,port,bits,parity,stops
    */
   override def setConfiguration(conf:String) {
     val parts = conf.split(",")
-    if (parts.length != 4) throw new IllegalArgumentException("Bad Telnet RS-232 configuration string. Expected <host>:<port>,<bits>,<parity>,<stops>")
+    if (parts.length != 5) throw new IllegalArgumentException("Bad Telnet RS-232 configuration string. Expected <host>:<port>,<baud>,<bits>,<parity>,<stops>")
     
     super.setConfiguration(conf.substring(conf.indexOf(",") + 1))
 
@@ -26,7 +27,10 @@ object TelnetRS232 extends StreamRS232 {
     
     host = pars(0)
     port = pars(1).toInt
+    config = conf
   }
+  
+  override def connectionInfo = config
   
   override def setEnabled(enabled:Boolean) {
     val lastEnabled = isEnabled    

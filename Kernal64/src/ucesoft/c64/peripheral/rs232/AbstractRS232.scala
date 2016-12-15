@@ -2,23 +2,27 @@ package ucesoft.c64.peripheral.rs232
 
 import ucesoft.c64.peripheral.cia.CIA
 import RS232._
+import ucesoft.c64.Clock
+import ucesoft.c64.ClockEvent
 
 abstract class AbstractRS232 extends RS232 with Runnable {
-  private[this] var cia2 : CIA = _
+  private[this] var cia1,cia2 : CIA = _
   private[this] var txd,others = 0
   private[this] var stop,parity,bits,length = 0
   protected var dsr = DSR
   protected var cts,dcd,ri = 0
   protected var rts,dtr = false
-  private[this] var rxd = RXD
+  @volatile private[this] var rxd = RXD
   private[this] var outbuffer = 0
-  private[this] var bitreceived,bitsent,tmpParity = 0
-  private[this] var byteToSend = -1
+  @volatile private[this] var bitreceived,bitsent,tmpParity = 0
+  @volatile private[this] var byteToSend = -1
   private[this] var totalByteSent,totalByteReceived = 0
   private[this] var configurationString = ""
   private[this] var enabled = false
   private[this] var statusListener : RS232StatusListener = _
-  protected val sendingLock = new Object
+  private[this] val sendingLock = new Object
+  private[this] var baudCycles = 0
+  private[this] val clk = Clock.systemClock
   
   def isEnabled = enabled
   def setEnabled(enabled:Boolean) = {
@@ -109,18 +113,14 @@ abstract class AbstractRS232 extends RS232 with Runnable {
   def getOthers : Int = {        
     //println(s"Read rxd=" + (if (rxd > 0) "1" else "0"))
     val ret = rxd | others & RTS | others & DTR | ri | dcd | cts | dsr
-    checkSendBit
+    //checkSendBit
     ret
-  }
-  
-  protected def checkSendBit {
-    if (byteToSend != -1) sendBit
   }
   
   def getConfiguration = configurationString
   
   /**
-   * Syntax: <bits>,<parity>,<stops>
+   * Syntax: <baud>,<bits>,<parity>,<stops>
    * 
    * parity can be:
    * n no parity
@@ -132,12 +132,14 @@ abstract class AbstractRS232 extends RS232 with Runnable {
   def setConfiguration(conf:String) {
     configurationString = conf
     val parts = conf.split(",")
-    if (parts.length != 3) throw new IllegalArgumentException("Bad configuration string")
+    if (parts.length != 4) throw new IllegalArgumentException("Bad configuration string")
     
-    bits = parts(0).toInt
-    stop = parts(2).toInt    
+    baudCycles = (clk.getClockHz / parts(0).toInt).toInt
+    //println(s"BAUD => ${parts(0)} $baudCycles")
+    bits = parts(1).toInt
+    stop = parts(3).toInt    
     if (stop != 1 && stop != 2) throw new IllegalArgumentException("Stop bits must be 1 or 2")
-    parity = parts(1).toUpperCase match {
+    parity = parts(2).toUpperCase match {
       case "N" => NO_PARITY
       case "E" => EVEN_PARITY
       case "O" => ODD_PARITY
@@ -150,23 +152,30 @@ abstract class AbstractRS232 extends RS232 with Runnable {
   }
   
   protected def isSending = byteToSend != -1
-  
+  protected def waitingSending {
+    if (isSending) sendingLock.synchronized {
+      sendingLock.wait
+      while (isSending) sendingLock.wait
+    }
+  }
+    
   protected def sendOutByte(byte:Int)
   
-  protected def sendInByte(byte:Int) {
+  protected def sendInByte(byte:Int) = sendingLock.synchronized {
     totalByteReceived += 1
     byteToSend = byte
     // send start bit
     rxd = 0
 //    dcd = DCD
-    cia2.setFlagLow
+    cia2.setFlagLow    
     bitsent = 1
-    tmpParity = 0
-    if (statusListener != null) statusListener.update(RXD,1)
+    tmpParity = 0      
     //println("Sent start bit")
+    clk.scheduleExternal(new ClockEvent("RS232-in",clk.currentCycles + baudCycles,c => sendBit))    
+    if (statusListener != null) statusListener.update(RXD,1)
   }
   
-  protected def sendBit : Boolean = {    
+  protected def sendBit {    
     if (bitsent == bits + 1 && parity != NO_PARITY) { // parity
       rxd = parity match {
         case ODD_PARITY => if (tmpParity == 0) RXD else 0
@@ -187,15 +196,15 @@ abstract class AbstractRS232 extends RS232 with Runnable {
       //println("Sent " + (if (rxd > 0) "1" else "0"))
     }
     bitsent += 1
-    if (bitsent == length) {
+    if (bitsent == length + 1) {
 //      dcd = 0      
-      byteToSend = -1
-      sendingLock.synchronized { sendingLock.notify }
-      if (statusListener != null) statusListener.update(RXD,0)
-      //println("BYTE FINISHED")
-      return true
+      sendingLock.synchronized {        
+        byteToSend = -1
+        sendingLock.notify
+      }
+      if (statusListener != null) statusListener.update(RXD,0)     
     }
-    return false
+    else clk.scheduleExternal(new ClockEvent("RS232-in",clk.currentCycles + baudCycles,c => sendBit))
   }
   
   def connectionInfo = getConfiguration

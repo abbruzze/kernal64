@@ -8,14 +8,14 @@ object FileRS232 extends StreamRS232 {
   
   private[this] var inFile,outFile = ""
   
-  def getDescription = "Get input stream and output stream from files. Connection String syntax: input file path,output file path,bits,parity,stops"
+  def getDescription = "Get input stream and output stream from files. Connection String syntax: input file path,output file path,baud,bits,parity,stops"
   
   /**
    * Syntax: input file path,output file path,bits,parity,stops
    */
   override def setConfiguration(conf:String) {
     val parts = conf.split(",")
-    if (parts.length != 5) throw new IllegalArgumentException("Bad File RS-232 configuration string. Expected <input file path>,<output file path>,<bits>,<parity>,<stops>")
+    if (parts.length != 6) throw new IllegalArgumentException("Bad File RS-232 configuration string. Expected <input file path>,<output file path>,<baud>,<bits>,<parity>,<stops>")
     
     inFile = parts(0)
     outFile = parts(1)

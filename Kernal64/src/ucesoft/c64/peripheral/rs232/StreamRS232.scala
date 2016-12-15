@@ -3,6 +3,8 @@ package ucesoft.c64.peripheral.rs232
 import java.io.OutputStream
 import java.io.InputStream
 import ucesoft.c64.Log
+import ucesoft.c64.Clock
+import ucesoft.c64.ClockEvent
 
 abstract class StreamRS232 extends AbstractRS232 with Runnable {
   private[this] var out : OutputStream = _
@@ -16,7 +18,7 @@ abstract class StreamRS232 extends AbstractRS232 with Runnable {
     }
     else {
       dcd = RS232.DCD
-      thread = new Thread(this)
+      thread = new Thread(this,"StreamRS232")
       thread.start
     }
   }
@@ -52,19 +54,29 @@ abstract class StreamRS232 extends AbstractRS232 with Runnable {
   protected def canSend = rts && dtr
   
   def run {
+    val clk = Clock.systemClock
+    val waitLock = new Object
+    var waitingClock = false
     while (isEnabled) {
       try {
         val byte = in.read
-        //println("<" + byte.toChar)
-        while (!canSend) { Thread.sleep(1) }
+        //if (byte != -1) println("<" + byte.toChar)
+        while (!canSend) Thread.sleep(1)
         
         if (byte != -1) {
           sendInByte(byte)
-          val ts = System.currentTimeMillis
-          while (isSending && System.currentTimeMillis - ts < 1000) Thread.sleep(1)
-          //if (isSending) sendingLock.synchronized { while (isSending) sendingLock.wait }
+          waitingSending
+          // wait some cycles before send another byte
+          waitingClock = true
+          clk.scheduleExternal(new ClockEvent("RS-232 receiveByte",clk.currentCycles + 10000, cycles => {
+            waitLock.synchronized {
+              waitingClock = false
+              waitLock.notify
+            }
+          }))
+          while (waitingClock) waitLock.synchronized { waitLock.wait }    
+          }
         }
-      }
       catch {
         case i:InterruptedException =>
         case t:Throwable =>
