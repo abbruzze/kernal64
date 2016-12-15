@@ -177,7 +177,7 @@ class GameBaseSpi extends GameProvider {
       case None =>
         val future = Future {
           val pages = constraint match {
-            case None => this.pages
+            case None|Some(SyncAll) => this.pages
             case Some(LetterConstraint(l)) => List(l.toInt)
             case _ => return Future.failed(new IllegalArgumentException("Bad constraint: " + constraint))
           }
