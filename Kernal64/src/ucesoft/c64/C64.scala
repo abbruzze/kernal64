@@ -182,7 +182,8 @@ class C64 extends C64Component with ActionListener with TraceListener with GameP
                                                            TCPRS232,
                                                            FileRS232,
                                                            SwiftLink.getSL(nmiSwitcher.expansionPortNMI,None),
-                                                           SwiftLink.getSL(nmiSwitcher.expansionPortNMI _,Some(REU.getREU(REU.REU_1750,mem,setDMA _,irqSwitcher.expPortIRQ _,None))))
+                                                           SwiftLink.getSL(nmiSwitcher.expansionPortNMI _,Some(REU.getREU(REU.REU_1750,mem,setDMA _,irqSwitcher.expPortIRQ _,None))),
+                                                           ProcessRS232)
   private[this] val rs232StatusPanel = new RS232StatusPanel
   // -------------------- PRINTER --------------
   private[this] var printerEnabled = false
