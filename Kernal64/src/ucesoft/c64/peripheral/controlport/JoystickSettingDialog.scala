@@ -13,7 +13,7 @@ import java.awt.event.KeyEvent
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyListener
 
-class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends JDialog(parent, "Joystick settings", true) with ActionListener {
+class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:GamePadControlPort) extends JDialog(parent, "Joystick settings", true) with ActionListener {
   private[this] var joyButtonSelected = ""
   private[this] var joystickDialog : JDialog = null
   private[this] var keyboardDialog : JDialog = null
@@ -192,7 +192,7 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends J
       val controllers = ControllerEnvironment.getDefaultEnvironment.getControllers map { _.asInstanceOf[Object] }
       val controller = JOptionPane.showInputDialog(this,"Select Joystick","GamePad configuration",JOptionPane.QUESTION_MESSAGE,null,controllers,controllers(0)).asInstanceOf[Controller]      
       if (controller != null) {
-        val buttons = controller.getComponents filter { _.getName.toUpperCase.indexOf("BUTTON") >= 0 }
+        val buttons = controller.getComponents filter { _.getIdentifier.isInstanceOf[Component.Identifier.Button] }
         joystickDialog = new JDialog(parent,"Fire button selection",true)
         val okButton = new JButton("Ok")
         okButton.setEnabled(false)
@@ -232,6 +232,7 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends J
         if (joyButtonSelected != "") {
           configuration.setProperty(CONFIG_CONTROLLER_NAME,controller.getName)
           configuration.setProperty(CONFIG_CONTROLLER_FIRE_BUTTON,joyButtonSelected)
+          gamepad.findController
         }
       }
     }
@@ -240,8 +241,4 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties) extends J
         JOptionPane.showMessageDialog(this,"Error while polling joystick: " + t,"Joystick error",JOptionPane.ERROR_MESSAGE)
     }
   }
-}
-
-object JoystickSettingDialog extends App {
-  new JoystickSettingDialog(new javax.swing.JFrame, new Properties).setVisible(true)
 }

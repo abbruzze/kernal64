@@ -8,15 +8,17 @@ import Joysticks._
 
 class GamePadControlPort(configuration:Properties) extends ControlPort {
   private[this] var controller : Option[Controller] = None
-  private[this] val controllerName = configuration.getProperty(CONFIG_CONTROLLER_NAME)
-  private[this] val controllerFireName = configuration.getProperty(CONFIG_CONTROLLER_FIRE_BUTTON,"1")
+  private[this] var controllerName = ""
+  private[this] var controllerFireName = ""
   private[this] var xAxisComponent : Option[Component] = None
   private[this] var yAxisComponent : Option[Component] = None
   private[this] var fireComponent : Option[Component] = None
   
   findController
   
-  private def findController {
+  def findController {
+    controllerName = configuration.getProperty(CONFIG_CONTROLLER_NAME)
+    controllerFireName = configuration.getProperty(CONFIG_CONTROLLER_FIRE_BUTTON,"1")
     val controllers = ControllerEnvironment.getDefaultEnvironment.getControllers
     controller = controllers find { c => c.getName == controllerName  && (c.getType == Controller.Type.GAMEPAD || c.getType == Controller.Type.STICK)}
     controller match {

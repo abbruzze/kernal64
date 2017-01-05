@@ -2227,7 +2227,7 @@ class C64 extends C64Component with ActionListener with TraceListener with GameP
   private def joySettings {
     Clock.systemClock.pause
     try {
-      val dialog = new JoystickSettingDialog(displayFrame,configuration)
+      val dialog = new JoystickSettingDialog(displayFrame,configuration,gameControlPort)
       dialog.setVisible(true)
       configureJoystick
     }
