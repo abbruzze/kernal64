@@ -1,4 +1,4 @@
-[![Build Status](https://drone.io/github.com/abbruzze/kernal64/status.png)](https://drone.io/github.com/abbruzze/kernal64/latest)
+[![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
 Kernal64 ver 1.3.1
 ========
