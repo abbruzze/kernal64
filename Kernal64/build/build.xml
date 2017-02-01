@@ -15,14 +15,14 @@
 		</not>
 	</condition>
 	
-	<!-- label is set only if ant is executed by Drone CI -->
- 	<condition property="DRONE_BUILD_NUMBER" value="?">
+	<!-- label is set only if ant is executed by CI -->
+ 	<condition property="BUILD_NUMBER" value="?">
 		<not>
-			<isset property="DRONE_BUILD_NUMBER"/>
+			<isset property="BUILD_NUMBER"/>
 		</not>
 	</condition>
 	
-	<property name="version" value="${VERSION} b${DRONE_BUILD_NUMBER}"/>
+	<property name="version" value="${VERSION} b${BUILD_NUMBER}"/>
 
 	<target name="scala-init">
 		<property name="scala-library.jar" value="${lib.dir}/scala-library.jar" />
