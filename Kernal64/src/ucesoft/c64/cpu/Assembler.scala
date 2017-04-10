@@ -68,12 +68,12 @@ class Assembler {
 
     // -------------------------------
     def rem: Parser[Step] = ";.*".r ^^ { r => REM }
-    def org: Parser[ORG] = ("*=" | "org") ~> address <~ opt(rem) ^^ { case a => ORG(a) }
-    def equ: Parser[EQU] = (label <~ "=") ~ address <~ opt(rem) ^^ { case l ~ n => EQU(Some(l), n) }
-    def byte: Parser[BYTE] = (opt(label) <~ (".byte" | ".by")) ~ byteList <~ opt(rem) ^^ { case l ~ bl => BYTE(l, bl) }
+    def org: Parser[ORG] = ("*=" | "org") ~> address ^^ { case a => ORG(a) }
+    def equ: Parser[EQU] = (label <~ "=") ~ address ^^ { case l ~ n => EQU(Some(l), n) }
+    def byte: Parser[BYTE] = (opt(label) <~ (".byte" | ".by")) ~ byteList ^^ { case l ~ bl => BYTE(l, bl) }
     def byteList: Parser[List[Int]] = repsep(byteType, ",") ^^ { l => l.flatten }
     def byteType: Parser[List[Int]] = address ^^ { a => List(a) } | "\"[^\"]*\"".r ^^ { s => s.toList map { _.toInt } }
-    def word: Parser[WORD] = (opt(label) <~ (".word" | ".wd")) ~ wordList <~ opt(rem) ^^ { case l ~ bl => WORD(l, bl) }
+    def word: Parser[WORD] = (opt(label) <~ (".word" | ".wd")) ~ wordList ^^ { case l ~ bl => WORD(l, bl) }
     def wordList: Parser[List[Int]] = repsep(address, ",")
 
     def opcode: Parser[String] = OPS.drop(1).foldLeft(OPS.head: Parser[String]) { (p, b) => p | b }
@@ -112,7 +112,7 @@ class Assembler {
 
     def crsEnd: Parser[String] = "[\n\r]+".r
     def crsStart: Parser[String] = "[\n\r]*".r
-    def steps: Parser[List[Step]] = crsStart ~> rep((rem | org | equ | byte | word | op) <~ crsEnd)
+    def steps: Parser[List[Step]] = crsStart ~> rep((rem | org<~opt(rem) | equ<~opt(rem) | byte<~opt(rem) | word<~opt(rem) | op<~opt(rem)) <~ crsEnd)
   }
 
   private def makeSymbolTable(steps: List[Step]) =
@@ -234,9 +234,15 @@ class Assembler {
     Parser.parseAll(Parser.steps, in) match {
       case Parser.Success(parsed, _) =>
         resolve(parsed)
-        encode(parsed,mem)
-        //parsed foreach println
-        None
+        try {
+          encode(parsed,mem)
+          None
+        }
+        catch {
+          case t:AssemblerException =>
+            Some(t.toString)
+        }
+        //parsed foreach println        
       case Parser.Error(msg, _) =>
         Some(msg)
       case Parser.Failure(e, _) =>
