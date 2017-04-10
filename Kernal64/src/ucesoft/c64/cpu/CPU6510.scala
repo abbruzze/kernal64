@@ -47,7 +47,7 @@ object CPU6510 {
   private[cpu] type OperationCell = (Instruction.CODE, Mode.MODE, Int)
   import Instruction._
   import Mode._
-  private val OP_MATRIX: Array[Array[OperationCell]] = Array(
+  private[cpu] val OP_MATRIX: Array[Array[OperationCell]] = Array(
     //  		x0			x1				x2				x3				x4			x5				x6				x7				x8			x9				xA				xB				xC				xD				xE			xF
     Array((BRK, IMP, 7), (ORA, IZX, 6), (KIL, IMP, 0), (SLO, IZX, 8), (NOP, ZP , 3), (ORA, ZP , 3), (ASL, ZP , 5), (SLO, ZP , 5), (PHP, IMP, 3), (ORA, IMM, 2), (ASL, IMP, 2), (ANC, IMM, 2), (NOP, ABS, 4), (ORA, ABS, 4), (ASL, ABS, 6), (SLO, ABS, 6)), // 0x
     Array((BPL, REL,-2), (ORA, IZY,-5), (KIL, IMP, 0), (SLO, IZY, 8), (NOP, ZPX, 4), (ORA, ZPX, 4), (ASL, ZPX, 6), (SLO, ZPX, 6), (CLC, IMP, 2), (ORA, ABY,-4), (NOP, IMP, 2), (SLO, ABY, 7), (NOP, ABX,-4), (ORA, ABX,-4), (ASL, ABX, 7), (SLO, ABX, 7)), // 1x
@@ -79,10 +79,17 @@ object CPU6510 {
   }
 
   def findCode(op: String, mode: Mode.MODE) = {
-    OP_Map get op match {
+    OP_Map get op.toUpperCase match {
       case Some(list) =>
         list find { case (_, m) => m == mode } map { case (c, _) => c }
       case None => None
+    }
+  }
+  
+  def hasMode(op:String,m:Mode.MODE) : Boolean = {
+    OP_Map get op.toUpperCase match {
+      case None => false
+      case Some(l) => l map { _._2 } exists { _ == m }
     }
   }
   
