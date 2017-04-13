@@ -47,7 +47,7 @@
 		<tstamp/>
 		<echo message="Building version ${version}"/>
 		<mkdir dir="${build.dir}"/>		
-		<echo file="${sources.dir}/ucesoft/c64/Version.scala" message='package ucesoft.c64 ; object Version { val VERSION = "${version}" ; val BUILD_DATE="${TODAY}"}'/>
+		<echo file="${sources.dir}/ucesoft/cbm/Version.scala" message='package ucesoft.cbm ; object Version { val VERSION = "${version}" ; val BUILD_DATE="${TODAY}"}'/>
 		<echo message="Optimise is set to ${optimise}"/>
 		<javac srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/c64/peripheral/sid/resid/*.java ucesoft/c64/peripheral/sid/resid2/*.java">
 			<classpath refid="build.classpath"/>
