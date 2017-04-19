@@ -2211,11 +2211,12 @@ class Z80(mem:Memory) extends Z80.IOMemory with TraceListener {
   
   @inline private def incR(deltaR:Int) = ctx.R = (ctx.R & 0x80) | (ctx.R + deltaR) & 0x7F
   
-  protected def interruptMode0Handling {
+  @inline private def interruptMode0Handling {
     throw new IllegalArgumentException("Interrupt mode 0 is not implemented")
   }
-  protected def interruptMode2Handling {
-    throw new IllegalArgumentException("Interrupt mode 0 is not implemented")
+  @inline private def interruptMode2Handling {
+    val addr = ctx.I << 8
+    ctx.PC = (mem.read(addr) << 8) | mem.read(addr + 1)
   }
   
   def fetchAndExecute : Int = {
