@@ -91,7 +91,7 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
   private[this] val CONFIGURATION_FRAME_DIM = "frame.dim"
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
-  private[this] val mem = new CPU6510Mems.MAIN_MEMORY
+  private[this] val mem = new C64MMU.MAIN_MEMORY
   private[this] var cpu = CPU6510.make(mem)  
   private[this] var cpuExact = cpu.isExact
   private[this] var vicChip : vic.VIC = _
@@ -322,9 +322,9 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
     add(new FloppyComponent(8,attachedDisks,drives,driveLeds))
     add(new FloppyComponent(9,attachedDisks,drives,driveLeds))
     // -----------------------
-    val bankedMemory = new vic.BankedMemory(mem,mem.CHAR_ROM,mem.COLOR_RAM)    
-    ExpansionPort.setMemoryForEmptyExpansionPort(bankedMemory)
-    ExpansionPort.addConfigurationListener(bankedMemory)    
+    val vicMemory = new C64VICMemory(mem,mem.CHAR_ROM)    
+    ExpansionPort.setMemoryForEmptyExpansionPort(vicMemory)
+    ExpansionPort.addConfigurationListener(vicMemory)    
     import cia._
     // control ports
     val cia1CP1 = new CIA1Connectors.PortAConnector(keyb,controlPortA)
@@ -338,7 +338,7 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
     				   cia1CP1,
     				   cia1CP2,
     				   irqSwitcher.ciaIRQ _)
-    val cia2CP1 = new CIA2Connectors.PortAConnector(bankedMemory,bus,rs232)
+    val cia2CP1 = new CIA2Connectors.PortAConnector(vicMemory,bus,rs232)
     val cia2CP2 = new CIA2Connectors.PortBConnector(rs232)    
     add(cia2CP1)
     add(cia2CP2)
@@ -351,8 +351,8 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
     rs232.setCIA(cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
-    vicChip = new vic.VIC(bankedMemory,mem.COLOR_RAM,irqSwitcher.vicIRQ _,baLow _)      
-    mem.setLastByteReadMemory(bankedMemory)
+    vicChip = new vic.VIC(vicMemory,mem.COLOR_RAM,irqSwitcher.vicIRQ _,baLow _)      
+    mem.setLastByteReadMemory(vicMemory)
     // mapping I/O chips in memory
     val io = mem.IO    
     io.addBridge(cia1)

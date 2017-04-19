@@ -15,7 +15,7 @@ import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
 
-object CPU6510Mems {
+object C64MMU {
   final val M_ROML = 0x8000
   final val M_BASIC = 0xA000
   final val M_KERNAL = 0xE000
@@ -49,8 +49,8 @@ object CPU6510Mems {
     val length = 0x10000
 
     private[this] val mem = Array.fill(length)(0xFF)
-    private[CPU6510Mems] var ULTIMAX = false
-    private[CPU6510Mems] var lastByteReadMemory : LastByteReadMemory = _
+    private[C64MMU] var ULTIMAX = false
+    private[C64MMU] var lastByteReadMemory : LastByteReadMemory = _
     
     final val isActive = true
     def init {
@@ -111,8 +111,8 @@ object CPU6510Mems {
       for(i <- 0 until mem.length) mem(i) = 0xFF
     }
     
-    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address - startAddress)
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address - startAddress) = value & 0xff
+    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address & 0x3FF)
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address & 0x3FF) = value & 0xff
     // state
     protected def saveState(out:ObjectOutputStream) {
       out.writeObject(mem)
@@ -151,42 +151,6 @@ object CPU6510Mems {
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   
-  private class ExtendedROM(ram: Memory,val name:String,val startAddress:Int) extends RAMComponent {    
-    import ExpansionPort._
-    val componentID = "Extended " + name
-    val componentType = CBMComponentType.MEMORY
-    val length = 8192
-    val isRom = true
-    
-    private[this] var active = false
-    final private[this] val isROML = name == "ROML"
-      
-    final def isActive = active
-    def setActive(active:Boolean) = this.active = active
-    def init {}
-    def reset = active = false
-    
-    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
-      val selectedROM = if (isROML) getExpansionPort.ROML else getExpansionPort.ROMH
-      if (selectedROM != null) selectedROM.read(address,chipID)
-      else ram.read(address,chipID)
-    }
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
-      val selectedROM = if (isROML) getExpansionPort.ROML else getExpansionPort.ROMH
-      if (selectedROM == null) ram.write(address,value,chipID)
-      else selectedROM.write(address,value)
-    }
-    // state
-    protected def saveState(out:ObjectOutputStream) {}
-    protected def loadState(in:ObjectInputStream) {}
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
-  }
-  
-  private case class MemConfig(basic:Boolean,roml:Boolean,romh:Boolean,char:Boolean,kernal:Boolean,io:Boolean,romhultimax:Boolean) {
-    override def toString = s"basic=${b2i(basic)} roml=${b2i(roml)} romh=${b2i(romh)} char=${b2i(char)} kernal=${b2i(kernal)} io=${b2i(io)} rom_ultimax=${b2i(romhultimax)}"
-    @inline private def b2i(b:Boolean) = if (b) "1" else "0"
-  }
-
   class MAIN_MEMORY extends RAMComponent with ExpansionPortConfigurationListener {
     val componentID = "Main RAM"
     val componentType = CBMComponentType.MEMORY
@@ -223,7 +187,7 @@ object CPU6510Mems {
     private[this] var datassette : Datassette = _
     private[this] var lastByteReadMemory : LastByteReadMemory = _
     private[this] var memConfig = -1
-    private[this] val MEM_CONFIG = Array.ofDim[MemConfig](32)
+    private[this] val MEM_CONFIG = MemConfig.MEM_CONFIG
     
     def getRAM : Memory = ram
     
@@ -302,49 +266,6 @@ object CPU6510Mems {
       ROMH_ULTIMAX.setActive(mc.romhultimax)
     }
     
-    private def initMemConfigs {
-      Log.info("Initializing main memory configurations ...")
-      for(m <- 0 to 31) {
-        val mc = m match {
-          case 31 => 
-            MemConfig(basic=true,roml=false,romh=false,char=false,kernal=true,io=true,romhultimax=false)
-          case 30|14 =>
-            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=true,io=true,romhultimax=false)
-          case 29|13 =>
-            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=true,romhultimax=false)
-          case 28|24 =>
-            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=false,romhultimax=false)
-          case 27 =>
-            MemConfig(basic=true,roml=false,romh=false,char=true,kernal=true,io=false,romhultimax=false)
-          case 26|10 =>
-            MemConfig(basic=false,roml=false,romh=false,char=true,kernal=true,io=false,romhultimax=false)
-          case 25|9 =>
-            MemConfig(basic=false,roml=false,romh=false,char=true,kernal=false,io=false,romhultimax=false)
-          case 23|22|21|20|19|18|17|16 =>
-            MemConfig(basic=false,roml=true,romh=false,char=false,kernal=false,io=true,romhultimax=true)
-          case 15 =>
-            MemConfig(basic=true,roml=true,romh=false,char=false,kernal=true,io=true,romhultimax=false)
-          case 12|8|4|0 =>
-            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=false,romhultimax=false)
-          case 11 =>
-            MemConfig(basic=true,roml=true,romh=false,char=true,kernal=true,io=false,romhultimax=false)
-          case 7 =>
-            MemConfig(basic=false,roml=true,romh=true,char=false,kernal=true,io=true,romhultimax=false)
-          case 6 =>
-            MemConfig(basic=false,roml=false,romh=true,char=false,kernal=true,io=true,romhultimax=false)
-          case 5 =>
-            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=true,romhultimax=false)
-          case 3 =>
-            MemConfig(basic=false,roml=true,romh=true,char=true,kernal=true,io=false,romhultimax=false)
-          case 2 =>
-            MemConfig(basic=false,roml=false,romh=true,char=true,kernal=true,io=false,romhultimax=false)
-          case 1 =>
-            MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=false,romhultimax=false)
-        }
-        MEM_CONFIG(m) = mc
-      }      
-    }
-
     def init {
       Log.info("Initializing main memory ...")
       
@@ -356,8 +277,6 @@ object CPU6510Mems {
       add(ROML)
       add(ROMH)
       add(ROMH_ULTIMAX)
-      
-      initMemConfigs
     }
     
     override def afterInitHook {
