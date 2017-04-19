@@ -14,7 +14,6 @@ import javax.swing.event.ChangeListener
 import javax.swing.event.ChangeEvent
 import ucesoft.cbm.peripheral.vic.Display
 import ucesoft.cbm.peripheral.vic.VIC
-import ucesoft.cbm.cpu.CPU6510Mems
 import java.io._
 
 object TraceDialog {
