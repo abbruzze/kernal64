@@ -6,7 +6,12 @@ import java.io._
 import ucesoft.cbm.ChipID
 import javax.swing.JFrame
 
-abstract class ROM(ram: Memory, val name: String, val startAddress: Int, val length: Int, val resourceName: String) extends RAMComponent {
+class ROM(ram: Memory, 
+          val name: String, 
+          val startAddress: Int, 
+          val length: Int, 
+          val resourceName: String,
+          initialOffset:Int = 0) extends RAMComponent {
     val componentID = "ROM " + name
     val componentType = CBMComponentType.MEMORY 
     
@@ -24,12 +29,12 @@ abstract class ROM(ram: Memory, val name: String, val startAddress: Int, val len
         case None => throw new IOException(s"Can't find resource ${resourceName} for ROM ${name}")
         case Some(in) =>
           val buffer = Array.ofDim[Byte](length)
-          var read = in.read(buffer)
-          var offset = 0
-          while (read > 0) {
-            offset += read
+          var read = 0 //in.read(buffer)
+          var offset = initialOffset
+          do {            
             read = in.read(buffer, offset, length - offset)
-          }
+            offset += read
+          } while (read > 0)
           in.close
           for (i <- 0 until length) mem(i) = buffer(i) & 0xff
       }
