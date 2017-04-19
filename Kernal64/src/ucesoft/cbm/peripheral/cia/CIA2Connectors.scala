@@ -1,15 +1,15 @@
 package ucesoft.cbm.peripheral.cia
 
-import ucesoft.cbm.peripheral.vic.BankedMemory
 import ucesoft.cbm.peripheral.bus._
 import ucesoft.cbm.peripheral.Connector
 import ucesoft.cbm.peripheral.rs232.RS232
 import ucesoft.cbm.peripheral.drive.ParallelCable
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
+import ucesoft.cbm.peripheral.vic.VICMemory
 
 object CIA2Connectors {
-  class PortAConnector(mem:BankedMemory,bus:IECBus,rs232:RS232) extends Connector with IECBusListener {
+  class PortAConnector(mem:VICMemory,bus:IECBus,rs232:RS232) extends Connector with IECBusListener {
     val componentID = "CIA2 Port A Connector"
     override val isController = true
     val busid = "CIA2_PortA"
@@ -26,7 +26,7 @@ object CIA2Connectors {
     final protected def performWrite(data:Int) = {
       val value = data | ~ddr // WHY ??
       bank = value & 3
-      mem.setBank(bank)
+      mem.setVideoBank(bank)
       
       bus.setLine(busid,if ((value & 8) > 0) GROUND else VOLTAGE,  // ATN
                         if ((value & 32) > 0) GROUND else VOLTAGE, // DATA
