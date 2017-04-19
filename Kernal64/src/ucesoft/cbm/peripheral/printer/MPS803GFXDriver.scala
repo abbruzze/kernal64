@@ -6,7 +6,6 @@ import scala.collection.mutable.ListBuffer
 import java.awt.Dimension
 import java.awt.Graphics
 import ucesoft.cbm.peripheral.vic.Palette
-import ucesoft.cbm.cpu.CPU6510Mems
 import java.io.File
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
