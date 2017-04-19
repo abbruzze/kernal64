@@ -10,7 +10,6 @@ import java.awt.Image
 import java.awt.geom.Rectangle2D
 import Palette._
 import java.awt.Graphics2D
-import ucesoft.cbm.cpu.CPU6510Mems
 import java.awt.event.ActionEvent
 import java.util.Arrays
 import ucesoft.cbm.CBMComponent
@@ -22,7 +21,7 @@ import java.io.ObjectInputStream
 import javax.swing.JFrame
 
 
-final class VIC(mem: BankedMemory,
+final class VIC(mem: VICMemory,
   colorMem:Memory,
   irqAction: (Boolean) => Unit,
   baLow: (Boolean) => Unit) extends Chip with RAMComponent {
@@ -1366,10 +1365,7 @@ final class VIC(mem: BankedMemory,
 
   def dump = {
     val sb = new StringBuffer("VIC dump:\n")
-    mem match {
-      case bm: BankedMemory => sb.append(s"Video Bank:\t\t\t${bm.getBank} = ${Integer.toHexString(bm.getBankAddress)}\n")
-      case _ =>
-    }
+    sb.append(s"Video Bank:\t\t\t${mem.getBank} = ${Integer.toHexString(mem.getBankAddress)}\n")
     sb.append(if (bmm) "Bitmap mode\n" else "Text mode\n")
     sb.append(s"Extended color mode\t\t${ecm}\n")
     sb.append(s"Multi color mode\t\t${mcm}\n")
