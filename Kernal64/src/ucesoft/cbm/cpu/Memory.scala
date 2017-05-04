@@ -52,14 +52,14 @@ abstract class BridgeMemory extends RAMComponent {
   private[this] var bridgesEnd : Array[Int] = _
   private[this] var bridgesMem : Array[Memory] = _
   
-  def addBridge(m:Memory,start:Int= -1,length:Int= -1) {
+  def addBridge(m:Memory,start:Int= -1,length:Int= -1,addComponent:Boolean=true) {
     val startAddress = if (start != -1) start else m.startAddress
     val endAddress = startAddress + (if (length != -1) length else m.length) - 1
     
     bridges = (startAddress,endAddress,m) :: bridges
     Log.info(s"Added bridged memory ${m.name} to ${name} ${hex4(startAddress)}-${hex4(endAddress)}")
     m match {
-      case mc : CBMComponent =>
+      case mc : CBMComponent if addComponent =>
         add(mc)
       case _ =>
     }

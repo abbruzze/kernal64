@@ -1,6 +1,7 @@
 package ucesoft.cbm.trace
 
 import java.io.PrintWriter
+import ucesoft.cbm.cpu.Memory
 
 sealed trait BreakType {
   def isBreak(address:Int,irq:Boolean,nmi:Boolean) : Boolean
@@ -61,4 +62,5 @@ trait TraceListener {
   def step(updateRegisters: (String) => Unit)
   def setBreakAt(breakType:BreakType,callback:(String) => Unit)
   def jmpTo(pc:Int)
+  def disassemble(mem:Memory,address:Int) : (String,Int)
 }

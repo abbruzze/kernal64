@@ -165,6 +165,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   private[this] var state = 0
   private[this] var ar,ar2,data,rdbuf = 0
 
+  // RESET
+  final private[this] val RESET = 0x02
   // IRQ & NMI
   final private[this] val IRQ_STATE = 0x8
   final private[this] val IRQ_STATE_2 = 0x9
@@ -1825,6 +1827,13 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 		Last
 	  }
 	  case 1 => () => { Last ; throw new CPU6510.CPUJammedException }
+	  case RESET => () => { 
+	    if (ready) {
+	      PC = readWordFrom(0xfffc, mem)
+	      state = 0
+	      Log.info(s"$componentID/$id RESET to ${hex4(PC)}")
+	    }
+	  }
 	  case s => () => { println("Check CPU6510_CE states: " + s) }
 	  //case _ => throw new IllegalArgumentException("Bad state " + state + " at PC=" + Integer.toHexString(PC))
     }
@@ -1886,11 +1895,11 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   }
 
   def reset {
-    PC = readWordFrom(0xfffc, mem)
+    //PC = readWordFrom(0xfffc, mem)
     irqLow = false
     nmiLow = false
     nmiOnNegativeEdge = false
-    state = 0
+    state = RESET
     dma = false
     ready = true
     baLow = false
@@ -1901,8 +1910,21 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     SP = 0
     Log.info(s"CPU reset! PC = ${hex4(PC)}")
   }
+  
+  def disassemble(mem:Memory,address:Int) = {
+    val dinfo = CPU6510.disassemble(mem, address)
+    (dinfo.toString,dinfo.len)
+  }
+  
+  final def fetchAndExecute(cycles:Int) {
+    var c = cycles
+    while (c > 0) {
+      fetchAndExecute
+      c -= 1
+    }
+  }
 
-  final def fetchAndExecute: Int = {
+  @inline private def fetchAndExecute {
     if (breakType != null && state == 0 && breakType.isBreak(PC,false,false)) {
       breakType = null
       tracing = true
@@ -1944,7 +1966,6 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       }
       states(state)()
     }
-    0
   }
   
   protected def formatDebug = s"[${id.toString}] ${CPU6510.disassemble(mem,PC).toString} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"

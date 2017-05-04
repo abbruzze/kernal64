@@ -18,11 +18,17 @@ import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.c64.MemConfig
 import ucesoft.cbm.expansion.ExpansionPort
 import ucesoft.cbm.peripheral.vdc.VDC
+import ucesoft.cbm.peripheral.keyboard.Keyboard
+import ucesoft.cbm.peripheral.vic.VICMemory
+import ucesoft.cbm.cpu.Z80
 
-object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
-  type CPUChangeListener = (Boolean) => Unit // true if 8502 selected, false if Z80 selected
-  type FreqChangeListener = (Int) => Unit    // 1 or 2 Mhz
-  
+trait MMUChangeListener {
+  def frequencyChanged(f:Int) // 1 or 2
+  def cpuChanged(is8502:Boolean)
+  def c64Mode(c64Mode:Boolean)
+}
+
+class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with ExpansionPortConfigurationListener with VICMemory with Z80.IOMemory {  
   val componentID = "128 MMU"
   val componentType = CBMComponentType.MEMORY
   
@@ -31,7 +37,7 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
   val startAddress = 0x0
   val length = 0x10000
   final val isActive = true
-  
+    
   // Addresses ---------------------------------
   // 64
   final private[this] val BASIC64_ADDR = 0xA000
@@ -47,21 +53,16 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
   final private[this] val Z80_BIOS_ADDR = 0xD000
   final private[this] val CHARACTERS128_ADDR = 0xD000
   // RAM ---------------------------------------
-  final private[this] val ram = new C128RAM(this)
+  final private[this] val ram = new C128RAM
   // Color & ROMS ------------------------------
   final private[this] val COLOR_RAM = new ColorRAM
   // 64
-  final private[this] val IO64 = new C64MMU.IO(ram,COLOR_RAM)
   final private[this] val KERNAL64_ROM = new ROM(ram, "KERNAL64", KERNAL64_ADDR, 0x2000,"roms/kernal.rom")
   final private[this] val BASIC64_ROM = new ROM(ram, "BASIC64", BASIC64_ADDR, 0x2000, "roms/basic.rom")
   final private[this] val CHARACTERS64_ROM = new ROM(ram, "CHARACTERS64", CHARACTERS64_ADDR, 0x1000, "roms/128/characters.rom",0x0)
   final private[this] val ROML = new ExtendedROM(ram,"ROML",ROML64_ADDR)
   final private[this] val ROMH = new ExtendedROM(ram,"ROMH",BASIC64_ADDR)
   final private[this] val ROMH_ULTIMAX = new ExtendedROM(ram,"ROMH_ULTIMAX",KERNAL64_ADDR)
-  final private[this] val banks64 = Array(KERNAL64_ROM,IO64,CHARACTERS64_ROM,BASIC64_ROM,ROML,ROMH,ROMH_ULTIMAX)
-  private[this] val banksStart = banks64 map { _.startAddress }
-  private[this] val banksEnd = banks64 map { _.endAddress }
-  private[this] val minAddress = banksStart.min
   // 128  
   final private[this] val BASIC128_ROM = new ROM(ram,"BASIC128_LOW_HI",BASIC_LOW_ADDR,0x8000,"roms/128/basic.rom")
   final private[this] val KERNAL128_ROM = new ROM(ram, "KERNAL128", KERNAL_ADDR, 0x4000,"roms/128/kernal.rom")
@@ -75,17 +76,18 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
   final private[this] val FF00_REGS = Array.ofDim[Int](0x5) // index 0 not used, see cr_reg  
   private[this] var cr_reg = 0
   private[this] var z80enabled = true
-  private[this] var cpuChangeListener : CPUChangeListener = _
+  private[this] var ramBank,vicBank = 0
   // IO =======================================================================================
   private[this] var cia_dc00,cia_dd00 : CIA = _
   private[this] var vic : VIC = _
   private[this] var sid : SID = _
   private[this] var vdc : VDC = _
-  //private[this] var vcd : VDC = _
   // Extended VIC registers ===================================================================
   final private[this] val VIC_XSCAN_REG = 0x2F
   final private[this] val VIC_CLKRATE_REG = 0x30
   private[this] var vic_xscan_reg,vic_clkrate_reg = 0
+  // 0/1 CAPSLOCK & 40/80 senses ==============================================================
+  private[this] var keyboard : Keyboard = _
   // 0/1 datassette lines =====================================================================
   private[this] var datassette : Datassette = _
   // ==========================================================================================
@@ -94,18 +96,23 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
   private[this] var exrom,game = false
   // C64 memory configuration =================================================================
   private[this] var c64MemConfig = -1
+  private[this] var c64MC : MemConfig = _
   private[this] val C64_MEM_CONFIG = MemConfig.MEM_CONFIG
   private[this] var ULTIMAX = false  
-  // 1Mhz/2Mhz change listener ================================================================
-  private[this] var freqChangeListener : FreqChangeListener = _
+  // VIC stuff ================================================================================
+  private[this] var videoBank = 0
+  private[this] var vicBaseAddress = 0
+  private[this] var memLastByteRead = 0
+  // Internal & External function ROM =========================================================
+  private[this] var internalFunctionROM_mid,internalFunctionROM_high,externalFunctionROM_mid,externalFunctionROM_high : Array[Int] = _
   // ==========================================================================================
   
-  def setFreqChangeListener(freqChangeListener:FreqChangeListener) {
-    this.freqChangeListener = freqChangeListener
-  }
+  def colorRAM = COLOR_RAM
+  def RAM = ram
+  def CHAR_ROM = CHARACTERS128_ROM
   
-  def setCPUChangeListener(cpuChangeListener:CPUChangeListener) {
-    this.cpuChangeListener = cpuChangeListener
+  def setKeyboard(keyboard:Keyboard) {
+    this.keyboard = keyboard
   }
     
   final def init {
@@ -116,10 +123,11 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
         sid == null ||
         vdc == null) throw new IllegalStateException("I/O components not configured properly")
     if (datassette == null) throw new IllegalStateException("Datassette not set")
+    if (keyboard == null) throw new IllegalStateException("Keyboard not set")
     Log.info("Initializing 128 main memory ...")
+    add(ram)
     add(COLOR_RAM)
     // 64
-    add(IO64)
     add(KERNAL64_ROM)
     add(BASIC64_ROM)
     add(CHARACTERS64_ROM)
@@ -135,6 +143,13 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     add(vic)
     add(sid)
     add(vdc)
+    
+//    val efr = new java.io.File("/Users/ealeame/Desktop/diag_c128_rev14_(325099-01).BIN")
+//    val buf = Array.ofDim[Byte](efr.length.toInt)
+//    val f = new java.io.DataInputStream(new java.io.FileInputStream(efr))
+//    f.readFully(buf)
+//    f.close
+//    externalFunctionROM_mid = buf map { _.toInt & 0xFF }
   }
   
   override def afterInitHook {
@@ -150,7 +165,9 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     c64MemConfig = -1
     ULTIMAX = false
     z80enabled = true
-    cpuChangeListener(!z80enabled)
+    mmuChangeListener.cpuChanged(false)
+    mmuChangeListener.c64Mode(false)
+    mmuChangeListener.frequencyChanged(1)
     java.util.Arrays.fill(D500_REGS,0)
     java.util.Arrays.fill(FF00_REGS,0)
     cr_reg = 0
@@ -158,6 +175,11 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     vic_clkrate_reg = 0
     exrom = false
     game = false
+    ramBank = 0
+    vicBank = 0
+    videoBank = 0
+    vicBaseAddress = 0
+    memLastByteRead = 0
     check128_1
   }
   
@@ -181,35 +203,129 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     this.exrom = exrom
     
     val newMemConfig = (~_0 | _1) & 0x7 | (if (game) 1 << 3 else 0) | (if (exrom) 1 << 4 else 0)
-    if (c64MemConfig == newMemConfig) return
-    
+    if (c64MemConfig == newMemConfig) return    
     c64MemConfig = newMemConfig
-    val mc = C64_MEM_CONFIG(c64MemConfig)
-    ULTIMAX = mc.romhultimax
-    ram.setULTIMAXMode(ULTIMAX)
-    BASIC64_ROM.setActive(mc.basic)
-    ROML.setActive(mc.roml)
-    ROMH.setActive(mc.romh)
-    CHARACTERS64_ROM.setActive(mc.char)
-    KERNAL64_ROM.setActive(mc.kernal)
-    IO64.setActive(mc.io)
-    ROMH_ULTIMAX.setActive(mc.romhultimax)
+    c64MC = C64_MEM_CONFIG(c64MemConfig)
+    ULTIMAX = c64MC.romhultimax
+    BASIC64_ROM.setActive(c64MC.basic)
+    ROML.setActive(c64MC.roml)
+    ROMH.setActive(c64MC.romh)
+    CHARACTERS64_ROM.setActive(c64MC.char)
+    KERNAL64_ROM.setActive(c64MC.kernal)
+    ROMH_ULTIMAX.setActive(c64MC.romhultimax)
+    //println(s"New C64 config: " + c64MC)
   }
     
   final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
-    if (c128Mode) read128(address)
+    if (chipID == ChipID.VIC) return vicRead(address)
+    
+    if (c128Mode) {
+      if (z80enabled) readZ80(address) else read128(address)
+    }
     else read64(address)
   }
   final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
-    if (c128Mode) write128(address,value)
-    else write128(address,value)
+    if (c128Mode) {
+      if (z80enabled) writeZ80(address,value) else write128(address,value)
+    }
+    else write64(address,value)
   }
   
+  /**
+   *  Z80 I/O memory handling ===================================================
+   *  Z-80 I/O mapped area:
+
+      In addition to the normal memory mapping which includes RAM and
+      ROM, the Z-80 has another addressing mode which is called I/O
+      mapping.  This is used to access the chip registers and is
+      similar to memory mapping except the Z-80 IN and OUT instructions
+      must be used instead of LD type instructions.  The two most
+      commonly used ones are:
+       
+      IN A,(C)    which will read the value of the I/O port (chip
+                  register) addressed by .BC into the .A register
+      OUT (C),A   which will write the value of .A to the I/O port
+                  addressed by .BC
+      
+      In both cases, .BC is a 16 bit address and .A is an 8 bit value. 
+      The C-128 I/O chips appear at their normal address locations in
+      the I/O area as outlined below and can be programmed directly by
+      the experienced user.  Note that you must be careful when playing
+      with register values because CP/M expects most of them to be set
+      in certain ways.  Changing these settings may cause a system
+      crash.  If no chip register is present at the specified address,
+      the underlying RAM or ROM is written/read.
+      
+      0000 to 0FFF                  image of RAM mapped down from D000 to
+      DFFF of BANK 0.
+      
+      1000 to 13FF      VICCOLOR    color map for 40 col screen  
+   */
+  final def in(addressHI:Int,addressLO:Int) : Int = {
+    val address = addressHI << 8 | addressLO
+    if (address < 0x1000) return ram.read(0xD000 | address,0)
+    if (address < 0x1400) return COLOR_RAM.read(address & 0x3FF)
+    if (address >= 0xD800 && address < 0xDC00) return ram.read(address)
+    if (address >= 0xD000 && address < 0xE000) return mem_read_0xD000_0xDFFF(address)
+    read128(address)
+  }
+  final def out(addressHI:Int,addressLO:Int,value:Int) {
+    val address = addressHI << 8 | addressLO
+    if (address < 0x1000) ram.write(0xD000 | address,0,value)
+    else if (address < 0x1400) COLOR_RAM.write(address & 0x3FF,value)
+    else if (address >= 0xD800 && address < 0xDC00) ram.write(address,value)
+    else if (address >= 0xD000 && address < 0xE000) mem_write_0xD000_0xDFFF(address,value)
+    else write128(address,value)    
+  }      
+  // Z80 ========================================================================
+  /**
+   * Z-80 
+   * BANK 2 :    MMU configuration register value $3E, or preconfig
+    register #3 (FF03)
+     
+    This bank, which I have arbitrarily called BANK 2, is mostly the
+    same as BANK 0 with the exception that the 40 column video color
+    and I/O are mapped into context:
+    
+    1000 to 13FF      VICCOLOR    color map for 40 col screen
+    
+    Note:       This bank must also be in context to access the MMU
+                chip registers at D500 in the Z-80 I/O mapped area.
+   */
+  @inline private[this] def readZ80(address:Int) : Int = {
+    if (address < 0x1000) {
+      if (ramBank == 0) return KERNAL128_ROM.read(Z80_BIOS_ADDR | address)
+      return ram.read(address)
+    }
+    if (address < 0x1400 && cr_reg == 0x3E) return COLOR_RAM.read(address & 0x3FF)
+    // FF00-FF04 --------------------------------------------
+    if (address == 0xFF00) return cr_reg
+    if (address > 0xFF00 && address < 0xFF05) return D500_REGS(address & 7) // read the preconfiguration registers
+    // 0002-3FFF --------------------------------------------
+    if (address < 0x4000) return ram.read(address)
+    // 4000-7FFF --------------------------------------------
+    if (address < 0x8000) return mem_read_0x4000_0x7FFF(address)
+    // 8000-BFFF --------------------------------------------
+    if (address < 0xC000) return mem_read_0x8000_0xBFFF(address)
+    // I/O --------------------------------------------------
+    if (address >= 0xD000 && address < 0xE000) return ram.read(address)
+    // C000-FFFF --------------------------------------------
+    mem_read_0xC000_0xFFFF(address,false)
+  }
+  @inline private[this] def writeZ80(address:Int,value:Int) {
+    if (address < 0x1000) {
+      if (ramBank == 0) KERNAL128_ROM.write(Z80_BIOS_ADDR | address,value) // ?
+      else ram.write(address,value)
+    }
+    else if (address < 0x1400 && cr_reg == 0x3E) COLOR_RAM.write(address & 0x3FF,value)
+    // FF00-FF04 --------------------------------------------
+    else if (address == 0xFF00) MMU_CR_write(value)
+    else if (address > 0xFF00 && address < 0xFF05) MMU_FF01_4_write(address & 7) // load cr from preconfiguration registers
+    else ram.write(address,value)
+  }
+  // 8502 =======================================================================
   @inline private[this] def ioenabled : Boolean = (cr_reg & 1) == 0
-  
-  @inline private[this] def read128(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
-    // Z-80 Bios
-    if (z80enabled && address < 0x1000) return KERNAL128_ROM.read(Z80_BIOS_ADDR | address)
+  @inline private[this] def read128(address: Int): Int = {
     // 0/1 ports --------------------------------------------
     if (address == 0) return _0
     if (address == 1) return read128_1
@@ -219,9 +335,9 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     // 0002-3FFF --------------------------------------------
     if (address < 0x4000) return ram.read(address)
     // 4000-7FFF --------------------------------------------
-    if (address < 0x7FFF) return mem_read_0x4000_0x7FFF(address)
+    if (address < 0x8000) return mem_read_0x4000_0x7FFF(address)
     // 8000-BFFF --------------------------------------------
-    if (address < 0xBFFF) return mem_read_0x8000_0xBFFF(address)
+    if (address < 0xC000) return mem_read_0x8000_0xBFFF(address)
     // D000-DFFF I/O ----------------------------------------
     if (address >= 0xD000 && address < 0xE000) {
       if (ioenabled) return mem_read_0xD000_0xDFFF(address)
@@ -230,11 +346,9 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     // C000-FFFF --------------------------------------------
     mem_read_0xC000_0xFFFF(address,false)
   }
-  @inline private[this] def write128(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {    
-    // Z-80 Bios
-    if (z80enabled && address < 0x1000) ram.write(Z80_BIOS_ADDR | address,value) // to be checked ??
+  @inline private[this] def write128(address: Int, value: Int) = {  
     // 0/1 ports --------------------------------------------
-    else if (address == 0) { _0 = value ; check128_1 }
+    if (address == 0) { _0 = value ; check128_1 }
     else if (address == 1) { _1 = value & 0x7F ; check128_1 }
     // FF00-FF04 --------------------------------------------
     else if (address == 0xFF00) MMU_CR_write(value)
@@ -242,9 +356,9 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     // 0002-3FFF --------------------------------------------
     else if (address < 0x4000) ram.write(address,value)
     // 4000-7FFF --------------------------------------------
-    else if (address < 0x7FFF) ram.write(address,value)
+    else if (address < 0x8000) ram.write(address,value)
     // 8000-BFFF --------------------------------------------
-    else if (address < 0xBFFF) ram.write(address,value)
+    else if (address < 0xC000) ram.write(address,value)
     // D000-DFFF I/O ----------------------------------------
     else if (ioenabled && address >= 0xD000 && address < 0xE000) mem_write_0xD000_0xDFFF(address,value)
     // C000-FFFF --------------------------------------------
@@ -253,15 +367,15 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
   
   @inline private[this] def read128_1 : Int = {
     val playSense = if ((_0 & 0x10) > 0) _1 & 0x10 else if (datassette.isPlayPressed) 0x00 else 0x10
-    val capsLockSense = 0x0 // TODO: must read caps lock sense from keyboard
-    var one = _1 & 0x2F | capsLockSense | playSense | ((_0 & 0x7) ^ 0x7) // pull up resistors
+    val capsLockSense = if (keyboard.isCapsLockPressed) 0x0 else 0x1
+    var one = _1 & 0x2F | capsLockSense << 6 | playSense | ((_0 & 0x7) ^ 0x7) // pull up resistors
     
     if ((_0 & 0x20) == 0) one &= 0xDF
     one
   }
   
   @inline private[this] def check128_1 {
-    val pr = read64_1
+    val pr = read128_1
     // check color bank
     COLOR_RAM.setProcessorAndVICColorBanks(pr)
     // check Charen
@@ -274,18 +388,22 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
   // MMU regs handling ==========================================================
   @inline private[this] def MMU_CR_write(value:Int) {
     cr_reg = value
+    ramBank = (cr_reg & 0xC0) >> 6
+    ram.setProcessorBank(ramBank)
     Log.debug(s"MMU CR set to 0x${Integer.toHexString(cr_reg)} %${Integer.toBinaryString(cr_reg)}")
+    //println(s"MMU CR set to 0x${Integer.toHexString(cr_reg)} %${Integer.toBinaryString(cr_reg)}")
   }
   // ----------------------------------------------------------------------------
   @inline private[this] def MMU_D505_read : Int = {
     var d505 = D500_REGS(5) | 0x36 // (xx11x11x)
     // game & exrom
     val expansionPort = ExpansionPort.getExpansionPort
-    if ((d505 & 0x10) > 0 && expansionPort.GAME) d505 &= 0xEF // clear game bit
-    if ((d505 & 0x20) > 0 && expansionPort.EXROM) d505 &= 0xDF // clear exrom bit
+    if ((d505 & 0x10) > 0 && !expansionPort.GAME) d505 &= 0xEF // clear game bit
+    if ((d505 & 0x20) > 0 && !expansionPort.EXROM) d505 &= 0xDF // clear exrom bit
+    //println(s"Reading D505 exrom=${expansionPort.EXROM} game=${expansionPort.GAME}")
     // 40/80 cols
-    // TODO: read the 40/80 button
-    if ((d505 & 0x80) > 0) d505 |= 0x80 else d505 &= 0x7F
+    val _40_80 = if (keyboard.is4080Pressed) 0x0 else 0x80 // key pressed means 80 columns
+    if ((d505 & 0x80) > 0) d505 |= _40_80 else d505 &= 0x7F
     Log.debug(s"Reading D505 register: 0x${Integer.toHexString(d505)} %${Integer.toBinaryString(d505)}")
     d505
   }
@@ -294,19 +412,26 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     D500_REGS(5) = value
     // Z80/8502 check
     val oldZ80enabled = z80enabled
-    z80enabled = (value & 1) == 0
-    if (z80enabled != oldZ80enabled) cpuChangeListener(!z80enabled)
+    z80enabled = (value & 1) == 0    
     // TODO: FSDIR on bit 3
     // 64/128 mode
+    val old128Mode = c128Mode
     c128Mode = (value & 0x40) == 0
+    if (z80enabled != oldZ80enabled) mmuChangeListener.cpuChanged(!z80enabled)
+    if (!c128Mode && old128Mode && !z80enabled) { 
+      mmuChangeListener.c64Mode(true)
+      check64_1
+    }
     Log.debug(s"Writing D505 register: z80enabled=$z80enabled c128Mode=$c128Mode")
+    //println(s"Writing D505 register: z80enabled=$z80enabled c128Mode=$c128Mode")
   }
   // ----------------------------------------------------------------------------
   @inline private[this] def MMU_D506_write(value:Int) {
     D500_REGS(6) = value
     // can be optimized in one call ...
     ram.setCommonAreaAndSize((value & 0xC) >> 2,value & 3)
-    ram.setVICBank((value & 0xC0) >> 6)
+    vicBank = (value & 0xC0) >> 6
+    ram.setVICBank(vicBank)
   }
   // ----------------------------------------------------------------------------
   @inline private[this] def MMU_D507_write(value:Int) {
@@ -322,12 +447,13 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
   @inline private[this] def MMU_D50B_read : Int = MMU_VER_NUMBER | ram.getBanksNumber << 4
   // ----------------------------------------------------------------------------
   @inline private[this] def MMU_FF01_4_write(index:Int) {
+    //println(s"Setting CR from PCR($index) = ${D500_REGS(index)}")
     MMU_CR_write(D500_REGS(index))
   }
   // Memory handling ============================================================
   // basic low
   @inline private[this] def mem_read_0x4000_0x7FFF(address:Int) : Int = {
-    if ((cr_reg & 1) == 0) BASIC128_ROM.read(address)
+    if ((cr_reg & 2) == 0) BASIC128_ROM.read(address)
     else ram.read(address)
   }
   // basic hi
@@ -363,6 +489,7 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     if (address < 0xD500) return sid.read(address)
     // MMU REGS ----------------------------------------------------------
     if (address == MMU_CR1) return cr_reg
+    if (address == 0xD505) return MMU_D505_read
     if (address < 0xD50B) return D500_REGS(address & 0xF)
     if (address == 0xD50B) return MMU_D50B_read
     if (address < 0xD600) return 0xFF // unused MMU space
@@ -371,7 +498,7 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     // Unused I/O --------------------------------------------------------
     if (address < 0xD800) return 0
     // Color RAM ---------------------------------------------------------
-    if (address < 0xDC00) return COLOR_RAM.read(address)
+    if (address < 0xDC00) return COLOR_RAM.read(address) | lastByteRead & 0xF0
     // CIA 1 -------------------------------------------------------------
     if (address < 0xDD00) return cia_dc00.read(address)
     // CIA 2 -------------------------------------------------------------
@@ -379,120 +506,187 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     // I/O expansion slots 1 & 2 -----------------------------------------
     0
   }
+  @inline private[this] def mem_write_D030(reg:Int,value:Int) {
+    val old_clkrate = vic_clkrate_reg & 1
+    vic_clkrate_reg = value
+    val clkrate = value & 1
+    if (clkrate != old_clkrate) mmuChangeListener.frequencyChanged(clkrate + 1)
+    if ((value & 2) > 0) println("VIC D030 trick mode...")
+    Log.debug(s"Clock frequency set to ${clkrate + 1} Mhz")
+  }
+  @inline private[this] def mem_write_D5xx(address:Int,value:Int) {
+    if (address == 0xD505) MMU_D505_write(value)
+    else if (address == 0xD506) MMU_D506_write(value)
+    else if (address == 0xD507) MMU_D507_write(value)
+    else if (address == 0xD508) D500_REGS(8) = value | 0xF0
+    else if (address == 0xD509) MMU_D509_write(value)
+    else if (address == 0xD50A) D500_REGS(0xA) = value | 0xF0
+    else if (address != 0xD50B) {
+      D500_REGS(address & 0xF) = value
+      Log.debug(s"D505_REG(${address & 0xF})=${Integer.toHexString(value)}")
+    }
+  }
   @inline private[this] def mem_write_0xD000_0xDFFF(address:Int,value:Int) {
     // VIC ---------------------------------------------------------------
     if (address < 0xD400) {
       // additional VIC registers D02F & D030
       val reg = address & 0x3F
-      if (reg == VIC_XSCAN_REG) vic_xscan_reg = value
-      else if (reg == VIC_CLKRATE_REG) {
-        val old_clkrate = vic_clkrate_reg & 1
-        vic_clkrate_reg = value
-        val clkrate = value & 1
-        if (clkrate != old_clkrate) freqChangeListener(clkrate + 1)
-        Log.debug(s"Clock frequency set to ${clkrate + 1} Mhz")
+      if (reg == VIC_XSCAN_REG) {
+        vic_xscan_reg = value
+        keyboard.selectC128ExtendedRow(value)
       }
+      else if (reg == VIC_CLKRATE_REG) mem_write_D030(reg,value)
       else vic.write(address,value)
     }
+    // SID ---------------------------------------------------------------
+    else if (address < 0xD500) sid.write(address,value)
     // MMU REGS ----------------------------------------------------------
     else if (address == MMU_CR1) MMU_CR_write(value)
-    else if (address < 0xD50C) {
-      if (address == 0xD505) MMU_D505_write(value)
-      else if (address == 0xD506) MMU_D506_write(value)
-      else if (address == 0xD507) MMU_D507_write(value)
-      else if (address == 0xD509) MMU_D509_write(value)
-      else if (address != 0xD50B) {
-        D500_REGS(address & 0xF) = value
-        Log.debug(s"D505_REG(${address & 0xF})=${Integer.toHexString(value)}")
-      }
-    }
+    else if (address < 0xD50C) mem_write_D5xx(address,value)
     else if (address < 0xD600) return // unused MMU space
     // VDC ---------------------------------------------------------------
     else if (address < 0xD700) vdc.write(address,value)
     // Unused I/O --------------------------------------------------------
     else if (address < 0xD800) return
     // Color RAM ---------------------------------------------------------
-    else if (address < 0xDC00) COLOR_RAM.write(address,value)
+    else if (address < 0xDC00) COLOR_RAM.write(address,value & 0x0F)
      // CIA 1 -------------------------------------------------------------
     else if (address < 0xDD00) cia_dc00.write(address,value)
     // CIA 2 -------------------------------------------------------------
     else if (address < 0xDE00) cia_dd00.write(address,value)
     // I/O expansion slots 1 & 2 -----------------------------------------
   }
-  // internal & external function ROM
-  @inline private[this] def mem_read_function_rom_0x8000_0xBFFF(internal:Boolean,address:Int) : Int = {
-    // TODO
-    0
+  /*
+   * internal & external function ROM
+   */
+  @inline private[this] def mem_read_function_rom_0x8000_0xBFFF(internal:Boolean,_address:Int) : Int = {
+    val address = _address & 0x3FFF
+    if (internal) {
+      if (internalFunctionROM_mid == null) return 0
+      if (address >= internalFunctionROM_mid.length) return 0
+      internalFunctionROM_mid(address)
+    }
+    else {
+      if (externalFunctionROM_mid == null) return 0
+      if (address >= externalFunctionROM_mid.length) return 0      
+      externalFunctionROM_mid(address)
+    }
   }
-  @inline private[this] def mem_read_function_rom_0xC000_0xFFFF(internal:Boolean,address:Int) : Int = {
-    // TODO
-    0
+  @inline private[this] def mem_read_function_rom_0xC000_0xFFFF(internal:Boolean,_address:Int) : Int = {
+    val address = _address & 0x3FFF
+    if (internal) {
+      if (internalFunctionROM_high == null) return 0      
+      if (address >= internalFunctionROM_high.length) return 0
+      internalFunctionROM_high(address)
+    }
+    else {
+      if (externalFunctionROM_high == null) return 0
+      if (address >= externalFunctionROM_high.length) return 0
+      externalFunctionROM_high(address)
+    }
   }
   // ============================================================================
   
   // C64 Management =============================================================
-  @inline private[this] def read64(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
-    if (isForwardRead) forwardReadTo.read(address)
+  @inline private[this] def read64(address: Int): Int = {
     if (ULTIMAX) {
-      if (chipID == ChipID.VIC) {
-        val bank = address & 0xF000
-        if (bank == 0x3000) return ROMH_ULTIMAX.read(0xF000 + address - 0x3000,chipID)
-        if (bank == 0x7000) return ROMH_ULTIMAX.read(0xF000 + address - 0x7000,chipID)
-        if (bank == 0xB000) return ROMH_ULTIMAX.read(0xF000 + address - 0xB000,chipID)
-        if (bank == 0xF000) return ROMH_ULTIMAX.read(0xF000 + address - 0xF000,chipID)
-      }
+      if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return lastByteRead
     }
-    if (chipID == ChipID.VIC) ram.read(address, chipID)
-    else {        
-      var b = 0
-      var found = false
-      val length = banks64.length
-      if (address >= minAddress)
-      while (b < length && !found) {
-        if (banks64(b).isActive && address >= banksStart(b) && address < banksEnd(b)) found = true
-        else b += 1
-      }
-      if (found) {
-        val r = banks64(b).read(address, chipID)
-        //Log.debug("Reading from bank %s %4X = %2X".format(bank.name,address,r)) 
-        r
-      }
-      else {
-        val r = if (address == 0) _0 
-      		  else
-      		  if (address == 1) read64_1 
-      		  else ram.read(address, chipID)
-        //Log.debug("Reading from RAM %4X = %2X".format(address,r))
-        r
-      }
+    if (isForwardRead) forwardReadTo.read(address)
+    if (address == 0) return _0
+    if (address == 1) return read64_1 
+    if (address < 0x8000) return ram.read(address)
+    if (address < 0xA000) { // ROML or RAM
+      if (c64MC.roml) return ROML.read(address) else return ram.read(address)
     }
+    if (address < 0xC000) { // BASIC or RAM or ROMH
+      if (c64MC.basic) return BASIC64_ROM.read(address)
+      if (c64MC.romh) return ROMH.read(address)
+      return ram.read(address)
+    }
+    if (address < 0xD000) return ram.read(address) // RAM
+    if (address < 0xE000) { // I/O or RAM or CHAR
+      if (c64MC.io) { // I/O               
+        if (address < 0xD400) {
+          val reg = address & 0x3F
+          if (reg == VIC_XSCAN_REG) return vic_xscan_reg | 0xF8
+          if (reg == VIC_CLKRATE_REG) return vic_clkrate_reg | 0xFC
+          return vic.read(address)
+        } 
+        if (address >= 0xD500 && address < 0xD50C) {
+          // MMU REGS ----------------------------------------------------------
+          if (address == MMU_CR1) return cr_reg
+          if (address == 0xD505) return MMU_D505_read
+          if (address < 0xD50B) return D500_REGS(address & 0xF)
+          if (address == 0xD50B) return MMU_D50B_read
+          // -------------------------------------------------------------------
+        }
+        if (address < 0xD800) return sid.read(address)
+        if (address < 0xDC00) return COLOR_RAM.read(address)
+        if (address < 0xDD00) return cia_dc00.read(address)
+        if (address < 0xDE00) return cia_dd00.read(address)
+        
+        return ExpansionPort.getExpansionPort.read(address) 
+      }
+      if (c64MC.char) return CHARACTERS64_ROM.read(address)
+      return ram.read(address)
+    }
+    // KERNAL or RAM or ROMHULTIMAX
+    if (c64MC.kernal) return KERNAL64_ROM.read(address)
+    if (c64MC.romhultimax) return ROMH_ULTIMAX.read(address)
+    ram.read(address)
   }
-  @inline private[this] def write64(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
-    if (isForwardWrite) forwardWriteTo.write(address,value)      
-      
-    var b = 0
-    var found = false
-    val length = banks64.length
-    if (address >= minAddress)
-    while (b < length && !found) {
-      if (banks64(b).isActive && address >= banksStart(b) && address < banksEnd(b)) found = true
-      else b += 1
-    }
-    val bank = if (!found) ram else banks64(b)
-    //Log.debug("Writing to %s %4X = %2X".format(bank.name,address,value))      
-    if (!found && address < 2) {
-      ram.write(address,ram.lastByteRead)
-      if (address == 0) _0 = value
+  private[this] def write64(address: Int,value:Int) {
+    if (ULTIMAX) {
+        if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return
+      }
+    if (isForwardWrite) forwardWriteTo.write(address,value)
+    
+    if (address < 2) {
+      if (address == 0) _0 = value & 0xFF
       else _1 = value & 0x3F
-      
+      ram.write(address,memLastByteRead)
       check64_1
     }
-    else bank.write(address,value,chipID)
+    else if (address < 0x8000) ram.write(address,value)
+    else if (address < 0xA000) { // ROML or RAM
+      if (c64MC.roml) ROML.write(address,value) else ram.write(address,value)
+    }
+    else if (address < 0xC000) { // BASIC or RAM or ROMH
+      if (c64MC.romh) ROMH.write(address,value) else ram.write(address,value)
+    }
+    else if (address < 0xD000) ram.write(address,value) // RAM
+    else if (address < 0xE000) { // I/O or RAM or CHAR
+      if (c64MC.io) { // I/O        
+        if (address < 0xD400) {
+          val reg = address & 0x3F
+          if (reg == VIC_XSCAN_REG) {
+            vic_xscan_reg = value
+            keyboard.selectC128ExtendedRow(value)
+          }
+          else if (reg == VIC_CLKRATE_REG) mem_write_D030(reg,value)
+          else vic.write(address,value)
+        }
+        // MMU REGS ----------------------------------------------------------
+        else if (address == MMU_CR1) MMU_CR_write(value)
+        else if (address > 0xD500 && address < 0xD50C) mem_write_D5xx(address,value)
+        // -------------------------------------------------------------------
+        else if (address < 0xD800) sid.write(address,value)
+        else if (address < 0xDC00) COLOR_RAM.write(address,value)
+        else if (address < 0xDD00) cia_dc00.write(address,value)
+        else if (address < 0xDE00) cia_dd00.write(address,value)
+        else ExpansionPort.getExpansionPort.write(address,value) 
+      }
+      else ram.write(address,value)
+    }
+    // KERNAL or RAM or ROMH
+    else if (c64MC.romhultimax) ROMH_ULTIMAX.write(address,value) else ram.write(address,value)
   }
+ 
   @inline private[this] def read64_1 : Int = {
     val playSense = if ((_0 & 0x10) > 0) _1 & 0x10 else if (datassette.isPlayPressed) 0x00 else 0x10
-    val capsLockSense = 0x0 // TODO: must read caps lock sense from keyboard
-    var one = _1 & 0x2F | capsLockSense | playSense | ((_0 & 0x7) ^ 0x7) // pull up resistors
+    val capsLockSense =  if (keyboard.isCapsLockPressed) 0x0 else 0x1
+    var one = _1 & 0x2F | capsLockSense << 6 | playSense | ((_0 & 0x7) ^ 0x7) // pull up resistors
     
     if ((_0 & 0x20) == 0) one &= 0xDF
     one
@@ -507,7 +701,39 @@ object C128MMU extends RAMComponent with ExpansionPortConfigurationListener {
     val GAME = expansionPort.GAME
     expansionPortConfigurationChanged(GAME,EXROM)
   }
-  // ============================================================================
+  // VIC memory ===========================================================================
+  final def getBank = videoBank
+  final def setVideoBank(bank: Int) {
+    videoBank = ~bank & 3
+    vicBaseAddress = videoBank << 14
+  }
+  final def lastByteRead = memLastByteRead
+  
+  @inline private def vicReadPhi1(address: Int) : Int = {
+    val realAddress = vicBaseAddress | address
+    if (!c128Mode) { // C64
+      if ((realAddress & 0x7000) == 0x1000 && !ULTIMAX) CHARACTERS64_ROM.read(0xD000 | (address & 0x0FFF),ChipID.VIC)
+      else {
+        if (ULTIMAX) {
+          val bank = address & 0xF000
+          if (bank == 0x3000) return ROMH_ULTIMAX.read(0xF000 + address - 0x3000,ChipID.VIC)
+          if (bank == 0x7000) return ROMH_ULTIMAX.read(0xF000 + address - 0x7000,ChipID.VIC)
+          if (bank == 0xB000) return ROMH_ULTIMAX.read(0xF000 + address - 0xB000,ChipID.VIC)
+          if (bank == 0xF000) return ROMH_ULTIMAX.read(0xF000 + address - 0xF000,ChipID.VIC)
+        }
+        ram.read(realAddress,ChipID.VIC)
+      }
+    }
+    else { // 128 mode
+      if ((realAddress & 0x1000) == 0x1000 && vicBank == 0 && CHARACTERS128_ROM.isActive) CHARACTERS128_ROM.read(0xD000 | (address & 0x0FFF),ChipID.VIC)
+      else ram.read(realAddress,ChipID.VIC)
+    }    
+  }
+  @inline private[this] def vicRead(address:Int) : Int = {
+    memLastByteRead = vicReadPhi1(address)    
+    memLastByteRead
+  }
+  final def readPhi2(address:Int) : Int = vicReadPhi1(address)
   // state
   protected def saveState(out:ObjectOutputStream) {
     // TODO

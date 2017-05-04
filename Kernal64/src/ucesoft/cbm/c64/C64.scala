@@ -72,6 +72,7 @@ import ucesoft.cbm.misc.Mouse1351
 import ucesoft.cbm.misc.TapeState
 import ucesoft.cbm.misc.IRQSwitcher
 import ucesoft.cbm.misc.NMISwitcher
+import ucesoft.cbm.misc.DNDHandler
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -82,7 +83,7 @@ object C64 extends App {
   }
 }
 
-class C64 extends CBMComponent with ActionListener with TraceListener with GamePlayer {
+class C64 extends CBMComponent with ActionListener with GamePlayer {
   val componentID = "Commodore 64"
   val componentType = CBMComponentType.INTERNAL
   
@@ -92,14 +93,13 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
   private[this] val CONFIGURATION_FRAME_DIM = "frame.dim"
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mem = new C64MMU.MAIN_MEMORY
-  private[this] var cpu = CPU6510.make(mem)  
-  private[this] var cpuExact = cpu.isExact
+  private[this] val cpu = CPU6510.make(mem)  
   private[this] var vicChip : vic.VIC = _
   private[this] val sid = new ucesoft.cbm.peripheral.sid.SID
   private[this] var display : vic.Display = _
   private[this] val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
   private[this] val irqSwitcher = new IRQSwitcher(cpu.irqRequest _)
-  private[this] val keyb = new keyboard.Keyboard(keyboard.DefaultKeyboardMapper,nmiSwitcher.keyboardNMIAction _)	// key listener
+  private[this] val keyb = new keyboard.Keyboard(C64KeyboardMapper,nmiSwitcher.keyboardNMIAction _)	// key listener
   private[this] val displayFrame = {
     val f = new JFrame("Kernal64 emulator ver. " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
@@ -118,10 +118,7 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
   private[this] val cartMenu = new JMenu("Cartridge")
   // -------------------------------------------
   private[this] val bus = new IECBus
-  private[this] var baLowUntil = -1L
-  private[this] var baLow = false
   private[this] var dma = false
-  private[this] var cpuWaitUntil = -1L
   private[this] val expansionPort = ExpansionPort.getExpansionPort
   // -------------------- TRACE ----------------
   private[this] var cpuTracer : TraceListener = cpu
@@ -241,51 +238,7 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   // ------------------------------------ Drag and Drop ----------------------------
-  private[this] val DNDHandler = new TransferHandler {
-    override def canImport(support:TransferHandler.TransferSupport) : Boolean = support.isDataFlavorSupported(DataFlavor.javaFileListFlavor)
-
-    override def importData(support: TransferHandler.TransferSupport) : Boolean = {
-        if (!canImport(support)) {
-            return false
-        }
-        
-        val t = support.getTransferable();
-
-        try {
-          import scala.collection.JavaConversions._
-          t.getTransferData(DataFlavor.javaFileListFlavor).asInstanceOf[java.util.List[File]].headOption match {
-            case None =>
-              false
-            case Some(f) =>
-              val name = f.getName.toUpperCase
-              if (name.endsWith(".D64") ||
-                  name.endsWith(".G64") ||
-                  name.endsWith(".TAP") || 
-                  name.endsWith(".PRG") || 
-                  name.endsWith(".CRT") ||
-                  name.endsWith(".T64")) {
-                handleDND(f)
-                true
-              }
-              else
-              if (name.endsWith(".ZIP")) {
-                ZIP.zipEntries(f) match {
-                  case Success(entries) if entries.size > 0 =>
-                    handleDND(f)
-                    true
-                  case _ =>
-                    false
-                }                
-              }
-              else false
-          }
-        } 
-        catch {
-          case t:Throwable =>
-            false
-        }
-    }
-  }
+  private[this] val DNDHandler = new DNDHandler(handleDND _)
   
   private object DriveLed8Listener extends AbstractDriveLedListener(driveLeds(0),diskProgressPanels(0))
   
@@ -294,9 +247,6 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
   }  
   
   def reset {
-    baLowUntil = 0
-    cpuWaitUntil = 0
-    baLow = false
     dma = false
     clock.maximumSpeed = false
     maxSpeedItem.setSelected(false)
@@ -374,7 +324,7 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
     val mouse = new Mouse1351(display,mouseEnabled,sid)
     add(mouse)
     display.addMouseMotionListener(mouse)
-    traceDialog = TraceDialog.getTraceDialog(displayFrame,mem,this,display,vicChip)
+    traceDialog = TraceDialog.getTraceDialog(displayFrame,mem,cpu,display,vicChip)
     diskTraceDialog = TraceDialog.getTraceDialog(displayFrame,c1541_real.getMem,c1541_real)
     // drive leds
     add(driveLeds(0))        
@@ -466,21 +416,16 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
     // Flyer
     if (isFlyerEnabled) flyerIEC.clock(cycles)
     // CPU PHI2
-    if (cpuExact) cpu.fetchAndExecute
-    else {
-      val canExecCPU = cycles > cpuWaitUntil && !baLow && !dma
-      if (canExecCPU) cpuWaitUntil = cycles + cpu.fetchAndExecute
-    }
+    cpu.fetchAndExecute(1)
   }
   
   private def setDMA(dma:Boolean) {
     this.dma = dma
-    if (cpuExact) cpu.setDMA(dma)
+    cpu.setDMA(dma)
   }
   
   private def baLow(low:Boolean) {
-    baLow = low
-    if (cpuExact) cpu.setBaLow(low)
+    cpu.setBaLow(low)
     expansionPort.setBaLow(low)
   }
     
@@ -538,9 +483,8 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
       case "ZOOM3" =>
         zoom(2)
       case "PAUSE" =>
-        Clock.systemClock.pause
-      case "PLAY" =>
-        Clock.systemClock.play
+        if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) Clock.systemClock.pause
+        else Clock.systemClock.play
       case "SWAP_JOY" =>
         swapJoysticks
       case "DISK_RO" =>
@@ -617,8 +561,6 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
         printer.setActive(printerEnabled)
       case "VOLUME" =>
         volumeDialog.setVisible(true)
-      case "CPU_CE" => changeCPU(true)
-      case "CPU" => changeCPU(false)
       case "CRT_PRESS" => ExpansionPort.getExpansionPort.freezeButton
       case "NO_REU" =>
         ExpansionPort.getExpansionPort.eject
@@ -918,19 +860,7 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
       case _ =>
     }
   }
-  
-  private def changeCPU(cycleExact:Boolean) {
-    clock.pause
-    val oldCpu = cpu
-    cpu = CPU6510.make(mem,cycleExact)
-    cpu.initComponent
-    cpuExact = cycleExact
-    change(oldCpu,cpu)
-    drives foreach { _.changeCPU(cycleExact) }
     
-    reset(true)
-  }
-  
   // GamePlayer interface
   def play(file:File) = {
     ExpansionPort.getExpansionPort.eject
@@ -1530,7 +1460,7 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
     
     optionMenu.addSeparator
         
-    maxSpeedItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F8,0))
+    maxSpeedItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_W,java.awt.event.InputEvent.ALT_DOWN_MASK))
     maxSpeedItem.setSelected(clock.maximumSpeed)
     maxSpeedItem.setActionCommand("MAXSPEED")
     maxSpeedItem.addActionListener(this)    
@@ -1539,7 +1469,7 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
     optionMenu.addSeparator
     
     val adjustRatioItem = new JMenuItem("Adjust display ratio")
-    adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A,java.awt.Event.CTRL_MASK))
+    resetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK))
     adjustRatioItem.setActionCommand("ADJUSTRATIO")
     adjustRatioItem.addActionListener(this)
     optionMenu.add(adjustRatioItem)
@@ -1606,20 +1536,11 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
     
     optionMenu.addSeparator
     
-    val group2 = new ButtonGroup
-    val pauseItem = new JRadioButtonMenuItem("Pause")
-    pauseItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F9,0))
+    val pauseItem = new JCheckBoxMenuItem("Pause")
+    pauseItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_P,java.awt.event.InputEvent.ALT_DOWN_MASK))
     pauseItem.setActionCommand("PAUSE")
     pauseItem.addActionListener(this)
     optionMenu.add(pauseItem)
-    group2.add(pauseItem)    
-    val playItem = new JRadioButtonMenuItem("Play")
-    playItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F11,0))
-    playItem.setSelected(true)
-    playItem.setActionCommand("PLAY")
-    playItem.addActionListener(this)
-    optionMenu.add(playItem)
-    group2.add(playItem)
     
     optionMenu.addSeparator
     
@@ -1836,24 +1757,7 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
     cpmItem.setActionCommand("CP/M")
     cpmItem.addActionListener(this)
     IOItem.add(cpmItem)
-    
-    val cpuItem = new JMenu("CPU")
-    val group4 = new ButtonGroup
-    val cpuExactItem = new JRadioButtonMenuItem("CPU exact")
-    cpuExactItem.setSelected(cpuExact)
-    cpuExactItem.setToolTipText("CPU with cycle exact behaviour")
-    cpuExactItem.setActionCommand("CPU_CE")
-    cpuExactItem.addActionListener(this)
-    cpuItem.add(cpuExactItem)
-    group4.add(cpuExactItem)
-    val cpuFastItem = new JRadioButtonMenuItem("Faster CPU")    
-    cpuFastItem.setToolTipText("Faster CPU with non-cycle exact behaviour")
-    cpuFastItem.setActionCommand("CPU")
-    cpuFastItem.addActionListener(this)
-    cpuItem.add(cpuFastItem)
-    optionMenu.add(cpuItem)
-    group4.add(cpuFastItem)
-    
+        
     // cartridge
     val cartButtonItem = new JMenuItem("Press cartridge button...")
     cartButtonItem.setActionCommand("CRT_PRESS")
@@ -1955,15 +1859,12 @@ class C64 extends CBMComponent with ActionListener with TraceListener with GameP
   }
   
   // ------------------------------- TRACE LISTENER ------------------------------------------
-  def setTraceOnFile(out:PrintWriter,enabled:Boolean) = cpuTracer.setTraceOnFile(out,enabled)
-  def setTrace(traceOn:Boolean) = cpuTracer.setTrace(traceOn)
-  def step(updateRegisters: (String) => Unit) = cpuTracer.step(updateRegisters)
-  def setBreakAt(breakType:BreakType,callback:(String) => Unit) = cpuTracer.setBreakAt(breakType,callback)
-  def jmpTo(pc:Int) = cpuTracer.jmpTo(pc)
   private def setTraceListener(tl:Option[TraceListener]) {
     tl match {
-      case None => cpuTracer = cpu
-      case Some(t) => cpuTracer = t
+      case None => 
+        traceDialog.traceListener = cpu
+      case Some(t) => 
+        traceDialog.traceListener = t
     }
   }
   // state

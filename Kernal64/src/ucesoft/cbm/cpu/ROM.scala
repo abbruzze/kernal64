@@ -28,13 +28,9 @@ class ROM(ram: Memory,
       Option(ClassLoader.getSystemClassLoader.getResourceAsStream(resourceName)) match {
         case None => throw new IOException(s"Can't find resource ${resourceName} for ROM ${name}")
         case Some(in) =>
+          in.skip(initialOffset)
           val buffer = Array.ofDim[Byte](length)
-          var read = 0 //in.read(buffer)
-          var offset = initialOffset
-          do {            
-            read = in.read(buffer, offset, length - offset)
-            offset += read
-          } while (read > 0)
+          in.read(buffer)
           in.close
           for (i <- 0 until length) mem(i) = buffer(i) & 0xff
       }

@@ -397,11 +397,11 @@ final class VIC(mem: VICMemory,
 
     @inline final def readMemoryData(first:Boolean) {            
       // p-access phi1
-      if (first) memoryPointer = mem.read(videoMatrixAddress + 1016 + index) << 6
+      if (first) memoryPointer = mem.read(videoMatrixAddress + 1016 + index,ChipID.VIC) << 6
       if (dma) {    
         if (first) {          
           // s-access phi2
-          gdata = (mem.read(memoryPointer + mc) & 0xFF) << 16
+          gdata = (mem.read(memoryPointer + mc,ChipID.VIC) & 0xFF) << 16
         }
         else {
           // s-accesses phi2
@@ -414,7 +414,7 @@ final class VIC(mem: VICMemory,
         mc = (mc + 1) & 0x3F
       }
       else 
-      if (!first) mem.read(0x3FFF) // idle access
+      if (!first) mem.read(0x3FFF,ChipID.VIC) // idle access
     }
     
     final def check16 {
@@ -700,7 +700,6 @@ final class VIC(mem: VICMemory,
   }
 
   def init {
-    add(mem)
     add(BorderShifter)
     add(GFXShifter)
     sprites foreach { add _ }    
@@ -1049,7 +1048,7 @@ final class VIC(mem: VICMemory,
         setBaLow((spriteDMAon & 0x80) > 0) // 7
         //setBaLow(false) // ***
       case 11 =>
-        mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+        mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
         setBaLow(false)
       // ---------------------------------------------------------------
       case 55 =>
@@ -1065,9 +1064,9 @@ final class VIC(mem: VICMemory,
           vc = (vc + 1) & 0x3FF //% 1024          
           vmli = (vmli + 1) & 0x3F 
         }
-        else dataToDraw = mem.read(if (ecm) 0x39ff else 0x3fff)
+        else dataToDraw = mem.read(if (ecm) 0x39ff else 0x3fff,ChipID.VIC)
       case 56 =>
-        mem.read(0x3FFF)
+        mem.read(0x3FFF,ChipID.VIC)
         var c = 0
         while (c < 8) {
           sprites(c).check55_56(false)
@@ -1075,7 +1074,7 @@ final class VIC(mem: VICMemory,
         }
         setBaLow((spriteDMAon & 0x01) > 0) // 0
       case 57 =>
-        mem.read(0x3FFF)
+        mem.read(0x3FFF,ChipID.VIC)
         setBaLow((spriteDMAon & 0x03) > 0)  // 0,1
       // ---------------------------------------------------------------
       case 58 =>     
@@ -1125,20 +1124,20 @@ final class VIC(mem: VICMemory,
         } 
         else 
         if (!isInDisplayState && rasterCycle >= 16) {
-          dataToDraw = mem.read(if (ecm) 0x39ff else 0x3fff)
+          dataToDraw = mem.read(if (ecm) 0x39ff else 0x3fff,ChipID.VIC)
         } 
         (rasterCycle : @switch) match {
           case 12 =>
-            mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+            mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
           case 13 =>
-            mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+            mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
           case 14 =>
-            mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+            mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
             vc = vcbase
             vmli = 0
             if (badLine) rc = 0
           case 15 =>
-            mem.read(0x3F00 | ref) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+            mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
             // c-access
             if (_baLow) readAndStoreVideoMemory
           case 16 =>
@@ -1315,12 +1314,12 @@ final class VIC(mem: VICMemory,
   @inline private def readCharFromMemory : Int = {
     if (bmm) {
       val offset = bitmapAddress | ((vc & 0x3ff) << 3) | rc
-      val bitmap = mem.read(offset)
+      val bitmap = mem.read(offset,ChipID.VIC)
       //Log.debug(s"Reading bitmap at ${offset} = ${bitmap}")
       bitmap
     } else {
       val charCode = if (ecm) vml_p(vmli) & 0x3F else vml_p(vmli)
-      val char = mem.read(characterAddress | (charCode << 3) | rc)
+      val char = mem.read(characterAddress | (charCode << 3) | rc,ChipID.VIC)
       //Log.fine(s"Reading char at ${characterAddress} for char code ${charCode} with rc=${rc} pattern=${char}")
       char
     }

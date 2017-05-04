@@ -15,6 +15,7 @@ import java.io.PrintWriter
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
+import ucesoft.cbm.cpu.Memory
 
 class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends TraceListener with Drive {
   val componentID = "C1541 Disk Drive " + jackID
@@ -32,12 +33,10 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] var currentSpeedHz = MIN_SPEED_HZ
   private[this] var cycleFrac = 0.0
   private[this] val mem = new C1541Mems.C1541_RAM
-  private[this] var cpu = CPU6510.make(mem,true,ChipID.CPU_1541)
-  private[this] var cpuExact = cpu.isExact
+  private[this] val cpu = CPU6510.make(mem,ChipID.CPU_1541)
   private[this] val clk = Clock.systemClock
   private[this] val viaBus = new VIAIECBus(jackID, bus, IRQSwitcher.viaBusIRQ _, () => awake)
   private[this] val viaDisk = new VIADiskControl(cpu, IRQSwitcher.viaDiskIRQ _, ledListener)
-  private[this] var cpuWaitUntil = 0L
   private[this] var running = true
   private[this] var awakeCycles = 0L
   private[this] var goSleepingCycles = 0L
@@ -110,20 +109,9 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     awakeCycles = 0
     goSleepingCycles = 0
     cycleFrac = 0.0
-    cpuWaitUntil = 0
     if (ledListener != null) ledListener.turnOn
   }
   
-  override def changeCPU(cycleExact:Boolean) {
-    val oldCpu = cpu
-    cpu = CPU6510.make(mem,cycleExact,ChipID.CPU_1541)
-    viaDisk.cpu = cpu
-    cpu.initComponent
-    cpuExact = cycleExact
-    change(oldCpu,cpu)
-    reset
-  }
-
   private object IRQSwitcher extends CBMComponent {
     val componentID = "IRQ Switcher (VIA1,VIA2)"
     val componentType = CBMComponentType.INTERNAL
@@ -194,30 +182,17 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
 
   def clock(cycles: Long) {
     if (running) {
-      if (cpuExact) {
-        checkPC(cycles)
-        cpu.fetchAndExecute
-        if (CYCLE_ADJ > 0) {
-          cycleFrac += CYCLE_ADJ
-          if (cycleFrac >= 1) {
-            cycleFrac -= 1
-            cpu.fetchAndExecute
-            viaDisk.clock(cycles)
-            viaBus.clock(cycles)
-          }
+      checkPC(cycles)      
+      if (CYCLE_ADJ > 0) {
+        cycleFrac += CYCLE_ADJ
+        if (cycleFrac >= 1) {
+          cycleFrac -= 1
+          cpu.fetchAndExecute(2)
+          viaDisk.clock(cycles)
+          viaBus.clock(cycles)
         }
-      } else {
-        if (cycles > cpuWaitUntil) {
-          checkPC(cycles)
-          cpuWaitUntil = cycles + cpu.fetchAndExecute
-          val delta = cpuWaitUntil - cycles + 1
-          cycleFrac += delta * CYCLE_ADJ
-          if (cycleFrac >= 1) {
-            cpuWaitUntil -= 1
-            cycleFrac -= 1
-          }
-        }        
       }
+      else cpu.fetchAndExecute(1)
       
       viaDisk.clock(cycles)
       viaBus.clock(cycles)
@@ -250,6 +225,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   def step(updateRegisters: (String) => Unit) = cpu.step(updateRegisters)
   def setBreakAt(breakType:BreakType,callback:(String) => Unit) = cpu.setBreakAt(breakType,callback)
   def jmpTo(pc: Int) = cpu.jmpTo(pc)
+  def disassemble(mem:Memory,address:Int) = cpu.disassemble(mem, address)
   // state
   protected def saveState(out:ObjectOutputStream) {
     if (ledListener != null) out.writeBoolean(ledListener.isOn)

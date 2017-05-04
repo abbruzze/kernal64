@@ -17,7 +17,7 @@ import ucesoft.cbm.peripheral.vic.VIC
 import java.io._
 
 object TraceDialog {
-  def getTraceDialog(displayFrame: JFrame, mem: Memory, traceListener: TraceListener, display: Display, vic: VIC): TraceDialog = {
+  def getTraceDialog(displayFrame: JFrame, mem: Memory,traceListener: TraceListener, display: Display, vic: VIC): TraceDialog = {
     val dialog = new TraceDialog(displayFrame, mem, traceListener,Some(display),Some(vic))
     dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE)
     dialog.pack
@@ -33,7 +33,7 @@ object TraceDialog {
 
 class TraceDialog private (displayFrame: JFrame,
   mem: Memory,
-  traceListener: TraceListener,
+  var traceListener: TraceListener,
   display: Option[Display],
   vic: Option[VIC]) extends JDialog(displayFrame, "Trace dialog") with ActionListener {
   private val notrace = new JButton("Tracing on")
@@ -48,6 +48,8 @@ class TraceDialog private (displayFrame: JFrame,
     case '%' => Integer.parseInt(address.substring(1), 2)
     case _ => address.toInt
   }
+  
+  def isTracing = tracing
   
   def forceTracing(on:Boolean) {
     tracing = on
@@ -138,9 +140,9 @@ class TraceDialog private (displayFrame: JFrame,
             val addresses = address split " " map s2a
             var a = addresses(0)
             while (a <= addresses(1)) {
-              val d = CPU6510.disassemble(mem, a)
+              val (d,len) = traceListener.disassemble(mem, a)
               Log.info(d.toString)
-              a += d.bytes.length
+              a += len
             }
           case _ =>
         }

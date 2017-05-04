@@ -6,6 +6,11 @@ import ucesoft.cbm.trace.TraceListener
 import java.io.PrintWriter
 import ucesoft.cbm.trace.BreakType
 import ucesoft.cbm.Log
+import ucesoft.cbm.Chip
+import ucesoft.cbm.CBMComponentType
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import javax.swing.JFrame
 
 object Z80 {
   @inline def hex2(data: Int) = "%02X".format(data & 0xffff)
@@ -300,6 +305,8 @@ object Z80 {
       L = L1
       L1 = tmp
     }
+    
+    def IXL = IX & 0xFF
     
     def push(w:Int) {
       SP = (SP - 1) & 0xFFFF
@@ -825,6 +832,9 @@ object Z80 {
   // *** ADC A,n
   // **************
   val ADC_A_n = Opcode(0xCE,7,2,MNEMONIC_n("ADC A,%s")) { ctx => adc(ctx,ctx.byte(1)) }
+  // *** ADC A,IXL
+  // **************
+  val ADC_A_IXL = Opcode((0xDD,0x8D),4,2,"ADD IXL") { ctx => add(ctx,ctx.IXL) }
   // *** SUB r
   // **************
   @inline private def sub(ctx:Context,value:Int) {
@@ -895,6 +905,7 @@ object Z80 {
   }
   val AND_A = Opcode(0xA7,4,1,"AND A") { ctx => and(ctx,ctx.A) }
   val AND_B = Opcode(0xA0,4,1,"AND B") { ctx => and(ctx,ctx.B) }
+  val AND_B_dd = Opcode((0xDD,0xA0),4,2,"AND B") { ctx => and(ctx,ctx.B) }
   val AND_C = Opcode(0xA1,4,1,"AND C") { ctx => and(ctx,ctx.C) }
   val AND_D = Opcode(0xA2,4,1,"AND D") { ctx => and(ctx,ctx.D) }
   val AND_E = Opcode(0xA3,4,1,"AND E") { ctx => and(ctx,ctx.E) }
@@ -921,6 +932,7 @@ object Z80 {
   val XOR_A = Opcode(0xAF,4,1,"XOR A") { ctx => xor(ctx,ctx.A) }
   val XOR_B = Opcode(0xA8,4,1,"XOR B") { ctx => xor(ctx,ctx.B) }
   val XOR_C = Opcode(0xA9,4,1,"XOR C") { ctx => xor(ctx,ctx.C) }
+  val XOR_C_dd = Opcode((0xDD,0xA9),4,2,"XOR C") { ctx => xor(ctx,ctx.C) }
   val XOR_D = Opcode(0xAA,4,1,"XOR D") { ctx => xor(ctx,ctx.D) }
   val XOR_E = Opcode(0xAB,4,1,"XOR E") { ctx => xor(ctx,ctx.E) }
   val XOR_H = Opcode(0xAC,4,1,"XOR H") { ctx => xor(ctx,ctx.H) }
@@ -1197,6 +1209,7 @@ object Z80 {
   // *** NOP
   // **************
   val NOP = Opcode(0x00,4,1,"NOP") { ctx => }
+  val NOP_fd = Opcode((0xFD,0xFD),4,1,"NOP") { ctx => } // skip FD
   // *** HALT
   // **************
   val HALT = Opcode(0x76,4,1,"HALT",modifyPC = true) { ctx => ctx.halted = true }
@@ -1273,7 +1286,7 @@ object Z80 {
     val h = (value & 0x80) >> 7
     val rot = (value << 1 | h) & 0xFF
     ctx.F = ctx.SZP(rot)
-    ctx.setCarry(h > 0)    
+    ctx.setCarry(h > 0)
     rot
   }
   val RLC_A = Opcode((0xCB,0x07),8,2,"RLC A") { ctx => ctx.A = rotLC(ctx,ctx.A) }
@@ -1307,7 +1320,7 @@ object Z80 {
     val carry = value & 0x01
     val rot = (value >> 1 | carry << 7) & 0xFF
     ctx.F = ctx.SZP(rot)
-    ctx.setCarry(carry > 0)    
+    ctx.setCarry(carry > 0)
     rot
   }  
   val RRC_A = Opcode((0xCB,0x0F),8,2,"RRC A") { ctx => ctx.A = rotRC(ctx,ctx.A) }
@@ -1342,7 +1355,7 @@ object Z80 {
     val h = (value & 0x80) >> 7
     val rot = (value << 1 | carry) & 0xFF
     ctx.F = ctx.SZP(rot)
-    ctx.setCarry(h > 0)    
+    ctx.setCarry(h > 0) 
     rot
   }
   val RL_A = Opcode((0xCB,0x17),8,2,"RL A") { ctx => ctx.A = rotL(ctx,ctx.A) }
@@ -2117,7 +2130,9 @@ object Z80 {
 /**
  * @author ealeame
  */
-class Z80(mem:Memory) extends Z80.IOMemory with TraceListener {
+class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemory with TraceListener {
+  val id = ChipID.CPU
+  override lazy val componentID = "Z80"
   import Z80._
   val ctx = new Context(mem,this)
   private[this] var irqLow,nmiLow,nmiOnNegativeEdge = false
@@ -2149,7 +2164,10 @@ class Z80(mem:Memory) extends Z80.IOMemory with TraceListener {
   def jmpTo(pc:Int) {
     ctx.PC = pc & 0xFFFF 
   }
-  
+  def disassemble(mem:Memory,address:Int) : (String,Int) = {
+    val opcode = fetch(address)
+    (opcode.disassemble(mem,address),opcode.size)
+  }
   // =================================== Interrupt Handling ==================================================
   
   final def irq(low:Boolean) = irqLow = low
@@ -2162,14 +2180,21 @@ class Z80(mem:Memory) extends Z80.IOMemory with TraceListener {
   
   // ======================================== Bus Request (threee state) =====================================
   def requestBUS(request:Boolean) = busREQ = request
-  // ======================================== I/O Handling default implementation ============================
-  
-  def in(addressHI:Int,addressLO:Int) = mem.read(addressHI << 8 | addressLO)
-  def out(addressHI:Int,addressLO:Int,value:Int) = mem.write(addressHI << 8 | addressLO,value)
-  
+  // ======================================== I/O Handling default implementation ============================  
+  def in(addressHI:Int,addressLO:Int) = {
+    if (io_memory == null) mem.read(addressHI << 8 | addressLO)
+    else io_memory.in(addressHI,addressLO)
+  }
+  def out(addressHI:Int,addressLO:Int,value:Int) {
+    if (io_memory == null) mem.write(addressHI << 8 | addressLO,value)
+    else io_memory.out(addressHI,addressLO,value)
+  }
   // ======================================== Fetch & Execute ================================================
   
-  def init = Z80.initOpcodes
+  def init {
+    Log.info("Z80 initializing opcodes...")
+    Z80.initOpcodes
+  }
   def reset {
     ctx.reset
     irqLow = false
@@ -2177,8 +2202,7 @@ class Z80(mem:Memory) extends Z80.IOMemory with TraceListener {
     nmiOnNegativeEdge = false
   }
   
-  def fetch : Opcode = {
-    val pc = ctx.PC    
+  @inline private[this] def fetch(pc:Int) : Opcode = {
     val op = mem.read(pc)    
     // single opcode
     var opcode = opcodes_1(op)
@@ -2219,18 +2243,17 @@ class Z80(mem:Memory) extends Z80.IOMemory with TraceListener {
     ctx.PC = (mem.read(addr) << 8) | mem.read(addr + 1)
   }
   
-  def fetchAndExecute : Int = {
-    
+  private def fetchAndExecute : Int = {    
     if (breakType != null && breakType.isBreak(ctx.PC,false,false)) {
       breakType = null
       tracing = true
       breakCallBack(ctx.toString)
     }
     
-    if ((irqLow || nmiOnNegativeEdge) && !ctx.mustDelayInt) { // any interrupt pending ?
-      ctx.push(ctx.PC)
-      incR(1)
+    if ((irqLow || nmiOnNegativeEdge) && !ctx.mustDelayInt) { // any interrupt pending ?      
       if (nmiOnNegativeEdge) { // NMI
+        ctx.push(ctx.PC)
+        incR(1)
         if (breakType != null && breakType.isBreak(ctx.PC,false,true)) {
           breakType = null
           tracing = true
@@ -2249,6 +2272,8 @@ class Z80(mem:Memory) extends Z80.IOMemory with TraceListener {
       }
       else { // IRQ
         if (ctx.IFF1 == 1) {
+          ctx.push(ctx.PC)
+          incR(1)
           if (breakType != null && breakType.isBreak(ctx.PC,true,false)) {
             breakType = null
             tracing = true
@@ -2277,7 +2302,7 @@ class Z80(mem:Memory) extends Z80.IOMemory with TraceListener {
       }
     }
     
-    val opcode = fetch
+    val opcode = fetch(ctx.PC)
     if (opcode == null) throw new IllegalArgumentException(s"Can't find opcode at ${hex4(ctx.PC)}: ${hex2(mem.read(ctx.PC))} ${hex2(mem.read(ctx.PC + 1))} ${hex2(mem.read(ctx.PC + 2))}")
     // tracing
     if (tracing) {
@@ -2295,8 +2320,17 @@ class Z80(mem:Memory) extends Z80.IOMemory with TraceListener {
   }
   
   // ======================================== Clock ==========================================================
-  def clock(cycles:Long,scaleFactor:Int = 1) {
+  final def clock(cycles:Long,scaleFactor:Int = 1) {
     val canExecCPU = cycles > cpuWaitUntil && !busREQ    
     if (canExecCPU) cpuWaitUntil = cycles + (fetchAndExecute - 1) / scaleFactor
   }
+  
+  // state
+  protected def saveState(out:ObjectOutputStream) {
+    // TODO
+  }
+  protected def loadState(in:ObjectInputStream) {
+    // TODO
+  }
+  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }

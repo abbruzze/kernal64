@@ -12,7 +12,6 @@ trait Drive extends CBMComponent {
   def setIsRunningListener(listener: (Boolean) => Unit) = isRunningListener = listener
   def setDriveReader(driveReader:Floppy,emulateInserting:Boolean)
   def clock(cycles:Long)
-  def changeCPU(cycleExact:Boolean) {}
   def setReadOnly(readOnly:Boolean) {}
   def getFloppy : Floppy
   

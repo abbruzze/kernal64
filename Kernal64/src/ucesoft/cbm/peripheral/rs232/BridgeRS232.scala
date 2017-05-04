@@ -5,7 +5,8 @@ import ucesoft.cbm.peripheral.cia.CIA
 object BridgeRS232 extends RS232 {
   val componentID = "RS-232 on UserPort"
   private[this] var rs232 : RS232 = _
-  private[this] var txd,others = 0
+  private[this] var txd = 0
+  private[this] var others = 0XFF
   private[this] var cia2 : CIA = _
   private[this] var statusListener : RS232StatusListener = _
   
@@ -26,7 +27,7 @@ object BridgeRS232 extends RS232 {
   def setTXD(high:Int) = if (rs232 != null) rs232.setTXD(high) else txd = high
   def getTXD : Int = if (rs232 == null) txd else rs232.getTXD  
   def setOthers(value:Int) = if (rs232 != null) rs232.setOthers(value) else others = value
-  def getOthers : Int = if (rs232 == null) others else rs232.getOthers
+  def getOthers : Int = if (rs232 == null) 0XFF else rs232.getOthers
   def setConfiguration(conf:String) = if (rs232 != null) rs232.setConfiguration(conf)
   def getConfiguration : String = if (rs232 == null) "" else rs232.getConfiguration
   def isEnabled : Boolean = if (rs232 != null) rs232.isEnabled else false

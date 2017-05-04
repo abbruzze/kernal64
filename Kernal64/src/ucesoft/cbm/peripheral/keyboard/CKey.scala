@@ -74,8 +74,38 @@ object CKey extends Enumeration {
 	  val CBM		= Value(0x75)
 	  val Q			= Value(0x76)
 	  val RUN_STOP	= Value(0x77)
+	  // C128 rows, add an offset 0x100
+	  // row 0
+	  val HELP = Value(0x100)
+	  val KEYPAD_N_8 = Value(0x101)
+	  val KEYPAD_N_5 = Value(0x102)
+	  val TAB = Value(0x103)
+	  val KEYPAD_N_2 = Value(0x104)
+	  val KEYPAD_N_4 = Value(0x105)
+	  val KEYPAD_N_7 = Value(0x106)
+	  val KEYPAD_N_1 = Value(0x107)
+	  // row 1
+	  val ESC = Value(0x110)
+	  val KEYPAD_PLUS = Value(0x111)
+	  val KEYPAD_MINUS = Value(0x112)
+	  val LINE_FEED = Value(0x113)
+	  val KEYPAD_ENTER = Value(0x114)
+	  val KEYPAD_N_6 = Value(0x115)
+	  val KEYPAD_N_9 = Value(0x116)
+	  val KEYPAD_N_3 = Value(0x117)
+	  // row 2
+	  val ALT = Value(0x120)
+	  val KEYPAD_N_0 = Value(0x121)
+	  val KEYPAD_DOT = Value(0x122)
+	  val KEYPAD_UP = Value(0x123)
+	  val KEYPAD_DOWN = Value(0x124)
+	  val KEYPAD_LEFT = Value(0x125)
+	  val KEYPAD_RIGHT = Value(0x126)
+	  val NO_SCROLL = Value(0x127)
 	  
 	  val RESTORE 	= Value(0xFF)
+	  
+	  def is128Key(k:Key) = k.id > 0xFF
 	  
 	  def getRowCol(k:Key) = {
 	    val id = k.id
