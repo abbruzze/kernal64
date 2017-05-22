@@ -70,7 +70,7 @@ class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with 
 	    add(" BLOCKS FREE.")
     }
     catch {
-      case i:IllegalArgumentException =>
+      case _ =>
         add("FORMAT NOT SUPPORTED.")
     }
     end

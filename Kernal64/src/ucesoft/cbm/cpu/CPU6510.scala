@@ -145,7 +145,6 @@ trait CPU6510 extends Chip with TraceListener {
   def nmiRequest(low: Boolean)
   def irqRequest(low: Boolean)
   
-  val isExact = false
   def setBaLow(low:Boolean) {}
   def setDMA(dma:Boolean) {}
 }

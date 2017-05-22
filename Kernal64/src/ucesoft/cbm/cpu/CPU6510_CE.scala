@@ -53,8 +53,6 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   private[this] var irqFirstCycle,nmiFirstCycle = 0L
   private[this] val clk = Clock.systemClock
   // -----------------------------------------
-
-  final override val isExact = true
   final override def setBaLow(baLow: Boolean) { 
     this.baLow = baLow
     ready = !this.baLow && !dma

@@ -27,6 +27,7 @@ class Keyboard(keyMapper: KeyboardMapper, nmiAction: (Boolean) => Unit = x => {}
   
   def isCapsLockPressed = c128_CapsLockPressed
   def is4080Pressed = c128_40_80_Pressed
+  def set4080Pressed(pressed:Boolean) = c128_40_80_Pressed = pressed
   
   def init {}
   def reset {
@@ -51,7 +52,7 @@ class Keyboard(keyMapper: KeyboardMapper, nmiAction: (Boolean) => Unit = x => {}
 
   final def keyPressed(e: KeyEvent) : Unit = synchronized {
     if (c128 && e.getKeyCode == KeyEvent.VK_CAPS_LOCK) {
-      c128_CapsLockPressed = !c128_CapsLockPressed
+      c128_CapsLockPressed = !c128_CapsLockPressed      
       return
     }
     if (c128 && e.getKeyCode == KeyEvent.VK_F9) {

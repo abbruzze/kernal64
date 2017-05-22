@@ -15,22 +15,32 @@ import ucesoft.cbm.CBMComponentType
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 
-class Display(width: Int,height: Int, title: String, frame: JFrame) extends JComponent with MouseMotionListener with CBMComponent {
+class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = Clock.systemClock) extends JComponent with MouseMotionListener with CBMComponent {
   val componentID = "Display"
   val componentType = CBMComponentType.OUTPUT_DEVICE  
   private[this] val dimension = new Dimension(0, 0)
   private[this] var clipArea: Tuple2[Point, Point] = null
-  private[this] var frameCounter = 0L
+  private[this] var totalFrameCounter,frameCounter = 0L
   private[this] var framePerSecond = 0
   private[this] var ts = 0L
-  val displayMem = Array.fill(width * height)(0xFF000000)
-  private[this] val displayImage = new MemoryImageSource(width, height, displayMem, 0, width)
+  private[this] val normalDisplayMem = Array.fill(width * height)(0xFF000000)
+  private[this] val interlacedDisplayMem = Array.fill(width * height * 2)(0xFF000000)
+  private[this] var ptrDisplayMem = normalDisplayMem
+  private[this] val normalDisplayImage = new MemoryImageSource(width, height, normalDisplayMem, 0, width)
+  private[this] val interlacedDisplayImage = new MemoryImageSource(width, height * 2, interlacedDisplayMem, 0, width)
+  private[this] var displayImage = normalDisplayImage
   private[this] var debugImage: Image = _
-  private[this] val screen = {
-    displayImage.setAnimated(true);
-    displayImage.setFullBufferUpdates(false)
-    createImage(displayImage)
+  private[this] val normalScreen = {
+    normalDisplayImage.setAnimated(true);
+    normalDisplayImage.setFullBufferUpdates(false)
+    createImage(normalDisplayImage)
   }
+  private[this] val interlacedScreen = {
+    interlacedDisplayImage.setAnimated(true);
+    interlacedDisplayImage.setFullBufferUpdates(false)
+    createImage(interlacedDisplayImage)
+  }
+  private[this] var screen = normalScreen
   private[this] var drawRasterLine = false
   private[this] var rasterLine = 0
   private[this] var lpX, lpY, mouseX, mouseY = 0
@@ -39,6 +49,20 @@ class Display(width: Int,height: Int, title: String, frame: JFrame) extends JCom
   private[this] var showRemotingLabel = true
   
   addMouseMotionListener(this)
+  
+  def displayMem : Array[Int] = ptrDisplayMem
+  def setInterlaceMode(enabled:Boolean) {
+    if (enabled) {
+      ptrDisplayMem = interlacedDisplayMem
+      displayImage = interlacedDisplayImage
+      screen = interlacedScreen
+    }
+    else {
+      ptrDisplayMem = normalDisplayMem
+      displayImage = normalDisplayImage
+      screen = normalScreen
+    }
+  }
   
   def init {}
   def reset {}
@@ -57,6 +81,8 @@ class Display(width: Int,height: Int, title: String, frame: JFrame) extends JCom
   
   def getMouseX = mouseX
   def getMouseY = mouseY
+  
+  def getFrameCounter = totalFrameCounter
   
   def getClipArea = clipArea
   def setRemote(remote:Option[ucesoft.cbm.remote.RemoteC64]) {
@@ -113,6 +139,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame) extends JCom
     if (drawRasterLine) repaint()
     
     frameCounter += 1
+    totalFrameCounter += 1
     val now = System.currentTimeMillis
     if (ts == 0 || now - ts > 1000) {
       framePerSecond = math.round(frameCounter / ((now - ts) / 1000.0)).toInt
@@ -125,7 +152,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame) extends JCom
                         if (showRemotingLabel) "(R) " else "    "
                      }
                      else "(?) "
-      frame.setTitle(title + " - " + remoting + framePerSecond + "fps - " + Clock.systemClock.getLastPerformancePerc + "%")
+      frame.setTitle(title + " - " + remoting + framePerSecond + "fps - " + clk.getLastPerformancePerc + "%")
     }
   }
 

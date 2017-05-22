@@ -13,11 +13,11 @@ class AboutCanvas(charRom:Memory,version:String) extends CBMCanvas(charRom) {
   add(center("VER " + version,WIDTH)).newLine
   newLine
   white
-  add(center("A COMMODORE 64 EMULATOR WRITTEN IN SCALA",WIDTH)).newLine
+  add(center("A COMMODORE 64/128 EMULATOR WRITTEN IN SCALA",WIDTH)).newLine
   newLine
   add(center("BY ALESSANDRO ABBRUZZETTI",WIDTH)).newLine
   newLine
-  add(center("2013-2016",WIDTH)).newLine
+  add(center("2013-2017",WIDTH)).newLine
   newLine
   yellow
   add(center("VISIT",WIDTH)).newLine

@@ -60,4 +60,5 @@ class MMUStatusPanel extends JPanel with MMUChangeListener {
   def frequencyChanged(f:Int) { m2.on = f == 2 ; m2.repaint() }
   def cpuChanged(is8502:Boolean) { z.on = !is8502 ; z.repaint() }
   def c64Mode(c64Mode:Boolean) { c64.on = c64Mode ; c64.repaint() }
+  def fastSerialDirection(input:Boolean) {}
 }

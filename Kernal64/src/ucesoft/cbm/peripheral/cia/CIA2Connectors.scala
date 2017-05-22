@@ -9,10 +9,12 @@ import java.io.ObjectInputStream
 import ucesoft.cbm.peripheral.vic.VICMemory
 
 object CIA2Connectors {
+  val CIA2_PORTA_BUSID = "CIA2_PortA"
+  
   class PortAConnector(mem:VICMemory,bus:IECBus,rs232:RS232) extends Connector with IECBusListener {
     val componentID = "CIA2 Port A Connector"
     override val isController = true
-    val busid = "CIA2_PortA"
+    val busid = CIA2_PORTA_BUSID
     
     private[this] var bank = 0
       

@@ -93,6 +93,8 @@ final class VIC(mem: VICMemory,
   private[this] var traceRasterLineInfo = false
   final private[this] val traceRasterLineBuffer = Array.fill(SCREEN_WIDTH)("")
   private[this] var traceRasterLine = 0
+  // ------------------------ C128 $D030 test bit ---------------------------------------------------------
+  private[this] var c128TestBitEnabled = false
   // ------------------------ PUBLIC REGISTERS ------------------------------------------------------------
   /*
    * $D000 - $D00F
@@ -987,6 +989,13 @@ final class VIC(mem: VICMemory,
   }
   
   final def clock {
+    if (c128TestBitEnabled) {
+      rasterCycle = 0 
+      updateRasterLine
+      GFXShifter.reset
+      return
+    }
+    
     drawCycle
     
     if (rasterCycle == RASTER_CYCLES) {
@@ -1361,6 +1370,10 @@ final class VIC(mem: VICMemory,
   }
 
   def getMemory = mem
+  
+  def c128TestBitEnabled(enabled:Boolean) {
+    c128TestBitEnabled = enabled
+  }
 
   def dump = {
     val sb = new StringBuffer("VIC dump:\n")

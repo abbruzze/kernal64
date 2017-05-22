@@ -9,36 +9,10 @@ import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
 
-/*
-object CIATimer extends App {
-  var prev = 0L
-  def finishB(id:String) = {
-    val delta = (System.currentTimeMillis - prev) / 1000
-    println(delta)
-    prev = System.currentTimeMillis
-  }
-  
-  def finishA(id:String) {
-  }
-  
-  Clock.setSystemClock(1) { c => }
-  val tb = new CIATimerB("CIA","B",finishB)
-  val ta = new CIATimerA("CIA","A",finishA,Some(tb))
-  
-  val event = new ClockEvent("",1,(cycles) => {
-  ta.writeLo(255)
-  ta.writeHi(255)
-  tb.writeLo(100)
-  tb.writeHi(0)
-  tb.writeCR(0xC1 | 8) 
-  ta.writeCR(1)
-  })
-  Clock.systemClock.schedule(event)
-  
-  Clock.systemClock.play
-}
-*/
-class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timerToNotify: Option[CIATimerA2] = None) extends CBMComponent {
+class CIATimerA2(ciaName: String,
+                 id: String,
+                 irqAction: (String) => Unit,
+                 timerToNotify: Option[CIATimerA2] = None) extends CBMComponent {
   val componentID = ciaName + id
   val componentType = CBMComponentType.CHIP 
   
@@ -67,6 +41,7 @@ class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timer
   def setSerialCallBack(serialActionCallback : Option[() => Unit]) = this.serialActionCallback = serialActionCallback
   def getLatch = latch
   def isStartedAndInContinousMode = started && !oneShot
+  def isStarted = started
   
   def init {}
   
@@ -191,7 +166,7 @@ class CIATimerA2(ciaName: String, id: String, irqAction: (String) => Unit, timer
     if (!countSystemClock) return // don't manage CNT counting
     
     // check serial callback
-    if (!oneShot && serialActionCallback.isDefined) serialActionCallback.get()
+    if (/*!oneShot &&*/ serialActionCallback.isDefined) serialActionCallback.get()
     // reset counter with latch value
     counter = latch
     //Log.debug(s"${ciaName}-${id} counter is zero")

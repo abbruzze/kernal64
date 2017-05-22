@@ -191,6 +191,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
           viaDisk.clock(cycles)
           viaBus.clock(cycles)
         }
+        else cpu.fetchAndExecute(1)
       }
       else cpu.fetchAndExecute(1)
       

@@ -3,11 +3,11 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.scala-ide.sdt.launching.SCALA_CONTAINER"/>
 	<classpathentry kind="lib" path="lib/jinput.jar"/>
-	<classpathentry kind="lib" path="lib/scala-parser-combinators_2.11-1.0.3.jar"/>
 	<classpathentry kind="lib" path="lib/commons-net-3.3.jar"/>
 	<classpathentry kind="lib" path="lib/dropbox-core-sdk-1.7.7.jar"/>
 	<classpathentry kind="lib" path="lib/jackson-core-2.2.4.jar"/>
 	<classpathentry kind="lib" path="roms"/>
+	<classpathentry kind="lib" path="lib/scala-parser-combinators_2.12-1.0.5.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.8.0_25"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

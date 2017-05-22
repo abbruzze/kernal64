@@ -68,7 +68,6 @@ import ucesoft.cbm.misc.FloppyComponent
 import ucesoft.cbm.misc.AbstractDriveLedListener
 import ucesoft.cbm.misc.DriveLed
 import ucesoft.cbm.misc.DriveLoadProgressPanel
-import ucesoft.cbm.misc.Mouse1351
 import ucesoft.cbm.misc.TapeState
 import ucesoft.cbm.misc.IRQSwitcher
 import ucesoft.cbm.misc.NMISwitcher
@@ -208,8 +207,6 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   private[this] val LIGHT_PEN_BUTTON_UP = 1
   private[this] val LIGHT_PEN_BUTTON_LEFT = 2
   private[this] var lightPenButtonEmulation = LIGHT_PEN_NO_BUTTON
-  // -------------- Mouse -----------------------------
-  private[this] var mouseEnabled = true
   
   private[this] class LightPenButtonListener extends MouseAdapter with CBMComponent {
     val componentID = "Light pen"
@@ -321,9 +318,6 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     val lightPen = new LightPenButtonListener
     add(lightPen)
     display.addMouseListener(lightPen)
-    val mouse = new Mouse1351(display,mouseEnabled,sid)
-    add(mouse)
-    display.addMouseMotionListener(mouse)
     traceDialog = TraceDialog.getTraceDialog(displayFrame,mem,cpu,display,vicChip)
     diskTraceDialog = TraceDialog.getTraceDialog(displayFrame,c1541_real.getMem,c1541_real)
     // drive leds
@@ -532,7 +526,15 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         vicChip.enableLightPen(true)
         keypadControlPort.setLightPenEmulation(true)
       case "MOUSE_ENABLED" =>
-        mouseEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        val mouseEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        sid.setMouseEnabled(mouseEnabled)
+        if (mouseEnabled) {
+          displayFrame.getContentPane.setCursor(displayFrame.getToolkit.createCustomCursor(
+              new java.awt.image.BufferedImage(3, 3, java.awt.image.BufferedImage.TYPE_INT_ARGB), new Point(0, 0),"null"))
+        }
+        else {
+          displayFrame.getContentPane.setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR))
+        }
       case "EXIT" => close
       case "TAPE" =>
         loadFileFromTape
@@ -1389,7 +1391,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     
     val resetItem = new JMenuItem("Reset")
     resetItem.setActionCommand("RESET")
-    resetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F12,0))
+    resetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK))
     resetItem.addActionListener(this)
     fileMenu.add(resetItem)
     
@@ -1469,7 +1471,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     optionMenu.addSeparator
     
     val adjustRatioItem = new JMenuItem("Adjust display ratio")
-    resetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A,java.awt.event.InputEvent.ALT_DOWN_MASK))
     adjustRatioItem.setActionCommand("ADJUSTRATIO")
     adjustRatioItem.addActionListener(this)
     optionMenu.add(adjustRatioItem)
@@ -1522,6 +1524,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     lightPenMenu.add(penLeft)
     
     val mouseEnabledItem = new JCheckBoxMenuItem("Mouse 1351 enabled")
+    mouseEnabledItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_M,java.awt.event.InputEvent.ALT_DOWN_MASK))
     mouseEnabledItem.setSelected(true)
     mouseEnabledItem.setActionCommand("MOUSE_ENABLED")
     mouseEnabledItem.addActionListener(this)    

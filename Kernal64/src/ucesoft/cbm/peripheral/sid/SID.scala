@@ -36,8 +36,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   }
   private[this] val POTX_OFS = 0x19
   private[this] val POTY_OFS = 0x1A
-  private[this] var potx = 0
-  private[this] var poty = 0
+  private[this] var mouseEnabled = false
   
   private[this] var lastCycles = Clock.systemClock.currentCycles
   private[this] var nextRest = 0
@@ -77,21 +76,16 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   
   @inline private def decode(address:Int) = address & 0x1F
   
+  def setMouseEnabled(enabled:Boolean) = mouseEnabled = enabled
+  
   final def read(address: Int, chipID: ChipID.ID) = decode(address) match {
-    case POTX_OFS => potx
-    case POTY_OFS => poty
+    case POTX_OFS =>
+      if (mouseEnabled) (java.awt.MouseInfo.getPointerInfo.getLocation.x & 0x7F) << 1 else 0
+    case POTY_OFS =>
+      if (mouseEnabled) (0x7F - (java.awt.MouseInfo.getPointerInfo.getLocation.y & 0x7F)) << 1 else 0
     case ofs => sid.read(ofs)
   }
-  final def write(address: Int, value: Int, chipID: ChipID.ID) = {
-    decode(address) match {
-      case POTX_OFS =>
-        potx = value
-      case POTY_OFS =>
-        poty = value
-      case ofs =>
-        sid.write(ofs,value)
-    }    
-  }
+  final def write(address: Int, value: Int, chipID: ChipID.ID) = sid.write(decode(address),value)
   
   private[this] val sidEventCallBack = sidEvent _
   

@@ -58,9 +58,13 @@ class CIA(val name:String,
   private[this] val timerA = new CIATimerA2(name,IRQ_SRC_TA,irqHandling _,Some(timerB))
   private[this] val tod = new TOD2//new TOD((timerB.readCR & 0x80) == 0)
   private[this] var icr = 0
-  private[this] var sdr = 0
+  private[this] var sdr,shiftRegister = 0
+  private[this] var sdrLoaded,sdrOut = false
+  private[this] var CNT,SP = false
   private[this] var sdrIndex = 0
   private[this] var icrMask = 0	// bits 0 - 4
+  
+  // ========================== TOD ================================================
   
   private class TOD2 extends CBMComponent {
     val componentID = name + " TOD"
@@ -263,8 +267,11 @@ class CIA(val name:String,
     }
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
+  
+  // ===============================================================================
       
   def init {
+    timerA.setSerialCallBack(Some(sendSerial _))
     add(timerB)
     add(timerA)
     add(tod)
@@ -371,19 +378,11 @@ class CIA(val name:String,
     case TOD_SEC => tod.writeSec(value)
     case TOD_MIN => tod.writeMin(value)
     case TOD_HR => tod.writeHour(value)
-    case SDR => 
+    case SDR => // serial register
       sdr = value
-      if (sdrIndex == 0 && (timerA.readCR & 0x40) == 0x40) {
-        if (timerA.isStartedAndInContinousMode) {
-          Log.debug("Starting to send over serial " + value + " at rate of " + timerA.getLatch + " " + timerA.readCR)
-          timerA.setSerialCallBack(Some(sendSerial _))
-        }
-        else {
-          Log.debug("Force sending serial IRQ") // for Arkanoid!!
-          irqHandling(IRQ_SERIAL)
-        }
+      if ((timerA.readCR & 0x40) == 0x40) { // serial out
+        sdrLoaded = true        
       }
-      Log.debug(s"${name} set SDR to ${Integer.toBinaryString(value)}")
     case ICR =>
       val mustSet = (value & 0x80) == 0x80 
       if (mustSet) icrMask |= value & 0x7f else icrMask &= ~value
@@ -393,28 +392,76 @@ class CIA(val name:String,
         irqAction(true)
       }
       Log.debug(s"${name} ICR's value is ${Integer.toBinaryString(value)} => ICR = ${Integer.toBinaryString(icrMask)}")
-    case CRA => timerA.writeCR(value)
+    case CRA =>
+      timerA.writeCR(value)
+      if (!timerA.isStarted) {
+        sdrIndex = 0
+        sdrLoaded = false
+        sdrOut = false
+      }
     case CRB => timerB.writeCR(value)
   }
   
+  @inline private def loadShiftRegister {
+    shiftRegister = sdr // load the shift register
+    sdrLoaded = false
+    sdrOut = true
+    //println("Shift register loaded with " + sdr)
+  }
+  
   private def sendSerial {
-    sdrIndex += 1
-    if ((sdrIndex & 1) == 0) {
-      Log.debug("Sending serial " + sdrIndex + " at rate " + timerA.getLatch)
-      val bit = (sdr & 0x80) > 0
-      sdr = (sdr << 1) & 0xFF
-      sendSerialBit(bit)
-      if (sdrIndex == 16) {
-        Log.debug("Finished sending serial")
-        irqHandling(IRQ_SERIAL)
-        timerA.setSerialCallBack(None)
-        sdrIndex = 0
+    if ((timerA.readCR & 0x40) == 0x40) { // serial out
+      if (sdrIndex == 0 && sdrLoaded) loadShiftRegister
+      if (sdrOut) {
+        sdrIndex += 1
+        if ((sdrIndex & 1) == 0) {
+          //println("Sending serial " + sdrIndex + " at rate " + timerA.getLatch)
+          val bit = (shiftRegister & 0x80) > 0
+          shiftRegister = (shiftRegister << 1) & 0xFF
+          sendSerialBit(bit)
+          if (sdrIndex == 16) {
+            irqHandling(IRQ_SERIAL)
+            sdrIndex = 0
+            sdrOut = false
+          }
+          CNT = true // reproduce the TimerA clock on CNT
+          sendCNT(CNT)
+        }
+        else {
+          CNT = false
+          sendCNT(CNT)
+        }
       }
     }
   }
   
-  // TODO
+  /**
+   * Used for serial
+   */
+  final def setCNT(cnt:Boolean) {
+    // only on rising edge
+    if (cnt && !CNT && (timerA.readCR & 0x40) == 0) { // serial input mode
+      CNT = true
+      shiftRegister >>= 1
+      if (SP) shiftRegister |= 0x80 else shiftRegister &= 0x7F
+      sdrIndex += 1
+      if (sdrIndex == 8) {
+        sdrIndex = 0
+        irqHandling(IRQ_SERIAL)
+        sdr = shiftRegister & 0xFF
+      }
+    }
+  }
+  /**
+   * Used for serial
+   */
+  final def setSP(sp:Boolean) {
+    SP = sp
+  }
+  
   protected def sendSerialBit(on:Boolean) {}
+  protected def sendCNT(high:Boolean) {}
+  
   // state
   protected def saveState(out:ObjectOutputStream) {
     out.writeInt(icr)

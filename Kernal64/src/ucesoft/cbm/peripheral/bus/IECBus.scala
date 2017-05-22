@@ -13,6 +13,7 @@ trait IECBusListener {
   val busid : String
   
   def atnChanged(oldValue:Int,newValue:Int) {}
+  def srqChanged(oldValue:Int,newValue:Int) {}
 }
 
 object IECBusLine extends Enumeration {
@@ -20,6 +21,7 @@ object IECBusLine extends Enumeration {
   val ATN = Value
   val CLK = Value
   val DATA = Value
+  val SRQ = Value
 }
 
 object IECBus {
@@ -35,7 +37,8 @@ class IECBus extends CBMComponent {
   private[this] var ATN = VOLTAGE
   private[this] var CLK = VOLTAGE
   private[this] var DATA = VOLTAGE
-  private[this] case class State(listener:IECBusListener,var atn:Int=VOLTAGE,var clk:Int=VOLTAGE,var data:Int=VOLTAGE)
+  private[this] var SRQ = VOLTAGE
+  private[this] case class State(listener:IECBusListener,var atn:Int=VOLTAGE,var clk:Int=VOLTAGE,var data:Int=VOLTAGE,var srq:Int=VOLTAGE)
   private[this] var lines : List[State] = Nil
   private[this] var controller : State = null
   
@@ -43,6 +46,7 @@ class IECBus extends CBMComponent {
     properties.setProperty("ATN",ATN.toString)
     properties.setProperty("CLK",CLK.toString)
     properties.setProperty("DATA",DATA.toString)
+    properties.setProperty("SRQ",SRQ.toString)
     properties
   }
   
@@ -69,8 +73,9 @@ class IECBus extends CBMComponent {
       case IECBusLine.ATN => l.head.atn = value
       case IECBusLine.CLK => l.head.clk = value
       case IECBusLine.DATA => l.head.data = value
+      case IECBusLine.SRQ => l.head.srq = value
     }
-    updateLines(id)
+    updateLines
   }
   
   final def setLine(id:String,atnValue:Int,dataValue:Int,clockValue:Int) {
@@ -81,7 +86,7 @@ class IECBus extends CBMComponent {
     l.head.atn = atnValue
     l.head.clk = clockValue
     l.head.data = dataValue
-    updateLines(id)
+    updateLines
   }
   
   def init {}
@@ -91,30 +96,35 @@ class IECBus extends CBMComponent {
       l.head.atn = VOLTAGE
       l.head.clk = VOLTAGE
       l.head.data = VOLTAGE
+      l.head.srq = VOLTAGE
       l = l .tail
     }
     
-    updateLines("RESET")
+    updateLines
   }
   
-  private def updateLines(id:String) {
+  @inline private def updateLines {
     val preATN = ATN
     val preCLK = CLK
     val preDATA = DATA
+    val preSRQ = SRQ
     ATN = VOLTAGE
     CLK = VOLTAGE
     DATA = VOLTAGE
+    SRQ = VOLTAGE
     var l = lines
     while (l != Nil) {
       if (l.head.atn == GROUND) ATN = GROUND
       if (l.head.clk == GROUND) CLK = GROUND
       if (l.head.data == GROUND) DATA = GROUND
+      if (l.head.srq == GROUND) SRQ = GROUND
       l = l .tail
     }
-    if (preATN != ATN) {
+    if (preATN != ATN || preSRQ != SRQ) {
       var l = lines
   	  while (l != Nil) {
-  	    l.head.listener.atnChanged(preATN,ATN)
+  	    if (preATN != ATN) l.head.listener.atnChanged(preATN,ATN)
+  	    if (preSRQ != SRQ) l.head.listener.srqChanged(preSRQ,SRQ)
   	    l = l .tail
   	  }
     }
@@ -123,8 +133,9 @@ class IECBus extends CBMComponent {
   final def atn = ATN
   final def clk = CLK
   final def data = DATA
+  final def srq = SRQ
   
-  override def toString = s"IECBus ATN=${ATN} CLK=${CLK} DATA=${DATA}"  
+  override def toString = s"IECBus ATN=$ATN CLK=$CLK DATA=$DATA SRQ=$SRQ"  
   
   // state
   protected def saveState(out:ObjectOutputStream) {
@@ -133,6 +144,7 @@ class IECBus extends CBMComponent {
       out.writeInt(l.atn)
       out.writeInt(l.data)
       out.writeInt(l.clk)
+      out.writeInt(l.srq)
     }
   }
   protected def loadState(in:ObjectInputStream) {
@@ -143,11 +155,12 @@ class IECBus extends CBMComponent {
           l.atn = in.readInt
           l.data = in.readInt
           l.clk = in.readInt
+          l.srq = in.readInt
         case None =>
           throw new IOException(s"Can't find busid $id")
       }
     }
-    updateLines("LOADING")
+    updateLines
   }
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
