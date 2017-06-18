@@ -2,7 +2,6 @@ package ucesoft.cbm.util
 
 import ucesoft.cbm.cpu.Memory
 import java.io.File
-import javax.swing.JFrame
 import javax.swing.JFileChooser
 import java.beans.PropertyChangeListener
 import java.beans.PropertyChangeEvent
@@ -19,7 +18,7 @@ class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with 
     val prop = e.getPropertyName
     if (JFileChooser.SELECTED_FILE_CHANGED_PROPERTY.equals(prop)) {
       val file = e.getNewValue.asInstanceOf[File]
-      if (file != null && file.getName.toUpperCase.endsWith(".D64")) readDir(file)        
+      if (file != null && (file.getName.toUpperCase.endsWith(".D64") || file.getName.toUpperCase.endsWith(".D71"))) readDir(file)        
       else clear
       repaint()
     }
@@ -30,8 +29,7 @@ class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with 
     try {
     	val d64 = new ucesoft.cbm.formats.D64(file.toString)   
 	    val dirs = d64.directories
-	    val bam = d64.bam
-	    d64.close
+	    val bam = d64.bam	    
 	    	        
 	    black
 	    add("0 ")
@@ -65,12 +63,13 @@ class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with 
 	      rep(0x20,endBlanks)
 	      newLine
 	    }
-	    val blocksFree = ucesoft.cbm.formats.D64.TOTAL_AVAILABLE_SECTORS - (dirs map { _.sizeInSectors } sum)
+	    val blocksFree = d64.TOTAL_AVAILABLE_SECTORS - (dirs map { _.sizeInSectors } sum)
 	    add(if (blocksFree < 0) "0" else blocksFree.toString)
 	    add(" BLOCKS FREE.")
+	    d64.close
     }
     catch {
-      case _ =>
+      case t:IllegalArgumentException =>
         add("FORMAT NOT SUPPORTED.")
     }
     end
