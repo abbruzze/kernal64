@@ -51,10 +51,12 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private[this] var z80Active = true
   private[this] var clockSpeed = 1
   private[this] var vicChip : vic.VIC = _
+  private[this] var cia1,cia2 : cia.CIA = _
   private[this] val vdc = new ucesoft.cbm.peripheral.vdc.VDC
   private[this] val sid = new ucesoft.cbm.peripheral.sid.SID
   private[this] var vicDisplay : vic.Display = _
   private[this] var vdcDisplay : vic.Display = _
+  private[this] var vdcOnItsOwnThread = false
   private[this] val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
   private[this] val irqSwitcher = new IRQSwitcher(irqRequest _)
   private[this] val keyb = new keyboard.Keyboard(C128KeyboardMapper,nmiSwitcher.keyboardNMIAction _,true)	// key listener
@@ -256,7 +258,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     add(irqSwitcher)    
     // CIAs
     // CIA1 must be modified to handle fast serial ...
-    val cia1 = new CIA("CIA1",
+    cia1 = new CIA("CIA1",
     				   0xDC00,
     				   cia1CP1,
     				   cia1CP2,
@@ -287,7 +289,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     val cia2CP2 = new CIA2Connectors.PortBConnector(rs232)    
     add(cia2CP1)
     add(cia2CP2)
-    val cia2 = new CIA("CIA2",
+    cia2 = new CIA("CIA2",
     				   0xDD00,
     				   cia2CP1,
     				   cia2CP2,
@@ -415,7 +417,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     }    
   }
   
-  private def mainLoop(cycles:Long) {
+  private def mainLoop(cycles:Long) { 
     // VIC PHI1
     vicChip.clock
     //DRIVES
@@ -727,13 +729,16 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         keyb.set4080Pressed(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
       case "VDCENABLED" =>
         if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) {
-          vdc.clk.play
+          vdc.play
           vdcDisplayFrame.setVisible(true)
         }
         else {
-          vdc.clk.pause
+          vdc.pause
           vdcDisplayFrame.setVisible(false)
-        }        
+        }   
+      case "VDCTHREAD" =>
+        vdcOnItsOwnThread = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        if (vdcOnItsOwnThread) vdc.setOwnThread else vdc.stopOwnThread
     }
   }
   
@@ -964,7 +969,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     
     if (name.endsWith(".PRG")) loadPRGFile(file,autorun)
     else    
-    if (name.endsWith(".D64") || name.endsWith(".G64")) attachDiskFile(0,file,autorun)
+    if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71")) attachDiskFile(0,file,autorun)
     else
     if (name.endsWith(".TAP")) attachTapeFile(file,autorun)
     else
@@ -995,29 +1000,16 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     var m = start
     var b = in.read
     var size = 0
+    val mem = mmu.getBank0RAM
     while (b != -1) {
-      mmu.write(m, b)
+      mem.write(m, b)
       m += 1
       size += 1
       b = in.read
     }
     in.close
     val end = start + size
-    // check if c128 or c64
-    if (c64Mode) {
-      mmu.write(45, end % 256)
-      mmu.write(46, end / 256)
-      mmu.write(0xAE,end % 256)
-      mmu.write(0xAF,end / 256)
-    }
-    else {
-      mmu.write(0x2B,start & 0xFF)
-      mmu.write(0xAC,start & 0xFF)
-      mmu.write(0x2C,start >> 8)
-      mmu.write(0xAD,start >> 8)
-      mmu.write(0x1210,end & 0xFF)
-      mmu.write(0x1211,end >> 8)
-    }    
+    ProgramLoader.updateBASICPointers(mem,start,end,c64Mode)
     
     Log.info(s"BASIC program loaded from ${start} to ${end} size=${size}")
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
@@ -1050,7 +1042,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   
   private def attachDiskFile(driveID:Int,file:File,autorun:Boolean) {
     try {      
-      val isD64 = file.getName.toUpperCase.endsWith(".D64")
+      val isD64 = file.getName.toUpperCase.endsWith(".D64") || file.getName.toUpperCase.endsWith(".D71")
       if (drives(driveID) == c1541 && !isD64) {
         JOptionPane.showMessageDialog(vicDisplayFrame,"G64 format not allowed on a 1541 not in true emulation mode", "Disk attaching error",JOptionPane.ERROR_MESSAGE)
         return
@@ -1128,11 +1120,11 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       case JFileChooser.APPROVE_OPTION =>
         configuration.setProperty(CONFIGURATION_LASTDISKDIR,fc.getSelectedFile.getParentFile.toString)
         val out = new FileOutputStream(fc.getSelectedFile)
-        val start = mmu.read(43) + mmu.read(44) * 256
-        val end = mmu.read(45) + mmu.read(46) * 256 - 1
-	    out.write(mmu.read(43))
-	    out.write(mmu.read(44))
-        for (m <- start to end) out.write(mmu.read(m))
+        val start = ProgramLoader.startAddress(mmu, c64Mode)
+        val end = ProgramLoader.endAddress(mmu, c64Mode) - 1
+  	    out.write(start & 0x0F)
+  	    out.write(start >> 8)
+        for (m <- start to end) out.write(mmu.getBank0RAM.read(m))
         out.close
         Log.info(s"BASIC program saved from ${start} to ${end}")
       case _ =>
@@ -1249,8 +1241,11 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new javax.swing.filechooser.FileFilter {
-      def accept(f:File) = f.isDirectory || f.getName.toUpperCase.endsWith(".D64") || f.getName.toUpperCase.endsWith(".G64")
-      def getDescription = "D64 or G64 files"
+      def accept(f:File) = f.isDirectory || 
+                           f.getName.toUpperCase.endsWith(".D64") ||
+                           f.getName.toUpperCase.endsWith(".D71") ||
+                           f.getName.toUpperCase.endsWith(".G64")
+      def getDescription = "D64/71 or G64 files"
     })
     fc.showOpenDialog(vicDisplayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
@@ -1268,7 +1263,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
           case None =>
           case Some(fileName) =>
             try {
-              floppy.asInstanceOf[D64].loadInMemory(mmu,fileName,relocate)
+              floppy.asInstanceOf[D64].loadInMemory(mmu.getBank0RAM,fileName,relocate,c64Mode)
             }
             catch {
               case t:Throwable =>
@@ -1301,7 +1296,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       JOptionPane.showInputDialog(vicDisplayFrame,"Select file to open:","Open file in " + file,JOptionPane.INFORMATION_MESSAGE,null,values,values(0)) match {
         case null =>
         case entry:T64Entry =>
-          tape.loadInMemory(mmu,entry)
+          tape.loadInMemory(mmu.getBank0RAM,entry,c64Mode)
           configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
           if (autorun) {
             insertTextIntoKeyboardBuffer("RUN" + 13.toChar)
@@ -1563,6 +1558,11 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     vdcEnabled.setActionCommand("VDCENABLED")
     vdcEnabled.addActionListener(this)    
     vdcMenu.add(vdcEnabled)
+    val vdcSeparateThreadItem = new JCheckBoxMenuItem("VDC on its own thread")
+    vdcSeparateThreadItem.setSelected(false)
+    vdcSeparateThreadItem.setActionCommand("VDCTHREAD")
+    vdcSeparateThreadItem.addActionListener(this)    
+    vdcMenu.add(vdcSeparateThreadItem)
     
     val statusPanelItem = new JCheckBoxMenuItem("MMU status panel enabled")
     statusPanelItem.setSelected(false)
@@ -2060,7 +2060,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         vdcDisplayFrame.pack
         vdcDisplayFrame.setResizable(false)
         vdcDisplayFrame.setVisible(true)
-        vdc.clk.play
+        vdc.play
       }
     }) 
     SwingUtilities.invokeLater(new Runnable {
