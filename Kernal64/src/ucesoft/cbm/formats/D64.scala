@@ -5,7 +5,6 @@ import scala.collection.mutable.ListBuffer
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.bus.BusDataIterator
 import java.util.StringTokenizer
-import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps 
 import ucesoft.cbm.peripheral.drive.Floppy
 
@@ -14,7 +13,7 @@ object D64 {
     val DEL, SEQ, PRG, USR, REL = Value
   }
   case class DirEntry(fileType: FileType.Value, fileName: String, t: Int, s: Int, sizeInSectors: Int)
-  case class BamInfo(diskName: String, diskID: String, dosType: String)
+  case class BamInfo(diskName: String, diskID: String, dosType: String,singleSide:Boolean=true)
   case class FileData(fileName: String, startAddress: Int, data: Array[Int]) {
     def iterator = {
       val buffer = if (startAddress != -1) Array.ofDim[Int](data.length + 2) else data
@@ -57,39 +56,61 @@ object D64 {
     fileNameToSearch.length == fileName.length
   }
 
+  // D64
   private val DISK_SIZE_40_TRACKS = 196608
   private val DISK_SIZE_35_TRACKS = 174848
   private val DISK_SIZE_35_TRACKS_WITH_ERRORS = 175531
   private val DISK_SIZE_40_TRACKS_WITH_ERRORS = 197376
+  // D71
+  private val D71_DISK_SIZE_70_TRACKS = 349696
+  private val D71_DISK_SIZE_70_TRACKS_WITH_ERRORS = 351062
   
   private val BYTES_PER_SECTOR = 256
   private val DIR_TRACK = 18
   private val DIR_SECTOR = 1
   private val BAM_SECTOR = 0
+  /*
+   *     Track       Sec/trk   # Sectors
+        --------------  -------   ---------
+         1-17 (side 0)    21         357
+        18-24 (side 0)    19         133
+        25-30 (side 0)    18         108
+        31-35 (side 0)    17          85
+        36-52 (side 1)    21         357
+        53-59 (side 1)    19         133
+        60-65 (side 1)    18         108
+        66-70 (side 1)    17          85
+                                     ---
+                              total 1366
+   */
   val TRACK_ALLOCATION = // Key = #track => Value = #sectors per track
-    (for (t <- 1 to 40) yield {
-      if (t >= 1 && t <= 17) (t, 21)
-      else if (t >= 18 && t <= 24) (t, 19)
-      else if (t >= 25 && t <= 30) (t, 18)
-      else (t, 17)
+    (for (t <- 1 to 70) yield {
+      if (t <= 17) (t, 21)
+      else if (t <= 24) (t, 19)
+      else if (t <= 30) (t, 18)
+      else if (t <= 35) (t, 17)
+      else if (t <= 52) (t, 21)
+      else if (t <= 59) (t, 19)
+      else if (t <= 65) (t, 18)
+      else (t,17)
     }).toMap
-  val TOTAL_AVAILABLE_SECTORS = 664  
 }
 
 class D64(val file: String,empty:Boolean = false) extends Floppy {
   import D64._
   private[this] val d64 = new RandomAccessFile(file, "rw")
   private[this] val absoluteSectorCache = new collection.mutable.HashMap[Int,Int]
+  private[this] var _bam : BamInfo = if (!empty) bamInfo else null
   
   TOTAL_TRACKS // just to check for a valid track format
+  
   private[this] val GCRImage = {
     val gcr = Array.ofDim[Array[Array[Int]]](TOTAL_TRACKS)
     for(i <- 0 until gcr.length) {
       gcr(i) = Array.ofDim[Array[Int]](TRACK_ALLOCATION(i + 1))
     }
     gcr
-  }
-  private[this] var _bam : BamInfo = if (!empty) bamInfo else null
+  }  
   
   @inline private def absoluteSector(t: Int, s: Int) = {
     val cacheIndex = t << 8 | s
@@ -106,7 +127,13 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   def TOTAL_TRACKS = d64.length match {
     case DISK_SIZE_35_TRACKS|DISK_SIZE_35_TRACKS_WITH_ERRORS => 35
     case DISK_SIZE_40_TRACKS|DISK_SIZE_40_TRACKS_WITH_ERRORS => 40
+    case D71_DISK_SIZE_70_TRACKS | D71_DISK_SIZE_70_TRACKS_WITH_ERRORS => if (_bam.singleSide) 35 else 70
     case _ => if (empty) 35 else throw new IllegalArgumentException("Unsupported D64 file format. size is " + d64.length)
+  }
+  def TOTAL_AVAILABLE_SECTORS = d64.length match {
+    case DISK_SIZE_35_TRACKS|DISK_SIZE_35_TRACKS_WITH_ERRORS => 683 - 19 // 18 for directory 1 for bam
+    case DISK_SIZE_40_TRACKS|DISK_SIZE_40_TRACKS_WITH_ERRORS => 768 - 19
+    case D71_DISK_SIZE_70_TRACKS | D71_DISK_SIZE_70_TRACKS_WITH_ERRORS => 1366 - 19 * 2
   }
   
   def bam = _bam
@@ -126,6 +153,8 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
       case DISK_SIZE_40_TRACKS_WITH_ERRORS =>
         d64.seek(DISK_SIZE_40_TRACKS + absoluteSector(t,s))
         Some(d64.read)
+      case D71_DISK_SIZE_70_TRACKS => None
+      case D71_DISK_SIZE_70_TRACKS_WITH_ERRORS => None // TODO
     }
   }
   
@@ -186,7 +215,9 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
     buffer
   }
 
-  private def bamInfo = {
+  private def bamInfo = {    
+    d64.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 3)
+    val singleSide = d64.read == 0
     d64.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)
     val diskName = new StringBuilder
     var i = 0
@@ -199,24 +230,20 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
     val diskID = "" + d64.readByte.toChar + d64.readByte.toChar
     d64.skipBytes(1)
     val dosType = "" + d64.readByte.toChar + d64.readByte.toChar
-    BamInfo(diskName.toString, diskID, dosType)
+    BamInfo(diskName.toString, diskID, dosType,singleSide)
   }
 
-  def loadInMemory(mem: Memory, fileName: String, relocate: Boolean) = {
+  def loadInMemory(mem: Memory, fileName: String, relocate: Boolean,c64Mode:Boolean=true) = {
     load(fileName) match {
       case FileData(fn, startAddress, data) =>
         val initialAddress = relocate match {
           case true => startAddress
-          case false => mem.read(43) + mem.read(44) * 256
+          case false => ProgramLoader.startBASICAddress(mem,c64Mode)
         }
         for (m <- initialAddress until initialAddress + data.length) mem.write(m, data(m - initialAddress))
         val endAddress = initialAddress + data.length
         println("Loaded " + fn + " from " + initialAddress + " to " + endAddress)
-        mem.write(45, endAddress % 256)	  // Pointer to the Start of the BASIC Variable Storage Area
-        mem.write(46, endAddress / 256)   //
-        mem.write(0xAE, endAddress % 256) // Pointer to Ending Address of Load (End of Program)
-        mem.write(0xAF, endAddress / 256) //
-        mem.write(0xBA,8)	// Current Device Number
+        ProgramLoader.updateBASICPointers(mem,initialAddress, endAddress,c64Mode)
         endAddress
     }
   }
