@@ -7,7 +7,6 @@ import java.awt.event._
 import java.awt._
 import ucesoft.cbm.expansion.ExpansionPort
 import ucesoft.cbm.formats._
-import ucesoft.cbm.peripheral.sid.SID
 import ucesoft.cbm.formats.ExpansionPortFactory
 import ucesoft.cbm.trace.TraceListener
 import ucesoft.cbm.trace.TraceDialog
@@ -17,7 +16,6 @@ import ucesoft.cbm.peripheral.bus.IECBus
 import java.io._
 import javax.swing.filechooser.FileFilter
 import ucesoft.cbm.peripheral.drive.C1541Emu
-import ucesoft.cbm.peripheral.drive.DriveLedListener
 import java.util.Properties
 import ucesoft.cbm.peripheral.controlport.JoystickSettingDialog
 import ucesoft.cbm.peripheral.controlport.Joysticks._
@@ -29,9 +27,6 @@ import ucesoft.cbm.util.D64Canvas
 import ucesoft.cbm.util.T64Canvas
 import ucesoft.cbm.util.C64FileView
 import ucesoft.cbm.peripheral.c2n.Datassette
-import ucesoft.cbm.peripheral.c2n.DatassetteState
-import java.awt.geom.Path2D
-import ucesoft.cbm.peripheral.c2n.DatassetteListener
 import ucesoft.cbm.util.AboutCanvas
 import ucesoft.cbm.peripheral.bus.BusSnoop
 import ucesoft.cbm.peripheral.printer.MPS803
@@ -40,8 +35,6 @@ import ucesoft.cbm.peripheral.printer.MPS803ROM
 import ucesoft.cbm.cpu.CPU6510.CPUJammedException
 import ucesoft.cbm.util.VolumeSettingsPanel
 import ucesoft.cbm.expansion.REU
-import ucesoft.cbm.trace.BreakType
-import ucesoft.cbm.peripheral.sid.SIDDevice
 import ucesoft.cbm.peripheral.rs232._
 import ucesoft.cbm.util.RS232StatusPanel
 import ucesoft.cbm.peripheral.drive.LocalDrive
@@ -94,6 +87,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   private[this] val mem = new C64MMU.MAIN_MEMORY
   private[this] val cpu = CPU6510.make(mem)  
   private[this] var vicChip : vic.VIC = _
+  private[this] var cia1,cia2 : CIA = _
   private[this] val sid = new ucesoft.cbm.peripheral.sid.SID
   private[this] var display : vic.Display = _
   private[this] val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
@@ -280,7 +274,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     add(cia1CP2)
     add(irqSwitcher)    
     // CIAs
-    val cia1 = new CIA("CIA1",
+    cia1 = new CIA("CIA1",
     				   0xDC00,
     				   cia1CP1,
     				   cia1CP2,
@@ -290,7 +284,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     add(cia2CP1)
     add(cia2CP2)
     add(nmiSwitcher)    
-    val cia2 = new CIA("CIA2",
+    cia2 = new CIA("CIA2",
     				   0xDD00,
     				   cia2CP1,
     				   cia2CP2,
