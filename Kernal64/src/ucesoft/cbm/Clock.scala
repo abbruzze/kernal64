@@ -1,6 +1,5 @@
 package ucesoft.cbm
 
-import scala.collection.mutable.ListBuffer
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
