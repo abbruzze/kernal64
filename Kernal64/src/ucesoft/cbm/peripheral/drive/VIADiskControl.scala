@@ -6,7 +6,6 @@ import ucesoft.cbm.cpu.CPU6510
 import ucesoft.cbm.ClockEvent
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
-import javax.swing.JFrame
 
 class VIADiskControl(var cpu: CPU6510,
   					 irqAction: (Boolean) => Unit,
