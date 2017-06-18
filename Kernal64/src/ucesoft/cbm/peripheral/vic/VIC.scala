@@ -3,15 +3,9 @@ package ucesoft.cbm.peripheral.vic
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.Chip
 import ucesoft.cbm.ChipID
-import ucesoft.cbm.Log
 import ucesoft.cbm.Clock
 import ucesoft.cbm.ClockEvent
-import java.awt.Image
-import java.awt.geom.Rectangle2D
 import Palette._
-import java.awt.Graphics2D
-import java.awt.event.ActionEvent
-import java.util.Arrays
 import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.cpu.RAMComponent
@@ -704,7 +698,7 @@ final class VIC(mem: VICMemory,
   def init {
     add(BorderShifter)
     add(GFXShifter)
-    sprites foreach { add _ }    
+    sprites foreach { add _ }        
   }
 
   override def getProperties = {    
