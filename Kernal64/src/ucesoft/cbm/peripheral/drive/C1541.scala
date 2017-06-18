@@ -6,10 +6,8 @@ import ucesoft.cbm.cpu.CPU6510
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.Clock
 import ucesoft.cbm.trace.TraceListener
-import ucesoft.cbm.formats.D64
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.cpu.CPU6510_CE
 import ucesoft.cbm.trace.BreakType
 import java.io.PrintWriter
 import java.io.ObjectOutputStream
