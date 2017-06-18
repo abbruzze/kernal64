@@ -9,7 +9,6 @@ import javax.swing.JFrame
 import ucesoft.cbm.cpu.ROM
 import ucesoft.cbm.expansion.ExpansionPortConfigurationListener
 import ucesoft.cbm.c64.ExtendedROM
-import ucesoft.cbm.c64.C64MMU
 import ucesoft.cbm.Log
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.vic.VIC
@@ -21,6 +20,7 @@ import ucesoft.cbm.peripheral.vdc.VDC
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.vic.VICMemory
 import ucesoft.cbm.cpu.Z80
+import ucesoft.cbm.cpu.Memory
 
 trait MMUChangeListener {
   def frequencyChanged(f:Int) // 1 or 2
@@ -65,8 +65,9 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   final private[this] val ROMH = new ExtendedROM(ram,"ROMH",BASIC64_ADDR)
   final private[this] val ROMH_ULTIMAX = new ExtendedROM(ram,"ROMH_ULTIMAX",KERNAL64_ADDR)
   // 128  
+  final private[this] val KERNAL_ROM = System.getProperty("kernal")
   final private[this] val BASIC128_ROM = new ROM(ram,"BASIC128_LOW_HI",BASIC_LOW_ADDR,0x8000,"roms/128/basic.rom")
-  final private[this] val KERNAL128_ROM = new ROM(ram, "KERNAL128", KERNAL_ADDR, 0x4000,"roms/128/kernal.rom")
+  final private[this] val KERNAL128_ROM = new ROM(ram, "KERNAL128", KERNAL_ADDR, 0x4000,if (KERNAL_ROM != null) KERNAL_ROM else "roms/128/kernal.rom")
   final private[this] val CHARACTERS128_ROM = new ROM(ram, "CHARACTERS128", CHARACTERS128_ADDR, 0x1000, "roms/128/characters.rom",0x1000)
   private[this] var c128Mode = true
   private[this] val expansionPort = ExpansionPort.getExpansionPort
@@ -109,7 +110,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // Internal & External function ROM =========================================================
   private[this] var internalFunctionROM_mid,internalFunctionROM_high,externalFunctionROM_mid,externalFunctionROM_high : Array[Int] = _
   // ==========================================================================================
-  
+  def getBank0RAM : Memory = ram.getBank0
   def colorRAM = COLOR_RAM
   def RAM = ram
   def CHAR_ROM = CHARACTERS128_ROM
