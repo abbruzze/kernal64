@@ -80,28 +80,22 @@ class CIATimerA2(ciaName: String,
 
   final def writeHi(hi: Int) {
     latch = ((hi & 0xFF) << 8) | (latch & 0x00FF)
-    if (!started || (cr & 0x10) > 0) counter = latch
+    if (!started) counter = latch
     Log.debug(s"${ciaName}-${id} set counter hi to ${hi} latch=${latch}")
     //println(s"${ciaName}-${id} set counter hi to ${hi} latch=${latch} prev=${prev}")
   }
 
-  final def readLo = {
-   val cycles = systemClock.currentCycles
-   var adjCycles = (if (!countExternal && started && cycles > startCycle) cycles - startCycle else 0).toInt
-   if (counter - adjCycles < 0) {
-     println(s"[$EVENT_ID] BAD COUNTER: delta=${counter - adjCycles} counter=$counter startCycle=$startCycle cycle=$cycles")
-     adjCycles = counter
-   }
-   (counter - adjCycles) & 0xFF 
-  }
-  final def readHi = {
+  final def readLo = getCounter & 0xFF  
+  final def readHi = getCounter >> 8
+  
+  @inline private def getCounter : Int = {
     val cycles = systemClock.currentCycles
-    var adjCycles = (if (!countExternal && started && cycles > startCycle) cycles - startCycle else 0).toInt
-    if (counter - adjCycles < 0) {
-     println(s"[$EVENT_ID] BAD COUNTER: delta=${counter - adjCycles} counter=$counter startCycle=$startCycle cycle=$cycles")
-     adjCycles = counter
-   }
-    ((counter - adjCycles) >> 8) & 0xFF
+    if (!started || countExternal || cycles < startCycle) counter
+    else {
+      val elapsed = cycles - startCycle
+      val actualCounter = ((counter - elapsed).asInstanceOf[Int] & 0xFFFF)
+      if (actualCounter > 0) actualCounter else 0
+    }
   }
 
   final def readCR = (cr & 0xEE) | (if (started) 1 else 0) // we mask the reload bit
@@ -114,11 +108,11 @@ class CIATimerA2(ciaName: String,
     val reload = (cr & 0x10) == 0x10
     countSystemClock = (value & 0x20) == 0 
     // bit 1,2 and 5 ignored
-    handleCR567
-    enableTimer(startTimer)
+    handleCR567    
     if (reload) {
       counter = latch // reload immediately
     }
+    enableTimer(startTimer,reload)
     Log.debug(s"${ciaName}-${id} control register set to ${cr} latch=${latch}")
   }
 
@@ -127,35 +121,38 @@ class CIATimerA2(ciaName: String,
   private[this] val underflowCallback = underflow _
   private[this] val toggleToFalse = (cycles:Long) => { toggleValue = false }
   
-  @inline private def reschedule(delay:Int) {
+  @inline private def reschedule(delay:Int,count:Int) {
     val cycles = systemClock.currentCycles
     startCycle = cycles + delay
-    val zeroCycle = startCycle + latch
+    val zeroCycle = startCycle + count
     
     systemClock.schedule(new ClockEvent(EVENT_ID,zeroCycle,underflowCallback,UNDERFLOW_SUBID))
   }
 
-  private def enableTimer(enabled: Boolean) {
-    if (!started && enabled) {
-      if (!countExternal) reschedule(START_DELAY)
+  private def enableTimer(enabled: Boolean,reload:Boolean) {
+    if (!started && enabled) { // start from stopped
+      if (!countExternal) reschedule(START_DELAY,counter)
     } 
     else 
-    if (started && enabled) {
-      systemClock.cancel(EVENT_ID)
-      if (!countExternal) reschedule(START_DELAY)
+    if (started && enabled) { // start from started
+      if (reload) {
+        systemClock.cancel(EVENT_ID)
+        if (!countExternal) reschedule(START_DELAY,counter)
+      }
     }
     else
-    if (!enabled) {
+    if (started && !enabled) { // stop timer from started
       systemClock.cancel(EVENT_ID)
-      if (started && !countExternal && countSystemClock) counter = (counter - (systemClock.currentCycles - startCycle).toInt) & 0xFFFF      
+      if (started && !countExternal && countSystemClock) counter = getCounter      
     }
 
     started = enabled
   }
 
-  private def externalNotify = if (countExternal && started) {
-    if (counter <= 0) underflow(systemClock.currentCycles)
-    else counter -= 1
+  private def externalUnderflow = if (countExternal && started) {
+    counter -= 1
+    if (counter == 0) underflow(systemClock.currentCycles)
+    //else counter -= 1
   }
   protected def setCountExternal(enabled: Boolean) {
     countExternal = enabled
@@ -179,12 +176,12 @@ class CIATimerA2(ciaName: String,
     }
     timerToNotify match {
       case None =>
-      case Some(tm) => tm.externalNotify
+      case Some(tm) => tm.externalUnderflow
     }
 
     irqAction(id)
     if (oneShot) started = false
-    else if (!countExternal) reschedule(START_CONT_DELAY)
+    else if (!countExternal) reschedule(START_CONT_DELAY,counter)
   }
   // state
   protected def saveState(out:ObjectOutputStream) {
