@@ -36,6 +36,19 @@ private[c128] class C128RAM extends RAMComponent {
   // page 0 & 1 ------------------------------------
   private[this] var page_0,page_1,page_0_bank,page_1_bank = 0
   // -----------------------------------------------
+  private object Bank0 extends Memory {
+    val isRom = false
+    val length = 0x10000
+    val startAddress = 0
+    val name = "RAM_bank0"
+    
+    def init {}
+    def isActive = true  
+    def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(0)(address)
+    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(0)(address) = value
+  }
+  
+  def getBank0 : Memory = Bank0
   
    override def getProperties = {
     super.getProperties
