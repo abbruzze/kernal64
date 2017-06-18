@@ -16,16 +16,13 @@ class T64(file: String) {
   def close = t64.close
   def tapeName = _tapeName
 
-  def loadInMemory(mem: Memory, entry: T64Entry) {
+  def loadInMemory(mem: Memory, entry: T64Entry,c64Mode:Boolean=true) {
     t64.seek(entry.offset)
     for (m <- entry.startAddress until entry.startAddress + entry.length) mem.write(m, read)
     
     val endAddress = entry.startAddress + entry.length
     println("Loaded " + entry.fileName + " from " + entry.startAddress + " to " + endAddress)
-    mem.write(45, endAddress % 256)
-    mem.write(46, endAddress / 256)
-    mem.write(0xAE, endAddress % 256)
-    mem.write(0xAF, endAddress / 256)
+    ProgramLoader.updateBASICPointers(mem,entry.startAddress,endAddress,c64Mode)
   }
 
   private def read = t64.read & 0xFF
