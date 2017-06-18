@@ -4,8 +4,6 @@ import ucesoft.cbm.peripheral.bus.IECBusListener
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.peripheral.bus.IECBusLine
-import ucesoft.cbm.Log
-import ucesoft.cbm.Clock
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 
