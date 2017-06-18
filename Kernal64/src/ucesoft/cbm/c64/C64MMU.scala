@@ -1,12 +1,10 @@
 package ucesoft.cbm.c64
 
 import ucesoft.cbm.cpu._
-import java.io.IOException
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.Log
 import ucesoft.cbm.expansion.ExpansionPort
 import ucesoft.cbm.expansion.ExpansionPortConfigurationListener
-import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.Clock
