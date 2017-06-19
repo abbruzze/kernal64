@@ -298,14 +298,14 @@ class VDC extends RAMComponent {
       case 11 => // R11 Cursor End Scan
         if (debug) println(s"VDC R11 Cursor End Scan: $value")
       case 12|13 => // R12  Display Start Address hi, R13  Display Start Address lo
-        ram_adr = (regs(12) << 8 | regs(13))
+        //ram_adr = (regs(12) << 8 | regs(13))
         if (debug) println(s"VDC: new Screen Address($address_reg): ${Integer.toHexString(regs(12) << 8 | regs(13))}")
         // TODO to be update on the next line
       case 14|15 =>  // REG 14-5 Cursor location HI/LO
         cursor_pos = regs(14) << 8 | regs(15)
         //if (debug) println(s"VDC: new cursor pos($address_reg): ${Integer.toHexString(cursor_pos)}")
       case 20|21 => // REG 20-1 Attribute Start Address hi/lo
-        attr_adr = regs(20) << 8 | regs(21)
+        //attr_adr = regs(20) << 8 | regs(21)
         if (debug) println(s"VDC: new Attribute Address($address_reg): ${Integer.toHexString(attr_adr)}")
         // TODO to be update on the next line
       case 22 => // REG 22 Character Horizontal Size Control
@@ -494,6 +494,10 @@ class VDC extends RAMComponent {
     if (useCacheForNextFrame) {
       if ((regs(25) & 0x80) == 0) useCacheForNextFrame = !(change || cursor_change) // text mode
     }    
+    
+    // update video & attributes address for the next frame
+    ram_adr = regs(12) << 8 | regs(13)
+    attr_adr = regs(20) << 8 | regs(21)
   }
   
   @inline private def drawTextLine {
