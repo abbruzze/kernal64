@@ -108,11 +108,12 @@ class CIATimerA2(ciaName: String,
     val reload = (cr & 0x10) == 0x10
     countSystemClock = (value & 0x20) == 0 
     // bit 1,2 and 5 ignored
+    val currentCountExternal = countExternal
     handleCR567    
     if (reload) {
       counter = latch // reload immediately
     }
-    enableTimer(startTimer,reload)
+    enableTimer(startTimer,reload,currentCountExternal)
     Log.debug(s"${ciaName}-${id} control register set to ${cr} latch=${latch}")
   }
 
@@ -129,7 +130,7 @@ class CIATimerA2(ciaName: String,
     systemClock.schedule(new ClockEvent(EVENT_ID,zeroCycle,underflowCallback,UNDERFLOW_SUBID))
   }
 
-  private def enableTimer(enabled: Boolean,reload:Boolean) {
+  private def enableTimer(enabled: Boolean,reload:Boolean,oldCountExternal:Boolean) {
     if (!started && enabled) { // start from stopped
       if (!countExternal) reschedule(START_DELAY,counter)
     } 
@@ -143,14 +144,14 @@ class CIATimerA2(ciaName: String,
     else
     if (started && !enabled) { // stop timer from started
       systemClock.cancel(EVENT_ID)
-      if (started && !countExternal && countSystemClock) counter = getCounter      
+      if (!oldCountExternal && countSystemClock) counter = getCounter      
     }
 
     started = enabled
   }
 
   private def externalUnderflow = if (countExternal && started) {
-    counter -= 1
+    counter = (counter - 1) & 0xFFFF
     if (counter == 0) underflow(systemClock.currentCycles)
     //else counter -= 1
   }
