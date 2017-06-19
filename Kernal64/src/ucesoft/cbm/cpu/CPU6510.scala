@@ -2,16 +2,9 @@ package ucesoft.cbm.cpu
 
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.Chip
-import ucesoft.cbm.Log
 import ucesoft.cbm.trace.TraceListener
-import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.ChipID
-import ucesoft.cbm.trace.BreakType
-import java.io.PrintWriter
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
 
 object CPU6510 {
   class CPUJammedException extends Exception

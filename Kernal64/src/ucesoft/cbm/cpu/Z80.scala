@@ -7,7 +7,6 @@ import java.io.PrintWriter
 import ucesoft.cbm.trace.BreakType
 import ucesoft.cbm.Log
 import ucesoft.cbm.Chip
-import ucesoft.cbm.CBMComponentType
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame

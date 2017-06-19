@@ -7,7 +7,6 @@ import java.awt.Graphics
 import java.net.Socket
 import java.io._
 import java.awt.Dimension
-import java.util.zip.GZIPInputStream
 import java.awt.event.KeyListener
 import java.awt.event.KeyEvent
 import java.awt.Color

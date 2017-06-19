@@ -7,8 +7,6 @@ import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Font
 import java.awt.FlowLayout
-import java.awt.BorderLayout
-import java.awt.Insets
 import java.awt.Component
 
 private class LabelledLed(label:String,labelUp:Boolean,colorON : Color = Color.GREEN,colorOFF : Color = Color.DARK_GRAY) extends JPanel {

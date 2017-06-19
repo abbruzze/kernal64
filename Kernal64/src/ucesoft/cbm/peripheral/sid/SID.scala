@@ -2,13 +2,10 @@ package ucesoft.cbm.peripheral.sid
 
 import resid.{SID => RESID}
 import ucesoft.cbm.Chip
-import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.peripheral.sid.resid.ISIDDefs
 import ucesoft.cbm.Clock
 import ucesoft.cbm.ClockEvent
-import ucesoft.cbm.Log
-import ucesoft.cbm.cpu.RAMComponent
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
