@@ -115,6 +115,16 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   def RAM = ram
   def CHAR_ROM = CHARACTERS128_ROM
   
+  override def getProperties = {
+    properties.setProperty("VIC bank",vicBank.toString)
+    properties.setProperty("RAM bank",ramBank.toString)
+    properties.setProperty("IO access",ioacc.toString)
+    properties.setProperty("Video bank",videoBank.toString)
+    properties.setProperty("VIC base address",Integer.toHexString(vicBaseAddress))
+    properties.setProperty("Char rom active",CHARACTERS128_ROM.isActive.toString)    
+    properties
+  }
+  
   def setKeyboard(keyboard:Keyboard) {
     this.keyboard = keyboard
   }
@@ -122,7 +132,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   final def isIOACC = ioacc
     
   final def init {
-    // TODO      
     if (cia_dc00 == null ||
         cia_dd00 == null ||
         vic == null ||
@@ -178,7 +187,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   
   final def reset {
     Log.info("Resetting 128 main memory ...")
-    // TODO
     _0 = 0
     _1 = read128_1
     c128Mode = true
@@ -754,7 +762,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       }
     }
     else { // 128 mode
-      if ((realAddress & 0x1000) == 0x1000 && vicBank == 0 && CHARACTERS128_ROM.isActive) CHARACTERS128_ROM.read(0xD000 | (address & 0x0FFF),ChipID.VIC)
+      if ((realAddress & 0x3000) == 0x1000 && CHARACTERS128_ROM.isActive) CHARACTERS128_ROM.read(0xD000 | (address & 0x0FFF),ChipID.VIC)
       else ram.read(realAddress,ChipID.VIC)
     }    
   }
