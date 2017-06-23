@@ -49,6 +49,66 @@ object Z80 {
     private[this] var delayInt = false
     private[this] var additionalClockCycles = 0
     
+    // state
+	  def saveState(out:ObjectOutputStream) {
+	  	out.writeInt(A1)
+	  	out.writeInt(B1)
+	  	out.writeInt(C1)
+	  	out.writeInt(D1)
+	  	out.writeInt(E1)
+	  	out.writeInt(F1)
+	  	out.writeInt(H1)
+	  	out.writeInt(L1)
+	  	out.writeInt(A)
+	  	out.writeInt(B)
+	  	out.writeInt(C)
+	  	out.writeInt(D)
+	  	out.writeInt(E)
+	  	out.writeInt(F)
+	  	out.writeInt(H)
+	  	out.writeInt(L)
+	  	out.writeInt(I)
+	  	out.writeInt(R)
+	  	out.writeInt(IX)
+	  	out.writeInt(IY)
+	  	out.writeInt(IFF1)
+	  	out.writeInt(IFF2)
+	  	out.writeInt(PC)
+	  	out.writeInt(SP)
+	  	out.writeBoolean(halted)
+	  	out.writeBoolean(delayInt)
+	  	out.writeInt(additionalClockCycles)
+	  }
+	  def loadState(in:ObjectInputStream) {
+	  	A1 = in.readInt
+	  	B1 = in.readInt
+	  	C1 = in.readInt
+	  	D1 = in.readInt
+	  	E1 = in.readInt
+	  	F1 = in.readInt
+	  	H1 = in.readInt
+	  	L1 = in.readInt
+	  	A = in.readInt
+	  	B = in.readInt
+	  	C = in.readInt
+	  	D = in.readInt
+	  	E = in.readInt
+	  	F = in.readInt
+	  	H = in.readInt
+	  	L = in.readInt
+	  	I = in.readInt
+	  	R = in.readInt
+	  	IX = in.readInt
+	  	IY = in.readInt
+	  	IFF1 = in.readInt
+	  	IFF2 = in.readInt
+	  	PC = in.readInt
+	  	SP = in.readInt
+	  	halted = in.readBoolean
+	  	delayInt = in.readBoolean
+	  	additionalClockCycles = in.readInt
+	  }
+    
     def setAdditionalClockCycles(acs:Int) = additionalClockCycles = acs
     def getAdditionalClockSycles = {
       val acs = additionalClockCycles
@@ -2326,10 +2386,20 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   
   // state
   protected def saveState(out:ObjectOutputStream) {
-    // TODO
+  	out.writeBoolean(irqLow)
+  	out.writeBoolean(nmiLow)
+  	out.writeBoolean(nmiOnNegativeEdge)
+  	out.writeLong(cpuWaitUntil)
+  	out.writeBoolean(busREQ)
+  	ctx.saveState(out)
   }
   protected def loadState(in:ObjectInputStream) {
-    // TODO
+    irqLow = in.readBoolean
+    nmiLow = in.readBoolean
+    nmiOnNegativeEdge = in.readBoolean
+    cpuWaitUntil = in.readLong
+    busREQ = in.readBoolean
+    ctx.loadState(in)
   }
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
