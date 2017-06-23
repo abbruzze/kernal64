@@ -116,6 +116,7 @@ class VDC extends RAMComponent {
   private[this] var attr_offset = 0
   private[this] var ram_adr = 0                     // REG 12/13 ram adr
   private[this] var ypos = 0
+  private[this] var ram_base_ptr,attr_base_ptr = 0
   // -----------------------------------------------------
   private[this] var rasterLine = 0
   private[this] var currentCharScanLine = 0
@@ -126,6 +127,7 @@ class VDC extends RAMComponent {
   private[this] var interlaceMode = false
   private[this] var geometryUpdateListener : (String) => Unit = _
   private[this] var useCacheForNextFrame,writeOnPrevFrame = false
+  private[this] var updateGeometryOnNextFrame = false
   // COLOR PALETTE =======================================
   private[this] val PALETTE = Array(
       0xFF000000,  // 00 Black
@@ -263,20 +265,20 @@ class VDC extends RAMComponent {
         recalculate_xsync
       case 1 => // REG 1 Horizontal Displayed
         if (debug) println(s"VDC: REG 1 Horizontal Displayed: $value")
-        updateGeometry
+        updateGeometryOnNextFrame = true
       case 2 => // REG 2 Horizontal Sync Pos
         if (debug) println(s"VDC: REG 2 Horizontal Sync Pos: $value")
-        updateGeometry
+        updateGeometryOnNextFrame = true
       case 3 => // REG 3 Horizontal/Vertical Sync widths
         if (debug) println(s"VDC: REG 3 Horizontal/Vertical Sync widths: $value")
-        updateGeometry
+        updateGeometryOnNextFrame = true
       case 4 => // REG 4 Vertical Total
         if (debug) println(s"VDC: REG 4 Vertical Total :$value")
       case 5 => // REG 5 Vertical Total Fine Adjust
         if (debug) println(s"VDC: REG 5 Vertical Total Fine Adjust :$value")
       case 6 => // REG 6 Vertical Displayed
         if (debug) println(s"VDC: REG 6 Vertical Displayed: $value")
-        updateGeometry
+        updateGeometryOnNextFrame = true
       case 7 => // REG 7 Vertical Sync Position
         if (debug) println(s"VDC: REG 7 Vertical Sync Position: $value")
       case 8 => // REG 8 Interlace
@@ -285,13 +287,14 @@ class VDC extends RAMComponent {
         display.setInterlaceMode(interlaceMode)
         bitmap = display.displayMem
         nextFrameScreenHeight = if (interlaceMode) SCREEN_HEIGHT << 1 else SCREEN_HEIGHT
-        updateGeometry
+        updateGeometryOnNextFrame = true
       case 9 => // REG 9 Character Total Vertical
-        if (currentCharScanLine == ychars_total) attr_offset += 3
+        //if (currentCharScanLine == ychars_total) attr_offset += 3
         ychars_total = value & 0x1F        
         bytes_per_char = if (ychars_total < 16) 16 else 32
+        if (ychars_total == 0) attr_offset == 3 else attr_offset = 0
         if (debug) println(s"VDC: REG 9 Character Total Vertical: $value ychars_total=$ychars_total bytes_per_char=$bytes_per_char attr_offset=$attr_offset")
-        updateGeometry
+        updateGeometryOnNextFrame = true
         // TODO: check if ychars_total == 0 to emulate 8x1 colour cell VDC trick
       case 10 => // R10  Cursor Mode, Start Scan
         //if (debug) println(s"VDC: R10  Cursor Mode, Start Scan: $value")
@@ -311,7 +314,7 @@ class VDC extends RAMComponent {
       case 22 => // REG 22 Character Horizontal Size Control
         charVisibleWidth = value & 0x0F
         if (debug) println(s"VCD: REG 22 Character Horizontal Size Control: $charVisibleWidth")
-        updateGeometry
+        updateGeometryOnNextFrame = true
       case 23 => // REG 23 Vert. Character Pxl Spc
         ychars_visible = value & 0x1F
         if (debug) println(s"VDC: REG 23 Vert. Character Pxl Spc: $ychars_visible")
@@ -424,11 +427,24 @@ class VDC extends RAMComponent {
     // NEXT RASTER LINE =====================================================
     rasterLine = rasterLine + 1
     if (rasterLine > screenHeight) rasterLine = 0
-    if (videoMode != VideoMode.IDLE) currentCharScanLine += 1
+    val virtualScreenWidth = (regs(1) + regs(27))
+    if (videoMode != VideoMode.IDLE) {     
+      if (videoMode == VideoMode.BITMAP) {
+        if (interlaceMode) {
+          if ((currentCharScanLine & 1) == 1) ram_base_ptr += virtualScreenWidth
+        }
+        else ram_base_ptr += virtualScreenWidth
+      }
+      
+      currentCharScanLine += 1
+    }    
+    
     if (currentCharScanLine > ychars_total) {
       currentCharScanLine = 0
-      ypos += 1
-    }
+      ypos += 1            
+      attr_base_ptr += virtualScreenWidth
+      if (videoMode == VideoMode.TEXT) ram_base_ptr += virtualScreenWidth
+    }    
   }
   
   @inline private def updateGeometry {
@@ -498,6 +514,13 @@ class VDC extends RAMComponent {
     // update video & attributes address for the next frame
     ram_adr = regs(12) << 8 | regs(13)
     attr_adr = regs(20) << 8 | regs(21)
+    ram_base_ptr = ram_adr
+    attr_base_ptr = attr_adr
+    
+    if (updateGeometryOnNextFrame) {
+      updateGeometryOnNextFrame = false
+      updateGeometry
+    }
   }
   
   @inline private def drawTextLine {
@@ -510,8 +533,9 @@ class VDC extends RAMComponent {
     val foregroundColor = PALETTE((regs(26) >> 4) & 0x0F)
     val virtualScreenWidth = (regs(1) + regs(27))
     val yoffset = ypos * virtualScreenWidth
-    var ram_ptr = ram_adr + yoffset
-    var attr_ptr = attr_adr + yoffset
+    
+    var ram_ptr = ram_base_ptr
+    var attr_ptr = attr_base_ptr
     var col = 0
     val doublePixFeature = (regs(25) & 0x10) > 0
     val charWidth = if (doublePixFeature) (regs(22) >> 4) << 1 else 1 + (regs(22) >> 4)     
@@ -608,21 +632,11 @@ class VDC extends RAMComponent {
     val bitmapOffset = rasterLine * SCREEN_WIDTH
     val foregroundColor = PALETTE((regs(26) >> 4) & 0x0F)
     val virtualScreenWidth = (regs(1) + regs(27))
-    val yoffset = if (interlaceMode) {
-      var ofs = (ypos * ((ychars_total + 1) >> 1) + (currentCharScanLine >> 1)) * virtualScreenWidth
-      if ((currentCharScanLine & 1) == 1) ofs += virtualScreenWidth * (visibleScreenHeightPix >> 1)
-      ofs
-    }
-    else (ypos * (ychars_total + 1) + currentCharScanLine) * virtualScreenWidth
+    val interlaceRamOffset = if (interlaceMode && (currentCharScanLine & 1) == 1) virtualScreenWidth * (visibleScreenHeightPix >> 1) else 0
+    val interlaceAttrOffset = if (interlaceMode && (currentCharScanLine & 1) == 1) visibleTextRows * virtualScreenWidth else 0
+    var ram_ptr = ram_base_ptr + interlaceRamOffset
+    var attr_ptr = attr_base_ptr + interlaceAttrOffset + attr_offset
     
-    var ram_ptr = ram_adr + yoffset
-    val attr_yoffset = if (interlaceMode) {
-      var ofs = ypos * virtualScreenWidth
-      if ((currentCharScanLine & 1) == 1) ofs += visibleTextRows * virtualScreenWidth
-      ofs
-    }
-    else ypos * virtualScreenWidth
-    var attr_ptr = attr_adr + attr_yoffset + attr_offset
     var col = 0
     val charWidth =  1 + (regs(22) >> 4)     
     val rightBorderPix = borderWidth + regs(1) * charWidth - (7 - xsmooth)
