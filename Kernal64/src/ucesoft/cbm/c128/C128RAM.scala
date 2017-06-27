@@ -224,13 +224,42 @@ private[c128] class C128RAM extends RAMComponent {
   // state -----------------------------------------------
   
   protected def saveState(out:ObjectOutputStream) {
-    // TODO
+    out.writeBoolean(expanded)
+    out.writeObject(mem(0))
+    out.writeObject(mem(1))
+    if (expanded) {
+      out.writeObject(mem(2))
+      out.writeObject(mem(3))
+    }
+    out.writeInt(processorBank)
+    out.writeInt(VICbank)    
+    out.writeInt(commonAreaSize)
+    out.writeInt(commonArea)
+    out.writeInt(commonAreaBottomLimit)
+    out.writeInt(commonAreaTopLimit)
+    out.writeInt(page_0)
+    out.writeInt(page_1)
+    out.writeInt(page_0_bank)
+    out.writeInt(page_1_bank)
   }
   protected def loadState(in:ObjectInputStream) {
-    // TODO
+    expanded = in.readBoolean    
+    loadMemory[Int](mem(0),in)
+    loadMemory[Int](mem(1),in)
+    if (expanded) {
+      loadMemory[Int](mem(2),in)
+      loadMemory[Int](mem(3),in)
+    }
+    processorBank = in.readInt
+    VICbank = in.readInt    
+    commonAreaSize = in.readInt
+    commonArea = in.readInt
+    commonAreaBottomLimit = in.readInt
+    commonAreaTopLimit = in.readInt
+    page_0 = in.readInt
+    page_1 = in.readInt
+    page_0_bank = in.readInt
+    page_1_bank = in.readInt
   }
-  protected def allowsStateRestoring(parent:JFrame) = {
-    true
-    // TODO
-  }
+  protected def allowsStateRestoring(parent:JFrame) = true
 }
