@@ -390,6 +390,7 @@ object C64MMU {
       exrom = in.readBoolean
       game = in.readBoolean
       memConfig = in.readInt
+      check0001
     }
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
