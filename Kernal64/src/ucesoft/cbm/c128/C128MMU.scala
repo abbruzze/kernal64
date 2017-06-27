@@ -773,10 +773,64 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   final def readPhi2(address:Int) : Int = vicReadPhi1(address)
   // state
   protected def saveState(out:ObjectOutputStream) {
-    // TODO
+    out.writeBoolean(c128Mode)
+    out.writeBoolean(z80enabled)
+    out.writeObject(D500_REGS)
+    out.writeObject(FF00_REGS)
+    out.writeInt(cr_reg)
+    out.writeInt(ramBank)
+    out.writeInt(vicBank)
+    out.writeBoolean(ioacc)
+    out.writeInt(vic_xscan_reg)
+    out.writeInt(vic_clkrate_reg)
+    out.writeInt(_0)
+    out.writeInt(_1)
+    out.writeBoolean(exrom)
+    out.writeBoolean(game)
+    out.writeInt(c64MemConfig)
+    out.writeBoolean(ULTIMAX)
+    out.writeInt(videoBank)
+    out.writeInt(vicBaseAddress)
+    out.writeInt(memLastByteRead)
   }
   protected def loadState(in:ObjectInputStream) {
-    // TODO
+    val old128Mode = c128Mode
+    val oldZ80enabled = z80enabled
+    c128Mode = in.readBoolean
+    z80enabled = in.readBoolean    
+    if (z80enabled != oldZ80enabled) mmuChangeListener.cpuChanged(!z80enabled)
+    if (!c128Mode && old128Mode && !z80enabled) { 
+      mmuChangeListener.c64Mode(true)
+      check64_1
+    }
+    
+    loadMemory[Int](D500_REGS,in)
+    loadMemory[Int](FF00_REGS,in)
+    cr_reg = in.readInt
+    ramBank = in.readInt
+    vicBank = in.readInt
+    ioacc = in.readBoolean
+    vic_xscan_reg = in.readInt
+    keyboard.selectC128ExtendedRow(vic_xscan_reg)
+    
+    val old_clkrate = vic_clkrate_reg & 1
+    vic_clkrate_reg = in.readInt    
+    val clkrate = vic_clkrate_reg & 1
+    if (clkrate != old_clkrate) mmuChangeListener.frequencyChanged(clkrate + 1)
+    vic.c128TestBitEnabled((vic_clkrate_reg & 2) > 0)
+    
+    _0 = in.readInt
+    _1 = in.readInt
+    exrom = in.readBoolean
+    game = in.readBoolean
+    c64MemConfig = in.readInt
+    if (c64MemConfig != -1) c64MC = C64_MEM_CONFIG(c64MemConfig)
+    ULTIMAX = in.readBoolean
+    videoBank = in.readInt
+    vicBaseAddress = in.readInt
+    memLastByteRead = in.readInt
+    check128_1
+    check64_1
   }
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
