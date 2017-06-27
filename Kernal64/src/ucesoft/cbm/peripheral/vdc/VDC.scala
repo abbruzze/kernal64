@@ -87,7 +87,7 @@ class VDC extends RAMComponent {
   private[this] var address_reg = 0
   private[this] val regs = Array.ofDim[Int](37)
   private[this] var vblank = false
-  private[this] var debug = false
+  private[this] val debug = false
   private[this] val vdc_revision = VDC_REVISION_2
   private[this] val reg_mask = Array(0x00, 0x00, 0x00, 0x00, 0x00, 0xE0, 0x00, 0x00,
                                      0xFC, 0xE0, 0x80, 0xE0, 0x00, 0x00, 0x00, 0x00,
@@ -123,7 +123,6 @@ class VDC extends RAMComponent {
   private[this] var visibleScreenHeightPix = 0      // total Y pixels
   private[this] var visibleTextRows = 0             // total rows 
   private[this] var borderHeight,borderWidth = 0    // top char position
-  private[this] var currentCharRowLine = 0          // line inside current row
   private[this] var interlaceMode = false
   private[this] var geometryUpdateListener : (String) => Unit = _
   private[this] var useCacheForNextFrame,writeOnPrevFrame = false
@@ -289,13 +288,11 @@ class VDC extends RAMComponent {
         nextFrameScreenHeight = if (interlaceMode) SCREEN_HEIGHT << 1 else SCREEN_HEIGHT
         updateGeometryOnNextFrame = true
       case 9 => // REG 9 Character Total Vertical
-        //if (currentCharScanLine == ychars_total) attr_offset += 3
         ychars_total = value & 0x1F        
         bytes_per_char = if (ychars_total < 16) 16 else 32
-        if (ychars_total == 0) attr_offset == 3 else attr_offset = 0
+        if (ychars_total == 0) attr_offset == 3
         if (debug) println(s"VDC: REG 9 Character Total Vertical: $value ychars_total=$ychars_total bytes_per_char=$bytes_per_char attr_offset=$attr_offset")
         updateGeometryOnNextFrame = true
-        // TODO: check if ychars_total == 0 to emulate 8x1 colour cell VDC trick
       case 10 => // R10  Cursor Mode, Start Scan
         //if (debug) println(s"VDC: R10  Cursor Mode, Start Scan: $value")
       case 11 => // R11 Cursor End Scan
@@ -303,14 +300,12 @@ class VDC extends RAMComponent {
       case 12|13 => // R12  Display Start Address hi, R13  Display Start Address lo
         //ram_adr = (regs(12) << 8 | regs(13))
         if (debug) println(s"VDC: new Screen Address($address_reg): ${Integer.toHexString(regs(12) << 8 | regs(13))}")
-        // TODO to be update on the next line
       case 14|15 =>  // REG 14-5 Cursor location HI/LO
         cursor_pos = regs(14) << 8 | regs(15)
         //if (debug) println(s"VDC: new cursor pos($address_reg): ${Integer.toHexString(cursor_pos)}")
       case 20|21 => // REG 20-1 Attribute Start Address hi/lo
         //attr_adr = regs(20) << 8 | regs(21)
         if (debug) println(s"VDC: new Attribute Address($address_reg): ${Integer.toHexString(attr_adr)}")
-        // TODO to be update on the next line
       case 22 => // REG 22 Character Horizontal Size Control
         charVisibleWidth = value & 0x0F
         if (debug) println(s"VCD: REG 22 Character Horizontal Size Control: $charVisibleWidth")
@@ -320,7 +315,6 @@ class VDC extends RAMComponent {
         if (debug) println(s"VDC: REG 23 Vert. Character Pxl Spc: $ychars_visible")
       case 24 => // REG 24 Vertical Smooth Scroll + Blink frequency + Screen reverse mode
         if (debug) println(s"VDC: REG 24 Vertical Smooth Scroll: ${value & 0x1F} Blink frequency: ${if ((value & 0x20) > 0) "1/32" else "1/16"} Screen reverse mode: ${if ((value & 0x40) > 0) "reverse" else "normal"}")
-        // TODO: blink frequency
       case 25 => // REG 25 Video mode,Color source,semi-graphics mode, double pixel mode
         if ((value & 0x0F) != (oldValue & 0x0F)) { // Horizontal smooth scroll
           if (vdc_revision == VDC_REVISION_0) xsmooth = ((regs(22) >> 4) - (value & 0x0F)) & 0x0F
@@ -695,13 +689,60 @@ class VDC extends RAMComponent {
   
   // state -----------------------------------------------  
   protected def saveState(out:ObjectOutputStream) {
-    // TODO
+    out.writeObject(ram)
+    out.writeObject(videoMode.id)
+    out.writeInt(screenHeight)
+    out.writeInt(nextFrameScreenHeight)
+    out.writeInt(cycles_per_line)
+    out.writeInt(xchars_total)
+    out.writeInt(ychars_total)
+    out.writeInt(ychars_visible)
+    out.writeInt(bytes_per_char)
+    out.writeInt(cursor_pos)
+    out.writeInt(charVisibleWidth)
+    out.writeInt(xsmooth)
+    out.writeInt(chargen_adr)
+    out.writeInt(attr_adr)
+    out.writeInt(attr_offset)
+    out.writeInt(ram_adr)
+    out.writeInt(ypos)
+    out.writeInt(ram_base_ptr)
+    out.writeInt(attr_base_ptr)
+    out.writeInt(rasterLine)
+    out.writeInt(currentCharScanLine)
+    out.writeInt(visibleScreenHeightPix)
+    out.writeInt(visibleTextRows)
+    out.writeInt(borderHeight)
+    out.writeInt(borderWidth)
+    out.writeBoolean(interlaceMode)
   }
   protected def loadState(in:ObjectInputStream) {
-    // TODO
+    loadMemory[Int](ram,in)
+    videoMode = VideoMode(in.readInt)
+    screenHeight = in.readInt
+    nextFrameScreenHeight = in.readInt
+    cycles_per_line = in.readInt
+    xchars_total = in.readInt
+    ychars_total = in.readInt
+    ychars_visible = in.readInt
+    bytes_per_char = in.readInt
+    cursor_pos = in.readInt
+    charVisibleWidth = in.readInt
+    xsmooth = in.readInt
+    chargen_adr = in.readInt
+    attr_adr = in.readInt
+    attr_offset = in.readInt
+    ram_adr = in.readInt
+    ypos = in.readInt
+    ram_base_ptr = in.readInt
+    attr_base_ptr = in.readInt
+    rasterLine = in.readInt
+    currentCharScanLine = in.readInt
+    visibleScreenHeightPix = in.readInt
+    visibleTextRows = in.readInt
+    borderHeight = in.readInt
+    borderWidth = in.readInt
+    interlaceMode = in.readBoolean
   }
-  protected def allowsStateRestoring(parent:JFrame) = {
-    true
-    // TODO
-  }
+  protected def allowsStateRestoring(parent:JFrame) = true
 }
