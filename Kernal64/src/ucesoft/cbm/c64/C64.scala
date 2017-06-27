@@ -263,7 +263,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     add(new FloppyComponent(8,attachedDisks,drives,driveLeds))
     add(new FloppyComponent(9,attachedDisks,drives,driveLeds))
     // -----------------------
-    val vicMemory = new C64VICMemory(mem,mem.CHAR_ROM)    
+    val vicMemory = new C64VICMemory(mem,mem.CHAR_ROM) 
+    add(vicMemory)
     ExpansionPort.setMemoryForEmptyExpansionPort(vicMemory)
     ExpansionPort.addConfigurationListener(vicMemory)    
     import cia._
