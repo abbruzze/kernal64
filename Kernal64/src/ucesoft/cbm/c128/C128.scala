@@ -42,6 +42,22 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
   private[this] val CONFIGURATION_FRAME_DIM = "frame.dim"
+  private[this] val CONFIGURATION_KEYB_MAP_FILE = "keyb.map.file"
+  
+  private[this] val configuration = {
+    val props = new Properties
+    val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
+    if (propsFile.exists) {
+      try {
+        props.load(new FileReader(propsFile))
+      }
+      catch {
+        case io:IOException =>
+      }
+    }
+    props
+  }
+    
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mmu = new C128MMU(this)
   private[this] val cpu = CPU6510.make(mmu)  
@@ -59,6 +75,30 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private[this] var vdcOnItsOwnThread = false
   private[this] val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
   private[this] val irqSwitcher = new IRQSwitcher(irqRequest _)
+  private[this] val keybMapper : keyboard.KeyboardMapper = {
+    Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)) match {
+      case None =>
+        keyboard.KeyboardMapperStore.loadFromResource("/resources/default_keyboard_c128") match {
+          case None => C128KeyboardMapper
+          case Some(m) =>
+            Log.info("Loaded keyboard configuration file from /resources/default_keyboard_c128")
+            m
+        }
+      case Some(file) =>
+        try {
+          val in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))
+          val m = keyboard.KeyboardMapperStore.load(in)
+          in.close
+          Log.info("Loaded keyboard configuration file from $file")
+          m
+        }
+        catch {
+          case t:Throwable =>
+            Log.info(s"Cannot load keyboard file $file: " + t)
+            C128KeyboardMapper
+        }
+    }
+  }
   private[this] val keyb = new keyboard.Keyboard(C128KeyboardMapper,nmiSwitcher.keyboardNMIAction _,true)	// key listener
   private[this] val vicDisplayFrame = {
     val f = new JFrame("Kernal128 emulator ver. " + ucesoft.cbm.Version.VERSION)
@@ -152,21 +192,6 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   }
   // -------------- AUDIO ----------------------
   private[this] val volumeDialog : JDialog = VolumeSettingsPanel.getDialog(vicDisplayFrame,sid.getDriver)
-  // -------------------------------------------
-  private[this] val configuration = {
-    val props = new Properties
-    val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
-    if (propsFile.exists) {
-      try {
-        props.load(new FileReader(propsFile))
-      }
-      catch {
-        case io:IOException =>
-      }
-    }
-    props
-  }
-  
   // ------------ Control Port -----------------------
   private[this] val gameControlPort = new controlport.GamePadControlPort(configuration)
   private[this] val keypadControlPort = controlport.ControlPort.keypadControlPort
