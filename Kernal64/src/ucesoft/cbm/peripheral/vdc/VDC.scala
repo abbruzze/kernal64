@@ -203,6 +203,10 @@ class VDC extends RAMComponent {
     ychars_total = 7
     regs(9) = 7
     bytes_per_char = 16
+    interlaceMode = false
+    display.setInterlaceMode(false)
+    bitmap = display.displayMem
+    nextFrameScreenHeight = SCREEN_HEIGHT
     play
   }
   
@@ -690,7 +694,8 @@ class VDC extends RAMComponent {
   // state -----------------------------------------------  
   protected def saveState(out:ObjectOutputStream) {
     out.writeObject(ram)
-    out.writeObject(videoMode.id)
+    out.writeObject(regs)
+    out.writeInt(videoMode.id)
     out.writeInt(screenHeight)
     out.writeInt(nextFrameScreenHeight)
     out.writeInt(cycles_per_line)
@@ -718,6 +723,7 @@ class VDC extends RAMComponent {
   }
   protected def loadState(in:ObjectInputStream) {
     loadMemory[Int](ram,in)
+    loadMemory[Int](regs,in)
     videoMode = VideoMode(in.readInt)
     screenHeight = in.readInt
     nextFrameScreenHeight = in.readInt
@@ -743,6 +749,7 @@ class VDC extends RAMComponent {
     borderHeight = in.readInt
     borderWidth = in.readInt
     interlaceMode = in.readBoolean
+    play
   }
   protected def allowsStateRestoring(parent:JFrame) = true
 }
