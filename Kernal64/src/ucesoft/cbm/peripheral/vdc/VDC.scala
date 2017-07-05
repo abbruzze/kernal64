@@ -298,7 +298,7 @@ class VDC extends RAMComponent {
         if (debug) println(s"VDC: REG 9 Character Total Vertical: $value ychars_total=$ychars_total bytes_per_char=$bytes_per_char attr_offset=$attr_offset")
         updateGeometryOnNextFrame = true
       case 10 => // R10  Cursor Mode, Start Scan
-        //if (debug) println(s"VDC: R10  Cursor Mode, Start Scan: $value")
+        if (debug) println(s"VDC: R10  Cursor Mode, Start Scan: $value")
       case 11 => // R11 Cursor End Scan
         if (debug) println(s"VDC R11 Cursor End Scan: $value")
       case 12|13 => // R12  Display Start Address hi, R13  Display Start Address lo
@@ -543,8 +543,8 @@ class VDC extends RAMComponent {
     var char_col = 0
     val useAttributes = (regs(25) & 0x40) > 0
     val cursorMode = regs(10) & 0x60
-    val cursorTopLine = regs(10) & 0x0F
-    val cursorBottomLine = regs(11) & 0x0F
+    val cursorTopLine = regs(10) & 0x1F
+    val cursorBottomLine = regs(11) & 0x1F
     val semigraphicMode = (regs(25) & 0x20) > 0    
     
     while (col < xchars_total) {      
