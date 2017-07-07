@@ -7,14 +7,14 @@ import CKey._
 object C64KeyboardMapper extends KeyboardMapper {
   val cmap = Map(
     'ù' -> (EQUAL,false),
-    '§' -> (EQUAL,true),
     'è' -> (STAR,false),
-    'é' -> (EXP,true),
+    'é' -> (STAR,true),
     'à' -> (SEMICOL,false),
     '°' -> (SEMICOL,true),
     'ò' -> (COLON,false),
     'ç' -> (COLON,true),
-    'ì' -> (MINUS,false)
+    'ì' -> (MINUS,false),
+    '^' -> (MINUS,true)
       )
   val map = Map(
     // row 0
