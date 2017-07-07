@@ -10,9 +10,11 @@ object C128KeyboardMapper extends KeyboardMapper {
       VK_F11 -> TAB,
       VK_SCROLL_LOCK -> NO_SCROLL,
       VK_F8 -> ESC,
-      VK_PAGE_UP -> ALT,
+      VK_PAGE_DOWN -> ALT,
       VK_PAUSE -> LINE_FEED,
-      VK_F12 -> HELP
+      VK_F12 -> HELP,
+      VK_F9 -> _40_80,
+      VK_CAPS_LOCK -> CAPS_LOCK
   )
   val keypad_map = Map(
       VK_NUMPAD1 -> KEYPAD_N_1,
