@@ -65,6 +65,7 @@ import ucesoft.cbm.misc.TapeState
 import ucesoft.cbm.misc.IRQSwitcher
 import ucesoft.cbm.misc.NMISwitcher
 import ucesoft.cbm.misc.DNDHandler
+import ucesoft.cbm.misc.KeyboardEditor
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -83,6 +84,20 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
   private[this] val CONFIGURATION_FRAME_DIM = "frame.dim"
+  private[this] val CONFIGURATION_KEYB_MAP_FILE = "keyb.map.file"
+  private[this] val configuration = {
+    val props = new Properties
+    val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
+    if (propsFile.exists) {
+      try {
+        props.load(new FileReader(propsFile))
+      }
+      catch {
+        case io:IOException =>
+      }
+    }
+    props
+  }
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mem = new C64MMU.MAIN_MEMORY
   private[this] val cpu = CPU6510.make(mem)  
@@ -92,7 +107,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   private[this] var display : vic.Display = _
   private[this] val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
   private[this] val irqSwitcher = new IRQSwitcher(cpu.irqRequest _)
-  private[this] val keyb = new keyboard.Keyboard(C64KeyboardMapper,nmiSwitcher.keyboardNMIAction _)	// key listener
+  private[this] val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c64",C64KeyboardMapper)
+  private[this] val keyb = new keyboard.Keyboard(keybMapper,nmiSwitcher.keyboardNMIAction _)	// key listener
   private[this] val displayFrame = {
     val f = new JFrame("Kernal64 emulator ver. " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
@@ -175,21 +191,6 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   }
   // -------------- AUDIO ----------------------
   private[this] val volumeDialog : JDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
-  // -------------------------------------------
-  private[this] val configuration = {
-    val props = new Properties
-    val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
-    if (propsFile.exists) {
-      try {
-        props.load(new FileReader(propsFile))
-      }
-      catch {
-        case io:IOException =>
-      }
-    }
-    props
-  }
-  
   // ------------ Control Port -----------------------
   private[this] val gameControlPort = new controlport.GamePadControlPort(configuration)
   private[this] val keypadControlPort = controlport.ControlPort.keypadControlPort
@@ -677,6 +678,46 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         loadState
       case "ZIP" =>
         attachZip
+        case "KEYB_EDITOR" =>
+        val source = configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE,"default")
+        val kbef = new JFrame(s"Keyboard editor ($source)")
+        val kbe = new KeyboardEditor(keybMapper,true)
+        kbef.getContentPane.add("Center",kbe)
+        kbef.pack
+        kbef.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
+        kbef.setVisible(true)
+      case "LOAD_KEYB" =>
+        loadKeyboard
+    }
+  }
+  
+  private def loadKeyboard {
+    JOptionPane.showConfirmDialog(displayFrame,"Would you like to set default keyboard or load a configuration from file ?","Keyboard layout selection", JOptionPane.YES_NO_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE) match {
+      case JOptionPane.YES_OPTION =>
+        configuration.remove(CONFIGURATION_KEYB_MAP_FILE)
+        JOptionPane.showMessageDialog(displayFrame,"Reboot the emulator to activate the new keyboard", "Keyboard..",JOptionPane.INFORMATION_MESSAGE)
+      case JOptionPane.NO_OPTION =>
+        val fc = new JFileChooser
+        fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+        fc.setDialogTitle("Choose a keyboard layout")
+        fc.showOpenDialog(displayFrame) match {
+          case JFileChooser.APPROVE_OPTION =>
+            val in = new BufferedReader(new InputStreamReader(new FileInputStream(fc.getSelectedFile)))
+            try {
+              keyboard.KeyboardMapperStore.load(in)
+              configuration.setProperty(CONFIGURATION_KEYB_MAP_FILE,fc.getSelectedFile.toString)
+              JOptionPane.showMessageDialog(displayFrame,"Reboot the emulator to activate the new keyboard", "Keyboard..",JOptionPane.INFORMATION_MESSAGE)
+            }
+            catch {
+              case _:IllegalArgumentException =>
+                JOptionPane.showMessageDialog(displayFrame,"Invalid keyboard layout file", "Keyboard..",JOptionPane.ERROR_MESSAGE)
+            }
+            finally {
+              in.close
+            }
+          case _ =>
+        }
+      case JOptionPane.CANCEL_OPTION =>
     }
   }
   
@@ -1448,6 +1489,20 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     traceMenu.add(inspectItem)
     
     // settings
+    
+    val keybMenu = new JMenu("Keyboard")
+    optionMenu.add(keybMenu)
+    
+    val keybEditorItem = new JMenuItem("Keyboard editor ...")
+    keybEditorItem.setActionCommand("KEYB_EDITOR")
+    keybEditorItem.addActionListener(this)
+    keybMenu.add(keybEditorItem)
+    val loadKeybItem = new JMenuItem("Set keyboard layout ...")
+    loadKeybItem.setActionCommand("LOAD_KEYB")
+    loadKeybItem.addActionListener(this)
+    keybMenu.add(loadKeybItem)
+    
+    optionMenu.addSeparator
     
     val volumeItem = new JMenuItem("Volume settings ...")
     volumeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V,java.awt.Event.ALT_MASK))

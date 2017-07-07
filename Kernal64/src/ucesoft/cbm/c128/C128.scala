@@ -75,31 +75,8 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private[this] var vdcOnItsOwnThread = false
   private[this] val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
   private[this] val irqSwitcher = new IRQSwitcher(irqRequest _)
-  private[this] val keybMapper : keyboard.KeyboardMapper = {
-    Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)) match {
-      case None =>
-        keyboard.KeyboardMapperStore.loadFromResource("/resources/default_keyboard_c128") match {
-          case None => C128KeyboardMapper
-          case Some(m) =>
-            Log.info("Loaded keyboard configuration file from /resources/default_keyboard_c128")
-            m
-        }
-      case Some(file) =>
-        try {
-          val in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))
-          val m = keyboard.KeyboardMapperStore.load(in)
-          in.close
-          Log.info("Loaded keyboard configuration file from $file")
-          m
-        }
-        catch {
-          case t:Throwable =>
-            Log.info(s"Cannot load keyboard file $file: " + t)
-            C128KeyboardMapper
-        }
-    }
-  }
-  private[this] val keyb = new keyboard.Keyboard(C128KeyboardMapper,nmiSwitcher.keyboardNMIAction _,true)	// key listener
+  private[this] val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c128",C128KeyboardMapper)
+  private[this] val keyb = new keyboard.Keyboard(keybMapper,nmiSwitcher.keyboardNMIAction _,true)	// key listener
   private[this] val vicDisplayFrame = {
     val f = new JFrame("Kernal128 emulator ver. " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
@@ -457,7 +434,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     if (z80Active) z80.clock(cycles,2) 
     else {
       cpu.fetchAndExecute(1)
-      if (cpuFrequency == 2 && !mmu.isIOACC) cpu.fetchAndExecute(1)
+      if (cpuFrequency == 2 && !mmu.isIOACC) cpu.fetchAndExecute(1)      
     }
   }
   
@@ -764,6 +741,46 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       case "VDCTHREAD" =>
         vdcOnItsOwnThread = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         if (vdcOnItsOwnThread) vdc.setOwnThread else vdc.stopOwnThread
+      case "KEYB_EDITOR" =>
+        val source = configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE,"default")
+        val kbef = new JFrame(s"Keyboard editor ($source)")
+        val kbe = new KeyboardEditor(keybMapper,false)
+        kbef.getContentPane.add("Center",kbe)
+        kbef.pack
+        kbef.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
+        kbef.setVisible(true)
+      case "LOAD_KEYB" =>
+        loadKeyboard
+    }
+  }
+  
+  private def loadKeyboard {
+    JOptionPane.showConfirmDialog(vicDisplayFrame,"Would you like to set default keyboard or load a configuration from file ?","Keyboard layout selection", JOptionPane.YES_NO_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE) match {
+      case JOptionPane.YES_OPTION =>
+        configuration.remove(CONFIGURATION_KEYB_MAP_FILE)
+        JOptionPane.showMessageDialog(vicDisplayFrame,"Reboot the emulator to activate the new keyboard", "Keyboard..",JOptionPane.INFORMATION_MESSAGE)
+      case JOptionPane.NO_OPTION =>
+        val fc = new JFileChooser
+        fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+        fc.setDialogTitle("Choose a keyboard layout")
+        fc.showOpenDialog(vicDisplayFrame) match {
+          case JFileChooser.APPROVE_OPTION =>
+            val in = new BufferedReader(new InputStreamReader(new FileInputStream(fc.getSelectedFile)))
+            try {
+              keyboard.KeyboardMapperStore.load(in)
+              configuration.setProperty(CONFIGURATION_KEYB_MAP_FILE,fc.getSelectedFile.toString)
+              JOptionPane.showMessageDialog(vicDisplayFrame,"Reboot the emulator to activate the new keyboard", "Keyboard..",JOptionPane.INFORMATION_MESSAGE)
+            }
+            catch {
+              case _:IllegalArgumentException =>
+                JOptionPane.showMessageDialog(vicDisplayFrame,"Invalid keyboard layout file", "Keyboard..",JOptionPane.ERROR_MESSAGE)
+            }
+            finally {
+              in.close
+            }
+          case _ =>
+        }
+      case JOptionPane.CANCEL_OPTION =>
     }
   }
   
@@ -1595,11 +1612,25 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     statusPanelItem.addActionListener(this)    
     optionMenu.add(statusPanelItem)
     
+    optionMenu.addSeparator
+    
+    val keybMenu = new JMenu("Keyboard")
+    optionMenu.add(keybMenu)
+    
     val enableKeypadItem = new JCheckBoxMenuItem("Keypad enabled")
     enableKeypadItem.setSelected(true)
     enableKeypadItem.setActionCommand("KEYPAD")
     enableKeypadItem.addActionListener(this)    
-    optionMenu.add(enableKeypadItem)
+    keybMenu.add(enableKeypadItem)
+    
+    val keybEditorItem = new JMenuItem("Keyboard editor ...")
+    keybEditorItem.setActionCommand("KEYB_EDITOR")
+    keybEditorItem.addActionListener(this)
+    keybMenu.add(keybEditorItem)
+    val loadKeybItem = new JMenuItem("Set keyboard layout ...")
+    loadKeybItem.setActionCommand("LOAD_KEYB")
+    loadKeybItem.addActionListener(this)
+    keybMenu.add(loadKeybItem)
     
     optionMenu.addSeparator
     
