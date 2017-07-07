@@ -3,7 +3,6 @@ package ucesoft.cbm.peripheral.keyboard
 import java.awt.event.KeyListener
 import java.awt.event.KeyEvent
 import CKey._
-import ucesoft.cbm.Log
 import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
 import java.io.ObjectOutputStream
@@ -24,6 +23,8 @@ class Keyboard(keyMapper: KeyboardMapper, nmiAction: (Boolean) => Unit = x => {}
   // 128 CAPS-LOCK & 40/80 keys handling
   private[this] var c128_CapsLockPressed = false
   private[this] var c128_40_80_Pressed = false
+  private[this] val _40_80_KEY : Int = keyMapper.map.map(kv => (kv._2,kv._1)).getOrElse(_40_80,KeyEvent.VK_F9)
+  private[this] val CAPS_LOCK_KEY : Int = keyMapper.map.map(kv => (kv._2,kv._1)).getOrElse(CAPS_LOCK,KeyEvent.VK_CAPS_LOCK)
   
   def isCapsLockPressed = c128_CapsLockPressed
   def is4080Pressed = c128_40_80_Pressed
@@ -51,11 +52,11 @@ class Keyboard(keyMapper: KeyboardMapper, nmiAction: (Boolean) => Unit = x => {}
   }
 
   final def keyPressed(e: KeyEvent) : Unit = synchronized {
-    if (c128 && e.getKeyCode == KeyEvent.VK_CAPS_LOCK) {
+    if (c128 && e.getKeyCode == CAPS_LOCK_KEY) {
       c128_CapsLockPressed = !c128_CapsLockPressed      
       return
     }
-    if (c128 && e.getKeyCode == KeyEvent.VK_F9) {
+    if (c128 && e.getKeyCode == _40_80_KEY) {
       c128_40_80_Pressed = !c128_40_80_Pressed
       return
     }
