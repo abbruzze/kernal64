@@ -5,6 +5,7 @@ import java.awt.event.KeyEvent
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import ucesoft.cbm.Log
+import java.io.FileInputStream
 
 trait KeyboardMapper {
 	val map : Map[Int,CKey.Key]
@@ -13,7 +14,7 @@ trait KeyboardMapper {
 }
 
 object KeyboardMapperStore {
-  private val KEY_EVENT_MAP = getKeyEventMap
+  val KEY_EVENT_MAP = getKeyEventMap
   private val KEY_EVENT_REV_MAP = getKeyEventMap map { kv => (kv._2,kv._1) }
   
   def store(km:KeyboardMapper,out:PrintWriter) {
@@ -81,6 +82,8 @@ object KeyboardMapperStore {
       line = in.readLine
     }
     
+    if (section == 0) throw new IllegalArgumentException
+    
     new KeyboardMapper {
       val map = e_map.toMap
       val cmap = e_cmap.toMap
@@ -92,5 +95,34 @@ object KeyboardMapperStore {
     val clazz = classOf[KeyEvent]
     val fields = clazz.getDeclaredFields
     fields filter { _.getName.startsWith("VK_") } map { f => (f.get(null).asInstanceOf[Int],f.getName) } toMap
+  }
+  
+  def loadMapper(externalFile:Option[String],internalResource:String,defaultMapper:KeyboardMapper) : KeyboardMapper = {
+    externalFile match {
+      case None =>
+        loadFromResource(internalResource) match {
+          case None => defaultMapper
+          case Some(m) =>
+            Log.info(s"Loaded keyboard configuration file from $internalResource")
+            m
+        }
+      case Some(file) =>
+        try {
+          val in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))
+          val m = load(in)
+          in.close
+          Log.info(s"Loaded keyboard configuration file from $file")
+          m
+        }
+        catch {
+          case t:Throwable =>
+            Log.info(s"Cannot load keyboard file $file: " + t)
+            defaultMapper
+        }
+    }
+  }
+  
+  def main(args:Array[String]) {
+    store(ucesoft.cbm.c128.C128KeyboardMapper,new java.io.PrintWriter(System.out,true))
   }
 }
