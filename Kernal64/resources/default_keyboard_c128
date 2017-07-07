@@ -1,11 +1,12 @@
 [map]
                 VK_E = E
                 VK_X = X
+               VK_F9 = _40_80
             VK_ENTER = RETURN
                 VK_8 = N_8
              VK_LESS = CBM
                 VK_4 = N_4
-        VK_CAPS_LOCK = RUN_STOP
+        VK_CAPS_LOCK = CAPS_LOCK
            VK_PERIOD = PERIOD
                 VK_9 = N_9
                 VK_N = N
@@ -15,13 +16,14 @@
                 VK_J = J
                 VK_U = U
                 VK_F = F
-          VK_PAGE_UP = ALT
+          VK_PAGE_UP = LIRA
        VK_BACK_SLASH = L_ARROW
                 VK_A = A
                 VK_5 = N_5
                 VK_M = M
                 VK_I = I
             VK_SPACE = SPACE
+        VK_PAGE_DOWN = ALT
             VK_MINUS = SLASH
           VK_CONTROL = CTRL
             VK_COMMA = COMMA
@@ -66,13 +68,13 @@
             VK_QUOTE = PLUS
 [cmap]
                    ù = EQUAL
-           é/shifted = EXP
+           é/shifted = STAR
                    à = SEMICOL
            °/shifted = SEMICOL
                    ì = MINUS
-           §/shifted = EQUAL
            ç/shifted = COLON
                    ò = COLON
+           ^/shifted = MINUS
                    è = STAR
 [keypad_map]
           VK_NUMPAD5 = KEYPAD_N_5

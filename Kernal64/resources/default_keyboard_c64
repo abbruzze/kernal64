@@ -61,12 +61,12 @@
             VK_QUOTE = PLUS
 [cmap]
                    ù = EQUAL
-           é/shifted = EXP
+           é/shifted = STAR
                    à = SEMICOL
            °/shifted = SEMICOL
                    ì = MINUS
-           §/shifted = EQUAL
            ç/shifted = COLON
                    ò = COLON
+           ^/shifted = MINUS
                    è = STAR
 [keypad_map]
