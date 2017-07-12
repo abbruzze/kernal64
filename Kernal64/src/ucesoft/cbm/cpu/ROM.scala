@@ -27,10 +27,11 @@ class ROM(ram: Memory,
       Log.info(s"Initialaizing ${name} memory ...")
       Option(ClassLoader.getSystemClassLoader.getResourceAsStream(resourceName)) match {
         case None => throw new IOException(s"Can't find resource ${resourceName} for ROM ${name}")
-        case Some(in) =>
+        case Some(_in) =>
+          val in = new DataInputStream(_in)
           in.skip(initialOffset)
           val buffer = Array.ofDim[Byte](length)
-          in.read(buffer)
+          in.readFully(buffer)
           in.close
           for (i <- 0 until length) mem(i) = buffer(i) & 0xff
       }
