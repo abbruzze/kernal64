@@ -97,7 +97,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // ==========================================================================================
   private[this] var _0 = 0
   private[this] var _1 = 0
-  private[this] var exrom,game = false
   // C64 memory configuration =================================================================
   private[this] var c64MemConfig = -1
   private[this] var c64MC : MemConfig = _
@@ -201,8 +200,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     cr_reg = 0
     vic_xscan_reg = 0
     vic_clkrate_reg = 0
-    exrom = false
-    game = false
     ramBank = 0
     vicBank = 0
     videoBank = 0
@@ -210,6 +207,12 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     memLastByteRead = 0
     ioacc = false
     check128_1
+    BASIC64_ROM.setActive(false)
+    ROML.setActive(false)
+    ROMH.setActive(false)
+    CHARACTERS64_ROM.setActive(false)
+    KERNAL64_ROM.setActive(false)
+    ROMH_ULTIMAX.setActive(false)
   }
   
   final def setIO(cia_dc00:CIA,cia_dd00:CIA,vic:VIC,sid:SID,vdc:VDC) {
@@ -228,9 +231,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
    * Used in C64 mode
    */
   final def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
-    this.game = game
-    this.exrom = exrom
-    
     val newMemConfig = (~_0 | _1) & 0x7 | (if (game) 1 << 3 else 0) | (if (exrom) 1 << 4 else 0)
     if (c64MemConfig == newMemConfig) return    
     c64MemConfig = newMemConfig
@@ -242,7 +242,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     CHARACTERS64_ROM.setActive(c64MC.char)
     KERNAL64_ROM.setActive(c64MC.kernal)
     ROMH_ULTIMAX.setActive(c64MC.romhultimax)
-    //println(s"New C64 config: " + c64MC)
   }
     
   final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
@@ -546,7 +545,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     vic_clkrate_reg = value
     val clkrate = value & 1
     if (clkrate != old_clkrate) mmuChangeListener.frequencyChanged(clkrate + 1)
-    if ((value & 2) > 0) println("VIC D030 trick mode...")
+    //if ((value & 2) > 0) println("VIC D030 trick mode...")
     vic.c128TestBitEnabled((value & 2) > 0)
     Log.debug(s"Clock frequency set to ${clkrate + 1} Mhz")
   }
@@ -592,7 +591,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // CIA 2 -------------------------------------------------------------
     else if (address < 0xDE00) cia_dd00.write(address,value)
     // I/O expansion slots 1 & 2 -----------------------------------------
-    expansionPort.write(address,value)
+    else expansionPort.write(address,value)
   }
   /*
    * internal & external function ROM
@@ -785,8 +784,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     out.writeInt(vic_clkrate_reg)
     out.writeInt(_0)
     out.writeInt(_1)
-    out.writeBoolean(exrom)
-    out.writeBoolean(game)
     out.writeInt(c64MemConfig)
     out.writeBoolean(ULTIMAX)
     out.writeInt(videoBank)
@@ -821,8 +818,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     
     _0 = in.readInt
     _1 = in.readInt
-    exrom = in.readBoolean
-    game = in.readBoolean
     c64MemConfig = in.readInt
     if (c64MemConfig != -1) c64MC = C64_MEM_CONFIG(c64MemConfig)
     ULTIMAX = in.readBoolean
