@@ -9,4 +9,4 @@ if [ ! -x $JAVA_HOME/bin/java ]; then
 else
         JAVA=$JAVA_HOME/bin/java
 fi
-$JAVA -Xms32M -Xmx32M -cp $CP ucesoft.c64.remote.RemoteC64Client $*
+$JAVA -Xms32M -Xmx32M -cp $CP ucesoft.cbm.remote.RemoteC64Client $*
