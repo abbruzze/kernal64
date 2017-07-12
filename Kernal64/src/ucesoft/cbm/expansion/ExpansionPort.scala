@@ -115,7 +115,7 @@ object ExpansionPort {
   def setMemoryForEmptyExpansionPort(mem:LastByteReadMemory) = memoryForEmptyExpansionPort = mem
   def setExpansionPort(expansionPort: ExpansionPort) = {
     this.expansionPort = expansionPort
-    Log.debug("Setting new expansion port: " + expansionPort.name + " listeners are " + listeners)
+    Log.info("Setting new expansion port: " + expansionPort.name + " listeners are " + listeners)
     updateListeners(expansionPort.GAME,expansionPort.EXROM)
   }
 }

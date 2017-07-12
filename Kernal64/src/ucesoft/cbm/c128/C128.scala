@@ -24,6 +24,7 @@ import ucesoft.cbm.game.GameUI
 import ucesoft.cbm.peripheral.controlport.JoystickSettingDialog
 import ucesoft.cbm.peripheral.bus.IECBusLine
 import ucesoft.cbm.peripheral.bus.IECBus
+import ucesoft.cbm.remote.RemoteC64
 
 object C128 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -99,6 +100,8 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     f.setIconImage(new ImageIcon(getClass.getResource("/resources/commodore.png")).getImage)    
     f
   }
+  // ----------------- REMOTE ------------------
+  private[this] var remote : Option[RemoteC64] = None
   // ------------- MMU Status Panel ------------
   private[this] val mmuStatusPanel = new MMUStatusPanel
   // -------------- MENU ITEMS -----------------
@@ -708,6 +711,37 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   	      case JFileChooser.APPROVE_OPTION =>
   	        flyerIEC.setFloppyRepository(fc.getSelectedFile)
   	      case _ =>
+        }
+      case "REMOTE_OFF" =>
+        remote match {
+          case Some(rem) => 
+            rem.stopRemoting
+            vicDisplay.setRemote(None)
+            remote = None
+          case None =>
+        }
+      case "REMOTE_ON" =>
+        val source = e.getSource.asInstanceOf[JRadioButtonMenuItem]
+        if (remote.isDefined) remote.get.stopRemoting
+        val listeningPort = JOptionPane.showInputDialog(vicDisplayFrame,"Listening port", "Remoting port configuration",JOptionPane.QUESTION_MESSAGE,null,null,"8064")
+        if (listeningPort == null) {
+          source.setSelected(false)
+          vicDisplay.setRemote(None)
+        }
+        else {
+          try {
+            val clip = vicDisplay.getClipArea
+            val remote = new ucesoft.cbm.remote.RemoteC64Server(listeningPort.toString.toInt,keyboardControlPort :: keyb :: keypadControlPort :: Nil,vicDisplay.displayMem,vicChip.SCREEN_WIDTH,vicChip.SCREEN_HEIGHT,clip._1.x,clip._1.y,clip._2.x,clip._2.y)
+            this.remote = Some(remote)            
+        	  vicDisplay.setRemote(this.remote)
+        	  remote.start
+          }
+          catch {
+            case io:IOException =>
+              JOptionPane.showMessageDialog(vicDisplayFrame,io.toString, "Remoting init error",JOptionPane.ERROR_MESSAGE)
+              source.setSelected(false)
+              vicDisplay.setRemote(None)
+          }
         }
       case "SAVE_STATE" =>
         saveState
