@@ -9,12 +9,6 @@
 	<!-- VERSION -->
 	<property name="VERSION" value="1.4.0"/> 
 	
-	<condition property="optimise" value="yes">
-		<not>
-			<isset property="optimise"/>
-		</not>
-	</condition>
-	
 	<!-- label is set only if ant is executed by CI -->
  	<condition property="BUILD_NUMBER" value="?">
 		<not>
@@ -48,11 +42,10 @@
 		<echo message="Building version ${version}"/>
 		<mkdir dir="${build.dir}"/>		
 		<echo file="${sources.dir}/ucesoft/cbm/Version.scala" message='package ucesoft.cbm ; object Version { val VERSION = "${version}" ; val BUILD_DATE="${TODAY}"}'/>
-		<echo message="Optimise is set to ${optimise}"/>
-		<javac srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/c64/peripheral/sid/resid/*.java">
+		<javac srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/cbm/peripheral/sid/resid/*.java">
 			<classpath refid="build.classpath"/>
 		</javac>
-		<scalac srcdir="${sources.dir}" excludes="ucesoft/c64/peripheral/sid/resid/**" 
+		<scalac srcdir="${sources.dir}" excludes="ucesoft/cbm/peripheral/sid/resid/**" 
 				destdir="${build.dir}" 
 				classpathref="build.classpath" 
 				deprecation="yes" 
