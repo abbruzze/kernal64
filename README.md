@@ -1,8 +1,28 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.3.1
+Kernal64 ver 1.4.0
 ========
-![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)
+![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
+
+###What's new in 1.4.0 (Jul 14th 2017)
+* New Commodore 128 emulator
+* General refactoring and minor bug fixing
+* Fix of severe bug on CIA when timer B counts timer A
+* Added keyboard layout editor in order to customize keyboard mapping
+* New scripts for launching emulators
+
+Main c128 emulator's features:
+* Z80 and CP/M
+* 2Mhz mode (still not cycle exact)
+* new keys and keypad
+* VDC support: interlace mode supported (known issues: 8x1 mode supported but still not working properly, interlaced color mode has some minor visualization problems)
+* VICii (interlaced mode not supported)
+* 1571 drive not yet implemented (JiffyDOS for 128 works fine)
+* MMU panel to check Z80, C64 mode and 2Mhz use
+
+<img src="https://github.com/abbruzze/kernal64/blob/master/images/c128_cpm.jpg" width="600" height="454" alt="Commodore 128 CP/M 3.0"/>
+<img src="https://github.com/abbruzze/kernal64/blob/master/images/c128_interlaced.jpg" width="600" height="454" alt="Commodore 128 interlaced mono"/>
+<img src="https://github.com/abbruzze/kernal64/blob/master/images/c128_rfo.jpg" width="600" height="454" alt="Commodore 128 Risen from oblivion demo"/>
 
 ###What's new in 1.3.1 (Dic 2nd 2016)
 * RS-232 improvements. Added baud rate in the configuration parameters
@@ -79,7 +99,7 @@ Here the main features:
 
 ###Installation
 Download and unzip https://github.com/abbruzze/kernal64/tree/master/Kernal64/dist/kernal64_install.zip on your computer.
-Be sure to have a jre (1.7 or above) in the path and launch the **kernal64.bat** or **kernal64.sh** batch file, depending on your operating system.
+Be sure to have a jre (1.7 or above) in the path and launch the **k64.bat** or **k64.sh** or **k128** equivalent for 128 emulator batch file, depending on your operating system.
 
 The scripts start java with the -server option for performance reason. It could happen that your Java installation does not support the server option. In this case edit the script and remove the -server option.
 
