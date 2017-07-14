@@ -533,8 +533,10 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         joySettings
       case "PASTE" =>
         paste
-      case "SNAPSHOT" =>
-        takeSnapshot
+      case "SNAPSHOT_VIC" =>
+        takeSnapshot(true)
+      case "SNAPSHOT_VDC" =>
+        takeSnapshot(false)
       case "LOADPRG" =>
         loadPrg
       case "SAVEPRG" =>
@@ -1222,12 +1224,15 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     }
   }
   
-  private def takeSnapshot {
+  private def takeSnapshot(vic:Boolean) {
     val fc = new JFileChooser
     fc.showSaveDialog(vicDisplayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
         val file = if (fc.getSelectedFile.getName.toUpperCase.endsWith(".PNG")) fc.getSelectedFile else new File(fc.getSelectedFile.toString + ".png")
-      	vicDisplay.saveSnapshot(file)
+      	vic match {
+          case true => vicDisplay.saveSnapshot(file)
+          case false => vdcDisplay.saveSnapshot(file)
+        }
       case _ =>
     }
   }
@@ -1742,10 +1747,17 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     
     optionMenu.addSeparator
     
-    val snapshotItem = new JMenuItem("Take a snapshot...")
-    snapshotItem.setActionCommand("SNAPSHOT")
-    snapshotItem.addActionListener(this)
-    optionMenu.add(snapshotItem)
+    val snapMenu = new JMenu("Take a snapshot")
+    optionMenu.add(snapMenu)
+    
+    val vicSnapshotItem = new JMenuItem("VIC ...")
+    vicSnapshotItem.setActionCommand("SNAPSHOT_VIC")
+    vicSnapshotItem.addActionListener(this)
+    snapMenu.add(vicSnapshotItem)
+    val vdcSnapshotItem = new JMenuItem("VDC ...")
+    vdcSnapshotItem.setActionCommand("SNAPSHOT_VDC")
+    vdcSnapshotItem.addActionListener(this)
+    snapMenu.add(vdcSnapshotItem)
     
     optionMenu.addSeparator
     
