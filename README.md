@@ -4,7 +4,7 @@ Kernal64 ver 1.4.0
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 
-###What's new in 1.4.0 (Jul 14th 2017)
+### What's new in 1.4.0 (Jul 14th 2017)
 * New Commodore 128 emulator
 * General refactoring and minor bug fixing
 * Fix of severe bug on CIA when timer B counts timer A
@@ -24,7 +24,7 @@ Main c128 emulator's features:
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/c128_interlaced.jpg" width="600" height="454" alt="Commodore 128 interlaced mono"/>
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/c128_rfo.jpg" width="600" height="454" alt="Commodore 128 Risen from oblivion demo"/>
 
-###What's new in 1.3.1 (Dic 2nd 2016)
+### What's new in 1.3.1 (Dic 2nd 2016)
 * RS-232 improvements. Added baud rate in the configuration parameters
 * New ZIP format: now you can open directly zip files containing C64 files, like D64, PRG, CRT ...
 * New "game jukebox" feature: a new plug & play components used to collect games, demos, intros, etc. from internet and play with them easily and immetiately. Out of the box you can find Gamebase (http://www.gb64.com/) component and Pouet demo (http://www.pouet.net/)  component.
@@ -32,38 +32,38 @@ Main c128 emulator's features:
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/pouet.jpg" width="724" height="427" alt="Pouet demos"/>
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/gamebase.jpg" width="724" height="427" alt="Gamebase"/>
 
-###What's new in 1.3.0 (Sep 23th 2016)
+### What's new in 1.3.0 (Sep 23th 2016)
 * Fixed VIC xcoord bug: now sprites can be viewed properly on sideborders
 * Fixed IRQ delay cycles that caused image flickering
 * Fixed display size
 * New feature: now it ca be possible to save and reload the emulator's state.
 
-###What's new in 1.2.7 (Aug 15th 2016)
+### What's new in 1.2.7 (Aug 15th 2016)
 * Improved CPU & VIC timings. Now nufli images can be displayed properly as well as nuvie videos.
 
-###What's new in 1.2.6 (May 26th 2016)
+### What's new in 1.2.6 (May 26th 2016)
 * Remoting (experimental) : share the emulator's screen with your friend on the network to play games in two-player mode
 * Removed jiffydos env variable: now the user must provide the JiffyDOS ROMS
 
-###What's new in 1.2.5 (May 5th 2016)
+### What's new in 1.2.5 (May 5th 2016)
 * Added support for [Flyer](http://www.retroswitch.com/products/flyer/) internet modem (see Wiki)
 * Minor RS-232 improvements and fixes
 
-###What's new in 1.2.4 (Apr 1st 2016)
+### What's new in 1.2.4 (Apr 1st 2016)
 * Added support for stereo dual SID chip
 
-###What's new in 1.2.3 (Dic 6th 2015)
+### What's new in 1.2.3 (Dic 6th 2015)
 * Added support for EasyFlash cart: eprom flashing is not emulated
 
-###What's new in 1.2.2
+### What's new in 1.2.2
 * Added support for dual drive (device 9)
 * Local driver and Dropbox support moved to device 10 
 * Added D64 extended format with errors
 
-###What's new in 1.2.1
+### What's new in 1.2.1
 * Added support for **CP/M** cartridge (see wiki for details)
 
-###An almost full Scala Commodore 64 emulator
+### A Scala Commodore 64 & 128 emulator
 
 Written in the Scala language (http://www.scala-lang.org/) and available for any Java JRE 1.7 environment.
 
@@ -97,7 +97,7 @@ Here the main features:
 * RS-232 **SwiftLink** cartridge implementation. Tried with NovaTerm 9.6 and other terminal software. 
 * ... and more
 
-###Installation
+### Installation
 Download and unzip https://github.com/abbruzze/kernal64/tree/master/Kernal64/dist/kernal64_install.zip on your computer.
 Be sure to have a jre (1.7 or above) in the path and launch the **k64.bat** or **k64.sh** or **k128** equivalent for 128 emulator batch file, depending on your operating system.
 
@@ -105,5 +105,5 @@ The scripts start java with the -server option for performance reason. It could 
 
 If you want to load a 16M REU modify the memory settings inside the start scripts: for example, you could set -Xmx128M.
 
-###Wiki
+### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
