@@ -10,6 +10,7 @@ Kernal64 ver 1.4.0
 * Fix of severe bug on CIA when timer B counts timer A
 * Added keyboard layout editor in order to customize keyboard mapping
 * New scripts for launching emulators
+* Scala 2.12 & jre 1.8
 
 Main c128 emulator's features:
 * Z80 and CP/M
@@ -65,7 +66,7 @@ Main c128 emulator's features:
 
 ### A Scala Commodore 64 & 128 emulator
 
-Written in the Scala language (http://www.scala-lang.org/) and available for any Java JRE 1.7 environment.
+Written in the Scala language (http://www.scala-lang.org/) and available for any Java JRE 1.8 environment.
 
 Here the main features:
 * Cycle based: exact cycle emulation using the PAL frequency
@@ -99,7 +100,7 @@ Here the main features:
 
 ### Installation
 Download and unzip https://github.com/abbruzze/kernal64/tree/master/Kernal64/dist/kernal64_install.zip on your computer.
-Be sure to have a jre (1.7 or above) in the path and launch the **k64.bat** or **k64.sh** or **k128** equivalent for 128 emulator batch file, depending on your operating system.
+Be sure to have a jre (1.8 or above) in the path and launch the **k64.bat** or **k64.sh** or **k128** equivalent for 128 emulator batch file, depending on your operating system.
 
 The scripts start java with the -server option for performance reason. It could happen that your Java installation does not support the server option. In this case edit the script and remove the -server option.
 
