@@ -99,7 +99,7 @@ Here the main features:
 * ... and more
 
 ### Installation
-Download and unzip https://github.com/abbruzze/kernal64/tree/master/Kernal64/dist/kernal64_install.zip on your computer.
+Go to https://github.com/abbruzze/kernal64/tree/master/Kernal64/dist/kernal64_install.zip download and unzip on your computer.
 Be sure to have a jre (1.8 or above) in the path and launch the **k64.bat** or **k64.sh** or **k128** equivalent for 128 emulator batch file, depending on your operating system.
 
 The scripts start java with the -server option for performance reason. It could happen that your Java installation does not support the server option. In this case edit the script and remove the -server option.
