@@ -20,7 +20,7 @@ class GameBaseSpi extends GameProvider {
   private val MAX_PER_PAGE = 45
   private val gamebaseVersionUrl = "http://www.gb64.com/search.php"
   private val gamebaseUrl = "http://www.gb64.com"
-  private val gamebaseDownloadUrl = "http://gamebase64.hardabasht.com/games"
+  private val gamebaseDownloadUrl = "ftp://8bitfiles.net/gamebase_64/Games"
   private val pages = (65 to 90).toList ++ List(48)
   private val constraints : List[SyncConstraint] = SyncAll :: (pages map { l => LetterConstraint(l.toChar) })
   
