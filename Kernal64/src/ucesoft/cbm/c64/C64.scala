@@ -578,9 +578,9 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   	      def getDescription = "REU files"
   	    })
   	    fc.showOpenDialog(displayFrame) match {
-  	      case JFileChooser.APPROVE_OPTION => 
+  	      case JFileChooser.APPROVE_OPTION|JFileChooser.CANCEL_OPTION => 
   	        try {
-  	          val reu = REU.getREU(REU.REU_16M,mem,setDMA _,irqSwitcher.expPortIRQ _,Some(fc.getSelectedFile))	          
+  	          val reu = REU.getREU(REU.REU_16M,mem,setDMA _,irqSwitcher.expPortIRQ _,Option(fc.getSelectedFile))	          
   	          ExpansionPort.setExpansionPort(reu)
   	        }
   	        catch {

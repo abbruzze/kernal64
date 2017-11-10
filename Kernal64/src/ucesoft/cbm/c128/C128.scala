@@ -651,9 +651,9 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   	      def getDescription = "REU files"
   	    })
   	    fc.showOpenDialog(vicDisplayFrame) match {
-  	      case JFileChooser.APPROVE_OPTION => 
+  	      case JFileChooser.APPROVE_OPTION|JFileChooser.CANCEL_OPTION => 
   	        try {
-  	          val reu = REU.getREU(REU.REU_16M,mmu,setDMA _,irqSwitcher.expPortIRQ _,Some(fc.getSelectedFile))	          
+  	          val reu = REU.getREU(REU.REU_16M,mmu,setDMA _,irqSwitcher.expPortIRQ _,Option(fc.getSelectedFile))	          
   	          ExpansionPort.setExpansionPort(reu)
   	        }
   	        catch {
