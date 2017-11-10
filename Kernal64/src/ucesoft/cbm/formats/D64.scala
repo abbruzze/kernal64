@@ -301,22 +301,24 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   }
   
   def load(fileName: String,fileType:FileType.Value = FileType.PRG) = {
-    val dpos = fileName.indexOf(":")
-    val st = new StringTokenizer(if (dpos != -1) fileName.substring(dpos + 1) else fileName,",")
-    val fn = st.nextToken
-    val ft = if (st.hasMoreTokens && st.nextToken == "S") FileType.SEQ else fileType
     if (fileName.startsWith("$")) formatDirectoriesAsPRG(fileName)
-    else
-    directories find { e =>
-      ft == e.fileType && fileNameMatch(fn,e.fileName)
-    } match {
-      case None => throw new FileNotFoundException(fileName)
-      case Some(entry) =>
-        entry.fileType match {
-          case FileType.PRG => loadPRG(entry)
-          case FileType.SEQ => loadSEQ(entry)
-          case _ => throw new IOException("Bad file type: " + entry.fileType)
-        }
+    else {
+      val dpos = fileName.indexOf(":")
+      val st = new StringTokenizer(if (dpos != -1) fileName.substring(dpos + 1) else fileName,",")
+      val fn = st.nextToken
+      val ft = if (st.hasMoreTokens && st.nextToken == "S") FileType.SEQ else fileType
+      
+      directories find { e =>
+        ft == e.fileType && fileNameMatch(fn,e.fileName)
+      } match {
+        case None => throw new FileNotFoundException(fileName)
+        case Some(entry) =>
+          entry.fileType match {
+            case FileType.PRG => loadPRG(entry)
+            case FileType.SEQ => loadSEQ(entry)
+            case _ => throw new IOException("Bad file type: " + entry.fileType)
+          }
+      }
     }
   }
   
