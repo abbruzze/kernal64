@@ -18,6 +18,12 @@ object VDC {
   final val HSYNC_MAX_80 = 116
   final val HSYNC_MAX_40 = 62
   final val PREFERRED_FRAME_SIZE = new java.awt.Dimension(SCREEN_WIDTH,SCREEN_HEIGHT * 2)
+  
+  object VideoMode extends Enumeration {
+    val IDLE = Value
+    val TEXT = Value
+    val BITMAP = Value
+  }
 }
 
 /**
@@ -73,12 +79,6 @@ class VDC extends RAMComponent {
   final private[this] val VDC_REVISION_0 = 0 /* 8563 R7A */
   final private[this] val VDC_REVISION_1 = 1 /* 8563 R8/R9 */
   final private[this] val VDC_REVISION_2 = 2 /* 8568 */
-  
-  private object VideoMode extends Enumeration {
-    val IDLE = Value
-    val TEXT = Value
-    val BITMAP = Value
-  }
   
   private[this] var clk = Clock.systemClock
   final private[this] val RAM_SIZE = 0x10000 

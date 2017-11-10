@@ -490,8 +490,11 @@ final class VIC(mem: VICMemory,
     }
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }   					
-  // ------------------------------ SHIFTERS ----------------------------------------------    
-  private[this] object BorderShifter extends CBMComponent {
+  // ------------------------------ SHIFTERS ----------------------------------------------
+  private[this] final val borderShifter = new BorderShifter
+  private[this] val gfxShifter = new GFXShifter
+  
+  private[this] class BorderShifter extends CBMComponent {
     val componentID = "BorderShifter"
     val componentType = CBMComponentType.INTERNAL
     private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
@@ -535,10 +538,11 @@ final class VIC(mem: VICMemory,
     }
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
+  
   /**
    * Graphics Shifter for text/bitmap & blank lines
    */
-  private object GFXShifter extends CBMComponent {
+  private class GFXShifter extends CBMComponent {
     val componentID = "GFXShifter"
     val componentType = CBMComponentType.INTERNAL
     private[this] var counter = 0
@@ -696,8 +700,8 @@ final class VIC(mem: VICMemory,
   }
 
   def init {
-    add(BorderShifter)
-    add(GFXShifter)
+    add(borderShifter)
+    add(gfxShifter)
     sprites foreach { add _ }        
   }
 
@@ -986,7 +990,7 @@ final class VIC(mem: VICMemory,
     if (c128TestBitEnabled) {
       rasterCycle = 0 
       updateRasterLine
-      GFXShifter.reset
+      gfxShifter.reset
       return
     }
     
@@ -995,7 +999,7 @@ final class VIC(mem: VICMemory,
     if (rasterCycle == RASTER_CYCLES) {
       rasterCycle = 0 
       updateRasterLine
-      GFXShifter.reset
+      gfxShifter.reset
     }
     
     rasterCycle += 1
@@ -1214,8 +1218,8 @@ final class VIC(mem: VICMemory,
     // --------------------- GFX -------------------------
     val borderOnOpt = verticalBorderFF && rasterLine != TOP_BOTTOM_FF_COMP(rsel)(0)
     if (!borderOnOpt && dataToDraw >= 0) {
-      GFXShifter.setData(dataToDraw)
-      GFXShifter.producePixels
+      gfxShifter.setData(dataToDraw)
+      gfxShifter.producePixels
     }
     // ------------------- Sprites -----------------------    
     
@@ -1227,11 +1231,11 @@ final class VIC(mem: VICMemory,
       s += 1
     }
     // ------------------- Border ------------------------
-    BorderShifter.producePixels
+    borderShifter.producePixels
     // ************************** RENDERING ************************************
 
-    val gfxPixels = GFXShifter.getPixels
-    val borderPixels = BorderShifter.getPixels
+    val gfxPixels = gfxShifter.getPixels
+    val borderPixels = borderShifter.getPixels
     while (i < 8) { // scan each bit      
       s = 7
       var pixel = PIXEL_TRANSPARENT
