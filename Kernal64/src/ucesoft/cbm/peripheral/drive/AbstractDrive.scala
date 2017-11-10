@@ -66,11 +66,13 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
     for(file <- getDirectoryEntries(path)) {
       val fileName = file.name.take(16).toUpperCase
       val sectors = file.byteSize / 256
-      val sizeInSector = math.min(if (sectors == 0) 1 else sectors,999).toInt
+      val sizeInSector = math.min(if (sectors == 0) 1 else sectors,9999).toInt
       val blanks = if (sizeInSector < 10) 3 
         else
         if (sizeInSector < 100) 2
-        else 1
+        else
+        if (sizeInSector < 1000) 1
+        else 0
       // write next line address
       ptr += blanks + 2 + 2 + 18 + 5
       val endBlanks = 32 - (blanks + 2 + 2 + 18 + 5)
