@@ -1,6 +1,5 @@
 package ucesoft.cbm.peripheral.bus
 
-import ucesoft.cbm.formats.D64
 import scala.collection.mutable.ListBuffer
 import language.postfixOps
 
@@ -217,7 +216,6 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
   }
   
   private def set(line:IECBusLine.Line,value:Int) {    
-    import IECBus._
     bus.setLine(busid,line,value)
   }
   
