@@ -45,9 +45,10 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   }
     
   override protected def loadData(fileName: String) : Option[BusDataIterator] = {
+    println(s"Loading $fileName ...")
     if (fileName.startsWith("$")) return Some(loadDirectory(currentDir.toString,currentDir.getName))
     val dp = fileName.indexOf(":")
-    val fn = if (dp != -1) fileName.substring(dp + 1) else fileName
+    val fn = (if (dp != -1) fileName.substring(dp + 1) else fileName) map { c => if (c < 128) c else (c - 128).toChar }
     val found = currentDir.listFiles find { f => D64.fileNameMatch(fn,f.getName.toUpperCase) }
     found match {
       case Some(file) =>
@@ -76,6 +77,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
         channels(channel).readDirection = true
       case 1 => // SAVING FILE
         loading = false
+        channels(channel).open
         channels(channel).readDirection = false
       case 15 =>
       case _ =>
@@ -85,13 +87,15 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   
   override def open_channel {
     super.open_channel
-    channels(channel).open
-    channel match {
-      case 15 => handleChannel15
-      case 0 => load(channels(channel).fileName.toString)
-      case 1 => // saving ...
-      case _ =>
-        setStatus(STATUS_CHANNEL_ERROR)
+    if (!channels(channel).isOpened) {
+      channels(channel).open
+      channel match {
+        case 15 => handleChannel15
+        case 0 => load(channels(channel).fileName.toString)
+        case 1 => // saving ...
+        case _ =>
+          setStatus(STATUS_CHANNEL_ERROR)
+      }
     }
   }
   
@@ -130,6 +134,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   }
   
   private def executeCommand(cmd: String) {
+    println(s"Executing CMD $cmd")
     val command = if (cmd.charAt(cmd.length - 1) == 13) cmd.substring(0, cmd.length - 1) else cmd
     if (command.startsWith("CD")) {
       val cd = command.substring(2).trim

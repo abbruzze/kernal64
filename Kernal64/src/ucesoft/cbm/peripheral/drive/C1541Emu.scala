@@ -128,10 +128,12 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
 
   override def open_channel {
     super.open_channel
-    channels(channel).open
-    channel match {
-      case 15 => handleChannel15
-      case _ => load(channels(channel).fileName.toString)
+    if (!channels(channel).isOpened) {
+      channels(channel).open
+      channel match {
+        case 15 => handleChannel15
+        case _ => load(channels(channel).fileName.toString)
+      }
     }
   }
 
