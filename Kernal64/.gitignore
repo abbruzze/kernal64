@@ -1,3 +1,4 @@
 /bin/
 /.cache-main
 /src/ucesoft/cbm/Version.scala
+/dist/
