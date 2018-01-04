@@ -1,8 +1,11 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.4.0
+Kernal64 ver 1.4.1
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
+
+### What's new in 1.4.1 (Jan 4th 2018)
+* New mouse handling: now the o.s. mouse hiding works properly and the mouse pointer cannot escape from the emulator
 
 ### What's new in 1.4.0 (Jul 14th 2017)
 * New Commodore 128 emulator
