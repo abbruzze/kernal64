@@ -92,7 +92,6 @@ private[formats] object GCR {
 }
 
 private[formats]class UNGCR {
-  import GCR._
   private[this] val tmpGCRBuffer = Array.ofDim[Int](5)
   private[this] val buffer = new ListBuffer[Int]
   private[this] var index = 0
@@ -127,7 +126,6 @@ private[formats]class UNGCR {
 }
 
 private[formats]class GCR private {
-  import GCR._
   private[this] val tmpGCRBuffer = Array.ofDim[Int](4)
   private[this] val GCRBuffer = new ListBuffer[Int]
   private[this] var tmpGCRIndex = 0

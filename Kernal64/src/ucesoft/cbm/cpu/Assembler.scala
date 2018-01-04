@@ -2,7 +2,6 @@ package ucesoft.cbm.cpu
 
 import util.parsing.combinator._
 import java.io.Reader
-import java.io.InputStreamReader
 import javax.swing.JFrame
 import javax.swing.JTextArea
 import java.awt.Font

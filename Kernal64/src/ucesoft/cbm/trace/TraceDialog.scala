@@ -6,10 +6,7 @@ import ucesoft.cbm.cpu.Memory
 import java.awt.BorderLayout
 import ucesoft.cbm.Log
 import ucesoft.cbm.cpu.Assembler
-import ucesoft.cbm.cpu.CPU6510
 import java.io.FileOutputStream
-import java.io.FileInputStream
-import java.awt.GridLayout
 import javax.swing.event.ChangeListener
 import javax.swing.event.ChangeEvent
 import ucesoft.cbm.peripheral.vic.Display

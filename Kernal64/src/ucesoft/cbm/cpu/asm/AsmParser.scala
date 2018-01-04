@@ -1,13 +1,11 @@
 package ucesoft.cbm.cpu.asm
 
 import util.parsing.combinator._
-import scala.collection.mutable.Buffer
 import scala.util.parsing.input.Positional
 
 object AsmParser {
   import ucesoft.cbm.cpu.CPU6510._
   import Mode._
-  import Instruction._
   
   private val OPCODES = (Instruction.values.map { _.toString.toLowerCase }) ++ (Instruction.values map { _.toString.toUpperCase })
   private val BRANCHES = OP_MATRIX flatMap { r => r.filter { o => o._2 == REL } } map { _._1.toString }

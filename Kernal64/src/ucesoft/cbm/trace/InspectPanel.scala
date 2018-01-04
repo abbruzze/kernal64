@@ -144,9 +144,9 @@ class InspectPanel(root: CBMComponent) extends JPanel with Runnable with ChangeL
   private def createTree(node: CBMComponent): DefaultMutableTreeNode = {
     val treeNode = new DefaultMutableTreeNode(new ComponentNode(node))
     treeNode.add(new DefaultMutableTreeNode(node.componentType))
-    import collection.JavaConversions._
+    import collection.JavaConverters._
     val properties = node.getProperties
-    properties foreach { p => treeNode.add(new DefaultMutableTreeNode(new PropNode(properties, p._1))) }
+    properties.asScala foreach { p => treeNode.add(new DefaultMutableTreeNode(new PropNode(properties, p._1))) }
     node match {
       case m: RAMComponent =>
         if (!m.isRom) treeNode.add(new MemoryTreeNode(new MemoryNode(m,m.startAddress)))
@@ -157,9 +157,9 @@ class InspectPanel(root: CBMComponent) extends JPanel with Runnable with ChangeL
   }
 
   private def updateTree(node: DefaultMutableTreeNode) {
-    import collection.JavaConversions._
+    import collection.JavaConverters._
     val props = node.getUserObject.asInstanceOf[ComponentNode].node.getProperties
-    node.children foreach { c =>
+    node.children.asScala foreach { c =>
       val child = c.asInstanceOf[DefaultMutableTreeNode]
       child.getUserObject match {
         case pNode: PropNode =>

@@ -66,6 +66,7 @@ import ucesoft.cbm.misc.IRQSwitcher
 import ucesoft.cbm.misc.NMISwitcher
 import ucesoft.cbm.misc.DNDHandler
 import ucesoft.cbm.misc.KeyboardEditor
+import ucesoft.cbm.util.MouseCage
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -524,13 +525,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
       case "MOUSE_ENABLED" =>
         val mouseEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         sid.setMouseEnabled(mouseEnabled)
-        if (mouseEnabled) {
-          displayFrame.getContentPane.setCursor(displayFrame.getToolkit.createCustomCursor(
-              new java.awt.image.BufferedImage(3, 3, java.awt.image.BufferedImage.TYPE_INT_ARGB), new Point(0, 0),"null"))
-        }
-        else {
-          displayFrame.getContentPane.setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR))
-        }
+        if (mouseEnabled) MouseCage.enableMouseCageOn(display) else MouseCage.disableMouseCage
       case "EXIT" => close
       case "TAPE" =>
         loadFileFromTape
@@ -1575,7 +1570,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     
     val mouseEnabledItem = new JCheckBoxMenuItem("Mouse 1351 enabled")
     mouseEnabledItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_M,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    mouseEnabledItem.setSelected(true)
+    mouseEnabledItem.setSelected(false)
     mouseEnabledItem.setActionCommand("MOUSE_ENABLED")
     mouseEnabledItem.addActionListener(this)    
     optionMenu.add(mouseEnabledItem)

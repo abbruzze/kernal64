@@ -2,11 +2,8 @@ package ucesoft.cbm.peripheral.printer
 
 import ucesoft.cbm.peripheral.bus.IECBusDevice
 import ucesoft.cbm.peripheral.bus.IECBus
-import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.util.CBMCanvas
 import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
-import scala.collection.mutable.ListBuffer
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame

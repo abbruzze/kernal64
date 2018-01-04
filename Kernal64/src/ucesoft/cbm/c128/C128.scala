@@ -320,6 +320,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     add(vdcDisplay)
     vdcDisplay.setPreferredSize(ucesoft.cbm.peripheral.vdc.VDC.PREFERRED_FRAME_SIZE)
     vdc.setDisplay(vdcDisplay)
+    
     val dummy = new JPanel(new FlowLayout(FlowLayout.LEFT,0,0))
     dummy.add(vdcDisplay)
     vdcDisplayFrame.getContentPane.add("Center",dummy)
@@ -334,6 +335,27 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     vdc.setGeometryUpdateListener { msg =>
       resLabel.setText(msg)
     }
+    // VDC KEYSTROKES =======================================================    
+    vdcDisplayFrame.addKeyListener(new KeyAdapter {
+      private var mouseEnabled = false
+      override def keyPressed(e:KeyEvent) {
+        e.getKeyCode match {
+          // mouse
+          case java.awt.event.KeyEvent.VK_M if e.isAltDown =>
+            mouseEnabled = !mouseEnabled
+            if (mouseEnabled) MouseCage.enableMouseCageOn(vdcDisplay) else MouseCage.disableMouseCage
+          // reset
+          case java.awt.event.KeyEvent.VK_R if e.isAltDown =>
+            reset(true)
+          // warp-mode
+          case java.awt.event.KeyEvent.VK_W if e.isAltDown =>
+            clock.maximumSpeed = !clock.maximumSpeed
+            sid.setFullSpeed(clock.maximumSpeed)
+          case _ =>
+        }
+      }
+    })
+    // ======================================================================
     // light pen
     val lightPen = new LightPenButtonListener    
     add(lightPen)
@@ -597,15 +619,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       case "MOUSE_ENABLED" =>
         val mouseEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         sid.setMouseEnabled(mouseEnabled)
-        if (mouseEnabled) {
-          val cursor = new java.awt.image.BufferedImage(3, 3, java.awt.image.BufferedImage.TYPE_INT_ARGB)
-          vicDisplayFrame.getContentPane.setCursor(vicDisplayFrame.getToolkit.createCustomCursor(cursor,new Point(0, 0),"null"))
-          vdcDisplayFrame.getContentPane.setCursor(vicDisplayFrame.getToolkit.createCustomCursor(cursor,new Point(0, 0),"null"))
-        }
-        else {
-          vicDisplayFrame.getContentPane.setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR))
-          vdcDisplayFrame.getContentPane.setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR))
-        }
+        if (mouseEnabled) MouseCage.enableMouseCageOn(vicDisplay) else MouseCage.disableMouseCage
       case "EXIT" => close
       case "TAPE" =>
         loadFileFromTape

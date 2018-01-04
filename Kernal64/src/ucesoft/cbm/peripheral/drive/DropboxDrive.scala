@@ -38,8 +38,8 @@ class DropboxDrive(bus: IECBus,dbxClient : DbxClient,device: Int = 9) extends Ab
   protected def getDirectoryEntries(path:String) : List[DirEntry] = {
     try {
       val meta = dbxClient.getMetadataWithChildren(currentPath)
-      import collection.JavaConversions._
-      meta.children map { c => DirEntry(c.name,if (c.isFile) c.asFile.numBytes.toInt else 0,c.isFolder) } toList
+      import collection.JavaConverters._
+      meta.children.asScala map { c => DirEntry(c.name,if (c.isFile) c.asFile.numBytes.toInt else 0,c.isFolder) } toList
     }
     catch {
       case t:Throwable =>

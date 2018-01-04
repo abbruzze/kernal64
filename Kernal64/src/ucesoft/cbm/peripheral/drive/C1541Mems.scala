@@ -2,16 +2,13 @@ package ucesoft.cbm.peripheral.drive
 
 import ucesoft.cbm.cpu.ROM
 import ucesoft.cbm.ChipID
-import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.Log
 import ucesoft.cbm.cpu.BridgeMemory
-import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.cpu.RAMComponent
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
-import java.io.IOException
 
 object C1541Mems {
   val KERNEL_M = 0xC000

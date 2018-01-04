@@ -4,7 +4,6 @@ import javax.swing._
 import ucesoft.cbm.peripheral.sid.AudioDriverDevice
 import javax.swing.event.ChangeListener
 import javax.swing.event.ChangeEvent
-import java.awt.BorderLayout
 
 object VolumeSettingsPanel {
   def getDialog(frame:JFrame,driver:AudioDriverDevice) = {

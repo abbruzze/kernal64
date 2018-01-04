@@ -3,8 +3,6 @@ package ucesoft.cbm.peripheral.drive
 import ucesoft.cbm.Chip
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.Log
-import ucesoft.cbm.Clock
-import ucesoft.cbm.ClockEvent
 import ucesoft.cbm.cpu.RAMComponent
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream

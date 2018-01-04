@@ -1,10 +1,6 @@
 package ucesoft.cbm.formats
 
 import java.io._
-import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.ChipID
-import ucesoft.cbm.expansion.ExpansionPort
-import ucesoft.cbm.Log
 import scala.language.postfixOps
 
 class Cartridge(file:String) {

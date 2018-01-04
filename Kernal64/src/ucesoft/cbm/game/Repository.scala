@@ -9,10 +9,7 @@ import java.io.FileOutputStream
 import java.io.PrintWriter
 import java.util.zip.GZIPInputStream
 import java.io.FileInputStream
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.URL
-import java.awt.image.BufferedImage
 import javax.swing.ImageIcon
 import java.nio.file.Files
 import javax.imageio.ImageIO

@@ -1,7 +1,6 @@
 package ucesoft.cbm.util
 
 import javax.swing.JFrame
-import javax.swing.JDialog
 import com.dropbox.core.DbxAppInfo
 import java.util.Properties
 import java.util.Locale

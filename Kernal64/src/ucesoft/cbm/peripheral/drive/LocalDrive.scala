@@ -1,6 +1,5 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.peripheral.bus.IECBusDevice
 import ucesoft.cbm.peripheral.bus.IECBus
 import java.io.File
 import ucesoft.cbm.formats.D64
@@ -8,7 +7,6 @@ import ucesoft.cbm.peripheral.bus.BusDataIterator
 import java.io.IOException
 import java.io.FileInputStream
 import java.io.DataInputStream
-import scala.collection.mutable.ListBuffer
 import java.io.FileOutputStream
 import language.postfixOps
 

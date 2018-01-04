@@ -2,11 +2,9 @@ package ucesoft.cbm.peripheral.keyboard
 
 import javax.swing.JFrame
 
-import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import javax.swing.JPanel
 import ucesoft.cbm.Log
-import ucesoft.cbm.peripheral.controlport.ControlPort
 import java.awt.event.KeyListener
 
 object KeyListenerTest extends App with KeyListener {

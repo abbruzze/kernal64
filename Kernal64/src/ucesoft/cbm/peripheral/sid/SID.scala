@@ -9,13 +9,14 @@ import ucesoft.cbm.ClockEvent
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
+import ucesoft.cbm.util.MouseCage
 
 class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Option[AudioDriverDevice] = None) extends Chip with SIDDevice {
   override lazy val componentID = "SID_" + sidID
-  private[this] val SAMPLE_RATE = 44100
-  private[this] val CPU_FREQ = 985248
-  private[this] val CLOCKS_PER_SAMPLE = CPU_FREQ / SAMPLE_RATE
-  private[this] val CLOCKS_PER_SAMPLE_REST = ((CPU_FREQ * 1000L) / SAMPLE_RATE).toInt - CLOCKS_PER_SAMPLE * 1000
+  private[this] final val SAMPLE_RATE = 44100
+  private[this] final val CPU_FREQ = 985248
+  private[this] final val CLOCKS_PER_SAMPLE = CPU_FREQ / SAMPLE_RATE
+  private[this] final val CLOCKS_PER_SAMPLE_REST = ((CPU_FREQ * 1000L) / SAMPLE_RATE).toInt - CLOCKS_PER_SAMPLE * 1000
   
   val id = ChipID.SID
   val name = "SID"
@@ -77,9 +78,9 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   
   final def read(address: Int, chipID: ChipID.ID) = decode(address) match {
     case POTX_OFS =>
-      if (mouseEnabled) (java.awt.MouseInfo.getPointerInfo.getLocation.x & 0x7F) << 1 else 0
+      if (mouseEnabled) (MouseCage.x & 0x7F) << 1 else 0
     case POTY_OFS =>
-      if (mouseEnabled) (0x7F - (java.awt.MouseInfo.getPointerInfo.getLocation.y & 0x7F)) << 1 else 0
+      if (mouseEnabled) (0x7F - (MouseCage.y & 0x7F)) << 1 else 0
     case ofs => sid.read(ofs)
   }
   final def write(address: Int, value: Int, chipID: ChipID.ID) = sid.write(decode(address),value)

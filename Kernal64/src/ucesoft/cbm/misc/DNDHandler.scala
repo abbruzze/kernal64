@@ -17,8 +17,8 @@ class DNDHandler(handleDND:(File) => Unit) extends TransferHandler {
       val t = support.getTransferable();
 
       try {
-        import scala.collection.JavaConversions._
-        t.getTransferData(DataFlavor.javaFileListFlavor).asInstanceOf[java.util.List[File]].headOption match {
+        import scala.collection.JavaConverters._
+        t.getTransferData(DataFlavor.javaFileListFlavor).asInstanceOf[java.util.List[File]].asScala.headOption match {
           case None =>
             false
           case Some(f) =>

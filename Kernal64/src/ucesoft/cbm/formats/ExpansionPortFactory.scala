@@ -3,7 +3,6 @@ package ucesoft.cbm.formats
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.expansion.ExpansionPort
-import ucesoft.cbm.Log
 import ucesoft.cbm.Clock
 import ucesoft.cbm.ClockEvent
 
