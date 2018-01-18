@@ -19,6 +19,7 @@ class FloppyComponent(device:Int,attachedDisks : Array[Option[Floppy]],drives : 
       properties.setProperty("Track",if (attachedDisk.isDefined) attachedDisk.get.currentTrack.toString else "-")
       properties.setProperty("Sector",if (attachedDisk.isDefined && attachedDisk.get.currentSector.isDefined) attachedDisk.get.currentSector.get.toString else "N/A")
       properties.setProperty("Total tracks",if (attachedDisk.isDefined) attachedDisk.get.totalTracks.toString else "-")
+      properties.setProperty("Side",if (attachedDisk.isDefined) attachedDisk.get.side.toString else "-")
       properties
     }
     

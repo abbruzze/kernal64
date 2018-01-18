@@ -455,7 +455,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       mmuChangeListener.c64Mode(true)
       check64_1
     }
-    Log.debug(s"Writing D505 register: z80enabled=$z80enabled c128Mode=$c128Mode")
+    Log.debug(s"Writing D505 register: z80enabled=$z80enabled c128Mode=$c128Mode fastSerialDir=${(value & 8) == 0}")
     //println(s"Writing D505 register: z80enabled=$z80enabled c128Mode=$c128Mode")
   }
   // ----------------------------------------------------------------------------

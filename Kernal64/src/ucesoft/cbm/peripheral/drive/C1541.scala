@@ -24,7 +24,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] val FORMAT_ROUTINE = 0xC8C6
   private[this] val FORMAT_ROUTINE_OK = 0xC8EF
   private[this] val FORMAT_ROUTINE_NOK = 0xC8E8
-  private[this] val WAIT_LOOP_ROUTINE = 0xEC9B //0xEBFF//0xEC9B
+  private[this] val WAIT_LOOP_ROUTINE = 0xEBFF//0xEC9B //0xEBFF//0xEC9B
   private[this] val WAIT_CYCLES_FOR_STOPPING = 2000000
   private[this] val GO_SLEEPING_MESSAGE_CYCLES = 3000000
   private[this] var CYCLE_ADJ = 0.0 //(MAX_SPEED_MHZ - MIN_SPEED_MHZ) / MIN_SPEED_MHZ.toDouble
@@ -158,7 +158,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
 
-  def getMem = mem
+  override def getMem = mem
 
   @inline private def checkPC(cycles: Long) {
     val pc = cpu.getPC

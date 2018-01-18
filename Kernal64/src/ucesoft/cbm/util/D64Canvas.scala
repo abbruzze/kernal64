@@ -8,6 +8,7 @@ import java.beans.PropertyChangeEvent
 import java.awt.Dimension
 
 import scala.language.postfixOps 
+import ucesoft.cbm.formats.D64
 
 class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with PropertyChangeListener {
   fc.addPropertyChangeListener(this)
@@ -30,7 +31,7 @@ class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with 
     	val d64 = new ucesoft.cbm.formats.D64(file.toString)   
 	    val dirs = d64.directories
 	    val bam = d64.bam	    
-	    	        
+	    
 	    black
 	    add("0 ")
 	    rvsOn
@@ -63,7 +64,8 @@ class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with 
 	      rep(0x20,endBlanks)
 	      newLine
 	    }
-	    val blocksFree = d64.TOTAL_AVAILABLE_SECTORS - (dirs map { _.sizeInSectors } sum)
+	    val blockUsed = dirs filter { _.fileType != D64.FileType.DEL} map { _.sizeInSectors } sum
+	    val blocksFree = d64.TOTAL_AVAILABLE_SECTORS - blockUsed
 	    add(if (blocksFree < 0) "0" else blocksFree.toString)
 	    add(" BLOCKS FREE.")
 	    d64.close

@@ -7,7 +7,7 @@ import ucesoft.cbm.ClockEvent
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 
-class VIADiskControl(var cpu: CPU6510,
+class VIADiskControl(cpu: CPU6510,
   					 irqAction: (Boolean) => Unit,
   					 ledListener: DriveLedListener) extends VIA("VIA_DiskControl", 0x1C00,irqAction) {
   override lazy val componentID = "VIA2 (DC)"
@@ -146,14 +146,9 @@ class VIADiskControl(var cpu: CPU6510,
     case PA|PA2 =>
       super.read(address, chipID)
       floppy.notifyTrackSectorChangeListener
-//      regs(PCR) & 0x0E match {
-//        case 0xA|0x08 => canSetByteReady = true
-//        case _ =>
-//      }
       if ((regs(PCR) & 0x0C) == 0x08) {
         canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
       }
-      //println(s"READ ${Integer.toHexString(headByte)} ${track}/${sector} gcrIndex=${gcrIndex}")
       lastRead
     case ofs => super.read(address, chipID)
   }
@@ -161,19 +156,14 @@ class VIADiskControl(var cpu: CPU6510,
   override def write(address: Int, value: Int, chipID: ChipID.ID) {
     (address & 0x0F) match {
       case PA =>
-//        regs(PCR) & 0x0E match {
-//          case 0xA|0x08 => canSetByteReady = true
-//          case _ =>
-//        }   
         if ((regs(PCR) & 0x0C) == 0x08) {
           canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
         }
       case PCR =>
-        //canSetByteReady = (value & 0x0A) == 0x0A
         value & 0x0E match {
           case 0xE => canSetByteReady = true        // 111 => Manual output mode high
           case 0xC => canSetByteReady = false       // 110 => Manual output mode low
-          case _ => canSetByteReady = true 
+          case _ => canSetByteReady = true
         }
         isWriting = (value & 0x20) == 0
         ledListener.writeMode(isWriting)
@@ -188,6 +178,7 @@ class VIADiskControl(var cpu: CPU6510,
             ledListener.endLoading
             if (lastMotorOn && !motorOn) currentFilename = ""
           }
+          else if (floppy == EmptyFloppy) floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
         }
         val newSpeedZone = (value & 0xFF) >> 5 & 0x3
         if (newSpeedZone != speedZone) {
@@ -237,7 +228,7 @@ class VIADiskControl(var cpu: CPU6510,
           bitCounter = 0
           lastWrite = regs(PA)
           byteReady = true
-          irq_set(IRQ_CA1)
+          //irq_set(IRQ_CA1)
         }
       }
       else { // READING
@@ -249,7 +240,7 @@ class VIADiskControl(var cpu: CPU6510,
           lastWrite = lastRead
           byteReady = true
           lastRead = last10Bits & 0xFF      
-          irq_set(IRQ_CA1)
+          //irq_set(IRQ_CA1)
         }
       }      
     }
@@ -266,7 +257,7 @@ class VIADiskControl(var cpu: CPU6510,
           case 0xA|0x08 => canSetByteReady = false
           case _ =>
         }         
-        //irq_set(IRQ_CA1)
+        irq_set(IRQ_CA1)
       }
     }
   }

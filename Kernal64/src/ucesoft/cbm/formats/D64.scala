@@ -13,7 +13,7 @@ object D64 {
     val DEL, SEQ, PRG, USR, REL = Value
   }
   case class DirEntry(fileType: FileType.Value, fileName: String, t: Int, s: Int, sizeInSectors: Int)
-  case class BamInfo(diskName: String, diskID: String, dosType: String,singleSide:Boolean=true)
+  case class BamInfo(diskName: String, diskID: String, dosType: String,singleSide:Boolean,freeSectors:Int)
   case class FileData(fileName: String, startAddress: Int, data: Array[Int]) {
     def iterator = {
       val buffer = if (startAddress != -1) Array.ofDim[Int](data.length + 2) else data
@@ -142,7 +142,7 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   //println(directories.mkString("\n"))
   if (!empty) loadGCRImage
   
-  def gcrImageOf(t:Int,s:Int) = GCRImage(t - 1)(s)
+  def gcrImageOf(t:Int,s:Int) = if (t == 0 || t > GCRImage.length) GCR.EMPTY_GCR_SECTOR else GCRImage(t - 1)(s)
   
   @inline private def getSectorError(t:Int,s:Int) : Option[Int] = {
     d64.length match {
@@ -217,7 +217,13 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
 
   private def bamInfo = {    
     d64.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 3)
-    val singleSide = d64.read == 0
+    val singleSide = file.toUpperCase.endsWith(".D64") || d64.read == 0
+    var freeSectors = 0
+    d64.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 4)
+    for(_ <- 1 to 35) {
+      freeSectors += d64.readByte
+      d64.skipBytes(3)
+    }
     d64.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)
     val diskName = new StringBuilder
     var i = 0
@@ -230,7 +236,7 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
     val diskID = "" + d64.readByte.toChar + d64.readByte.toChar
     d64.skipBytes(1)
     val dosType = "" + d64.readByte.toChar + d64.readByte.toChar
-    BamInfo(diskName.toString, diskID, dosType,singleSide)
+    BamInfo(diskName.toString, diskID, dosType,singleSide,freeSectors)
   }
 
   def loadInMemory(mem: Memory, fileName: String, relocate: Boolean,c64Mode:Boolean=true) = {
@@ -387,7 +393,7 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
     ptr += 2 + 2 + blocksFreeText.length + 1
     out.append(ptr & 0xFF) 	// L
     out.append(ptr >> 8)	// H
-    val blocksFree = TOTAL_AVAILABLE_SECTORS - (dirs map { _.sizeInSectors } sum)
+    val blocksFree = bamInfo.freeSectors//TOTAL_AVAILABLE_SECTORS - (dirs map { _.sizeInSectors } sum)
     // write block free
     out.append(blocksFree & 0xFF) 	// L
     out.append(blocksFree >> 8)		// H    
@@ -461,8 +467,43 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   private[this] var sectorModified = false
   private[this] var trackChangeListener : Floppy#TrackListener = null
   private[this] var bit = 1
+  private[this] var _side = 0
+  private[this] var trackSideBase = 0
+  
+  override def minTrack = _side match {
+    case 0 =>
+      1
+    case 1 =>
+      (totalTracks >> 1) + 1
+  }
+  override def maxTrack = _side match {
+    case 0 =>
+      if (bam.singleSide) totalTracks else totalTracks >> 1
+    case 1 =>
+      totalTracks
+  }
+  
+  override def side = _side
+  override def side_=(newSide:Int) {
+    newSide match {
+      case 0 if _side == 1 =>
+        track -= TOTAL_TRACKS >> 1
+        sector = 0
+        sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
+        gcrSector = gcrImageOf(track, sector)
+      case 1 if _side == 0 =>
+        val oldT = track
+        track += TOTAL_TRACKS >> 1
+        sector = 0
+        sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
+        gcrSector = gcrImageOf(track, sector)
+      case _ =>
+    }
+    _side = newSide    
+  }
   
   def reset {
+    side = 0
     track = 1
     sector = 0
     gcrSector = gcrImageOf(track, sector)
@@ -494,7 +535,7 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
       }
       gcrIndex = 0
       sector = (sector + 1) % sectorsPerCurrentTrack        
-      gcrSector = gcrImageOf(track, sector)      
+      gcrSector = gcrImageOf(track, sector)  
     }
   }
   
@@ -526,7 +567,8 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   
   override def toString = s"D64 fileName=$file totalTracks=$TOTAL_TRACKS t=$track s=$sector"
   // state
-  def save(out:ObjectOutputStream) {    
+  def save(out:ObjectOutputStream) {
+    out.writeInt(_side)
     out.writeInt(track)
     out.writeInt(sector)
     out.writeInt(gcrIndex)
@@ -534,6 +576,7 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
     out.writeBoolean(sectorModified)
   }
   def load(in:ObjectInputStream) {
+    _side = in.readInt
     track = in.readInt
     sector = in.readInt
     gcrIndex = in.readInt

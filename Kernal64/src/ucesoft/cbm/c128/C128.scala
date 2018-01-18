@@ -25,6 +25,7 @@ import ucesoft.cbm.peripheral.controlport.JoystickSettingDialog
 import ucesoft.cbm.peripheral.bus.IECBusLine
 import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.remote.RemoteC64
+import ucesoft.cbm.peripheral.bus.IECBusListener
 
 object C128 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -127,8 +128,8 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private[this] val driveLeds = Array(new DriveLed,new DriveLed)
   private[this] val diskProgressPanels = Array(new DriveLoadProgressPanel,new DriveLoadProgressPanel)
   private[this] val c1541 = new C1541Emu(bus,DriveLed8Listener)
-  private[this] val c1541_real = new C1541(0x00,bus,DriveLed8Listener)
-  private[this] val c1541_real9 = new C1541(0x01,bus,DriveLed9Listener)
+  private[this] val c1541_real : Drive with TraceListener = new C1571(0x00,bus,DriveLed8Listener)//new C1541(0x00,bus,DriveLed8Listener)
+  private[this] val c1541_real9 : Drive with TraceListener = new C1541(0x01,bus,DriveLed9Listener)
   private[this] val flyerIEC = new FlyerIEC(bus,file => attachDiskFile(0,file,false))
   private[this] var isFlyerEnabled = false
   private[this] var drives : Array[Drive] = Array(c1541_real,c1541_real9)
@@ -235,6 +236,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     Log.info("Building the system ...")
     ExpansionPort.addConfigurationListener(mmu)
     // -----------------------    
+    clock.setClockHz(1000000)
     mmu.setKeyboard(keyb)
     add(clock)
     add(mmu)
@@ -267,7 +269,25 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     				   0xDC00,
     				   cia1CP1,
     				   cia1CP2,
-    				   irqSwitcher.ciaIRQ _) {
+    				   irqSwitcher.ciaIRQ _) with IECBusListener {
+      val busid = "CIA1"
+      
+      bus.registerListener(this)
+    }
+    
+    cia1.setSerialOUT(bitOut => {
+      if (!FSDIRasInput && !c64Mode) {
+        //println(s"C128 send serial $bitOut")
+        bus.setLine("CIA1",IECBusLine.DATA,if (bitOut) IECBus.GROUND else IECBus.VOLTAGE)
+        c1541_real.asInstanceOf[C1571].serialIN(bitOut)
+      }
+    })
+    c1541_real.asInstanceOf[C1571].setSerialOUT(bitOut => {
+      //println(s"C1571 send serial $bitOut")
+      bus.setLine("VIA1571_DiskControl",IECBusLine.DATA,if (bitOut) IECBus.GROUND else IECBus.VOLTAGE)
+      if (FSDIRasInput) cia1.serialIN(bitOut)
+    })
+    /*
       override protected def sendSerialBit(on:Boolean) {
         if (!FSDIRasInput) {
           bus.setLine(CIA2Connectors.CIA2_PORTA_BUSID,IECBusLine.DATA,if (on) IECBus.GROUND else IECBus.VOLTAGE)
@@ -281,16 +301,18 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         }
       }
     }
+    */
     add(nmiSwitcher)
     // CIA2 connector must be modified to handle fast serial ... 
-    val cia2CP1 = new CIA2Connectors.PortAConnector(mmu,bus,rs232) {
+    val cia2CP1 = new CIA2Connectors.PortAConnector(mmu,bus,rs232)
+    /*
+    {
       override def srqChanged(oldValue:Int,newValue:Int) {
-        if (FSDIRasInput) {
-          cia1.setSP(bus.data == IECBus.GROUND)
-          cia1.setCNT(newValue == IECBus.GROUND)          
-        }
+        if (FSDIRasInput) cia1.serialIN(bus.data == IECBus.GROUND)
       }
     }
+    * 
+    */
     val cia2CP2 = new CIA2Connectors.PortBConnector(rs232)    
     add(cia2CP1)
     add(cia2CP2)
@@ -363,6 +385,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     // tracing
     traceDialog = TraceDialog.getTraceDialog(vicDisplayFrame,mmu,z80,vicDisplay,vicChip)
     diskTraceDialog = TraceDialog.getTraceDialog(vicDisplayFrame,c1541_real.getMem,c1541_real)    
+    //diskTraceDialog.forceTracing(true)
     // drive leds
     add(driveLeds(0))        
     add(driveLeds(1))
@@ -512,6 +535,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   
   def fastSerialDirection(input:Boolean) {
     FSDIRasInput = input
+    if (input) bus.setLine("CIA1",IECBusLine.DATA,IECBus.VOLTAGE)
     //println(s"FSDIR set to input $input")
   }
   // ---------------------------------- GUI HANDLING -------------------------------

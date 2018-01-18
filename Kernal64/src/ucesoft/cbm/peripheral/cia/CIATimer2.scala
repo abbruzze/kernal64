@@ -12,6 +12,7 @@ import javax.swing.JFrame
 class CIATimerA2(ciaName: String,
                  id: String,
                  irqAction: (String) => Unit,
+                 autoClock: Boolean = true,
                  timerToNotify: Option[CIATimerA2] = None) extends CBMComponent {
   val componentID = ciaName + id
   val componentType = CBMComponentType.CHIP 
@@ -35,6 +36,7 @@ class CIATimerA2(ciaName: String,
   private[this] var countExternal = false
   private[this] var serialActionCallback : Option[() => Unit] = None
   protected[this] var countSystemClock = true
+  private[this] var startDelayCount = 0
   
   private[this] var startCycle = 0L
   
@@ -85,8 +87,8 @@ class CIATimerA2(ciaName: String,
     //println(s"${ciaName}-${id} set counter hi to ${hi} latch=${latch} prev=${prev}")
   }
 
-  final def readLo = getCounter & 0xFF  
-  final def readHi = getCounter >> 8
+  final def readLo = (if (autoClock) getCounter else counter) & 0xFF  
+  final def readHi = (if (autoClock) getCounter else counter) >> 8
   
   @inline private def getCounter : Int = {
     val cycles = systemClock.currentCycles
@@ -132,19 +134,22 @@ class CIATimerA2(ciaName: String,
 
   private def enableTimer(enabled: Boolean,reload:Boolean,oldCountExternal:Boolean) {
     if (!started && enabled) { // start from stopped
-      if (!countExternal) reschedule(START_DELAY,counter)
+      if (!countExternal && autoClock) reschedule(START_DELAY,counter)
+      startDelayCount = START_DELAY
     } 
     else 
     if (started && enabled) { // start from started
-      if (reload) {
+      if (reload && autoClock) {
         systemClock.cancel(EVENT_ID)
-        if (!countExternal) reschedule(START_DELAY,counter)
+        if (!countExternal) reschedule(START_DELAY,counter)        
       }
     }
     else
     if (started && !enabled) { // stop timer from started
-      systemClock.cancel(EVENT_ID)
-      if (!oldCountExternal && countSystemClock) counter = getCounter      
+      if (autoClock) {
+        systemClock.cancel(EVENT_ID)
+        if (!oldCountExternal && countSystemClock) counter = getCounter
+      }            
     }
 
     started = enabled
@@ -159,6 +164,19 @@ class CIATimerA2(ciaName: String,
     countExternal = enabled
     Log.debug(s"${ciaName}-${id} countExternal=${enabled}")
   }
+  
+  /**
+   * Manual clock
+   */
+  final def clock {
+    if (started) {
+      if (startDelayCount > 0) startDelayCount -= 1
+      else {
+        if (counter == 0) underflow(0)
+        else counter -= 1
+      }
+    }
+  }
 
   private def underflow(cycles: Long) {
     if (!countSystemClock) return // don't manage CNT counting
@@ -171,8 +189,10 @@ class CIATimerA2(ciaName: String,
     if (timerUnderflowOnPortB) {
       if (toggleMode) flipFlop = !flipFlop
       else {
-        toggleValue = true
-        systemClock.schedule(new ClockEvent(EVENT_ID,cycles + 2, toggleToFalse,TOGGLE_TO_FALSE_SUBID))
+        if (autoClock) {
+          toggleValue = true
+          systemClock.schedule(new ClockEvent(EVENT_ID,cycles + 2, toggleToFalse,TOGGLE_TO_FALSE_SUBID))
+        }
       }
     }
     timerToNotify match {
@@ -182,7 +202,7 @@ class CIATimerA2(ciaName: String,
 
     irqAction(id)
     if (oneShot) started = false
-    else if (!countExternal) reschedule(START_CONT_DELAY,counter)
+    else if (!countExternal && autoClock) reschedule(START_CONT_DELAY,counter)
   }
   // state
   protected def saveState(out:ObjectOutputStream) {
@@ -197,7 +217,8 @@ class CIATimerA2(ciaName: String,
     out.writeBoolean(started)
     out.writeBoolean(countExternal)
     out.writeBoolean(countSystemClock)
-    out.writeLong(startCycle)  
+    out.writeLong(startCycle) 
+    out.writeInt(startDelayCount)
     saveClockEvents(out)
   }
   protected def loadState(in:ObjectInputStream) {
@@ -213,6 +234,7 @@ class CIATimerA2(ciaName: String,
     countExternal = in.readBoolean
     countSystemClock = in.readBoolean
     startCycle = in.readLong
+    startDelayCount = in.readInt
     loadClockEvents(in) {
       case (UNDERFLOW_SUBID,w) =>
         new ClockEvent(EVENT_ID,w,underflowCallback,UNDERFLOW_SUBID)
@@ -223,7 +245,7 @@ class CIATimerA2(ciaName: String,
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
 
-class CIATimerB2(ciaName: String, id: String, irqAction: (String) => Unit) extends CIATimerA2(ciaName, id, irqAction) {
+class CIATimerB2(ciaName: String, id: String, irqAction: (String) => Unit,autoClock:Boolean = true) extends CIATimerA2(ciaName, id, irqAction,autoClock) {
   override protected def handleCR567 {
     val bit56 = (cr >> 5) & 0x3
     setCountExternal(bit56 == 2)

@@ -45,7 +45,8 @@ class CIA(val name:String,
 		  val startAddress:Int,
 		  portAConnector:Connector,
 		  portBConnector:Connector,
-		  irqAction:(Boolean) => Unit) extends Chip with RAMComponent {
+		  irqAction:(Boolean) => Unit,
+		  autoClock:Boolean = true) extends Chip with RAMComponent {
   import CIA._
   
   override lazy val componentID = name
@@ -54,13 +55,14 @@ class CIA(val name:String,
   val isActive = true
   val id = ChipID.CIA
     
-  private[this] val timerB = new CIATimerB2(name,IRQ_SRC_TB,irqHandling _)
-  private[this] val timerA = new CIATimerA2(name,IRQ_SRC_TA,irqHandling _,Some(timerB))
+  private[this] val timerB = new CIATimerB2(name,IRQ_SRC_TB,irqHandling _,autoClock)
+  private[this] val timerA = new CIATimerA2(name,IRQ_SRC_TA,irqHandling _,autoClock,Some(timerB))
   private[this] val tod = new TOD2//new TOD((timerB.readCR & 0x80) == 0)
   private[this] var icr = 0
   private[this] var sdr,shiftRegister = 0
   private[this] var sdrLoaded,sdrOut = false
-  private[this] var CNT,SP = false
+  private[this] var SP = false
+  private[this] var serialOUTTrigger : Boolean => Unit = _
   private[this] var sdrIndex = 0
   private[this] var icrMask = 0	// bits 0 - 4
   
@@ -269,6 +271,14 @@ class CIA(val name:String,
   }
   
   // ===============================================================================
+  
+  /**
+   * Manual clock
+   */
+  final def clock {
+    timerA.clock
+    timerB.clock
+  }
       
   def init {
     timerA.setSerialCallBack(Some(sendSerial _))
@@ -382,6 +392,7 @@ class CIA(val name:String,
       sdr = value
       if ((timerA.readCR & 0x40) == 0x40) { // serial out
         sdrLoaded = true        
+        //println(s"$name SDR=${Integer.toHexString(value)} '${value.toChar}'")
       }
     case ICR =>
       val mustSet = (value & 0x80) == 0x80 
@@ -418,18 +429,12 @@ class CIA(val name:String,
           //println("Sending serial " + sdrIndex + " at rate " + timerA.getLatch)
           val bit = (shiftRegister & 0x80) > 0
           shiftRegister = (shiftRegister << 1) & 0xFF
-          sendSerialBit(bit)
+          if (serialOUTTrigger != null) serialOUTTrigger(bit)
           if (sdrIndex == 16) {
             irqHandling(IRQ_SERIAL)
             sdrIndex = 0
             sdrOut = false
           }
-          CNT = true // reproduce the TimerA clock on CNT
-          sendCNT(CNT)
-        }
-        else {
-          CNT = false
-          sendCNT(CNT)
         }
       }
     }
@@ -438,29 +443,25 @@ class CIA(val name:String,
   /**
    * Used for serial
    */
-  final def setCNT(cnt:Boolean) {
+  final def serialIN(sp:Boolean) {
     // only on rising edge
-    if (cnt && !CNT && (timerA.readCR & 0x40) == 0) { // serial input mode
-      CNT = true
-      shiftRegister >>= 1
-      if (SP) shiftRegister |= 0x80 else shiftRegister &= 0x7F
+    if ((timerA.readCR & 0x40) == 0) { // serial input mode
+      SP = sp
+      shiftRegister <<= 1
+      if (SP) shiftRegister |= 0x01 else shiftRegister &= 0xFE
       sdrIndex += 1
       if (sdrIndex == 8) {
         sdrIndex = 0
         irqHandling(IRQ_SERIAL)
         sdr = shiftRegister & 0xFF
+        //println(s"$name Received=${Integer.toHexString(sdr)} '${sdr.toChar}'")
       }
     }
   }
-  /**
-   * Used for serial
-   */
-  final def setSP(sp:Boolean) {
-    SP = sp
-  }
   
-  protected def sendSerialBit(on:Boolean) {}
-  protected def sendCNT(high:Boolean) {}
+  final def setSerialOUT(sot:Boolean => Unit) {
+    serialOUTTrigger = sot
+  }
   
   // state
   protected def saveState(out:ObjectOutputStream) {

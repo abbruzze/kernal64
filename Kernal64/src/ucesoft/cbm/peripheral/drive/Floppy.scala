@@ -55,6 +55,12 @@ trait Floppy {
   val totalTracks : Int
   val file : String
   
+  def minTrack = 1
+  def maxTrack = totalTracks
+  
+  def side : Int = 0
+  def side_=(newSide:Int) {}
+  
   def nextBit : Int
   def writeNextBit(bit:Boolean)
   
@@ -97,9 +103,11 @@ trait Floppy {
 object EmptyFloppy extends Floppy {
   val isReadOnly = false
   val isFormattable = false
-  val totalTracks = 42
+  val totalTracks = 35
   val file = ""
+  
   private[this] var track = 1
+  private[this] var listener : TrackListener = _
   
   def nextBit = 0
   def writeNextBit(bit:Boolean) {}
@@ -111,9 +119,12 @@ object EmptyFloppy extends Floppy {
     if (isOnTrack) {
       track = trackSteps >> 1
     }
+    notifyTrackSectorChangeListener
   }
-  def setTrackChangeListener(l:TrackListener) {}
-  def notifyTrackSectorChangeListener {}
+  def setTrackChangeListener(l:TrackListener) = listener = l
+  def notifyTrackSectorChangeListener {
+    if (listener != null) listener(track,false,None)
+  }
   
   def format(diskName:String) = throw new IllegalArgumentException("Empty disk. Can't format")
   

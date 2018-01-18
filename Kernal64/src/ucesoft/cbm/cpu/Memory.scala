@@ -108,6 +108,8 @@ abstract class BridgeMemory extends RAMComponent {
 }
 
 object Memory {
+  val empty = dummyWith(0,0)
+  
   def dummyWith(address:Int,values:Int*) = new Memory {
     private val mem = values.toArray
     val isRom = false

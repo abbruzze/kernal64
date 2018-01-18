@@ -18,6 +18,8 @@ private[formats] object GCR {
   final private[this] val DOS_22_DATA_DESC_BYTE_NOT_FOUND = 4
   final private[this] val DOS_23_CHECKSUM_ERROR_IN_DATA_BLOCK = 5
   
+  final val EMPTY_GCR_SECTOR = Array.ofDim[Int](DATA_SIZE)
+  
   @inline private def getZoneFrom(track:Int) = {
     if (track <= 17) 0
     else if (track <= 24) 1

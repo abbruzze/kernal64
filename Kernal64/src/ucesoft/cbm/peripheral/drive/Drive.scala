@@ -2,6 +2,7 @@ package ucesoft.cbm.peripheral.drive
 
 import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
+import ucesoft.cbm.cpu.Memory
 
 trait Drive extends CBMComponent {
   val componentType = CBMComponentType.DISK
@@ -14,6 +15,7 @@ trait Drive extends CBMComponent {
   def clock(cycles:Long)
   def setReadOnly(readOnly:Boolean) {}
   def getFloppy : Floppy
+  def getMem : Memory = Memory.empty
   
   def getSpeedHz = -1  
   def setSpeedHz(speed:Int) {}
