@@ -61,20 +61,12 @@ class C1571(val driveID: Int,
   private[this] var currentSpeedHz = MIN_SPEED_HZ
   private[this] var cycleFrac = 0.0
   
-  def setSerialOUT(serialOutHandler:Boolean => Unit) {
-    CIA.setSerialOUT(b => {
-      if (busDataDirection == 1) {
-        serialOutHandler(b)
-      }
-    })
-  }
-    
   // ================== Components =================================  
   /************************************************************************************************************
    * CPU
    * 
    ***********************************************************************************************************/
-  private[this] val cpu = CPU6510.make(this,ChipID.CPU_1541)  
+  private[this] val cpu = CPU6510.make(this,ChipID.CPU_1571)  
   /**
    * IRQ Manager for VIA1,VIA2 and CIA
    */
@@ -147,7 +139,19 @@ class C1571(val driveID: Int,
    * CIA for fast serial bus
    * 
    ***********************************************************************************************************/
-  private[this] val CIA = new CIA("CIA_FAST",0x4000,EmptyCIAConnector,EmptyCIAConnector,IRQSwitcher.ciaIRQ _,false)
+  private[this] val CIA = new CIA("CIA_FAST",0x4000,EmptyCIAConnector,EmptyCIAConnector,IRQSwitcher.ciaIRQ _,false) with IECBusListener {
+    val busid = name    
+    
+    override def srqTriggered = if (busDataDirection == 0) serialIN(bus.data == IECBus.GROUND)    
+    
+    bus.registerListener(this)
+    setSerialOUT(b => {
+      if (busDataDirection == 1) {
+        bus.setLine(busid,IECBusLine.DATA,if (b) IECBus.GROUND else IECBus.VOLTAGE)
+        bus.triggerSRQ(busid)
+      }
+    })
+  }
   /************************************************************************************************************
    * VIA1 IEC Bus Manager
    * 
@@ -191,7 +195,7 @@ class C1571(val driveID: Int,
           autoacknwoledgeData
         case ad@(PA|PA2) =>
           busDataDirection = (value & 2) >> 1
-          if (busDataDirection == 0) bus.setLine("VIA1571_DiskControl",IECBusLine.DATA,IECBus.VOLTAGE)
+          if (busDataDirection == 0) bus.setLine(CIA.name,IECBusLine.DATA,IECBus.VOLTAGE)
           activeHead = (value & 4) >> 2
           if (floppy.side != activeHead) {
             floppy.side = activeHead
@@ -228,7 +232,7 @@ class C1571(val driveID: Int,
    * VIA2 Disk Controller
    * 
    ***********************************************************************************************************/
-  private[this] val VIA2 = new VIA("VIA1571_DiskControl", 0x1C00,IRQSwitcher.viaDiskIRQ _) with IECBusListener {
+  private[this] val VIA2 = new VIA("VIA1571_DiskControl", 0x1C00,IRQSwitcher.viaDiskIRQ _) {
     val busid = "VIA1571_DiskControl"
     override lazy val componentID = "VIA1571_2 (DC)"
     private[this] val WRITE_PROTECT_SENSE = 0x10
@@ -245,8 +249,6 @@ class C1571(val driveID: Int,
     private[this] var track = 1
     private[this] var trackSteps = track << 1    
     private[this] var currentFilename = ""
-    
-    bus.registerListener(this)
     
     /**
      * Get the rotation cycles needed for read a byte for the given zone.
@@ -315,7 +317,9 @@ class C1571(val driveID: Int,
     def setReadOnly(readOnly:Boolean) = isReadOnly = readOnly
   
     def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
-      floppy = driveReader    
+      floppy = driveReader
+      track = 18
+      trackSteps = track << 1
       if (emulateInserting) {
         // reset the last track
         floppy.changeTrack(trackSteps) 
@@ -323,12 +327,12 @@ class C1571(val driveID: Int,
         isDiskChanged = true
         isDiskChanging = true
         VIA1.irq_set(IRQ_CA2)
-        Clock.systemClock.schedule(new ClockEvent("DiskRemoving",Clock.systemClock.currentCycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
+        clk.schedule(new ClockEvent("DiskRemoving",Clock.systemClock.currentCycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
           isDiskChanged = false
-          Clock.systemClock.schedule(new ClockEvent("DiskWaitingInserting",cycles + REMOVING_DISK_WAIT, cycles => {
+          clk.schedule(new ClockEvent("DiskWaitingInserting",cycles + REMOVING_DISK_WAIT, cycles => {
             isDiskChanged = true
             VIA1.irq_set(IRQ_CA2)
-            Clock.systemClock.schedule(new ClockEvent("DiskWaitingClearing",cycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
+            clk.schedule(new ClockEvent("DiskWaitingClearing",cycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
               isDiskChanged = false
               isDiskChanging = false
             }))
@@ -374,14 +378,15 @@ class C1571(val driveID: Int,
     override def write(address: Int, value: Int, chipID: ChipID.ID) {
       (address & 0x0F) match {
         case PA =>
-          if ((regs(PCR) & 0x0C) == 0x08) canSetByteReady = (regs(PCR) & 0x0E) == 0x0A    
+          if ((regs(PCR) & 0x0C) == 0x08) canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
+          byteReadySignal = 1
         case PCR =>
           value & 0x0E match {
             case 0xE => canSetByteReady = true        // 111 => Manual output mode high
             case 0xC => canSetByteReady = false       // 110 => Manual output mode low
             case _ => canSetByteReady = true
           }
-          isWriting = (value & 0x20) == 0
+          isWriting = (value & 0x20) == 0          
           ledListener.writeMode(isWriting)
         case PB =>
           // led
@@ -406,11 +411,14 @@ class C1571(val driveID: Int,
           val oldStepHead = regs(PB) & 0x03
           val stepHead = value & 0x03
           
-          if (motorOn && oldStepHead == ((stepHead + 1) & 0x03) && track > floppy.minTrack) moveHead(moveOut = true)
+          if (motorOn && oldStepHead == ((stepHead + 1) & 0x03) && track > floppy.minTrack) {            
+            moveHead(moveOut = true)
+            //println(s"Move out $track/${floppy.maxTrack}")
+          }
           else 
-          if (motorOn && oldStepHead == ((stepHead - 1) & 0x03) && track < floppy.maxTrack) {
-            println(s"Move in $track/${floppy.maxTrack}")
+          if (motorOn && oldStepHead == ((stepHead - 1) & 0x03) && track < floppy.maxTrack) {            
             moveHead(moveOut = false)
+            //println(s"Move in $track/${floppy.maxTrack}")
           }
         case _ =>
       }
@@ -421,6 +429,7 @@ class C1571(val driveID: Int,
     def sideChanged {
       track = floppy.currentTrack
       trackSteps = track << 1
+      //println(s"Side changed: track=$track")
     }
   
     private def moveHead(moveOut: Boolean) {
@@ -454,6 +463,7 @@ class C1571(val driveID: Int,
             bitCounter = 0
             lastWrite = regs(PA)
             byteReady = true
+            byteReadySignal = 0
             //irq_set(IRQ_CA1)
           }
         }
@@ -658,7 +668,7 @@ class C1571(val driveID: Int,
   
   @inline private def checkPC(cycles: Long) {
     val pc = cpu.getPC
-    if (_1541Mode) {
+//    if (_1541Mode) {
       if (pc == _1541_LOAD_ROUTINE) setFilename
       else 
       if (pc == _1541_FORMAT_ROUTINE && useTRAPFormat) {
@@ -672,7 +682,7 @@ class C1571(val driveID: Int,
         VIA2.setActive(false)
         goSleepingCycles = cycles
       }
-    }
+//    }
   }
   
   final def clock(cycles: Long) {
@@ -695,8 +705,7 @@ class C1571(val driveID: Int,
         n_cycles -= 1
       }
       
-      VIA2.rotate
-      
+      VIA2.rotate      
     }
     else
     if (cycles - goSleepingCycles > GO_SLEEPING_MESSAGE_CYCLES) {
@@ -714,9 +723,7 @@ class C1571(val driveID: Int,
     awakeCycles = clk.currentCycles
     VIA2.awake
   }
-  
-  final def serialIN(sp:Boolean) = if (busDataDirection == 0) CIA.serialIN(sp)
-  
+    
   // ================== Tracing ====================================
   def setTraceOnFile(out:PrintWriter,enabled:Boolean) {/* ignored */}
   def setTrace(traceOn: Boolean) = {

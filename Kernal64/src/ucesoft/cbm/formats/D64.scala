@@ -5,7 +5,6 @@ import scala.collection.mutable.ListBuffer
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.bus.BusDataIterator
 import java.util.StringTokenizer
-import scala.language.postfixOps 
 import ucesoft.cbm.peripheral.drive.Floppy
 
 object D64 {
@@ -184,8 +183,8 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
       case Array(_,rest) =>
         rest split "," match {
           case Array(diskName,id) =>
-            if (diskName.length == 0 || diskName.length > 16 || id.length != 2) throw new IllegalArgumentException("Bad diskName='" + diskName + "' or bad id='" + id + "'")
-            val emptyDisk = getClass.getResourceAsStream("/resources/emptyDisk.d64")
+            if (diskName.length == 0 || diskName.length > 16 || id.length != 2) throw new IllegalArgumentException("Bad diskName='" + diskName + "' or bad id='" + id + "'")            
+            val emptyDisk = getClass.getResourceAsStream(if (file.toUpperCase.endsWith(".D71")) "/resources/emptyDisk.d71" else "/resources/emptyDisk.d64")
             if (emptyDisk == null) throw new IllegalArgumentException
             d64.seek(0)
             var b = emptyDisk.read
@@ -217,7 +216,7 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
 
   private def bamInfo = {    
     d64.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 3)
-    val singleSide = file.toUpperCase.endsWith(".D64") || d64.read == 0
+    val singleSide = file.toUpperCase.endsWith(".D64") || d64.read != 0x80
     var freeSectors = 0
     d64.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 4)
     for(_ <- 1 to 35) {
@@ -458,6 +457,7 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   val isReadOnly = false
   val isFormattable = false
   val totalTracks = TOTAL_TRACKS
+  override lazy val singleSide = bamInfo.singleSide
   
   private[this] var track = 1
   private[this] var sector = 0
@@ -499,6 +499,7 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
         gcrSector = gcrImageOf(track, sector)
       case _ =>
     }
+    
     _side = newSide    
   }
   

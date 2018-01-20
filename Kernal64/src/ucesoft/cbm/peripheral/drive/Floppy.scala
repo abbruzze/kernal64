@@ -54,6 +54,7 @@ trait Floppy {
   val isFormattable : Boolean
   val totalTracks : Int
   val file : String
+  lazy val singleSide = true
   
   def minTrack = 1
   def maxTrack = totalTracks

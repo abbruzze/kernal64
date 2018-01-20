@@ -13,7 +13,7 @@ trait IECBusListener {
   val busid : String
   
   def atnChanged(oldValue:Int,newValue:Int) {}
-  def srqChanged(oldValue:Int,newValue:Int) {}
+  def srqTriggered {}
 }
 
 object IECBusLine extends Enumeration {
@@ -89,6 +89,15 @@ class IECBus extends CBMComponent {
     updateLines
   }
   
+  final def triggerSRQ(id:String) {
+    var l = lines
+    while (l != Nil) {
+      val listener = l.head.listener
+      if (listener.busid != id) listener.srqTriggered
+      l = l .tail
+    }
+  }
+  
   def init {}
   def reset {
     var l = lines
@@ -107,24 +116,23 @@ class IECBus extends CBMComponent {
     val preATN = ATN
     val preCLK = CLK
     val preDATA = DATA
-    val preSRQ = SRQ
     ATN = VOLTAGE
     CLK = VOLTAGE
     DATA = VOLTAGE
     SRQ = VOLTAGE
     var l = lines
     while (l != Nil) {
-      if (l.head.atn == GROUND) ATN = GROUND
-      if (l.head.clk == GROUND) CLK = GROUND
-      if (l.head.data == GROUND) DATA = GROUND
-      if (l.head.srq == GROUND) SRQ = GROUND
+      val head = l.head
+      if (head.atn == GROUND) ATN = GROUND
+      if (head.clk == GROUND) CLK = GROUND
+      if (head.data == GROUND) DATA = GROUND
+      if (head.srq == GROUND) SRQ = GROUND
       l = l .tail
     }
-    if (preATN != ATN || preSRQ != SRQ) {
+    if (preATN != ATN) {
       var l = lines
   	  while (l != Nil) {
   	    if (preATN != ATN) l.head.listener.atnChanged(preATN,ATN)
-  	    if (preSRQ != SRQ) l.head.listener.srqChanged(preSRQ,SRQ)
   	    l = l .tail
   	  }
     }

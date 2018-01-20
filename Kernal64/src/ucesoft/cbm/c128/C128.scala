@@ -270,49 +270,21 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     				   cia1CP1,
     				   cia1CP2,
     				   irqSwitcher.ciaIRQ _) with IECBusListener {
-      val busid = "CIA1"
+      val busid = name
       
       bus.registerListener(this)
-    }
-    
-    cia1.setSerialOUT(bitOut => {
-      if (!FSDIRasInput && !c64Mode) {
-        //println(s"C128 send serial $bitOut")
-        bus.setLine("CIA1",IECBusLine.DATA,if (bitOut) IECBus.GROUND else IECBus.VOLTAGE)
-        c1541_real.asInstanceOf[C1571].serialIN(bitOut)
-      }
-    })
-    c1541_real.asInstanceOf[C1571].setSerialOUT(bitOut => {
-      //println(s"C1571 send serial $bitOut")
-      bus.setLine("VIA1571_DiskControl",IECBusLine.DATA,if (bitOut) IECBus.GROUND else IECBus.VOLTAGE)
-      if (FSDIRasInput) cia1.serialIN(bitOut)
-    })
-    /*
-      override protected def sendSerialBit(on:Boolean) {
-        if (!FSDIRasInput) {
-          bus.setLine(CIA2Connectors.CIA2_PORTA_BUSID,IECBusLine.DATA,if (on) IECBus.GROUND else IECBus.VOLTAGE)
-          //println(s"Sending serial bit $on")
+      
+      override def srqTriggered = if (FSDIRasInput) cia1.serialIN(bus.data == IECBus.GROUND)            
+      
+      setSerialOUT(bitOut => {
+        if (!FSDIRasInput && !c64Mode) {
+          bus.setLine(busid,IECBusLine.DATA,if (bitOut) IECBus.GROUND else IECBus.VOLTAGE)
+          bus.triggerSRQ(busid)
         }
-      }
-      override protected def sendCNT(high:Boolean) {
-        if (!FSDIRasInput) {
-          bus.setLine(CIA2Connectors.CIA2_PORTA_BUSID,IECBusLine.SRQ,if (high) IECBus.GROUND else IECBus.VOLTAGE)
-          //println(s"SRQ set to $high")
-        }
-      }
+      })
     }
-    */
     add(nmiSwitcher)
-    // CIA2 connector must be modified to handle fast serial ... 
     val cia2CP1 = new CIA2Connectors.PortAConnector(mmu,bus,rs232)
-    /*
-    {
-      override def srqChanged(oldValue:Int,newValue:Int) {
-        if (FSDIRasInput) cia1.serialIN(bus.data == IECBus.GROUND)
-      }
-    }
-    * 
-    */
     val cia2CP2 = new CIA2Connectors.PortBConnector(rs232)    
     add(cia2CP1)
     add(cia2CP2)
@@ -535,7 +507,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   
   def fastSerialDirection(input:Boolean) {
     FSDIRasInput = input
-    if (input) bus.setLine("CIA1",IECBusLine.DATA,IECBus.VOLTAGE)
+    if (input) bus.setLine(cia1.name,IECBusLine.DATA,IECBus.VOLTAGE)
     //println(s"FSDIR set to input $input")
   }
   // ---------------------------------- GUI HANDLING -------------------------------
