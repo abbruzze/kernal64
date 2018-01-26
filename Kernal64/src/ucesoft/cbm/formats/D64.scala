@@ -83,7 +83,7 @@ object D64 {
                               total 1366
    */
   val TRACK_ALLOCATION = // Key = #track => Value = #sectors per track
-    (for (t <- 1 to 70) yield {
+    (for (t <- 0 to 70) yield {
       if (t <= 17) (t, 21)
       else if (t <= 24) (t, 19)
       else if (t <= 30) (t, 18)
@@ -485,26 +485,28 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   
   override def side = _side
   override def side_=(newSide:Int) {
+    val oldT = track
     newSide match {
       case 0 if _side == 1 =>
-        track -= TOTAL_TRACKS >> 1
-        sector = 0
-        sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
-        gcrSector = gcrImageOf(track, sector)
-      case 1 if _side == 0 =>
-        val oldT = track
-        track += TOTAL_TRACKS >> 1
-        sector = 0
-        sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
-        gcrSector = gcrImageOf(track, sector)
+          track -= (if (bam.singleSide) TOTAL_TRACKS else TOTAL_TRACKS >> 1)
+          sector = 0
+          gcrIndex = 0
+          sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
+          gcrSector = gcrImageOf(track, sector)
+      case 1 if _side == 0 =>        
+          track += (if (bam.singleSide) TOTAL_TRACKS else TOTAL_TRACKS >> 1)
+          sector = 0
+          gcrIndex = 0
+          sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
+          gcrSector = gcrImageOf(track, sector)
       case _ =>
     }
-    
+    println(s"Side changed: ${_side} -> $newSide $oldT => $track")
     _side = newSide    
   }
   
   def reset {
-    side = 0
+    _side = 0
     track = 1
     sector = 0
     gcrSector = gcrImageOf(track, sector)
@@ -515,9 +517,8 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
   }
   
   def nextBit = {
-    val b = (gcrSector(gcrIndex) >> (8 - bit)) & 1
     if (bit == 8) rotate else bit += 1
-    b
+    (gcrSector(gcrIndex) >> (8 - bit)) & 1
   }
   def writeNextBit(value:Boolean) {
     sectorModified = true
@@ -548,19 +549,22 @@ class D64(val file: String,empty:Boolean = false) extends Floppy {
    * in the D64 format.
    */
   def changeTrack(trackSteps:Int) {
-    val isOnTrack = (trackSteps & 1) == 0
+    val isOnTrack = (trackSteps & 1) == 0    
     if (isOnTrack) {
-      if (sectorModified) {
-        sectorModified = false
-        writeGCRSector(track,sector,gcrSector)
-      } 
-      track = trackSteps >> 1
-      sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
-      sector = 0   
-      bit = 1
-      gcrSector = gcrImageOf(track, sector)
-      gcrIndex = gcrIndex % gcrSector.length
-      notifyTrackSectorChangeListener
+      val newTrack = trackSteps >> 1
+      if (track != newTrack) {
+        if (sectorModified) {
+          sectorModified = false
+          writeGCRSector(track,sector,gcrSector)
+        } 
+        track = trackSteps >> 1
+        sectorsPerCurrentTrack = D64.TRACK_ALLOCATION(track)
+        sector = 0   
+        bit = 1
+        gcrSector = gcrImageOf(track, sector)
+        gcrIndex = gcrIndex % gcrSector.length
+        notifyTrackSectorChangeListener
+      }
     }
   }
   

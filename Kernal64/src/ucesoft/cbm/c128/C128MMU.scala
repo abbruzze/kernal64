@@ -27,6 +27,7 @@ trait MMUChangeListener {
   def cpuChanged(is8502:Boolean)
   def c64Mode(c64Mode:Boolean)
   def fastSerialDirection(input:Boolean)
+  def _1571mode(_1571Mode:Boolean)
 }
 
 class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with ExpansionPortConfigurationListener with VICMemory with Z80.IOMemory {  

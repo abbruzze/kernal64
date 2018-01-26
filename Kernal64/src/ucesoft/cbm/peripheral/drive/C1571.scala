@@ -24,7 +24,8 @@ import ucesoft.cbm.ClockEvent
 
 class C1571(val driveID: Int, 
             bus: IECBus, 
-            ledListener: DriveLedListener) extends 
+            ledListener: DriveLedListener,
+            _1571Listener: Boolean => Unit) extends 
             RAMComponent with 
             TraceListener with 
             Drive {
@@ -37,6 +38,7 @@ class C1571(val driveID: Int,
   val length = 0x0800
   val isActive = true
   
+  private[this] val _1571_LOAD_ROUTINE = 0x9088
   private[this] val _1541_LOAD_ROUTINE = 0xD7B4
   private[this] val _1541_FORMAT_ROUTINE = 0xC8C6
   private[this] val _1541_FORMAT_ROUTINE_OK = 0xC8EF
@@ -52,7 +54,6 @@ class C1571(val driveID: Int,
   private[this] var _1541Mode = true     // VIA1 PA5 Output  
   private[this] var busDataDirection = 0 // VIA1 PA1 Output
   private[this] var activeHead = 0       // VIA1 PA2 Output
-  private[this] var byteReadySignal = 0  // VIA1 PA7 Input
   private[this] var awakeCycles = 0L
   private[this] var goSleepingCycles = 0L
   private[this] var canSleep = true
@@ -153,6 +154,11 @@ class C1571(val driveID: Int,
     })
   }
   /************************************************************************************************************
+   * R/W HEAD Controller
+   * 
+   ***********************************************************************************************************/
+  private[this] val RW_HEAD = new RWHeadController("1571",floppy,ledListener)
+  /************************************************************************************************************
    * VIA1 IEC Bus Manager
    * 
    ***********************************************************************************************************/
@@ -179,7 +185,7 @@ class C1571(val driveID: Int,
     override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
       case ad@(PA|PA2) =>
         super.read(address,chipID)
-        (if (floppy.currentTrack == 0) 1 else 0) | busDataDirection << 1 | activeHead << 2 | (if (_1541Mode) 0 else 1 << 5) | byteReadySignal << 7
+        (if (floppy.currentTrack == 0) 1 else 0) | busDataDirection << 1 | activeHead << 2 | (if (_1541Mode) 0 else 1 << 5) | RW_HEAD.getByteReadySignal << 7
       case PB =>
         (super.read(address,chipID) & 0x1A) | (bus.data|data_out) | (bus.clk|clock_out) << 2 | bus.atn << 7 | IDJACK << 5
         
@@ -197,11 +203,9 @@ class C1571(val driveID: Int,
           busDataDirection = (value & 2) >> 1
           if (busDataDirection == 0) bus.setLine(CIA.name,IECBusLine.DATA,IECBus.VOLTAGE)
           activeHead = (value & 4) >> 2
-          if (floppy.side != activeHead) {
-            floppy.side = activeHead
-            sideChanged
-          }
-          _1541Mode = (value & 0x20) == 0          
+          if (floppy.side != activeHead) RW_HEAD.changeSide(activeHead)
+          _1541Mode = (value & 0x20) == 0
+          _1571Listener(!_1541Mode)
           //println(s"1571: 1541mode=${_1541Mode} busDirection=$busDataDirection activeHead=$activeHead")
         case _ =>
       }         
@@ -225,9 +229,6 @@ class C1571(val driveID: Int,
       driveEnabled = in.readBoolean
     }
   }
-  private def sideChanged {
-    VIA2.sideChanged
-  }
   /************************************************************************************************************
    * VIA2 Disk Controller
    * 
@@ -239,91 +240,16 @@ class C1571(val driveID: Int,
     private[this] val WRITE_PROTECT_SENSE_WAIT = 3 * 400000L
     private[this] val REMOVING_DISK_WAIT = 500000L
     private[this] val SYNC_DETECTION_LINE = 0x80
-    private[this] var isWriting = false
     private[this] var isDiskChanged = true
     private[this] var isDiskChanging = false
     private[this] var isReadOnly = false
-    private[this] var motorOn = false
-    private[this] var canSetByteReady = false
-    private[this] var byteReady = false
-    private[this] var track = 1
-    private[this] var trackSteps = track << 1    
-    private[this] var currentFilename = ""
-    
-    /**
-     * Get the rotation cycles needed for read a byte for the given zone.
-     *
-     * Zone	Tracks	Clock rate
-     * ----------------------------
-     * 1		1-17	307.692 bit/s
-     * 2		18-24	285.714 bit/s
-     * 3		25-30	266.667 bit/s
-     * 4		31-35	250.000 bit/s
-     */
-    private[this] val C1541_CLOCK_HZ = 1000000
-    private[this] val rotationCyclesForBit = Array[Double](
-        250000.0 / C1541_CLOCK_HZ,  // zone 4
-        266667.0 / C1541_CLOCK_HZ,  // zone 3
-        285714.0 / C1541_CLOCK_HZ,  // zone 2
-        307692.0 / C1541_CLOCK_HZ   // zone 1 
-    )
-      
-    private[this] var speedZone = 3
-    private[this] var bitCycleWait = rotationCyclesForBit(speedZone)
-    private[this] var rotationCycleCounter = 0.0  
-    private[this] var bitCounter = 0
-    private[this] var last10Bits,lastRead = 0
-    private[this] var lastWrite = 0x55
-    
-    override def reset {
-      super.reset
-      resetFloppy
-    }
-    
-    private def resetFloppy {
-      isWriting = false
-      isDiskChanged = true
-      isDiskChanging = false
-      motorOn = false
-      canSetByteReady = false
-      byteReady = false
-      trackSteps = 2
-      track = 1
-      currentFilename = ""
-      bitCounter = 0
-      speedZone = 3
-      bitCycleWait = rotationCyclesForBit(speedZone)
-      rotationCycleCounter = 0.0
-      last10Bits = 0
-      lastRead = 0
-      lastWrite = 0x55
-    }
-        
-    override def getProperties = {
-      properties.setProperty("Motor on",motorOn.toString)
-      properties.setProperty("Writing",isWriting.toString)
-      properties.setProperty("Track","%2d".format(track))
-      properties.setProperty("Disk",floppy.toString)
-      properties.setProperty("Current filename",currentFilename)
-      properties.setProperty("Byte ready signal",byteReadySignal.toString)
-      properties.setProperty("Last byte read",Integer.toHexString(lastRead))
-      super.getProperties
-    } 
-    
-    def awake {
-      //if (isDiskChanged) diskChangedAtClockCycle = Clock.systemClock.currentCycles
-    }
     
     def setReadOnly(readOnly:Boolean) = isReadOnly = readOnly
   
     def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
       floppy = driveReader
-      track = 18
-      trackSteps = track << 1
+      RW_HEAD.setFloppy(floppy)
       if (emulateInserting) {
-        // reset the last track
-        floppy.changeTrack(trackSteps) 
-        floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
         isDiskChanged = true
         isDiskChanging = true
         VIA1.irq_set(IRQ_CA2)
@@ -339,14 +265,14 @@ class C1571(val driveID: Int,
           }))
         }))
       }
-      else floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
+      //else floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
+      awake
     }
     
-    def setCurrentFilename(fn:String) = currentFilename = fn
     def formatDisk = {
       try {
-        println("Formatting '" + currentFilename + "'")
-        floppy.format(currentFilename)
+        println("Formatting '" + RW_HEAD.getCurrentFileName + "'")
+        floppy.format(RW_HEAD.getCurrentFileName)
         true
       }
       catch {
@@ -356,194 +282,93 @@ class C1571(val driveID: Int,
       }
     }
     
-    def isMotorOn = motorOn
-  
-    @inline private def isSync = !isWriting && motorOn && last10Bits == 0x3FF  
-  
     override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
       case PB =>
         val wps = if (isDiskChanging) isDiskChanged else isReadOnly | floppy.isReadOnly
         (super.read(address, chipID) & ~(WRITE_PROTECT_SENSE | SYNC_DETECTION_LINE)) |
-          (if (isSync) 0x00 else SYNC_DETECTION_LINE) |
+          (if (RW_HEAD.isSync) 0x00 else SYNC_DETECTION_LINE) |
           (if (wps) 0x00 else WRITE_PROTECT_SENSE)
       case PA|PA2 =>
         super.read(address, chipID)
         floppy.notifyTrackSectorChangeListener
-        if ((regs(PCR) & 0x0C) == 0x08) canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
-        byteReadySignal = 1
-        lastRead
+        if ((regs(PCR) & 0x0C) == 0x08) RW_HEAD.canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
+        RW_HEAD.resetByteReadySignal
+        RW_HEAD.getLastRead
       case ofs => super.read(address, chipID)
     }
   
     override def write(address: Int, value: Int, chipID: ChipID.ID) {
       (address & 0x0F) match {
         case PA =>
-          if ((regs(PCR) & 0x0C) == 0x08) canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
-          byteReadySignal = 1
+          if ((regs(PCR) & 0x0C) == 0x08) RW_HEAD.canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
+          RW_HEAD.setNextToWrite(value)
+          RW_HEAD.resetByteReadySignal
         case PCR =>
           value & 0x0E match {
-            case 0xE => canSetByteReady = true        // 111 => Manual output mode high
-            case 0xC => canSetByteReady = false       // 110 => Manual output mode low
-            case _ => canSetByteReady = true
+            case 0xE => RW_HEAD.canSetByteReady = true        // 111 => Manual output mode high
+            case 0xC => RW_HEAD.canSetByteReady = false       // 110 => Manual output mode low
+            case _ => RW_HEAD.canSetByteReady = true
           }
-          isWriting = (value & 0x20) == 0          
+          val isWriting = (value & 0x20) == 0
+          RW_HEAD.setWriting(isWriting)          
           ledListener.writeMode(isWriting)
         case PB =>
           // led
           val ledOn = (value & 0x08) > 0
-          val lastMotorOn = motorOn
-          motorOn = (value & 0x04) > 0
+          val lastMotorOn = RW_HEAD.isMotorOn
+          val motorOn = (value & 0x04) > 0
+          RW_HEAD.setMotor(motorOn)
           if (ledListener != null) {
             if (ledOn) ledListener.turnOn else ledListener.turnOff
             if (!motorOn) {
               ledListener.endLoading
-              if (lastMotorOn && !motorOn) currentFilename = ""
+              if (lastMotorOn && !motorOn) RW_HEAD.setCurrentFileName("")
             }
-            else if (floppy == EmptyFloppy) floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
           }
           val newSpeedZone = (value & 0xFF) >> 5 & 0x3
-          if (newSpeedZone != speedZone) {
-            speedZone = newSpeedZone
-            bitCycleWait = rotationCyclesForBit(speedZone)
-            rotationCycleCounter = 0.0
-          }
+          RW_HEAD.setSpeedZone(newSpeedZone)
           // check the head step indication
           val oldStepHead = regs(PB) & 0x03
           val stepHead = value & 0x03
           
-          if (motorOn && oldStepHead == ((stepHead + 1) & 0x03) && track > floppy.minTrack) {            
-            moveHead(moveOut = true)
-            //println(s"Move out $track/${floppy.maxTrack}")
-          }
+          if (motorOn && oldStepHead == ((stepHead + 1) & 0x03)) RW_HEAD.moveHead(moveOut = true)
           else 
-          if (motorOn && oldStepHead == ((stepHead - 1) & 0x03) && track < floppy.maxTrack) {            
-            moveHead(moveOut = false)
-            //println(s"Move in $track/${floppy.maxTrack}")
-          }
+          if (motorOn && oldStepHead == ((stepHead - 1) & 0x03)) RW_HEAD.moveHead(moveOut = false)
         case _ =>
       }
       // write on register
       super.write(address, value, chipID)
     }
-    
-    def sideChanged {
-      track = floppy.currentTrack
-      trackSteps = track << 1
-      //println(s"Side changed: track=$track")
-    }
-  
-    private def moveHead(moveOut: Boolean) {
-      if (moveOut) trackSteps -= 1 else trackSteps += 1
+          
+    final def byteReady {
+      cpu.setOverflowFlag
+      irq_set(IRQ_CA1)
       
-      floppy.changeTrack(trackSteps)
-      track = floppy.currentTrack
-    }
-    
-    private def updateTrackSectorLabelProgress(track:Int,halfTrack:Boolean,sector:Option[Int]) {
-      if (ledListener != null) {      
-        sector match {
-          case None =>
-            val trackFormat = if (halfTrack) "%02d." else "%02d "
-            ledListener.beginLoadingOf(s"%s $trackFormat".format(currentFilename,track),true)
-          case Some(sec) =>
-            ledListener.beginLoadingOf("%s %02d/%02d".format(currentFilename,track,sec),true)
-        }
-      }
-    }
-    
-    private def rotateDisk {
-      rotationCycleCounter += bitCycleWait
-      if (rotationCycleCounter >= 1) {
-        bitCounter += 1
-        rotationCycleCounter -= 1
-        if (isWriting) { // WRITING
-          floppy.writeNextBit((lastWrite & 0x80) > 0)
-          lastWrite <<= 1        
-          if (bitCounter == 8) {
-            bitCounter = 0
-            lastWrite = regs(PA)
-            byteReady = true
-            byteReadySignal = 0
-            //irq_set(IRQ_CA1)
-          }
-        }
-        else { // READING
-          val bit = floppy.nextBit
-          last10Bits = ((last10Bits << 1) | bit) & 0x3FF
-          if (last10Bits == 0x3FF) {
-            bitCounter = 0
-            byteReadySignal = 1
-          }
-          if (bitCounter == 8) {
-            bitCounter = 0
-            lastWrite = lastRead
-            byteReady = true
-            lastRead = last10Bits & 0xFF    
-            byteReadySignal = 0
-            //irq_set(IRQ_CA1)
-          }
-        }      
-      }
-    }
-  
-    final def rotate {
-      if (motorOn) {
-        rotateDisk
-        if (byteReady && canSetByteReady) {
-          cpu.setOverflowFlag
-          irq_set(IRQ_CA1)
-          byteReady = false
-          byteReadySignal = 0
-          regs(PCR) & 0x0E match {
-            case 0xA|0x08 => canSetByteReady = false
-            case _ =>
-          }         
-        }
+      regs(PCR) & 0x0E match {
+        case 0xA|0x08 => RW_HEAD.canSetByteReady = false
+        case _ =>
       }
     }
     
     // state
     override protected def saveState(out:ObjectOutputStream) {
       super.saveState(out)
-      out.writeBoolean(isWriting)
       out.writeBoolean(isDiskChanged)
       out.writeBoolean(isDiskChanging)
       out.writeBoolean(isReadOnly)
-      out.writeBoolean(motorOn)
-      out.writeBoolean(canSetByteReady)
-      out.writeBoolean(byteReady)
-      out.writeInt(trackSteps)
-      out.writeInt(track)
-      out.writeObject(currentFilename)
-      out.writeInt(speedZone)
-      out.writeDouble(bitCycleWait)
-      out.writeDouble(rotationCycleCounter)
-      out.writeInt(bitCounter)
-      out.writeInt(last10Bits)
-      out.writeInt(lastRead)
-      out.writeInt(lastWrite)
     }
     override protected def loadState(in:ObjectInputStream) {
       super.loadState(in)
-      isWriting = in.readBoolean
       isDiskChanged = in.readBoolean
       isDiskChanging = in.readBoolean
       isReadOnly = in.readBoolean
-      motorOn = in.readBoolean
-      canSetByteReady = in.readBoolean
-      byteReady = in.readBoolean
-      trackSteps = in.readInt
-      track = in.readInt
-      currentFilename = in.readObject.asInstanceOf[String]
-      speedZone = in.readInt
-      bitCycleWait = in.readDouble
-      rotationCycleCounter = in.readDouble
-      bitCounter = in.readInt
-      last10Bits = in.readInt
-      lastRead = in.readInt
-      lastWrite = in.readInt
     }
   }
+   /************************************************************************************************************
+   * WD1770 Controller
+   * 
+   ***********************************************************************************************************/
+  private[this] val WD1770 = new WD1770(RW_HEAD)
   /************************************************************************************************************
    * Memory: Kernal (32K) + RAM (2K)
    * 
@@ -563,8 +388,8 @@ class C1571(val driveID: Int,
     if (address >= 0x1C00 && address < 0x1C10) VIA2.read(address)
     else
     if (address >= 0x2000 && address < 0x2004) {
-      println("WD1770 reading from " + Integer.toHexString(address) + " " + Integer.toHexString(cpu.getPC))
-      0 //TODO WD1770
+      //println("WD1770 reading from " + Integer.toHexString(address) + " " + Integer.toHexString(cpu.getPC))
+      WD1770.read(address)
     }
     else
     if (address >= 0x4000 && address < 0x4010) CIA.read(address)
@@ -588,7 +413,8 @@ class C1571(val driveID: Int,
     if (address >= 0x1C00 && address < 0x1C10) VIA2.write(address,value)
     else
     if (address >= 0x2000 && address < 0x2004) {
-      println("WD1770 writing to " + Integer.toHexString(address) + " = " + Integer.toHexString(value))
+      //println("WD1770 writing to " + Integer.toHexString(address) + " = " + Integer.toHexString(value))
+      WD1770.write(address,value)
     } //TODO WD1770
     else
     if (address >= 0x4000 && address < 0x4010) CIA.write(address,value)    
@@ -634,6 +460,7 @@ class C1571(val driveID: Int,
     add(VIA1)
     add(VIA2)
     add(CIA)    
+    add(RW_HEAD)
     //TODO
     if (ledListener != null) ledListener.turnOn
   }
@@ -658,7 +485,7 @@ class C1571(val driveID: Int,
       adr += 1
       fileNameSize -= 1      
     }
-    VIA2.setCurrentFilename(sb.toString)
+    RW_HEAD.setCurrentFileName(sb.toString)
   }
   
   override def setSpeedHz(speed:Int) {
@@ -669,14 +496,14 @@ class C1571(val driveID: Int,
   @inline private def checkPC(cycles: Long) {
     val pc = cpu.getPC
 //    if (_1541Mode) {
-      if (pc == _1541_LOAD_ROUTINE) setFilename
+      if (pc == _1541_LOAD_ROUTINE || pc == _1571_LOAD_ROUTINE) setFilename
       else 
       if (pc == _1541_FORMAT_ROUTINE && useTRAPFormat) {
         setFilename
         if (VIA2.formatDisk) cpu.jmpTo(_1541_FORMAT_ROUTINE_OK) else cpu.jmpTo(_1541_FORMAT_ROUTINE_NOK)
       } 
       else 
-      if (pc == _1541_WAIT_LOOP_ROUTINE && canSleep && channelActive == 0 && !VIA2.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
+      if (pc == _1541_WAIT_LOOP_ROUTINE && canSleep && channelActive == 0 && !RW_HEAD.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
         running = false      
         VIA1.setActive(false)
         VIA2.setActive(false)
@@ -705,7 +532,7 @@ class C1571(val driveID: Int,
         n_cycles -= 1
       }
       
-      VIA2.rotate      
+      if (RW_HEAD.rotate) VIA2.byteReady      
     }
     else
     if (cycles - goSleepingCycles > GO_SLEEPING_MESSAGE_CYCLES) {
@@ -720,8 +547,7 @@ class C1571(val driveID: Int,
     isRunningListener(true)
     VIA1.setActive(true)
     VIA2.setActive(true)
-    awakeCycles = clk.currentCycles
-    VIA2.awake
+    awakeCycles = clk.currentCycles    
   }
     
   // ================== Tracing ====================================

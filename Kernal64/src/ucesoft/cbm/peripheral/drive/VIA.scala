@@ -89,13 +89,17 @@ abstract class VIA(val name:String,
    */
   def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
     case PA =>
-      irq_clr(IRQ_CA1 | IRQ_CA2)
+      irq_clr(IRQ_CA1)
+      val PCR_CA2_CTRL = (regs(PCR) >> 1) & 7
+      if (PCR_CA2_CTRL != 1 && PCR_CA2_CTRL != 3) irq_clr(IRQ_CA2) // check for independent interrupt mode
       Log.debug(s"Cleared IRQ_CA1: IFR=${Integer.toBinaryString(regs(IFR))} IER=${Integer.toBinaryString(regs(IER))}")
       (if (is_set(ACR,PA_LATCH_ENABLED)) paLatch else regs(PA)) // & ~regs(DDRA)
     case PA2 =>
       (if (is_set(ACR,PA_LATCH_ENABLED)) paLatch else regs(PA)) // & ~regs(DDRA)
     case PB =>
-      irq_clr(IRQ_CB1 | IRQ_CB2)
+      irq_clr(IRQ_CB1)
+      val PCR_CB2_CTRL = (regs(PCR) >> 5) & 7
+      if (PCR_CB2_CTRL != 1 && PCR_CB2_CTRL != 3) irq_clr(IRQ_CB2) // check for independent interrupt mode
       (if (is_set(ACR,PB_LATCH_ENABLED)) paLatch else regs(PB)) | PB7 //& (~regs(DDRB) | (if (is_set(ACR,0x80)) 0x80 else 0))
     case SR =>
       irq_clr(IRQ_SR)
@@ -120,10 +124,14 @@ abstract class VIA(val name:String,
       regs(DDRB) = value
       write(startAddress + PB,regs(PB) | ~value,chipID)
     case PA =>
-      irq_clr(IRQ_CA1 | IRQ_CA2)
+      irq_clr(IRQ_CA1)
+      val PCR_CA2_CTRL = (regs(PCR) >> 1) & 7
+      if (PCR_CA2_CTRL != 1 && PCR_CA2_CTRL != 3) irq_clr(IRQ_CA2) // check for independent interrupt mode
       regs(PA) = value
     case PB =>
-      irq_clr(IRQ_CB1 | IRQ_CB2)
+      irq_clr(IRQ_CB1)
+      val PCR_CB2_CTRL = (regs(PCR) >> 5) & 7
+      if (PCR_CB2_CTRL != 1 && PCR_CB2_CTRL != 3) irq_clr(IRQ_CB2) // check for independent interrupt mode
       regs(PB) = value
     case T1LC =>
       regs(T1LL) = value

@@ -128,7 +128,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private[this] val driveLeds = Array(new DriveLed,new DriveLed)
   private[this] val diskProgressPanels = Array(new DriveLoadProgressPanel,new DriveLoadProgressPanel)
   private[this] val c1541 = new C1541Emu(bus,DriveLed8Listener)
-  private[this] val c1541_real : Drive with TraceListener = new C1571(0x00,bus,DriveLed8Listener)//new C1541(0x00,bus,DriveLed8Listener)
+  private[this] val c1541_real : Drive with TraceListener = new C1571(0x00,bus,DriveLed8Listener,_1571mode _)//new C1541(0x00,bus,DriveLed8Listener)
   private[this] val c1541_real9 : Drive with TraceListener = new C1541(0x01,bus,DriveLed9Listener)
   private[this] val flyerIEC = new FlyerIEC(bus,file => attachDiskFile(0,file,false))
   private[this] var isFlyerEnabled = false
@@ -509,6 +509,10 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     FSDIRasInput = input
     if (input) bus.setLine(cia1.name,IECBusLine.DATA,IECBus.VOLTAGE)
     //println(s"FSDIR set to input $input")
+  }
+  
+  def _1571mode(_1571Mode:Boolean) {
+    mmuStatusPanel._1571mode(_1571Mode)
   }
   // ---------------------------------- GUI HANDLING -------------------------------
     

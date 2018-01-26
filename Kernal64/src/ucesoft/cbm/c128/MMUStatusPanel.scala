@@ -49,14 +49,17 @@ class MMUStatusPanel extends JPanel with MMUChangeListener {
   private val z = new LabelledLed("Z80",true)
   private val m2 = new LabelledLed("2Mhz",true)
   private val c64 = new LabelledLed("64",true)
+  private val _1571 = new LabelledLed("1571",true)
   
   setLayout(new FlowLayout(FlowLayout.LEFT,2,0))
   add(z)
   add(m2)
   add(c64)
+  add(_1571)
   
   def frequencyChanged(f:Int) { m2.on = f == 2 ; m2.repaint() }
   def cpuChanged(is8502:Boolean) { z.on = !is8502 ; z.repaint() }
   def c64Mode(c64Mode:Boolean) { c64.on = c64Mode ; c64.repaint() }
   def fastSerialDirection(input:Boolean) {}
+  def _1571mode(_1571Mode:Boolean) { _1571.on = _1571Mode ; _1571.repaint() }
 }
