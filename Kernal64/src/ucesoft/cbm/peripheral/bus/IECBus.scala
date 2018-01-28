@@ -55,6 +55,7 @@ class IECBus extends CBMComponent {
   }
   
   final def registerListener(l:IECBusListener) {
+    unregisterListener(l)
     val state = State(l)
     lines = state :: lines
     Log.info(s"IECBus has registerd ${l.busid} as a listener")

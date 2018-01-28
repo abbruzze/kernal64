@@ -7,9 +7,7 @@ import java.io.FileInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.DataOutputStream
-import java.io.IOException
-import ucesoft.cbm.formats.D64
-import ucesoft.cbm.formats.G64
+import ucesoft.cbm.formats.Diskette
 
 object Floppy {
   def load(in:ObjectInputStream) : Option[Floppy] = {
@@ -23,10 +21,7 @@ object Floppy {
         out.write(content)
         out.close
         val fileName = file.toUpperCase
-        val floppy : Floppy = if (fileName.endsWith(".D64")) new D64(tmpFile.toString) 
-                              else 
-                              if (fileName.endsWith(".G64")) new G64(tmpFile.toString)
-                              else throw new IOException(s"Can't load floppy $file")
+        val floppy : Floppy = Diskette(fileName)
         floppy.load(in)
         Some(floppy)
       case false =>

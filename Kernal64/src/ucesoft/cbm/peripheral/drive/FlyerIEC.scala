@@ -3,7 +3,6 @@ package ucesoft.cbm.peripheral.drive
 import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.peripheral.bus.BusDataIterator
 import java.io.File
-import ucesoft.cbm.formats.D64
 import java.net.InetAddress
 import scala.collection.mutable.ListBuffer
 import java.io.InputStream
@@ -17,6 +16,7 @@ import java.net.URL
 import java.io.FileOutputStream
 import java.io.BufferedOutputStream
 import java.net.URLEncoder
+import ucesoft.cbm.formats.Diskette
 
 class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bus, 7) {
   val componentID = "FlyerIEC"
@@ -702,7 +702,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
       return
     }
     val newDisk = new File(floppyRepository,typeName(1) + ".d64")
-    val emptyD64 = new D64(newDisk.toString,true)
+    val emptyD64 = Diskette(newDisk.toString,true)
     emptyD64.format(s"N:FLYER,00")
     emptyD64.close
   }

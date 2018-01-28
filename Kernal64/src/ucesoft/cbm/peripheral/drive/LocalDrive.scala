@@ -2,13 +2,13 @@ package ucesoft.cbm.peripheral.drive
 
 import ucesoft.cbm.peripheral.bus.IECBus
 import java.io.File
-import ucesoft.cbm.formats.D64
 import ucesoft.cbm.peripheral.bus.BusDataIterator
 import java.io.IOException
 import java.io.FileInputStream
 import java.io.DataInputStream
 import java.io.FileOutputStream
 import language.postfixOps
+import ucesoft.cbm.formats.Diskette
 
 class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device) {
   val componentID = "Local Drive"
@@ -47,7 +47,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
     if (fileName.startsWith("$")) return Some(loadDirectory(currentDir.toString,currentDir.getName))
     val dp = fileName.indexOf(":")
     val fn = (if (dp != -1) fileName.substring(dp + 1) else fileName) map { c => if (c < 128) c else (c - 128).toChar }
-    val found = currentDir.listFiles find { f => D64.fileNameMatch(fn,f.getName.toUpperCase) }
+    val found = currentDir.listFiles find { f => Diskette.fileNameMatch(fn,f.getName.toUpperCase) }
     found match {
       case Some(file) =>
         val buffer = Array.ofDim[Byte](file.length.toInt)

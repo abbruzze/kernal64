@@ -6,6 +6,8 @@ import java.io.File
 import java.nio.file._
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
+import ucesoft.cbm.formats.Diskette._
+import ucesoft.cbm.cpu.Memory
 
 object G64 {
   def makeEmptyDisk(file:String) {
@@ -16,7 +18,7 @@ object G64 {
 }
 
 
-class G64(val file:String) extends Floppy {
+private[formats] class G64(val file:String) extends Diskette {
   private[this] var tracks : Array[Array[Int]] = _
   private[this] var trackOffsets : Array[Int] = _
   private[this] var speedZones : Array[Int] = _
@@ -27,12 +29,18 @@ class G64(val file:String) extends Floppy {
   private[this] var trackIndexModified = false
   
   loadTracks
-  
+  val canBeEmulated = false
   val isReadOnly = false
   val isFormattable = true
-  lazy val totalTracks = tracks.length
+  lazy val totalTracks = tracks.length >> 1
   
   private[this] var trackChangeListener : Floppy#TrackListener = null
+  def TOTAL_AVAILABLE_SECTORS = throw new UnsupportedOperationException
+  def bam : BamInfo = throw new UnsupportedOperationException
+  def directories : List[DirEntry] = throw new UnsupportedOperationException
+  def readBlock(track:Int,sector:Int) : Array[Byte] = throw new UnsupportedOperationException
+  def loadInMemory(mem: Memory, fileName: String, relocate: Boolean,c64Mode:Boolean=true) : Int = throw new UnsupportedOperationException
+  def load(fileName: String,fileType:FileType.Value = FileType.PRG) : FileData = throw new UnsupportedOperationException
   
   private def loadTracks {    
     val header = Array.ofDim[Byte](0x0C)

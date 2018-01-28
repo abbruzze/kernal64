@@ -38,10 +38,7 @@ import ucesoft.cbm.expansion.REU
 import ucesoft.cbm.peripheral.rs232._
 import ucesoft.cbm.util.RS232StatusPanel
 import ucesoft.cbm.peripheral.drive.LocalDrive
-import ucesoft.cbm.util.DropBoxAuth
-import ucesoft.cbm.peripheral.drive.DropboxDrive
 import ucesoft.cbm.expansion.SwiftLink
-import ucesoft.cbm.peripheral.drive.Floppy
 import ucesoft.cbm.peripheral.drive.ParallelCable
 import ucesoft.cbm.peripheral.drive.C1541Mems
 import ucesoft.cbm.expansion.DualSID
@@ -143,7 +140,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   // -------------------- DISK -----------------
   private[this] var isDiskActive = true
   private[this] var isDiskActive9 = false
-  private[this] var attachedDisks : Array[Option[Floppy]] = Array(None,None)
+  private[this] var attachedDisks : Array[Option[Diskette]] = Array(None,None)
   private[this] val driveLeds = Array(new DriveLed,new DriveLed)
   private[this] val diskProgressPanels = Array(new DriveLoadProgressPanel,new DriveLoadProgressPanel)
   private[this] val c1541 = new C1541Emu(bus,DriveLed8Listener)
@@ -600,8 +597,6 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         device10Drive = new LocalDrive(bus,10)
         device10DriveEnabled = true
         changeLocalDriveDir
-      case "DROPBOX_DRIVE_ENABLED" =>
-        checkDropboxDrive
       case "DRIVE_9_ENABLED" =>
         val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         c1541_real9.setActive(enabled)
@@ -797,28 +792,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     display.setPreferredSize(dim) 
     displayFrame.pack
   } 
-  
-  private def checkDropboxDrive {
-    try {
-      if (DropBoxAuth.isAccessCodeRequested(configuration)) {                 
-        device10Drive = new DropboxDrive(bus,DropBoxAuth.getDbxClient(configuration),10)
-        device10DriveEnabled = true
-      }
-      else {
-        if (DropBoxAuth.requestAuthorization(configuration,displayFrame)) {          
-          device10Drive = new DropboxDrive(bus,DropBoxAuth.getDbxClient(configuration),10)
-          device10DriveEnabled = true
-        }
-      }
-    }
-    catch {
-        case t:Throwable =>
-          t.printStackTrace
-          device10DriveEnabled = false
-          JOptionPane.showMessageDialog(displayFrame,t.toString, "Dropbox init error",JOptionPane.ERROR_MESSAGE)
-      }
-  }
-  
+    
   private def changeLocalDriveDir {
     val fc = new JFileChooser
     fc.setCurrentDirectory(device10Drive.asInstanceOf[LocalDrive].getCurrentDir)
@@ -880,7 +854,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
             val diskLabel = JOptionPane.showInputDialog(displayFrame,"Insert disk label", "New Disk label",JOptionPane.QUESTION_MESSAGE)
             if (diskLabel != null) {
               if (!emptyFile.toUpperCase.endsWith(".D64")) emptyFile += ".d64"
-              val emptyD64 = new D64(emptyFile,true)
+              val emptyD64 = Diskette(emptyFile,true)
               emptyD64.format(s"N:${diskLabel.toUpperCase},00")
               emptyD64.close
             }
@@ -996,7 +970,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         JOptionPane.showMessageDialog(displayFrame,"G64 format not allowed on a 1541 not in true emulation mode", "Disk attaching error",JOptionPane.ERROR_MESSAGE)
         return
       }
-      val disk = if (isD64) new D64(file.toString) else new G64(file.toString)
+      val disk = Diskette(file.toString) //if (isD64) new D64(file.toString) else new G64(file.toString)
       attachedDisks(driveID) match {
         case Some(oldDisk) => oldDisk.close
         case None =>
@@ -1204,7 +1178,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
           case None =>
           case Some(fileName) =>
             try {
-              floppy.asInstanceOf[D64].loadInMemory(mem,fileName,relocate)
+              floppy.loadInMemory(mem,fileName,relocate)
             }
             catch {
               case t:Throwable =>
@@ -1412,11 +1386,6 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     localDriveEnabled.addActionListener(this)
     group0.add(localDriveEnabled)
     localDriveItem.add(localDriveEnabled)
-    val dropboxDriveEnabled = new JRadioButtonMenuItem("Dropbox drive ...")
-    dropboxDriveEnabled.setActionCommand("DROPBOX_DRIVE_ENABLED")
-    dropboxDriveEnabled.addActionListener(this)
-    group0.add(dropboxDriveEnabled)
-    localDriveItem.add(dropboxDriveEnabled)
     
     fileMenu.addSeparator
     

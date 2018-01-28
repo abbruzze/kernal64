@@ -43,6 +43,9 @@ class C1571(val driveID: Int,
   private[this] val _1541_FORMAT_ROUTINE = 0xC8C6
   private[this] val _1541_FORMAT_ROUTINE_OK = 0xC8EF
   private[this] val _1541_FORMAT_ROUTINE_NOK = 0xC8E8
+  private[this] val _1571_FORMAT_ROUTINE = 0xA40D
+  private[this] val _1571_FORMAT_ROUTINE_OK = 0xA46C
+  private[this] val _1571_FORMAT_ROUTINE_NOK = 0xA47B
   private[this] val _1541_WAIT_LOOP_ROUTINE = 0xEBFF
   private[this] val WAIT_CYCLES_FOR_STOPPING = 2000000
   private[this] final val GO_SLEEPING_MESSAGE_CYCLES = 3000000
@@ -185,7 +188,7 @@ class C1571(val driveID: Int,
     override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
       case ad@(PA|PA2) =>
         super.read(address,chipID)
-        (if (floppy.currentTrack == 0) 1 else 0) | busDataDirection << 1 | activeHead << 2 | (if (_1541Mode) 0 else 1 << 5) | RW_HEAD.getByteReadySignal << 7
+        (if (floppy.currentTrack != 0) 1 else 0) | busDataDirection << 1 | activeHead << 2 | (if (_1541Mode) 0 else 1 << 5) | RW_HEAD.getByteReadySignal << 7
       case PB =>
         (super.read(address,chipID) & 0x1A) | (bus.data|data_out) | (bus.clk|clock_out) << 2 | bus.atn << 7 | IDJACK << 5
         
@@ -461,11 +464,17 @@ class C1571(val driveID: Int,
     add(VIA2)
     add(CIA)    
     add(RW_HEAD)
-    //TODO
+    add(WD1770)
     if (ledListener != null) ledListener.turnOn
   }
   
   def reset {
+    tracing = false
+    channelActive = 0
+    _1541Mode = true  
+    busDataDirection = 0
+    activeHead = 0
+    canSleep = true
     running = true
     isRunningListener(true)
     awakeCycles = 0
@@ -495,21 +504,24 @@ class C1571(val driveID: Int,
   
   @inline private def checkPC(cycles: Long) {
     val pc = cpu.getPC
-//    if (_1541Mode) {
-      if (pc == _1541_LOAD_ROUTINE || pc == _1571_LOAD_ROUTINE) setFilename
-      else 
-      if (pc == _1541_FORMAT_ROUTINE && useTRAPFormat) {
-        setFilename
-        if (VIA2.formatDisk) cpu.jmpTo(_1541_FORMAT_ROUTINE_OK) else cpu.jmpTo(_1541_FORMAT_ROUTINE_NOK)
-      } 
-      else 
-      if (pc == _1541_WAIT_LOOP_ROUTINE && canSleep && channelActive == 0 && !RW_HEAD.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
-        running = false      
-        VIA1.setActive(false)
-        VIA2.setActive(false)
-        goSleepingCycles = cycles
-      }
-//    }
+    if (pc == _1541_LOAD_ROUTINE || pc == _1571_LOAD_ROUTINE) setFilename
+    else 
+    if (pc == _1541_FORMAT_ROUTINE && useTRAPFormat) {
+      setFilename
+      if (VIA2.formatDisk) cpu.jmpTo(_1541_FORMAT_ROUTINE_OK) else cpu.jmpTo(_1541_FORMAT_ROUTINE_NOK)
+    } 
+    else
+    if (pc == _1571_FORMAT_ROUTINE && !_1541Mode && useTRAPFormat) {
+      setFilename
+      if (VIA2.formatDisk) cpu.jmpTo(_1571_FORMAT_ROUTINE_OK) else cpu.jmpTo(_1571_FORMAT_ROUTINE_NOK)
+    }
+    else 
+    if (pc == _1541_WAIT_LOOP_ROUTINE && canSleep && channelActive == 0 && !RW_HEAD.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
+      running = false      
+      VIA1.setActive(false)
+      VIA2.setActive(false)
+      goSleepingCycles = cycles
+    }
   }
   
   final def clock(cycles: Long) {
@@ -564,13 +576,29 @@ class C1571(val driveID: Int,
   // ================== State ======================================
   protected def saveState(out:ObjectOutputStream) {
     if (ledListener != null) out.writeBoolean(ledListener.isOn)
-    //TODO
+    out.writeObject(ram)
+    out.writeInt(channelActive)
+    out.writeBoolean(_1541Mode)  
+    out.writeInt(busDataDirection)
+    out.writeInt(activeHead)
+    out.writeBoolean(canSleep)
+    out.writeBoolean(running)
+    out.writeDouble(cycleFrac)
+    out.writeDouble(CYCLE_ADJ)
   }
   protected def loadState(in:ObjectInputStream) {
     if (ledListener != null) {
       if (in.readBoolean) ledListener.turnOn else ledListener.turnOff
     }
-    //TODO
+    loadMemory[Int](ram,in)
+    channelActive = in.readInt
+    _1541Mode = in.readBoolean  
+    busDataDirection = in.readInt
+    activeHead = in.readInt
+    canSleep = in.readBoolean
+    running = in.readBoolean
+    cycleFrac = in.readDouble
+    CYCLE_ADJ = in.readDouble
   }
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }

@@ -1,12 +1,12 @@
 package ucesoft.cbm.peripheral.drive
 
 import ucesoft.cbm.peripheral.bus._
-import ucesoft.cbm.formats.D64
 import java.io.FileNotFoundException
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
 import javax.swing.JOptionPane
+import ucesoft.cbm.formats.Diskette
 
 object C1541Emu {
   private val BLINK_TIMEOUT = 100000
@@ -45,7 +45,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
   import C1541Emu._
   import Job._
 
-  private[this] var driveReader: Option[D64] = None
+  private[this] var driveReader: Option[Diskette] = None
   private[this] var job = EMPTY
 
   private[this] var status = STATUS_WELCOME
@@ -73,7 +73,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
   def getFloppy = driveReader.getOrElse(EmptyFloppy)
 
   def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) {
-    this.driveReader = Some(driveReader.asInstanceOf[D64])
+    this.driveReader = Some(driveReader.asInstanceOf[Diskette])
   }
 
   private def blinkLed(cycles: Long) {

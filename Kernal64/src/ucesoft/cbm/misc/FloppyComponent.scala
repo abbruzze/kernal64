@@ -3,12 +3,13 @@ package ucesoft.cbm.misc
 import ucesoft.cbm.peripheral.drive.Drive
 import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.peripheral.drive.Floppy
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
+import ucesoft.cbm.formats.Diskette
+import ucesoft.cbm.peripheral.drive.Floppy
 
-class FloppyComponent(device:Int,attachedDisks : Array[Option[Floppy]],drives : Array[Drive],driveLeds:Array[DriveLed]) extends CBMComponent {
+class FloppyComponent(device:Int,attachedDisks : Array[Option[Diskette]],drives : Array[Drive],driveLeds:Array[DriveLed]) extends CBMComponent {
     val componentID = "Mounted floppy " + device
     val componentType = CBMComponentType.FLOPPY
     final private[this] val deviceID = device - 8 
@@ -40,7 +41,7 @@ class FloppyComponent(device:Int,attachedDisks : Array[Option[Floppy]],drives : 
             case Some(oldDisk) => oldDisk.close
             case None =>
           }
-          attachedDisks(deviceID) = Some(floppy)
+          attachedDisks(deviceID) = Some(floppy.asInstanceOf[Diskette])
           drives(deviceID).setDriveReader(floppy,false)
           driveLeds(deviceID).setToolTipText(floppy.file)
         case None =>

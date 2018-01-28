@@ -89,7 +89,8 @@ class RWHeadController(val name:String,
   final def changeSide(side:Int) {
     floppy.side = side
     track = floppy.currentTrack
-    trackSteps = track << 1
+    val oldTrackSteps = trackSteps
+    trackSteps = (track << 1) | (oldTrackSteps & 1)
   }
   final def getLastRead : Int = lastRead
   final def setSpeedZone(newSpeedZone:Int) {
