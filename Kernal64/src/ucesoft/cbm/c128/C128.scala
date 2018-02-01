@@ -337,6 +337,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
           // mouse
           case java.awt.event.KeyEvent.VK_M if e.isAltDown =>
             mouseEnabled = !mouseEnabled
+            sid.setMouseEnabled(mouseEnabled)
             if (mouseEnabled) MouseCage.enableMouseCageOn(vdcDisplay) else MouseCage.disableMouseCage
           // reset
           case java.awt.event.KeyEvent.VK_R if e.isAltDown =>

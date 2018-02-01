@@ -17,7 +17,7 @@ class AboutCanvas(charRom:Memory,version:String) extends CBMCanvas(charRom) {
   newLine
   add(center("BY ALESSANDRO ABBRUZZETTI",WIDTH)).newLine
   newLine
-  add(center("2013-2017",WIDTH)).newLine
+  add(center("2013-2018",WIDTH)).newLine
   newLine
   yellow
   add(center("VISIT",WIDTH)).newLine

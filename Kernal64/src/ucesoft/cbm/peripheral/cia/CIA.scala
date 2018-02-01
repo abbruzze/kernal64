@@ -469,12 +469,20 @@ class CIA(val name:String,
     out.writeInt(sdr)
     out.writeInt(sdrIndex)
     out.writeInt(icrMask)
+    out.writeInt(shiftRegister)
+    out.writeBoolean(sdrLoaded)
+    out.writeBoolean(sdrOut)
+    out.writeBoolean(SP)
   }
   protected def loadState(in:ObjectInputStream) {
     icr = in.readInt
     sdr = in.readInt
     sdrIndex = in.readInt
     icrMask = in.readInt
+    shiftRegister = in.readInt
+    sdrLoaded = in.readBoolean
+    sdrOut = in.readBoolean
+    SP = in.readBoolean
   }
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
