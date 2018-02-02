@@ -17,22 +17,30 @@ import java.util.EventObject
 import java.awt.event.MouseEvent
 
 object InspectPanel {
-  def getInspectDialog(f: JFrame, root: CBMComponent) = {
-    val panel = new InspectPanel(root)
-    val dialog = new JDialog(f, "Inspect panel") {
-      override def setVisible(visible: Boolean) {
-        super.setVisible(visible)
-        panel.enableUpdating(visible)
-      }
-    }
-    dialog.getContentPane.add("Center", panel)
-    dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE)
-    dialog.pack
-    dialog
+  def getInspectDialog(f: JFrame, root: CBMComponent) = new InspectPanelDialog(f,root)
+}
+
+class InspectPanelDialog(f: JFrame,root: CBMComponent) extends JDialog(f, "Inspect panel") {
+  private[this] var panel = new InspectPanel(root)
+  
+  override def setVisible(visible: Boolean) {
+    super.setVisible(visible)
+    panel.enableUpdating(visible)
+  }
+  
+  getContentPane.add("Center", panel)
+  setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE)
+  pack
+  
+  def updateRoot {    
+    getContentPane.remove(panel)
+    panel = new InspectPanel(root)
+    getContentPane.add("Center", panel)
+    revalidate
   }
 }
 
-class InspectPanel(root: CBMComponent) extends JPanel with Runnable with ChangeListener {
+private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnable with ChangeListener {
   private[this] val treeRoot = createTree(root)
   private[this] val lock = new Object
   private[this] val tree = new JTree(treeRoot)
@@ -118,7 +126,7 @@ class InspectPanel(root: CBMComponent) extends JPanel with Runnable with ChangeL
     override def toString = "Insert an hex address [=<new value>]"
   }
 
-  private def enableUpdating(enabled: Boolean) {
+  def enableUpdating(enabled: Boolean) {
     visible = enabled
     if (enabled) lock.synchronized {
       lock.notify

@@ -51,7 +51,8 @@ class IECBus extends CBMComponent {
   }
   
   final def unregisterListener(l:IECBusListener) {
-    lines = lines filterNot { s => s.listener == l }
+    lines = lines filterNot { _.listener.busid == l.busid }
+    updateLines
   }
   
   final def registerListener(l:IECBusListener) {

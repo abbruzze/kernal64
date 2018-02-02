@@ -140,15 +140,12 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   // -------------------- DISK -----------------
   private[this] var isDiskActive = true
   private[this] var isDiskActive9 = false
-  private[this] var attachedDisks : Array[Option[Diskette]] = Array(None,None)
   private[this] val driveLeds = Array(new DriveLed,new DriveLed)
   private[this] val diskProgressPanels = Array(new DriveLoadProgressPanel,new DriveLoadProgressPanel)
   private[this] val c1541 = new C1541Emu(bus,DriveLed8Listener)
-  private[this] val c1541_real = new C1541(0x00,bus,DriveLed8Listener)
-  private[this] val c1541_real9 = new C1541(0x01,bus,DriveLed9Listener)
   private[this] val flyerIEC = new FlyerIEC(bus,file => attachDiskFile(0,file,false))
   private[this] var isFlyerEnabled = false
-  private[this] var drives : Array[Drive] = Array(c1541_real,c1541_real9)
+  private[this] val drives : Array[Drive with TraceListener] = Array.ofDim(2)
   private[this] var device10Drive : Drive = _
   private[this] var device10DriveEnabled = false
   
@@ -218,7 +215,6 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         case _ => controlPortB.releaseEmulated
       }
     }
-    //override def mouseDragged(e:MouseEvent) = mouseClicked(e)
     
     def init {}
     def reset {}
@@ -236,6 +232,24 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     driveLeds(1).setVisible(false)
   }  
   
+  private def initDrive(id:Int) {
+    val old = Option(drives(id))
+    id match {
+      case 0 =>        
+        drives(0) = new C1541(0x00,bus,DriveLed8Listener)
+        drives(0).setIsRunningListener(diskRunning => isDiskActive = diskRunning)
+      case 1 =>
+        drives(1) = new C1541(0x01,bus,DriveLed9Listener)
+        drives(1).setIsRunningListener(diskRunning => isDiskActive9 = diskRunning)
+    }
+    old match {
+      case None =>
+        add(drives(id))
+      case Some(c) =>
+        change(c,drives(id))
+    }
+  }
+  
   def reset {
     dma = false
     clock.maximumSpeed = false
@@ -248,6 +262,9 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     
     Log.info("Building the system ...")
     ExpansionPort.addConfigurationListener(mem)
+    // drive
+    initDrive(0)
+    initDrive(1)
     // -----------------------    
     add(clock)
     add(mem)
@@ -259,8 +276,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     add(expansionPort)
     add(rs232)    
     rs232.setRS232Listener(rs232StatusPanel)
-    add(new FloppyComponent(8,attachedDisks,drives,driveLeds))
-    add(new FloppyComponent(9,attachedDisks,drives,driveLeds))
+    add(new FloppyComponent(8,drives(0),driveLeds(0)))
+    add(new FloppyComponent(9,drives(1),driveLeds(1)))
     // -----------------------
     val vicMemory = new C64VICMemory(mem,mem.CHAR_ROM) 
     add(vicMemory)
@@ -313,7 +330,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     add(lightPen)
     display.addMouseListener(lightPen)
     traceDialog = TraceDialog.getTraceDialog(displayFrame,mem,cpu,display,vicChip)
-    diskTraceDialog = TraceDialog.getTraceDialog(displayFrame,c1541_real.getMem,c1541_real)
+    diskTraceDialog = TraceDialog.getTraceDialog(displayFrame,drives(0).getMem,drives(0))
     // drive leds
     add(driveLeds(0))        
     add(driveLeds(1))
@@ -322,12 +339,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
       displayFrame.setLocation(xy(0),xy(1))
     }    
     configureJoystick
-    // drive
-    c1541_real.setIsRunningListener(diskRunning => isDiskActive = diskRunning)    
-    c1541_real9.setIsRunningListener(diskRunning => isDiskActive9 = diskRunning)
     add(c1541)
-    add(c1541_real) 
-    add(c1541_real9)
     Log.setOutput(traceDialog.logPanel.writer)
     // tape
     datassette = new Datassette(cia1.setFlagLow _)
@@ -363,7 +375,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   override def afterInitHook {    
 	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)    
     // deactivate drive 9
-    c1541_real9.setActive(false)    
+    drives(1).setActive(false)    
+    driveLeds(1).setVisible(false)    
   }
   
   private def errorHandler(t:Throwable) {
@@ -477,16 +490,6 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         swapJoysticks
       case "DISK_RO" =>
         drives foreach { _.setReadOnly(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) }
-      case "DISK_TRUE_EMU" =>
-        val trueEmu = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        bus.reset
-        drives(0).setActive(false)
-        drives(0) = if (trueEmu) c1541_real 
-        else {
-          isDiskActive = true
-          c1541
-        }
-        drives(0).setActive(true)
       case "DISK_CAN_GO_SLEEP" =>
         val canGoSleep = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         drives foreach { _.setCanSleep(canGoSleep) }
@@ -599,7 +602,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         changeLocalDriveDir
       case "DRIVE_9_ENABLED" =>
         val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        c1541_real9.setActive(enabled)
+        drives(1).setActive(enabled)
         driveLeds(1).setVisible(enabled)
         adjustRatio
       case "SID_6581" =>
@@ -971,12 +974,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         return
       }
       val disk = Diskette(file.toString) //if (isD64) new D64(file.toString) else new G64(file.toString)
-      attachedDisks(driveID) match {
-        case Some(oldDisk) => oldDisk.close
-        case None =>
-      }
-      attachedDisks(driveID) = Some(disk)
-      clock.pause
+      drives(driveID).getFloppy.close
+      if (!traceDialog.isTracing) clock.pause
       drives(driveID).setDriveReader(disk,true)
       clock.play
             
@@ -1170,21 +1169,20 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   }
   
   private def loadFileFromAttachedFile(driveID:Int,relocate:Boolean) {
-    attachedDisks(driveID) match {
-      case None =>
-        JOptionPane.showMessageDialog(displayFrame,"No disk attached!", "Loading error",JOptionPane.ERROR_MESSAGE)
-      case Some(floppy) =>
-        Option(JOptionPane.showInputDialog(displayFrame,"Load file","*")) match {
-          case None =>
-          case Some(fileName) =>
-            try {
-              floppy.loadInMemory(mem,fileName,relocate)
-            }
-            catch {
-              case t:Throwable =>
-                JOptionPane.showMessageDialog(displayFrame, "Errore while loading from disk: " + t.getMessage,"Loading error",JOptionPane.ERROR_MESSAGE)
-            }
-        }
+    val floppy = drives(driveID).getFloppy
+    if (floppy.isEmpty) JOptionPane.showMessageDialog(displayFrame,"No disk attached!", "Loading error",JOptionPane.ERROR_MESSAGE)
+    else {
+      Option(JOptionPane.showInputDialog(displayFrame,"Load file","*")) match {
+        case None =>
+        case Some(fileName) =>
+          try {
+            floppy.asInstanceOf[Diskette].loadInMemory(mem,fileName,relocate)
+          }
+          catch {
+            case t:Throwable =>
+              JOptionPane.showMessageDialog(displayFrame, "Errore while loading from disk: " + t.getMessage,"Loading error",JOptionPane.ERROR_MESSAGE)
+          }
+      }
     }
   }    
   
@@ -1624,12 +1622,6 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     diskReadOnlyItem.addActionListener(this)    
     diskItem.add(diskReadOnlyItem)
     
-    val diskTrueEmuItem = new JCheckBoxMenuItem("1541 True emulation")
-    diskTrueEmuItem.setSelected(true)
-    diskTrueEmuItem.setActionCommand("DISK_TRUE_EMU")
-    diskTrueEmuItem.addActionListener(this)    
-    diskItem.add(diskTrueEmuItem)
-    
     val diskCanSleepItem = new JCheckBoxMenuItem("1541 can go sleeping")
     diskCanSleepItem.setSelected(true)
     diskCanSleepItem.setActionCommand("DISK_CAN_GO_SLEEP")
@@ -1863,11 +1855,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
       val out = new FileWriter(propsFile)
       configuration.store(out, "C64 configuration file")
       out.close
-      for(attachedDisk <- attachedDisks)
-        attachedDisk match {
-          case Some(d64) => d64.close
-          case None =>
-        }
+      for(d <- drives)
+        d.getFloppy.close
     }
     catch {
       case io:IOException =>

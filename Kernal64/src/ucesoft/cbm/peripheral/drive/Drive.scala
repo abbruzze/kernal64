@@ -4,10 +4,20 @@ import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.cpu.Memory
 
+object DriveType extends Enumeration {
+  val _1541 = Value
+  val _1571 = Value
+  val _1581 = Value
+  val OTHER = Value
+  val LOCAL = Value
+}
+
 trait Drive extends CBMComponent {
   val componentType = CBMComponentType.DISK
+  val driveType : DriveType.Value
   protected var isRunningListener : (Boolean) => Unit = x => {}
   
+  def disconnect {}
   def setActive(active:Boolean) {}
   def setCanSleep(canSleep:Boolean) {}
   def setIsRunningListener(listener: (Boolean) => Unit) = isRunningListener = listener

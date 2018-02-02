@@ -16,6 +16,7 @@ import javax.swing.JFrame
 import ucesoft.cbm.cpu.Memory
 
 class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends TraceListener with Drive {
+  val driveType = DriveType._1541
   val componentID = "C1541 Disk Drive " + jackID
   override val MIN_SPEED_HZ = 985248
   override val MAX_SPEED_HZ = 1000000
@@ -66,7 +67,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     viaDisk.awake
   }
   
-  def disconnect {
+  override def disconnect {
     bus.unregisterListener(viaBus)
   }
   

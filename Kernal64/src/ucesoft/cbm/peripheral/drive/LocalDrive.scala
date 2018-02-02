@@ -11,6 +11,7 @@ import language.postfixOps
 import ucesoft.cbm.formats.Diskette
 
 class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device) {
+  val driveType = DriveType.LOCAL
   val componentID = "Local Drive"
   override val busid = "LocalDrive_" + device
   

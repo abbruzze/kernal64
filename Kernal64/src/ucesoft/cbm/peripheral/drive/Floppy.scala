@@ -50,6 +50,7 @@ trait Floppy {
   val totalTracks : Int
   val file : String
   lazy val singleSide = true
+  val isEmpty = false
   
   def minTrack = 1
   def maxTrack = totalTracks
@@ -101,6 +102,7 @@ object EmptyFloppy extends Floppy {
   val isFormattable = false
   val totalTracks = 35
   val file = ""
+  override val isEmpty = true
   
   private[this] var track = 1
   private[this] var listener : TrackListener = _

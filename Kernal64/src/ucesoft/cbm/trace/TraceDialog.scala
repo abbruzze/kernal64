@@ -29,7 +29,7 @@ object TraceDialog {
 }
 
 class TraceDialog private (displayFrame: JFrame,
-  mem: Memory,
+  var mem: Memory,
   var traceListener: TraceListener,
   display: Option[Display],
   vic: Option[VIC]) extends JDialog(displayFrame, "Trace dialog") with ActionListener {

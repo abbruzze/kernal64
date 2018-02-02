@@ -19,6 +19,7 @@ import java.net.URLEncoder
 import ucesoft.cbm.formats.Diskette
 
 class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bus, 7) {
+  val driveType = DriveType.OTHER
   val componentID = "FlyerIEC"
   override val busid = "FlyerIEC"
   

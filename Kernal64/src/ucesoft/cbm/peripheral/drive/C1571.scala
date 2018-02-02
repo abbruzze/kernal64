@@ -29,6 +29,7 @@ class C1571(val driveID: Int,
             RAMComponent with 
             TraceListener with 
             Drive {
+  val driveType = DriveType._1571
   val componentID = "C1571 Disk Drive " + driveID
   override val MIN_SPEED_HZ = 985248
   override val MAX_SPEED_HZ = 1000000
@@ -143,7 +144,7 @@ class C1571(val driveID: Int,
    * CIA for fast serial bus
    * 
    ***********************************************************************************************************/
-  private[this] val CIA = new CIA("CIA_FAST",0x4000,EmptyCIAConnector,EmptyCIAConnector,IRQSwitcher.ciaIRQ _,false) with IECBusListener {
+  private[this] val CIA = new CIA("CIA_FAST_" + driveID,0x4000,EmptyCIAConnector,EmptyCIAConnector,IRQSwitcher.ciaIRQ _,false) with IECBusListener {
     val busid = name    
     
     override def srqTriggered = if (busDataDirection == 0) serialIN(bus.data == IECBus.GROUND)    
@@ -188,7 +189,7 @@ class C1571(val driveID: Int,
     override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
       case ad@(PA|PA2) =>
         super.read(address,chipID)
-        (if (floppy.currentTrack != 0) 1 else 0) | busDataDirection << 1 | activeHead << 2 | (if (_1541Mode) 0 else 1 << 5) | RW_HEAD.getByteReadySignal << 7
+        (if (floppy.currentTrack != 1) 1 else 0) | busDataDirection << 1 | activeHead << 2 | (if (_1541Mode) 0 else 1 << 5) | RW_HEAD.getByteReadySignal << 7
       case PB =>
         (super.read(address,chipID) & 0x1A) | (bus.data|data_out) | (bus.clk|clock_out) << 2 | bus.atn << 7 | IDJACK << 5
         
@@ -237,7 +238,6 @@ class C1571(val driveID: Int,
    * 
    ***********************************************************************************************************/
   private[this] val VIA2 = new VIA("VIA1571_DiskControl", 0x1C00,IRQSwitcher.viaDiskIRQ _) {
-    val busid = "VIA1571_DiskControl"
     override lazy val componentID = "VIA1571_2 (DC)"
     private[this] val WRITE_PROTECT_SENSE = 0x10
     private[this] val WRITE_PROTECT_SENSE_WAIT = 3 * 400000L
@@ -424,6 +424,11 @@ class C1571(val driveID: Int,
   }
   override def getMem = this
   // ===============================================================
+  
+  override def disconnect {
+    bus.unregisterListener(VIA1)
+    bus.unregisterListener(CIA)
+  }
   
   override def getProperties = {
     properties.setProperty("Speed Hz",currentSpeedHz.toString)

@@ -114,7 +114,7 @@ class RWHeadController(val name:String,
   final def isMotorOn : Boolean = motorOn
   final def setMotor(on:Boolean) {
     motorOn = on
-    if (on && floppy == EmptyFloppy) floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
+    if (on && floppy.isEmpty) floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
   }
   final def isSync : Boolean = !isWriting && motorOn && last10Bits == 0x3FF
   final def moveHead(moveOut: Boolean) {

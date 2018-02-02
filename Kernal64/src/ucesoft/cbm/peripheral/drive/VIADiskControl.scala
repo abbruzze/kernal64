@@ -178,7 +178,7 @@ class VIADiskControl(cpu: CPU6510,
             ledListener.endLoading
             if (lastMotorOn && !motorOn) currentFilename = ""
           }
-          else if (floppy == EmptyFloppy) floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
+          else if (floppy.isEmpty) floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
         }
         val newSpeedZone = (value & 0xFF) >> 5 & 0x3
         if (newSpeedZone != speedZone) {
