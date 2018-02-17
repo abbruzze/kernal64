@@ -28,29 +28,96 @@ private[formats] object GCR {
   } 
   
   /**
-   * Convert a gcr sector back to a disk format sector.
+   * Convert a gcr track back to a disk format sectors.
    */
-  def GCR2sector(gcrSector:Array[Int]) = {
+  def GCR2track(gcrTrack:Array[Int],sectorSize:Int,writeSector : (Int,Int,Array[Int]) => Unit) = {
     val ungcr = new UNGCR
-    val headerUngcr = new UNGCR
-    var base = 0
-    // skip 0xFF
-    while (gcrSector(base) != 0xFF) base += 1
-    while (gcrSector(base) == 0xFF) base += 1
-    for(i <- 0 until HEADER_SIZE) headerUngcr.add(gcrSector(base + i))
-    base += HEADER_SIZE
-    // skip GAP
-    while (gcrSector(base) == GAP) base += 1
-    // skip 0xFF
-    while (gcrSector(base) != 0xFF) base += 1
-    while (gcrSector(base) == 0xFF) base += 1
-    for(i <- 0 until DATA_SIZE) {
-      ungcr.add(gcrSector(base + i))
-    }    
-    val bytes = ungcr.getBytes
-    val sector = Array.ofDim[Int](256)
-    Array.copy(bytes,1,sector,0,256)
-    sector
+    var i = 0
+    var readData = 0
+    var sectorsFound = 0
+    var dataBuffer = Array.ofDim[Int](256)
+    var sync = false
+    var dataFound = false
+    var headerFound = false
+    var dataBufferIndex = 0 
+    var bits = 0
+    var track,sector = 0
+    var round = 0
+    
+    while (sectorsFound < sectorSize) {
+      
+      var data = gcrTrack(i)
+      var b = 0
+      while (b < 8) {
+        readData <<= 1
+        if ((data & 0x80) == 0x80) readData |= 0x1
+        
+        if (headerFound) {
+          bits += 1
+          if (bits == 10) {
+            readData &= 0x3FF
+            dataBuffer(dataBufferIndex) = ungcr.gcr2Byte(readData)
+            dataBufferIndex += 1
+            bits = 0
+            if (dataBufferIndex == 5) {
+              headerFound = false
+              sector = dataBuffer(1)
+              track = dataBuffer(2)
+              //println(s"Found header sector=${sector} track=${track}")              
+            }
+          }
+        }
+        else
+        if (dataFound) {
+          bits += 1
+          if (bits == 10) {
+            readData &= 0x3FF
+            dataBuffer(dataBufferIndex) = ungcr.gcr2Byte(readData)
+            dataBufferIndex += 1
+            bits = 0
+            if (dataBufferIndex == 256) {
+              writeSector(track,sector,dataBuffer)
+              sectorsFound += 1
+              dataFound = false
+              dataBufferIndex = 0
+              dataBuffer = Array.ofDim[Int](256)
+              readData = 0
+              bits = 0
+            }
+          }
+        }
+        else
+        if (sync) {
+          readData &= 0xFFFFF
+          if (readData == 1047895) { // 10 1's 01010 10111 = 7
+            dataFound = true
+            dataBufferIndex = 0
+            bits = 0
+            sync = false
+          }
+          else
+          if (readData == 1047881) { // 10 1's 01010 01001 = 8
+            sync = false 
+            headerFound = true
+            dataBufferIndex = 0
+            bits = 0
+          }
+        }
+        else {
+          readData &= 0x3FF // 10 1's
+          if (readData == 0x3FF) sync = true          
+        }
+        
+        b += 1
+        data <<= 1
+      }
+      i += 1
+      if (i == gcrTrack.length) {
+        i = 0
+        round += 1
+        if (round == 2) throw new IllegalArgumentException("Cannot write changes on disk: invalid format")
+      }
+    }
   }
   
   /**
@@ -105,7 +172,7 @@ private[formats]class UNGCR {
       0, 0x09, 0x0a, 0x0b, 0, 0x0d, 0x0e, 0
   )
   
-  private def gcr2Byte(b:Int) = GCR_TO_NIBBLE((b >> 5) & 0x1F) << 4 | GCR_TO_NIBBLE(b & 0x1F)
+  def gcr2Byte(b:Int) = GCR_TO_NIBBLE((b >> 5) & 0x1F) << 4 | GCR_TO_NIBBLE(b & 0x1F)
   
   def add(b:Int) {
     tmpGCRBuffer(index) = b

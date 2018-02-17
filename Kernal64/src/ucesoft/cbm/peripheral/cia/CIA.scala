@@ -46,7 +46,8 @@ class CIA(val name:String,
 		  portAConnector:Connector,
 		  portBConnector:Connector,
 		  irqAction:(Boolean) => Unit,
-		  autoClock:Boolean = true) extends Chip with RAMComponent {
+		  autoClock:Boolean = true,
+		  manualClockTODUpdate:Boolean = false) extends Chip with RAMComponent {
   import CIA._
   
   override lazy val componentID = name
@@ -190,9 +191,11 @@ class CIA(val name:String,
     private[this] val tickCallback = tick _
     
     @inline private def reschedule = {
-      val clk = Clock.systemClock
-      clk.cancel(componentID)
-      clk.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 98524,tickCallback,TICK_SUBID))
+      if (!manualClockTODUpdate) {
+        val clk = Clock.systemClock
+        clk.cancel(componentID)
+        clk.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 98524,tickCallback,TICK_SUBID))
+      }
     }
     
     def readHour = {
@@ -275,9 +278,10 @@ class CIA(val name:String,
   /**
    * Manual clock
    */
-  final def clock {
+  final def clock(updateTOD:Boolean) {
     timerA.clock
     timerB.clock
+    if (updateTOD) tod.tick(0)
   }
       
   def init {

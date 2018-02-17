@@ -6,19 +6,16 @@ import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
 
-class RWHeadController(val name:String,
-                       private var floppy:Floppy,
+abstract class RWHeadController(protected var floppy:Floppy,
                        ledListener:DriveLedListener) extends CBMComponent {
-  val componentID = name + " rw head controller"
   val componentType = CBMComponentType.INTERNAL
   
-  private[this] var isWriting = false
-  private[this] var motorOn = false
-  private[this] var byteReady = false
-  private[this] var byteReadySignal = 1
-  private[this] var track = 1
-  private[this] var trackSteps = track << 1    
-  private[this] var currentFilename = ""
+  protected var isWriting = false
+  protected var motorOn = false
+  protected var byteReady = false
+  protected var byteReadySignal = 1
+  protected var track = 1
+  protected var currentFilename = ""
   
   var canSetByteReady = false
   
@@ -40,13 +37,14 @@ class RWHeadController(val name:String,
       307692.0 / C1541_CLOCK_HZ   // zone 1 
   )
     
-  private[this] var speedZone = 3
-  private[this] var bitCycleWait = rotationCyclesForBit(speedZone)
-  private[this] var rotationCycleCounter = 0.0  
-  private[this] var bitCounter = 0
-  private[this] var last10Bits,lastRead = 0
-  private[this] var lastWrite = 0x55
-  private[this] var nextWrite = 0
+  protected var speedZone = 3
+  protected var bitCycleWait = rotationCyclesForBit(speedZone)
+  protected var rotationCycleCounter = 0.0  
+  protected var bitCounter = 0
+  protected var lastRead = 0
+  protected var lastWrite = 0x55
+  protected var nextWrite = 0
+  protected var lastByteReady = false
   
   def init {
     
@@ -58,40 +56,23 @@ class RWHeadController(val name:String,
     motorOn = false
     canSetByteReady = false
     byteReady = false
-    trackSteps = 2
     track = 1
     currentFilename = ""
     bitCounter = 0
     speedZone = 3
     bitCycleWait = rotationCyclesForBit(speedZone)
     rotationCycleCounter = 0.0
-    last10Bits = 0
     lastRead = 0
     lastWrite = 0x55
+    lastByteReady = false
   }
   
-  override def getProperties = {
-    properties.setProperty("Motor on",motorOn.toString)
-    properties.setProperty("Writing",isWriting.toString)
-    properties.setProperty("Track","%2d".format(track))
-    properties.setProperty("Disk",floppy.toString)
-    properties.setProperty("Current filename",currentFilename)
-    properties.setProperty("Byte ready signal",byteReadySignal.toString)
-    properties.setProperty("Last byte read",Integer.toHexString(lastRead))
-    super.getProperties
-  } 
-  
-  // ======================================================================
+  def isOnIndexHole : Boolean = floppy.isOnIndexHole
   final def getCurrentFileName = currentFilename
   final def resetByteReadySignal = byteReadySignal = 1
   final def getByteReadySignal = byteReadySignal
-  final def setWriting(on:Boolean) = isWriting = on  
-  final def changeSide(side:Int) {
-    floppy.side = side
-    track = floppy.currentTrack
-    val oldTrackSteps = trackSteps
-    trackSteps = (track << 1) | (oldTrackSteps & 1)
-  }
+  final def getLastByteReady : Boolean = lastByteReady
+  final def setWriting(on:Boolean) = isWriting = on
   final def getLastRead : Int = lastRead
   final def setSpeedZone(newSpeedZone:Int) {
     if (speedZone != newSpeedZone) {
@@ -100,10 +81,9 @@ class RWHeadController(val name:String,
       rotationCycleCounter = 0.0
     }
   }
-  final def setFloppy(newFloppy:Floppy) {
+  def setFloppy(newFloppy:Floppy) {
     floppy = newFloppy
     floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
-    floppy.changeTrack(trackSteps)
   }
   final def setNextToWrite(b:Int) {
     nextWrite = b
@@ -115,26 +95,6 @@ class RWHeadController(val name:String,
   final def setMotor(on:Boolean) {
     motorOn = on
     if (on && floppy.isEmpty) floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
-  }
-  final def isSync : Boolean = !isWriting && motorOn && last10Bits == 0x3FF
-  final def moveHead(moveOut: Boolean) {
-    var trackMoved = false
-    if (moveOut) {
-      if (track > floppy.minTrack) {
-        trackSteps -= 1
-        trackMoved = true
-      }
-    }
-    else {
-      if (track < floppy.maxTrack) {
-        trackSteps += 1
-        trackMoved = true
-      }
-    }
-    if (trackMoved) {
-      floppy.changeTrack(trackSteps)
-      track = floppy.currentTrack
-    }
   }
   private def updateTrackSectorLabelProgress(track:Int,halfTrack:Boolean,sector:Option[Int]) {
     if (ledListener != null) {      
@@ -152,36 +112,13 @@ class RWHeadController(val name:String,
     if (rotationCycleCounter >= 1) {
       bitCounter += 1
       rotationCycleCounter -= 1
-      if (isWriting) { // WRITING
-        floppy.writeNextBit((lastWrite & 0x80) > 0)
-        lastWrite <<= 1        
-        if (bitCounter == 8) {
-          bitCounter = 0
-          lastWrite = nextWrite
-          byteReady = true
-          byteReadySignal = 0
-        }
-      }
-      else { // READING
-        val bit = floppy.nextBit
-        last10Bits = ((last10Bits << 1) | bit) & 0x3FF
-        if (last10Bits == 0x3FF) {
-          bitCounter = 0
-          byteReadySignal = 1
-        }
-        if (bitCounter == 8) {
-          bitCounter = 0
-          lastWrite = lastRead
-          byteReady = true
-          lastRead = last10Bits & 0xFF    
-          byteReadySignal = 0
-        }
-      }      
+      if (isWriting) writeNextBit
+      else readNextBit      
     }
   }
   
   final def rotate : Boolean = {
-    if (motorOn) {
+    lastByteReady = if (motorOn) {
       rotateDisk
       if (byteReady && canSetByteReady) {
         byteReadySignal = 0
@@ -191,40 +128,57 @@ class RWHeadController(val name:String,
       else false
     }
     else false
-    }
-  // ======================================================================
+    
+    lastByteReady
+  }
   
   protected def saveState(out:ObjectOutputStream) {
     out.writeBoolean(isWriting)
     out.writeBoolean(motorOn)
     out.writeBoolean(canSetByteReady)
     out.writeBoolean(byteReady)
-    out.writeInt(trackSteps)
     out.writeInt(track)
     out.writeObject(currentFilename)
     out.writeInt(speedZone)
     out.writeDouble(bitCycleWait)
     out.writeDouble(rotationCycleCounter)
     out.writeInt(bitCounter)
-    out.writeInt(last10Bits)
     out.writeInt(lastRead)
     out.writeInt(lastWrite)    
+    out.writeBoolean(lastByteReady)
   }
   protected def loadState(in:ObjectInputStream) {
     isWriting = in.readBoolean
     motorOn = in.readBoolean
     canSetByteReady = in.readBoolean
     byteReady = in.readBoolean
-    trackSteps = in.readInt
     track = in.readInt
     currentFilename = in.readObject.asInstanceOf[String]
     speedZone = in.readInt
     bitCycleWait = in.readDouble
     rotationCycleCounter = in.readDouble
     bitCounter = in.readInt
-    last10Bits = in.readInt
     lastRead = in.readInt
     lastWrite = in.readInt
+    lastByteReady = in.readBoolean
   }
   protected def allowsStateRestoring(parent:JFrame) = true
+ // ================== Abstract methods =============================================== 
+ def changeSide(side:Int)
+ def isSync : Boolean
+ def moveHead(moveOut: Boolean)
+ protected def readNextBit
+ protected def writeNextBit
+ // ===================================================================================
+  
+  override def getProperties = {
+    properties.setProperty("Motor on",motorOn.toString)
+    properties.setProperty("Writing",isWriting.toString)
+    properties.setProperty("Track","%2d".format(track))
+    properties.setProperty("Disk",floppy.toString)
+    properties.setProperty("Current filename",currentFilename)
+    properties.setProperty("Byte ready signal",byteReadySignal.toString)
+    properties.setProperty("Last byte read",Integer.toHexString(lastRead))
+    super.getProperties
+  }
 }

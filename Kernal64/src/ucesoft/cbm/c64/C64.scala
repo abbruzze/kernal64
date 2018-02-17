@@ -148,7 +148,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   private[this] val drives : Array[Drive with TraceListener] = Array.ofDim(2)
   private[this] var device10Drive : Drive = _
   private[this] var device10DriveEnabled = false
-  
+  private[this] var canWriteOnDisk = true
   // -------------------- TAPE -----------------
   private[this] var datassette : Datassette = _
   // ----------------- RS-232 ------------------
@@ -681,6 +681,10 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         kbef.setVisible(true)
       case "LOAD_KEYB" =>
         loadKeyboard
+      case "WRITE_ON_DISK" =>
+        val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        canWriteOnDisk = enabled
+        for(d <- 0 to 1) drives(d).getFloppy.canWriteOnDisk = canWriteOnDisk
     }
   }
   
@@ -847,21 +851,11 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileView(new C64FileView)
-    fc.setDialogTitle("Save a .d64 or .g64 empty disk")
+    fc.setDialogTitle("Make an empty disk")
     fc.showSaveDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION => 
         try {          
-          var emptyFile = fc.getSelectedFile.toString
-          if (emptyFile.toUpperCase.endsWith(".G64")) G64.makeEmptyDisk(emptyFile)
-          else {
-            val diskLabel = JOptionPane.showInputDialog(displayFrame,"Insert disk label", "New Disk label",JOptionPane.QUESTION_MESSAGE)
-            if (diskLabel != null) {
-              if (!emptyFile.toUpperCase.endsWith(".D64")) emptyFile += ".d64"
-              val emptyD64 = Diskette(emptyFile,true)
-              emptyD64.format(s"N:${diskLabel.toUpperCase},00")
-              emptyD64.close
-            }
-          }          
+          Diskette.makeEmptyDisk(fc.getSelectedFile.toString)         
         }
         catch {
           case t:Throwable => 
@@ -894,7 +888,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     
     if (name.endsWith(".PRG")) loadPRGFile(file,autorun)
     else    
-    if (name.endsWith(".D64") || name.endsWith(".G64")) attachDiskFile(0,file,autorun)
+    if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun)
     else
     if (name.endsWith(".TAP")) attachTapeFile(file,autorun)
     else
@@ -970,10 +964,11 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     try {      
       val isD64 = file.getName.toUpperCase.endsWith(".D64")
       if (drives(driveID) == c1541 && !isD64) {
-        JOptionPane.showMessageDialog(displayFrame,"G64 format not allowed on a 1541 not in true emulation mode", "Disk attaching error",JOptionPane.ERROR_MESSAGE)
+        JOptionPane.showMessageDialog(displayFrame,"Format not allowed on a 1541 not in true emulation mode", "Disk attaching error",JOptionPane.ERROR_MESSAGE)
         return
       }
-      val disk = Diskette(file.toString) //if (isD64) new D64(file.toString) else new G64(file.toString)
+      val disk = Diskette(file.toString)
+      disk.canWriteOnDisk = canWriteOnDisk
       drives(driveID).getFloppy.close
       if (!traceDialog.isTracing) clock.pause
       drives(driveID).setDriveReader(disk,true)
@@ -1384,6 +1379,12 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     localDriveEnabled.addActionListener(this)
     group0.add(localDriveEnabled)
     localDriveItem.add(localDriveEnabled)
+    
+    val writeOnDiskCheckItem = new JCheckBoxMenuItem("Write changes on disk")
+    writeOnDiskCheckItem.setSelected(true)
+    writeOnDiskCheckItem.setActionCommand("WRITE_ON_DISK")
+    writeOnDiskCheckItem.addActionListener(this)
+    fileMenu.add(writeOnDiskCheckItem)
     
     fileMenu.addSeparator
     

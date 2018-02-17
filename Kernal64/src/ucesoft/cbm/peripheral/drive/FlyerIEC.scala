@@ -703,9 +703,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
       return
     }
     val newDisk = new File(floppyRepository,typeName(1) + ".d64")
-    val emptyD64 = Diskette(newDisk.toString,true)
-    emptyD64.format(s"N:FLYER,00")
-    emptyD64.close
+    Diskette.makeEmptyDisk(newDisk.toString)
   }
   
   private def diskRelabel(indexRen:String) {

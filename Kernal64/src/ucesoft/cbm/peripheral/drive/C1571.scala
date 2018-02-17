@@ -41,12 +41,6 @@ class C1571(val driveID: Int,
   
   private[this] val _1571_LOAD_ROUTINE = 0x9088
   private[this] val _1541_LOAD_ROUTINE = 0xD7B4
-  private[this] val _1541_FORMAT_ROUTINE = 0xC8C6
-  private[this] val _1541_FORMAT_ROUTINE_OK = 0xC8EF
-  private[this] val _1541_FORMAT_ROUTINE_NOK = 0xC8E8
-  private[this] val _1571_FORMAT_ROUTINE = 0xA40D
-  private[this] val _1571_FORMAT_ROUTINE_OK = 0xA46C
-  private[this] val _1571_FORMAT_ROUTINE_NOK = 0xA47B
   private[this] val _1541_WAIT_LOOP_ROUTINE = 0xEBFF
   private[this] val WAIT_CYCLES_FOR_STOPPING = 2000000
   private[this] final val GO_SLEEPING_MESSAGE_CYCLES = 3000000
@@ -61,7 +55,6 @@ class C1571(val driveID: Int,
   private[this] var awakeCycles = 0L
   private[this] var goSleepingCycles = 0L
   private[this] var canSleep = true
-  private[this] var useTRAPFormat = false
   private[this] var CYCLE_ADJ = 0.0 //(MAX_SPEED_MHZ - MIN_SPEED_MHZ) / MIN_SPEED_MHZ.toDouble
   private[this] var currentSpeedHz = MIN_SPEED_HZ
   private[this] var cycleFrac = 0.0
@@ -144,7 +137,7 @@ class C1571(val driveID: Int,
    * CIA for fast serial bus
    * 
    ***********************************************************************************************************/
-  private[this] val CIA = new CIA("CIA_FAST_" + driveID,0x4000,EmptyCIAConnector,EmptyCIAConnector,IRQSwitcher.ciaIRQ _,false) with IECBusListener {
+  private[this] val CIA = new CIA("CIA_FAST_" + driveID,0x4000,EmptyCIAConnector,EmptyCIAConnector,IRQSwitcher.ciaIRQ _,false,true) with IECBusListener {
     val busid = name    
     
     override def srqTriggered = if (busDataDirection == 0) serialIN(bus.data == IECBus.GROUND)    
@@ -161,7 +154,7 @@ class C1571(val driveID: Int,
    * R/W HEAD Controller
    * 
    ***********************************************************************************************************/
-  private[this] val RW_HEAD = new RWHeadController("1571",floppy,ledListener)
+  private[this] val RW_HEAD = new GCRRWHeadController("1571",floppy,ledListener)
   /************************************************************************************************************
    * VIA1 IEC Bus Manager
    * 
@@ -270,19 +263,6 @@ class C1571(val driveID: Int,
       }
       //else floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
       awake
-    }
-    
-    def formatDisk = {
-      try {
-        println("Formatting '" + RW_HEAD.getCurrentFileName + "'")
-        floppy.format(RW_HEAD.getCurrentFileName)
-        true
-      }
-      catch {
-        case t:IllegalArgumentException =>
-          t.printStackTrace
-          false
-      }
     }
     
     override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
@@ -446,7 +426,6 @@ class C1571(val driveID: Int,
   
   def getFloppy : Floppy = floppy
   def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
-    useTRAPFormat = !driveReader.isFormattable
     VIA2.setDriveReader(driveReader,emulateInserting)    
   }
   override def setActive(active: Boolean) {
@@ -511,16 +490,6 @@ class C1571(val driveID: Int,
     val pc = cpu.getPC
     if (pc == _1541_LOAD_ROUTINE || pc == _1571_LOAD_ROUTINE) setFilename
     else 
-    if (pc == _1541_FORMAT_ROUTINE && useTRAPFormat) {
-      setFilename
-      if (VIA2.formatDisk) cpu.jmpTo(_1541_FORMAT_ROUTINE_OK) else cpu.jmpTo(_1541_FORMAT_ROUTINE_NOK)
-    } 
-    else
-    if (pc == _1571_FORMAT_ROUTINE && !_1541Mode && useTRAPFormat) {
-      setFilename
-      if (VIA2.formatDisk) cpu.jmpTo(_1571_FORMAT_ROUTINE_OK) else cpu.jmpTo(_1571_FORMAT_ROUTINE_NOK)
-    }
-    else 
     if (pc == _1541_WAIT_LOOP_ROUTINE && canSleep && channelActive == 0 && !RW_HEAD.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
       running = false      
       VIA1.setActive(false)
@@ -543,13 +512,14 @@ class C1571(val driveID: Int,
       }
       while (n_cycles > 0) {
         cpu.fetchAndExecute(1)
-        CIA.clock
+        CIA.clock(false)
         VIA1.clock(cycles)
         VIA2.clock(cycles)
         n_cycles -= 1
       }
       
-      if (RW_HEAD.rotate) VIA2.byteReady      
+      if (RW_HEAD.rotate) VIA2.byteReady
+      WD1770.clock
     }
     else
     if (cycles - goSleepingCycles > GO_SLEEPING_MESSAGE_CYCLES) {

@@ -14,6 +14,9 @@ import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
 import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.peripheral.bus.IECBusListener
+import ucesoft.cbm.peripheral.bus.IECBusLine
+import ucesoft.cbm.ClockEvent
 
 class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends TraceListener with Drive {
   val driveType = DriveType._1541
@@ -22,9 +25,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   override val MAX_SPEED_HZ = 1000000
   
   private[this] val LOAD_ROUTINE = 0xD7B4
-  private[this] val FORMAT_ROUTINE = 0xC8C6
-  private[this] val FORMAT_ROUTINE_OK = 0xC8EF
-  private[this] val FORMAT_ROUTINE_NOK = 0xC8E8
   private[this] val WAIT_LOOP_ROUTINE = 0xEBFF//0xEC9B //0xEBFF//0xEC9B
   private[this] val WAIT_CYCLES_FOR_STOPPING = 2000000
   private[this] val GO_SLEEPING_MESSAGE_CYCLES = 3000000
@@ -34,19 +34,221 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] val mem = new C1541Mems.C1541_RAM
   private[this] val cpu = CPU6510.make(mem,ChipID.CPU_1541)
   private[this] val clk = Clock.systemClock
-  private[this] val viaBus = new VIAIECBus(jackID, bus, IRQSwitcher.viaBusIRQ _, () => awake)
-  private[this] val viaDisk = new VIADiskControl(cpu, IRQSwitcher.viaDiskIRQ _, ledListener)
   private[this] var running = true
   private[this] var awakeCycles = 0L
   private[this] var goSleepingCycles = 0L
   private[this] var tracing = false
   private[this] var canSleep = true
-  private[this] var useTRAPFormat = false
+  private[this] var floppy : Floppy = EmptyFloppy
+  /************************************************************************************************************
+   * R/W HEAD Controller
+   * 
+   ***********************************************************************************************************/
+  private[this] val RW_HEAD = new GCRRWHeadController("1541",floppy,ledListener)
+  /************************************************************************************************************
+   * VIA1 Disk Controller
+   * 
+   ***********************************************************************************************************/
+  private[this] val viaBus = new VIA("VIA_IECBus" + jackID,0x1800,IRQSwitcher.viaBusIRQ _) with IECBusListener {
+    override lazy val componentID = "VIA1 (Bus)"
+    val busid = name
+    private[this] val IDJACK = jackID & 0x03
+    private[this] var driveEnabled = true
+    
+    bus.registerListener(this)
+    if (jackID == 0) ParallelCable.pcCallback = onCB1 _
+    
+    override def reset {
+      super.reset
+    }
+    
+    def setEnabled(enabled:Boolean) = driveEnabled = enabled
+    
+    override def atnChanged(oldValue:Int,newValue:Int) {
+      if (driveEnabled) {
+        if (newValue == IECBus.GROUND) {
+          irq_set(IRQ_CA1)
+          awake
+        }
+        autoacknwoledgeData
+      }
+    }
+    
+    private def onCB1 = irq_set(IRQ_CB1)
+    
+    override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
+      case ad@(PA|PA2) =>
+        super.read(address,chipID)
+        if (jackID == 0 && ParallelCable.enabled) {
+          val r = ParallelCable.read & ~regs(DDRA)
+          if (ad == PA && (regs(PCR) & 0xE) == 0xA) ParallelCable.onCA2
+          r
+        }
+        else 0xFF
+      case PB =>
+        (super.read(address,chipID) & 0x1A) | (bus.data|data_out) | (bus.clk|clock_out) << 2 | bus.atn << 7 | IDJACK << 5
+        
+      case ofs => super.read(address,chipID)
+    }
+    
+    override def write(address: Int, value: Int, chipID: ChipID.ID) {
+      super.write(address,value,chipID)
+      (address & 0x0F) match {
+        case PB|DDRB =>        
+          bus.setLine(busid,IECBusLine.DATA,data_out)
+          bus.setLine(busid,IECBusLine.CLK,clock_out)
+          
+          autoacknwoledgeData
+        case ad@(PA|PA2) =>
+          if (jackID == 0 && ParallelCable.enabled) {
+            ParallelCable.write(value)
+            if (ad == PA && (regs(PCR) & 0xE) == 0xA) ParallelCable.onCA2
+          }
+        case _ =>
+      }         
+    }
+    
+    @inline private def data_out = if ((regs(DDRB) & regs(PB) & 0x02) > 0) IECBus.GROUND else IECBus.VOLTAGE
+    @inline private def clock_out = if ((regs(DDRB) & regs(PB) & 0x08) > 0) IECBus.GROUND else IECBus.VOLTAGE
+    
+    @inline private def autoacknwoledgeData {
+      val atna = (regs(DDRB) & regs(PB) & 0x10) > 0
+      val dataOut = (bus.atn == IECBus.GROUND) ^ atna
+      if (dataOut) bus.setLine(busid,IECBusLine.DATA,IECBus.GROUND) else bus.setLine(busid,IECBusLine.DATA,data_out)
+    }
+    // state
+    override protected def saveState(out:ObjectOutputStream) {
+      super.saveState(out)
+      //out.writeInt(data_out)
+      out.writeBoolean(driveEnabled)
+    }
+    override protected def loadState(in:ObjectInputStream) {
+      super.loadState(in)
+      driveEnabled = in.readBoolean
+    }
+  }
+  /************************************************************************************************************
+   * VIA2 Disk Controller
+   * 
+   ***********************************************************************************************************/
+  private[this] val viaDisk = new VIA("VIA1541_DiskControl", 0x1C00,IRQSwitcher.viaDiskIRQ _) {
+    override lazy val componentID = "VIA1541_2 (DC)"
+    private[this] val WRITE_PROTECT_SENSE = 0x10
+    private[this] val WRITE_PROTECT_SENSE_WAIT = 3 * 400000L
+    private[this] val REMOVING_DISK_WAIT = 500000L
+    private[this] val SYNC_DETECTION_LINE = 0x80
+    private[this] var isDiskChanged = true
+    private[this] var isDiskChanging = false
+    private[this] var isReadOnly = false
+    
+    def setReadOnly(readOnly:Boolean) = isReadOnly = readOnly
   
-  def getFloppy = viaDisk.getFloppy
+    def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
+      floppy = driveReader
+      RW_HEAD.setFloppy(floppy)
+      if (emulateInserting) {
+        isDiskChanged = true
+        isDiskChanging = true
+        viaBus.irq_set(IRQ_CA2)
+        clk.schedule(new ClockEvent("DiskRemoving",Clock.systemClock.currentCycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
+          isDiskChanged = false
+          clk.schedule(new ClockEvent("DiskWaitingInserting",cycles + REMOVING_DISK_WAIT, cycles => {
+            isDiskChanged = true
+            viaBus.irq_set(IRQ_CA2)
+            clk.schedule(new ClockEvent("DiskWaitingClearing",cycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
+              isDiskChanged = false
+              isDiskChanging = false
+            }))
+          }))
+        }))
+      }
+      awake
+    }
+    
+    override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
+      case PB =>
+        val wps = if (isDiskChanging) isDiskChanged else isReadOnly | floppy.isReadOnly
+        (super.read(address, chipID) & ~(WRITE_PROTECT_SENSE | SYNC_DETECTION_LINE)) |
+          (if (RW_HEAD.isSync) 0x00 else SYNC_DETECTION_LINE) |
+          (if (wps) 0x00 else WRITE_PROTECT_SENSE)
+      case PA|PA2 =>
+        super.read(address, chipID)
+        floppy.notifyTrackSectorChangeListener
+        if ((regs(PCR) & 0x0C) == 0x08) RW_HEAD.canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
+        RW_HEAD.getLastRead
+      case ofs => super.read(address, chipID)
+    }
+  
+    override def write(address: Int, value: Int, chipID: ChipID.ID) {
+      (address & 0x0F) match {
+        case PA =>
+          if ((regs(PCR) & 0x0C) == 0x08) RW_HEAD.canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
+          RW_HEAD.setNextToWrite(value)
+        case PCR =>
+          value & 0x0E match {
+            case 0xE => RW_HEAD.canSetByteReady = true        // 111 => Manual output mode high
+            case 0xC => RW_HEAD.canSetByteReady = false       // 110 => Manual output mode low
+            case _ => RW_HEAD.canSetByteReady = true
+          }
+          val isWriting = (value & 0x20) == 0
+          RW_HEAD.setWriting(isWriting)          
+          ledListener.writeMode(isWriting)
+        case PB =>
+          // led
+          val ledOn = (value & 0x08) > 0
+          val lastMotorOn = RW_HEAD.isMotorOn
+          val motorOn = (value & 0x04) > 0
+          RW_HEAD.setMotor(motorOn)
+          if (ledListener != null) {
+            if (ledOn) ledListener.turnOn else ledListener.turnOff
+            if (!motorOn) {
+              ledListener.endLoading
+              if (lastMotorOn && !motorOn) RW_HEAD.setCurrentFileName("")
+            }
+          }
+          val newSpeedZone = (value & 0xFF) >> 5 & 0x3
+          RW_HEAD.setSpeedZone(newSpeedZone)
+          // check the head step indication
+          val oldStepHead = regs(PB) & 0x03
+          val stepHead = value & 0x03
+          
+          if (motorOn && oldStepHead == ((stepHead + 1) & 0x03)) RW_HEAD.moveHead(moveOut = true)
+          else 
+          if (motorOn && oldStepHead == ((stepHead - 1) & 0x03)) RW_HEAD.moveHead(moveOut = false)
+        case _ =>
+      }
+      // write on register
+      super.write(address, value, chipID)
+    }
+          
+    final def byteReady {
+      cpu.setOverflowFlag
+      irq_set(IRQ_CA1)
+      
+      regs(PCR) & 0x0E match {
+        case 0xA|0x08 => RW_HEAD.canSetByteReady = false
+        case _ =>
+      }
+    }
+    
+    // state
+    override protected def saveState(out:ObjectOutputStream) {
+      super.saveState(out)
+      out.writeBoolean(isDiskChanged)
+      out.writeBoolean(isDiskChanging)
+      out.writeBoolean(isReadOnly)
+    }
+    override protected def loadState(in:ObjectInputStream) {
+      super.loadState(in)
+      isDiskChanged = in.readBoolean
+      isDiskChanging = in.readBoolean
+      isReadOnly = in.readBoolean
+    }
+  }
+  
+  def getFloppy = floppy
 
   def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) = {
-    useTRAPFormat = !driveReader.isFormattable
     viaDisk.setDriveReader(driveReader,emulateInserting)
   }
   override def setActive(active: Boolean) = {
@@ -64,7 +266,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     viaBus.setActive(true)
     viaDisk.setActive(true)
     awakeCycles = clk.currentCycles
-    viaDisk.awake
+    //viaDisk.awake
   }
   
   override def disconnect {
@@ -97,6 +299,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     add(mem)
     add(cpu)
     add(IRQSwitcher)
+    add(RW_HEAD)
     mem.addBridge(viaBus)
     mem.addBridge(viaDisk)
     if (ledListener != null) ledListener.turnOn
@@ -165,12 +368,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     val pc = cpu.getPC
     if (pc == LOAD_ROUTINE) setFilename
     else 
-    if (pc == FORMAT_ROUTINE && useTRAPFormat) {
-      setFilename
-      if (viaDisk.formatDisk) cpu.jmpTo(FORMAT_ROUTINE_OK) else cpu.jmpTo(FORMAT_ROUTINE_NOK)
-    } 
-    else 
-    if (pc == WAIT_LOOP_ROUTINE && canSleep && !mem.isChannelActive && !viaDisk.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
+    if (pc == WAIT_LOOP_ROUTINE && canSleep && !mem.isChannelActive && !RW_HEAD.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
       running = false      
       viaBus.setActive(false)
       viaDisk.setActive(false)
@@ -196,6 +394,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       
       viaDisk.clock(cycles)
       viaBus.clock(cycles)
+      if (RW_HEAD.rotate) viaDisk.byteReady
     } else if (cycles - goSleepingCycles > GO_SLEEPING_MESSAGE_CYCLES) {
       ledListener.endLoading
       goSleepingCycles = Long.MaxValue
@@ -212,7 +411,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       adr += 1
       c = mem.read(adr)
     }
-    viaDisk.setCurrentFilename(sb.toString)
+    RW_HEAD.setCurrentFileName(sb.toString)
   }
 
   // ------------ TRACING -----------
@@ -236,7 +435,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     out.writeLong(awakeCycles)
     out.writeLong(goSleepingCycles)
     out.writeBoolean(canSleep)
-    out.writeBoolean(useTRAPFormat)
   }
   protected def loadState(in:ObjectInputStream) {
     if (ledListener != null) {
@@ -249,7 +447,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     awakeCycles = in.readLong
     goSleepingCycles = in.readLong
     canSleep = in.readBoolean
-    useTRAPFormat = in.readBoolean
   }
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }

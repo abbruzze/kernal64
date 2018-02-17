@@ -45,12 +45,15 @@ object Floppy {
  */
 trait Floppy {
   type TrackListener = (Int,Boolean,Option[Int]) => Unit
+  var canWriteOnDisk = true
+  
   val isReadOnly : Boolean
-  val isFormattable : Boolean
   val totalTracks : Int
   val file : String
   lazy val singleSide = true
   val isEmpty = false
+  
+  def isOnIndexHole : Boolean = false
   
   def minTrack = 1
   def maxTrack = totalTracks
@@ -60,15 +63,15 @@ trait Floppy {
   
   def nextBit : Int
   def writeNextBit(bit:Boolean)
+  def nextByte : Int
+  def writeNextByte(b:Int)
   
   def currentTrack : Int
   def currentSector : Option[Int]
   def changeTrack(trackSteps:Int)
   def setTrackChangeListener(l:TrackListener)
   def notifyTrackSectorChangeListener
-  
-  def format(diskName:String)
-  
+    
   def defaultZoneFor(track:Int) : Int = {
     if (track <= 17) 0
     else if (track <= 24) 1
@@ -76,6 +79,7 @@ trait Floppy {
     else 3
   }
   
+  def flush {}
   def close
   def reset
   // state
@@ -83,6 +87,7 @@ trait Floppy {
   def load(in:ObjectInputStream)
   
   protected def saveFile(out:ObjectOutputStream) {
+    flush
     val len = new File(file).length.toInt
     val f = new DataInputStream(new FileInputStream(file))
     try {
@@ -99,7 +104,6 @@ trait Floppy {
 
 object EmptyFloppy extends Floppy {
   val isReadOnly = false
-  val isFormattable = false
   val totalTracks = 35
   val file = ""
   override val isEmpty = true
@@ -109,6 +113,8 @@ object EmptyFloppy extends Floppy {
   
   def nextBit = 0
   def writeNextBit(bit:Boolean) {}
+  def nextByte = 0
+  def writeNextByte(b:Int) {}
   
   def currentTrack = track
   def currentSector = None
@@ -123,9 +129,7 @@ object EmptyFloppy extends Floppy {
   def notifyTrackSectorChangeListener {
     if (listener != null) listener(track,false,None)
   }
-  
-  def format(diskName:String) = throw new IllegalArgumentException("Empty disk. Can't format")
-  
+    
   def close {}
   def reset {
     track = 1

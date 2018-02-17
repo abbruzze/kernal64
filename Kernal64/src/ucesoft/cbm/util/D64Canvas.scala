@@ -7,7 +7,6 @@ import java.beans.PropertyChangeListener
 import java.beans.PropertyChangeEvent
 import java.awt.Dimension
 
-import scala.language.postfixOps 
 import ucesoft.cbm.formats.Diskette
 
 class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with PropertyChangeListener {
@@ -19,7 +18,7 @@ class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with 
     val prop = e.getPropertyName
     if (JFileChooser.SELECTED_FILE_CHANGED_PROPERTY.equals(prop)) {
       val file = e.getNewValue.asInstanceOf[File]
-      if (file != null && (file.getName.toUpperCase.endsWith(".D64") || file.getName.toUpperCase.endsWith(".D71"))) readDir(file)        
+      if (file != null && (file.getName.toUpperCase.endsWith(".D64") || file.getName.toUpperCase.endsWith(".D71") || file.getName.toUpperCase.endsWith(".D81"))) readDir(file)        
       else clear
       repaint()
     }
@@ -64,8 +63,7 @@ class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with 
 	      rep(0x20,endBlanks)
 	      newLine
 	    }
-	    val blockUsed = dirs filter { _.fileType != Diskette.FileType.DEL} map { _.sizeInSectors } sum
-	    val blocksFree = d64.TOTAL_AVAILABLE_SECTORS - blockUsed
+	    val blocksFree = bam.freeSectors
 	    add(if (blocksFree < 0) "0" else blocksFree.toString)
 	    add(" BLOCKS FREE.")
 	    d64.close
