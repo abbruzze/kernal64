@@ -10,6 +10,15 @@ abstract class AbstractDriveLedListener(led:DriveLed,progress:DriveLoadProgressP
     
     override def isOn = led.driveLedOn
     
+    def setPowerLedMode(on:Boolean) = led.setPowerLedMode(on)
+    
+    def turnPower(on:Boolean) {
+      if (on != led.powerOn) {
+        led.powerOn = on
+        led.repaint()
+      }
+    }
+    
     override def turnOn {
       if (!led.driveLedOn) {        
         led.driveLedOn = true

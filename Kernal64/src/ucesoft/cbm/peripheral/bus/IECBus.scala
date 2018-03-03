@@ -6,11 +6,11 @@ import ucesoft.cbm.CBMComponentType
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
-import java.io.IOException
 
 trait IECBusListener {
   val isController = false
   val busid : String
+  private[bus] var bitmap = 0
   
   def atnChanged(oldValue:Int,newValue:Int) {}
   def srqTriggered {}
@@ -34,143 +34,126 @@ class IECBus extends CBMComponent {
   val componentType = CBMComponentType.CHIP 
   
   import IECBus._
-  private[this] var ATN = VOLTAGE
-  private[this] var CLK = VOLTAGE
-  private[this] var DATA = VOLTAGE
-  private[this] var SRQ = VOLTAGE
-  private[this] case class State(listener:IECBusListener,var atn:Int=VOLTAGE,var clk:Int=VOLTAGE,var data:Int=VOLTAGE,var srq:Int=VOLTAGE)
-  private[this] var lines : List[State] = Nil
-  private[this] var controller : State = null
+  private[this] var ATN : Long = VOLTAGE
+  private[this] var CLK : Long = VOLTAGE
+  private[this] var DATA : Long = VOLTAGE
+  private[this] var SRQ : Long = VOLTAGE
+  private[this] var listeners : List[IECBusListener] = Nil
+  private[this] var listenersBitMap = 0L
   
   override def getProperties = {
-    properties.setProperty("ATN",ATN.toString)
-    properties.setProperty("CLK",CLK.toString)
-    properties.setProperty("DATA",DATA.toString)
-    properties.setProperty("SRQ",SRQ.toString)
+    properties.setProperty("ATN",normalize(ATN).toString)
+    properties.setProperty("CLK",normalize(CLK).toString)
+    properties.setProperty("DATA",normalize(DATA).toString)
+    properties.setProperty("SRQ",normalize(SRQ).toString)
     properties
   }
+    
+  @inline private def findAndSetNextBit :Int = {
+    for(b <- 0 to 63) {
+      val p = 1 << b
+      if ((listenersBitMap & p) == 0) {
+        listenersBitMap |= p
+        return b
+      }
+    }
+    throw new IllegalArgumentException("Too many listeners")
+  }
+  
+  @inline private def normalize(v:Long) = if (v > 0) GROUND else VOLTAGE
   
   final def unregisterListener(l:IECBusListener) {
-    lines = lines filterNot { _.listener.busid == l.busid }
-    updateLines
+    listeners = listeners filterNot { _.busid == l.busid }
+    listenersBitMap &= ~l.bitmap
+    ATN &= ~(1 << l.bitmap)
+    DATA &= ~(1 << l.bitmap)
+    CLK &= ~(1 << l.bitmap)
+    SRQ &= ~(1 << l.bitmap)
   }
   
   final def registerListener(l:IECBusListener) {
-    unregisterListener(l)
-    val state = State(l)
-    lines = state :: lines
-    Log.info(s"IECBus has registerd ${l.busid} as a listener")
+    l.bitmap = findAndSetNextBit
+    listeners = l :: listeners
+    Log.info(s"IECBus has registerd ${l.busid}(${l.bitmap})(${l.getClass.getName}) as a listener")
     if (l.isController ) {
-      controller = state
       Log.info(s"Found IECBus controller: ${l.busid}")
     }
   }
   
-  final def setLine(id:String,line:IECBusLine.Line,value:Int) {
-    //println(s"[${this}] ${id} set ${line} to ${value}")
-    var l = lines
-    while (l != Nil && l.head.listener.busid != id) l = l.tail
-    if (l == Nil) throw new IllegalArgumentException(s"${id} listener not found as IECBus listener")
+  final def setLine(l:IECBusListener,line:IECBusLine.Line,value:Int) {
     line match {
-      case IECBusLine.ATN => l.head.atn = value
-      case IECBusLine.CLK => l.head.clk = value
-      case IECBusLine.DATA => l.head.data = value
-      case IECBusLine.SRQ => l.head.srq = value
+      case IECBusLine.ATN => 
+        val preATN = ATN
+        if (value == GROUND) ATN |= 1 << l.bitmap else ATN &= ~(1 << l.bitmap)
+        if (preATN != ATN) notifyATNChange(preATN,ATN)
+      case IECBusLine.CLK => 
+        if (value == GROUND) CLK |= 1 << l.bitmap else CLK &= ~(1 << l.bitmap)
+      case IECBusLine.DATA => 
+        if (value == GROUND) DATA |= 1 << l.bitmap else DATA &= ~(1 << l.bitmap)
+      case IECBusLine.SRQ => 
+        val preSRQ = SRQ
+        if (value == GROUND) SRQ |= 1 << l.bitmap else SRQ &= ~(1 << l.bitmap)
     }
-    updateLines
   }
   
-  final def setLine(id:String,atnValue:Int,dataValue:Int,clockValue:Int) {
-    var l = lines
-    while (l != Nil && l.head.listener.busid != id) l = l.tail
-    if (l == Nil) throw new IllegalArgumentException(s"${id} listener not found as IECBus listener")
-    
-    l.head.atn = atnValue
-    l.head.clk = clockValue
-    l.head.data = dataValue
-    updateLines
+  @inline private def notifyATNChange(preATN:Long,ATN:Long) {
+    var l = listeners
+	  while (l != Nil) {
+	    l.head.atnChanged(normalize(preATN),normalize(ATN))
+	    l = l .tail
+	  }
+  }
+  def triggerSRQ(caller:IECBusListener) {
+    var l = listeners
+	  while (l != Nil) {
+	    if (caller.bitmap != l.head.bitmap) l.head.srqTriggered
+	    l = l .tail
+	  }
   }
   
-  final def triggerSRQ(id:String) {
-    var l = lines
-    while (l != Nil) {
-      val listener = l.head.listener
-      if (listener.busid != id) listener.srqTriggered
-      l = l .tail
-    }
+  final def setLine(l:IECBusListener,atnValue:Int,dataValue:Int,clockValue:Int) {
+    val preATN = ATN
+    if (atnValue == GROUND) ATN |= 1 << l.bitmap else ATN &= ~(1 << l.bitmap)
+    if (preATN != ATN) notifyATNChange(preATN,ATN)
+    if (dataValue == GROUND) DATA |= 1 << l.bitmap else DATA &= ~(1 << l.bitmap)
+    if (clockValue == GROUND) CLK |= 1 << l.bitmap else CLK &= ~(1 << l.bitmap)
   }
   
   def init {}
   def reset {
-    var l = lines
-    while (l != Nil) {
-      l.head.atn = VOLTAGE
-      l.head.clk = VOLTAGE
-      l.head.data = VOLTAGE
-      l.head.srq = VOLTAGE
-      l = l .tail
-    }
-    
-    updateLines
-  }
-  
-  @inline private def updateLines {
-    val preATN = ATN
-    val preCLK = CLK
-    val preDATA = DATA
     ATN = VOLTAGE
     CLK = VOLTAGE
     DATA = VOLTAGE
     SRQ = VOLTAGE
-    var l = lines
-    while (l != Nil) {
-      val head = l.head
-      if (head.atn == GROUND) ATN = GROUND
-      if (head.clk == GROUND) CLK = GROUND
-      if (head.data == GROUND) DATA = GROUND
-      if (head.srq == GROUND) SRQ = GROUND
-      l = l .tail
-    }
-    if (preATN != ATN) {
-      var l = lines
-  	  while (l != Nil) {
-  	    if (preATN != ATN) l.head.listener.atnChanged(preATN,ATN)
-  	    l = l .tail
-  	  }
-    }
   }
   
-  final def atn = ATN
-  final def clk = CLK
-  final def data = DATA
-  final def srq = SRQ
+  final def atn = normalize(ATN)
+  final def clk = normalize(CLK)
+  final def data = normalize(DATA)
+  final def srq = normalize(SRQ)
   
   override def toString = s"IECBus ATN=$ATN CLK=$CLK DATA=$DATA SRQ=$SRQ"  
   
   // state
   protected def saveState(out:ObjectOutputStream) {
-    for(l <- lines) {
-      out.writeObject(l.listener.busid)
-      out.writeInt(l.atn)
-      out.writeInt(l.data)
-      out.writeInt(l.clk)
-      out.writeInt(l.srq)
-    }
+    out.writeInt(listeners.size)
+    for(l <- listeners) out.writeObject(l.busid)
+    out.writeLong(ATN)
+    out.writeLong(CLK)
+    out.writeLong(DATA)
+    out.writeLong(SRQ)
   }
   protected def loadState(in:ObjectInputStream) {
-    for(i <- 0 until lines.length) {
-      val id = in.readObject.asInstanceOf[String]
-      lines find { _.listener.busid == id } match {
-        case Some(l) =>
-          l.atn = in.readInt
-          l.data = in.readInt
-          l.clk = in.readInt
-          l.srq = in.readInt
-        case None =>
-          throw new IOException(s"Can't find busid $id")
-      }
+    val listenerSize = in.readInt
+    for(l <- 1 to listenerSize) {
+      val id = in.readObject.toString
+      val found = listeners exists { _.busid == id }
+      if (!found) throw new IllegalArgumentException(s"Cannot find $id. Check peripherals")
     }
-    updateLines
+    ATN = in.readLong
+    CLK = in.readLong
+    DATA = in.readLong
+    SRQ = in.readLong
   }
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }

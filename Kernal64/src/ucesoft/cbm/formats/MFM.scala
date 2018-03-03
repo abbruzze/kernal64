@@ -40,6 +40,7 @@ object MFM {
     02 512 bytes per sector
     03 1024 bytes per sector
    */
+  final val SECTOR_SIZE = Array(128,256,512,1024)
   
   private[this] val crcCache = {
     val cache = Array.ofDim[Int](256)
@@ -72,6 +73,63 @@ object MFM {
     newOffset
   }
   
+  /**
+   * head,track,sector
+   */
+  def physicalTrackToLogical(head:Int,track:Array[Int],writeLogical:(Int,Int,Int,Array[Int]) => Unit) {
+    var offset = 0
+    var sectorsEncountered = 0
+    var round = 0
+    var index = 0
+    val header = Array(0,0,0) // t,h,s
+    val data = Array.ofDim[Int](512)
+    var headerFound = false
+    var dataFound = false
+    var lastTwo = 0
+    val HEADER = SYNC_MARK << 8 | SYNC_MARK_HEADER_NEXT
+    val DATA = SYNC_MARK << 8 | SYNC_MARK_DATA_NEXT
+    
+    while (sectorsEncountered < 10) {
+      val byte = track(offset)
+      lastTwo <<= 8
+      lastTwo |= byte
+      if (dataFound) {
+        data(index) = byte
+        index += 1
+        if (index == 512) {
+          dataFound = false
+          writeLogical(head,header(0),header(2),data)
+          sectorsEncountered += 1
+        }
+      }
+      else
+      if (headerFound) {
+        header(index) = byte                
+        index += 1        
+        if (index == 3) headerFound = false
+      }
+      else {        
+        lastTwo & 0x1FFFF match {
+          case HEADER =>
+            index = 0
+            headerFound = true
+            dataFound = false
+          case DATA => 
+            index = 0
+            dataFound = true
+            headerFound = false
+          case _ =>
+        }
+      }
+      offset += 1
+      if (offset == track.length) {
+        offset = 0
+        round += 1
+        if (round > 1) throw new IllegalArgumentException("Invalid MFM disk format")
+      }
+    }
+  }
+  
   def buildPhysicalTrack(side:Int,sectorSize:Int,trackID:Int,track:Array[Int],readLogical512:(Int,Int,Int) => Array[Int]) {
     var offset = fill(track,0,FILL_MARK,80) // initial track filler
     offset = fill(track,offset,0x00,12)
@@ -98,14 +156,17 @@ object MFM {
       offset = fill(track,offset,0x00,12)
       // ================ DATA FIELD ===================================
       offset = fill(track,offset,SYNC_MARK,3)
-      offset = fill(track,offset,0xFB,1)
+      offset = fill(track,offset,SYNC_MARK_DATA_NEXT,1)
       // ==================== DATA =====================================
       _crc = 58005 // 58005 crc of A1 x 3, FB x 1
       val logicalSector = readLogical512(side,trackID,sector)
-      for(d <- logicalSector) {
+      //println(s"H${side}T${trackID}S${sector}")
+      for(d <- logicalSector) {        
+        //print(s"'${d.toChar}' ")
         offset = fill(track,offset,d,1)
         _crc = crc(d,_crc)
       }
+      //println
       offset = fill(track,offset,_crc >> 8,1)
       offset = fill(track,offset,_crc & 0xFF,1)
       offset = fill(track,offset,FILL_MARK,38)

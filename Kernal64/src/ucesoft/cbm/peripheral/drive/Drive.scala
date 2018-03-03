@@ -15,6 +15,7 @@ object DriveType extends Enumeration {
 trait Drive extends CBMComponent {
   val componentType = CBMComponentType.DISK
   val driveType : DriveType.Value
+  val formatExtList : List[String]
   protected var isRunningListener : (Boolean) => Unit = x => {}
   
   def disconnect {}

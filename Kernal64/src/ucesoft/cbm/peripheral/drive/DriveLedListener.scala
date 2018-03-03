@@ -2,6 +2,8 @@ package ucesoft.cbm.peripheral.drive
 
 trait DriveLedListener {
   def writeMode(enabled:Boolean)
+  def setPowerLedMode(on:Boolean)
+  def turnPower(on:Boolean)
   def turnOn
   def turnOff
   def isOn : Boolean

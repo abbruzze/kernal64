@@ -22,6 +22,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
   val driveType = DriveType.OTHER
   val componentID = "FlyerIEC"
   override val busid = "FlyerIEC"
+  val formatExtList = Nil
   
   private class ConnectionDataIterator extends BusDataIterator {
     private val queue = new collection.mutable.Queue[Int]

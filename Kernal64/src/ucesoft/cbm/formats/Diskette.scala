@@ -134,7 +134,7 @@ abstract class Diskette extends Floppy {
           readNextEntry = false // last+1 entry of this sector
         }
         else {                              
-          val fileType = FileType(buffer(2) & 3)
+          val fileType = FileType(buffer(2) & 7)
           val track = buffer(3)
           val sector = buffer(4)
           val fileName = new StringBuilder

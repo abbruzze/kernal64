@@ -9,12 +9,11 @@ import ucesoft.cbm.ChipID
 import ucesoft.cbm.Clock
 import ucesoft.cbm.formats.MFM
 
-class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
+class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean = false) extends RAMComponent {
   val componentID = "WD1770"
   val componentType = CBMComponentType.INTERNAL
   val isRom = false
-  val length = 4
-  val startAddress = 0x2000
+  val length = 4  
   val name = componentID
   val isActive = true
   
@@ -66,7 +65,7 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
   private[this] final val CMD_TYPEI_R0R1_TIME_1772_MS = Array(2,3,5,6)
   private[this] final val CMD_TYPEI_R0R1_TIME_CLOCKS = (if (wd1772) CMD_TYPEI_R0R1_TIME_1772_MS else CMD_TYPEI_R0R1_TIME_1770_MS) map millis2clocks
   
-  @inline private def millis2clocks(m:Int) : Int = (m * clk_hz / 1000).toInt
+  @inline private def millis2clocks(m:Int) : Int = (m * clk_hz / 1000).toInt  
   
   @inline private def sf(flag:Int) {
     status |= flag
@@ -77,6 +76,7 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
   @inline private def isf(flag:Int) = (status & flag) == flag 
   
   private abstract class Step(name:String) {
+    var lastStep : Step = _
     def apply()
     
     override def toString = name
@@ -99,8 +99,8 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
       Command(1,0xE0,0x20,STEP_CMD,"STEP",TypeIMainStep),
       Command(1,0xE0,0x40,STEP_IN_CMD,"STEP_IN",TypeIMainStep),
       Command(1,0xE0,0x60,STEP_OUT_CMD,"STEP_OUT",TypeIMainStep),
-      Command(2,0xE0,0x80,READ_SECTOR_CMD,"READ_SECTOR"),
-      Command(2,0xE0,0xA0,WRITE_SECTOR_CMD,"WRITE_SECTOR"),
+      Command(2,0xE0,0x80,READ_SECTOR_CMD,"READ_SECTOR",TypeIIMainStep),
+      Command(2,0xE0,0xA0,WRITE_SECTOR_CMD,"WRITE_SECTOR",TypeIIMainStep),
       Command(3,0xF0,0xC0,READ_ADDRESS_CMD,"READ_ADDRESS",TypeIIIMainStep),
       Command(3,0xF0,0xE0,READ_TRACK_CMD,"READ_TRACK",TypeIIIMainStep),
       Command(3,0xF0,0xF0,WRITE_TRACK_CMD,"WRITE_TRACK",TypeIIIMainStep),
@@ -123,6 +123,8 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
   private[this] var direction = 1 // 1 = step in , 0 = step out
   private[this] var step : Step = NoStep
   private[this] val idfield = Array(0,0,0,0,0,0) // track,side,sector,sector len,crc1,crc2
+  private[this] var crc = 0
+  private[this] final val DEBUG = false
   
   @inline private def setDirection = direction = 1
   @inline private def clearDirection = direction = 0
@@ -157,7 +159,7 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
     override def toString = s"$name($indexPulses)"
   }
   private class WaitIndexPulses(qt:Int,nextStep:Step,setDataMark:Boolean = true) extends CountIndexPulses("WaitIndexPulses") {
-    println(s"Begin waiting $qt pulses")
+    if (DEBUG) println(s"Begin waiting $qt pulses")
     override def apply {
       super.apply
       if (indexPulses == qt) {
@@ -166,8 +168,8 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
       }
     }
   }
-  private class WaitCycles(millis:Int,nextStep:Step) extends Step("WaitCycles") {
-    private var cycles = millis2clocks(millis)
+  private class WaitCycles(_cycles:Int,nextStep:Step) extends Step("WaitCycles") {
+    private var cycles = _cycles
     def apply {
       cycles -= 1
       if (cycles <= 0) {
@@ -176,14 +178,27 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
       }
     }
     
-    override def toString = s"$name($millis)"
+    override def toString = s"$name(${_cycles})"
   }
   private object CommandCompleted extends Step("CommandCompleted") {
     def apply {
-      // TODO
       cf(BUSY_FLAG)
+      //step = new WaitMotorOff
       step = NoStep
-      println("Command completed")
+      cmd = IdleCommand
+      rwh.setWriting(false)
+      if (status != 0) if (DEBUG) println(s"Command completed: status=$status")
+    }
+  }
+  private class WaitMotorOff extends CountIndexPulses("WaitMotorOff") {
+    override def apply {
+      super.apply
+      if (indexPulses == 10) {
+        step = NoStep
+        cmd = IdleCommand
+        cf(MOTORON_FLAG)
+        if (DEBUG) println("Motor off")
+      }
     }
   }
   private class FindIDField(maxIndexPulses:Int,findStep:Step,trackToVerify:Int = -1,sectorToVerify:Int = -1) extends CountIndexPulses("FindIDField") {
@@ -197,7 +212,7 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
       if (indexPulses >= maxIndexPulses) {
         sf(RECORD_NOT_FOUND_FLAG)
         step = CommandCompleted
-        println(s"Max index pulses..$maxIndexPulses")
+        if (DEBUG) println(s"Max index pulses..$maxIndexPulses")
       }
       else {
         if (rwh.getLastByteReady) { // ok, byte ready
@@ -213,6 +228,7 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
           }
           else
           if (idCount < 4) {
+            if (DEBUG) println(s"idfield($idCount) = $byte")
             idfield(idCount) = byte
             crc = MFM.crc(byte,crc)
             idCount += 1
@@ -243,20 +259,50 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
       if (crc == crcToCheck) {
         cf(CRC_ERROR_FLAG)
         step = findStep
+        step.lastStep = this
       }
-      else sf(CRC_ERROR_FLAG)
+      else {
+        sf(CRC_ERROR_FLAG)
+      }
     }
     
     override def toString = s"$name($A1FEcount,$idCount,$crc,$crcToCheck)"
+  }
+  
+  private class FindDataField(foundStep:Step,notFoundStep:Step) extends Step("FindDataField") {
+    private var byteCount = 0
+    private var A1FBcount = 0
+    def apply {
+      if (rwh.getLastByteReady) { // ok, byte ready
+        val byte = rwh.getLastRead
+        byteCount += 1
+        if (byteCount > 43) step = notFoundStep
+        else {
+          if (A1FBcount < 3) {
+            if (byte == MFM.SYNC_MARK) A1FBcount += 1            
+            else A1FBcount = 0
+          }
+          else
+          if (A1FBcount == 3) {
+            if (byte == MFM.SYNC_MARK_DATA_NEXT) { 
+              step = foundStep // ok, Data Address Mark found
+              // TODO put record record type in status bit 5
+            }
+            else A1FBcount = 0
+          }
+        }
+      }
+    }
   }
   // ========================= Type I =============================================    
   private object TypeIMainStep extends Step("TypeIMainStep") {
     def apply {
       sf(BUSY_FLAG)
       cf(CRC_ERROR_FLAG | DRQ_FLAG | RECORD_NOT_FOUND_FLAG)
-      println("Begin Type I command")
-      step = if (!cmd.is(CMD_H) && !rwh.isMotorOn) {
-        // rwh.setMotor(true) MO line is not connected
+      step = if (!cmd.is(CMD_H) && !isf(MOTORON_FLAG)) {
+        //rwh.setMotor(true) MO line is not connected
+        sf(MOTORON_FLAG)
+        if (DEBUG) println("Motor on")
         new WaitIndexPulses(6,step_1)      
       }
       else step_1
@@ -298,8 +344,10 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
     
     private val step_1_1 = new Step("TypeIMainStep_1_1") {
       def apply {
-        println(s"step_1_1 $track $dr $direction")
-        if (track == dr) step = step_2
+        if (DEBUG) println(s"step_1_1 $track $dr $direction")
+        if (track == dr) {
+          step = if (cmd.cmd == RESTORE_CMD) new WaitCycles(100,step_2) else step_2
+        }
         else {
           if (dr > track) setDirection else clearDirection
           if (direction == 1) track += 1 else track -= 1
@@ -307,7 +355,7 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
           
           if (rwh.getTrack == 0 && direction == 0) {
             track = 0
-            step = step_2
+            step = if (cmd.cmd == RESTORE_CMD) new WaitCycles(100,step_2) else step_2
           }
           else {
             rwh.moveHead(moveOut = direction == 0)
@@ -324,15 +372,244 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
       }
     }
   }
+  // ========================= Type II ============================================
+  private object TypeIIMainStep extends Step("TypeIIMainStep") {
+    def apply {
+      sf(BUSY_FLAG)
+      cf(CRC_ERROR_FLAG | DRQ_FLAG | RECORD_NOT_FOUND_FLAG | DATA_MARK_FLAG | WP_FLAG | LOSTDATA_TRACK0_FLAG)
+      
+      step = if (!cmd.is(CMD_H) /*&& !rwh.isMotorOn*/) {
+        // rwh.setMotor(true) MO line is not connected
+        sf(MOTORON_FLAG)
+        if (DEBUG) println("Motor on")
+        new WaitIndexPulses(6,step_1)      
+      }
+      else step_1            
+    }
+    
+    private val step_1 = new Step("TypeIIMainStep_1") {
+      def apply {
+        step = if (cmd.is(CMD_E)) new WaitCycles(millis2clocks(30),step_2) else step_2
+      }
+    }
+    
+    private val step_2 : Step = new Step("TypeIIMainStep_2") {
+      def apply {
+        step = cmd.cmd match {
+          case READ_SECTOR_CMD =>
+            new FindIDField(5,step_3)
+          case WRITE_SECTOR_CMD =>
+            if (rwh.isWriteProtected) {
+              sf(WP_FLAG)
+              CommandCompleted
+            }
+            else {
+              new FindIDField(5,step_3_1)
+            }
+        }
+      }
+    }
+    
+    private val step_3_1 = new Step("TypeIIMainStep_3_1") { // read sector
+      def apply {
+        // ok, ID FIELD found, check track & sector
+        if (track != idfield(0) || sector != idfield(2)) step = step.lastStep // go back to FindIDField
+        else {
+          if (DEBUG) println(s"Write sector: found track $track sector $sector.")
+          step_7.gapCount = 0
+          step = step_7
+        }
+      }
+    }
+    
+    private val step_3 = new Step("TypeIIMainStep_3") { // read sector
+      def apply {
+        // ok, ID FIELD found, check track & sector
+        if (track != idfield(0) || sector != idfield(2)) step = step.lastStep // go back to FindIDField
+        else {
+          if (DEBUG) println(s"Read sector: found track $track sector $sector.")
+          step = new FindDataField(step_4,step.lastStep)
+        }
+      }
+    }
+    
+    private val step_4 = new Step("TypeIIMainStep_4") {
+      def apply {
+        if (rwh.getLastByteReady) { // ok, first byte ready
+          val byte = rwh.getLastRead
+          sf(DRQ_FLAG)
+          dr = byte & 0xFF
+          step_5.byteCounter = MFM.SECTOR_SIZE(idfield(3)) - 1
+          if (DEBUG) print(s"Going to read ${step_5.byteCounter} bytes: ")
+          step = step_5
+          crc = MFM.crc(byte,58005) // 58005 crc of A1 x 3, FB x 1
+        }
+      }
+    }
+    
+    private val step_5 = new Step("TypeIIMainStep_5") {
+      var byteCounter = 0      
+      def apply {
+        if (rwh.getLastByteReady) { // ok, first byte ready
+          val byte = rwh.getLastRead
+          if (DEBUG) print("'" + byte.toChar + "' ")
+          crc = MFM.crc(byte,crc)
+          dr = byte & 0xFF
+          if (isf(DRQ_FLAG)) sf(LOSTDATA_TRACK0_FLAG)
+          else sf(DRQ_FLAG)
+          byteCounter -= 1
+          if (byteCounter == 0) {
+            if (DEBUG) println
+            step_6.dataCrc = 0
+            step_6.crcCount = 0
+            step = step_6          
+          }
+        }
+      }
+    }
+    
+    private val step_6 = new Step("TypeIIMainStep_6") {
+      var dataCrc = 0
+      var crcCount = 0
+      def apply {
+        if (rwh.getLastByteReady) { // ok, first byte ready
+          val byte = rwh.getLastRead
+          dataCrc = (dataCrc << 8) | byte
+          crcCount += 1
+          if (crcCount == 2) { // ok, crc ready to be checked
+            crcCount = 0
+            if ((dataCrc & 0xFFFF) == crc) {
+              if (!cmd.is(CMD_M)) step = CommandCompleted
+              else {
+                sector += 1
+                step = step_2
+              }
+            }
+            else {
+              sf(CRC_ERROR_FLAG)
+              step = CommandCompleted
+              if (DEBUG) println(s"CRC error: dataCrc=$dataCrc crc=$crc")
+            }
+          }
+        }
+      }
+    }
+    
+    private val step_7 = new Step("TypeIIMainStep_7") {
+      var gapCount = 0
+      def apply {
+        if (rwh.getLastByteReady) {
+          if (DEBUG) println("Read GAP " + rwh.getLastRead)
+          gapCount += 1
+          if (gapCount == 22) {
+            gapCount = 0
+            if (isf(DRQ_FLAG)) {
+              sf(LOSTDATA_TRACK0_FLAG)
+              step = CommandCompleted
+            }
+            else {
+              rwh.setWriting(true)
+              rwh.setNextToWrite(0)
+              sf(DRQ_FLAG)
+              step_8.zeroCount = 0
+              step = step_8
+            }
+          }
+        }
+      }
+    }
+    
+    private val step_8 = new Step("TypeIIMainStep_8") {
+      var zeroCount = 0
+      def apply {
+        if (rwh.getLastByteReady) {
+          zeroCount += 1
+          if (zeroCount == 12) {
+            if (DEBUG) println("12 0 written")
+            rwh.setNextToWrite(MFM.SYNC_MARK)
+            step_8_1.dataFieldCount = 0
+            step = step_8_1
+          }
+        }
+      }
+    }
+    
+    private val step_8_1 = new Step("TypeIIMainStep_8_1") {
+      var dataFieldCount = 0
+      def apply {
+        if (rwh.getLastByteReady) {
+          dataFieldCount += 1
+          if (dataFieldCount < 3) rwh.setNextToWrite(MFM.SYNC_MARK)
+          else
+          if (dataFieldCount == 3) rwh.setNextToWrite(MFM.SYNC_MARK_DATA_NEXT)
+          else {
+            if (DEBUG) println("DATA Field written")
+            step_9.dataCount = MFM.SECTOR_SIZE(idfield(3))
+            step = step_9
+            crc = 58005 // 58005 crc of A1 x 3, FB x 1
+            crc = MFM.crc(dr, crc)
+            rwh.setNextToWrite(dr)
+            sf(DRQ_FLAG)
+            if (DEBUG) println(s"Going to write ${step_9.dataCount} bytes ...")
+            if (DEBUG) println(s"[${step_9.dataCount}]Writing $dr status=$status")            
+          }
+        }
+      }
+    }
+    
+    private val step_9 = new Step("TypeIIMainStep_9") {
+      var dataCount = 0
+      def apply {
+        if (rwh.getLastByteReady) {
+          dataCount -= 1
+          
+          var nextToWrite = dr
+          if (dataCount > 0 && isf(DRQ_FLAG)) {
+            sf(LOSTDATA_TRACK0_FLAG)
+            nextToWrite = 0
+            if (DEBUG) println("LOST DATA")
+          }
+          if (dataCount > 0) {
+            rwh.setNextToWrite(nextToWrite)
+            if (DEBUG) println(s"[$dataCount]Writing $nextToWrite status=$status")
+            sf(DRQ_FLAG)
+            crc = MFM.crc(dr, crc)
+          }
+          else {
+            rwh.setNextToWrite(crc >> 8)
+            step_10.crcCount = 0
+            step = step_10
+          }
+        }
+      }
+    }
+    
+    private val step_10 = new Step("TypeIIMainStep_10") {
+      var crcCount = 0
+      def apply {
+        if (rwh.getLastByteReady) {
+          crcCount += 1
+          crcCount match {
+            case 1 =>
+              rwh.setNextToWrite(crc & 0xFF)
+            case 2 =>
+              step = CommandCompleted
+              rwh.setWriting(false)
+          }
+        }
+      }
+    }
+  }
   // ========================= Type III ===========================================
   private object TypeIIIMainStep extends Step("TypeIIIMainStep") {
     def apply {
       sf(BUSY_FLAG)
       cf(CRC_ERROR_FLAG | DRQ_FLAG | RECORD_NOT_FOUND_FLAG | LOSTDATA_TRACK0_FLAG)
-      println("Begin Type III command")
       
       step = if (!cmd.is(CMD_H) /*&& !rwh.isMotorOn*/) {
         // rwh.setMotor(true) MO line is not connected
+        sf(MOTORON_FLAG)
+        if (DEBUG) println("Motor on")
         new WaitIndexPulses(6,step_1)      
       }
       else step_1            
@@ -340,7 +617,7 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
     
     private val step_1 = new Step("TypeIIIMainStep_1") {
       def apply {
-        step = if (cmd.is(CMD_E)) new WaitCycles(30,step_2) else step_2
+        step = if (cmd.is(CMD_E)) new WaitCycles(millis2clocks(30),step_2) else step_2
       }
     }
     
@@ -350,10 +627,18 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
           case READ_ADDRESS_CMD => 
             new FindIDField(6,step_3)
           case READ_TRACK_CMD => 
+            step_5.indexHoleFound = false
             step_5
-          case _ =>
-            println("Unimplemented command")
-            CommandCompleted
+          case WRITE_TRACK_CMD =>
+            if (rwh.isWriteProtected) {
+              sf(WP_FLAG)
+              CommandCompleted
+            }
+            else {
+              sf(DRQ_FLAG)
+              step_8.byteCount = 0
+              step_8
+            }
         }
       }
     }
@@ -363,16 +648,20 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
         sector = idfield(0) // track
         dr = idfield(0)
         sf(DRQ_FLAG)
+        step_4.byteIndex = 0
         step = step_4
       }
     }
     
     private val step_4 = new Step("TypeIIIMainStep_4") {      
-      private var byteIndex = 0
+      var byteIndex = 0
       def apply {
         if (!isf(DRQ_FLAG)) { // ok, byte read from computer
           byteIndex += 1
-          if (byteIndex == 6) step = CommandCompleted
+          if (byteIndex == 6) {
+            step = CommandCompleted
+            byteIndex = 0
+          }
           else {
             dr = idfield(byteIndex)
             sf(DRQ_FLAG)
@@ -382,7 +671,7 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
     }
     
     private val step_5 = new Step("TypeIIIMainStep_5") {
-      private var indexHoleFound = false
+      var indexHoleFound = false
       def apply {
         if (!indexHoleFound) {
           if (rwh.isOnIndexHole) indexHoleFound = true // wait the first index hole          
@@ -418,19 +707,104 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
         }
       }
     }
+    
+    private val step_8 = new Step("TypeIIIMainStep_8") {
+      var byteCount = 0
+      def apply {
+        if (rwh.getByteReadySignal == 0) { // ok, byte ready
+          rwh.resetByteReadySignal
+          byteCount += 1
+          if (byteCount == 3) {
+            byteCount = 0
+            if (isf(DRQ_FLAG)) {
+              sf(LOSTDATA_TRACK0_FLAG)
+              step = CommandCompleted
+            }
+            else {
+              step_9.indexHoleStatus = 0
+              step = step_9
+            }
+          }
+        }
+      }
+    }
+    
+    private val step_9 = new Step("TypeIIIMainStep_9") {
+      var indexHoleStatus = 0
+      def apply {
+        indexHoleStatus match {
+          case 0 =>
+            if (rwh.isOnIndexHole) indexHoleStatus += 1
+          case 1 =>
+            if (!rwh.isOnIndexHole) indexHoleStatus += 1
+          case 2 =>
+            if (DEBUG) println("Hole REACHED, start formatting track...")
+            step_10.crcWriting = 0
+            step = step_10
+            rwh.setWriting(true)
+            rwh.setNextToWrite(dr)
+        }       
+      }
+    }
+    
+    private val step_10 = new Step("TypeIIIMainStep_10") {
+      var crcWriting,lastWritten = 0
+      def apply {
+        if (rwh.getByteReadySignal == 0) { // ok, byte written
+          rwh.resetByteReadySignal
+          if (rwh.isOnIndexHole) step = CommandCompleted
+          else
+          if (crcWriting == 2) {
+            rwh.setNextToWrite(crc & 0xFF)
+            crcWriting = 0
+          }
+          else {
+            var byteToWrite = dr
+            if (isf(DRQ_FLAG)) {
+              sf(LOSTDATA_TRACK0_FLAG)
+              byteToWrite = 0
+              if (DEBUG) println("LOST BYTE")
+            }
+            sf(DRQ_FLAG)
+            byteToWrite = byteToWrite match {
+              case 0xF5 =>
+                if (lastWritten != MFM.SYNC_MARK) {
+                  crc = 0xFFFF
+                  crcWriting = 1
+                }
+                MFM.SYNC_MARK
+              case 0xF6 => 
+                MFM.SYNC_INDEX_MARK 
+              case 0xF7 => 
+                crcWriting = 2
+                crc >> 8
+              case _ => byteToWrite
+            }
+            if (crcWriting == 1) crc = MFM.crc(byteToWrite,crc)
+            lastWritten = byteToWrite
+            rwh.setNextToWrite(byteToWrite)
+          }
+        }
+      }
+    }    
   }
   // ==============================================================================
   
   def reset {
-    // TODO
+    cmd = IdleCommand
+    track = 0
+    sector = 0
+    dr = 0
+    status = 0
+    direction = 1
+    step = NoStep
+    crc = 0
   }
-  def init {
-    // TODO
-  }
+  def init {}
   
   // ==============================================================================
   @inline private def stat : Int = {
-    var st = status | (if (rwh.isMotorOn) MOTORON_FLAG else 0)
+    var st = status// | (if (rwh.isMotorOn) MOTORON_FLAG else 0)
     if (cmd.cmdType == 1) {
       st |= (if (rwh.isOnIndexHole) DRQ_FLAG else 0) // index hole
       st |= (if (rwh.getTrack != 0) LOSTDATA_TRACK0_FLAG else 0)
@@ -457,39 +831,40 @@ class WD1770(rwh:RWHeadController,wd1772:Boolean = false) extends RAMComponent {
     address & 3 match {
       case 0 =>
         decodeCommand(value) match {
-          case Some(c) if !isf(BUSY_FLAG) =>
-            cmd = c
-            cmd.flags = value
-            step = cmd.mainStep
           case Some(c) if c.cmdType == 4 =>
             if (cmd.isIdle) cf(BUSY_FLAG | CRC_ERROR_FLAG | DRQ_FLAG | RECORD_NOT_FOUND_FLAG)
             else cf(BUSY_FLAG)
             cmd = IdleCommand
             step = NoStep
-            println("Command Interrupted!!")
+            if (DEBUG) println("Command Interrupted!!")
+          case Some(c) if !isf(BUSY_FLAG) =>
+            cmd = c
+            cmd.flags = value
+            step = cmd.mainStep          
           case Some(c) =>
-            println(s"Command $c ignored")
+            if (DEBUG) println(s"Command $c ignored")
           case None =>
-            println(s"Command value $value unrecognized")
+            if (DEBUG) println(s"Command value $value unrecognized")
         }
-        println(s"WD1770: command $cmd")
-        //clk.schedule(new ClockEvent("WD1770",clk.currentCycles + 100, cycles => cmd = None))
+        if (DEBUG) println(s"WD1770: command $cmd")
       case 1 =>
         track = value
+        if (DEBUG) println("WDD1770 set track to " + track)
       case 2 =>
         sector = value
+        if (DEBUG) println("WDD1770 set sector to " + sector)
       case 3 =>
         dr = value
+        if (DEBUG) println(s"DR="+dr.toHexString)
         cf(DRQ_FLAG)
     }
   }
   // ==============================================================================
   
   protected def saveState(out:ObjectOutputStream) {
-    // TODO
+    if (!cmd.isIdle) throw new IllegalStateException("Cannot save state while the drive attached is running")
   }
-  protected def loadState(in:ObjectInputStream) {
-    // TODO
-  }
+  protected def loadState(in:ObjectInputStream) {}
+    
   protected def allowsStateRestoring(parent:JFrame) = true
 }

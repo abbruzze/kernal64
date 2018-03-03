@@ -13,13 +13,16 @@ private[formats] class G64(val file:String) extends Diskette {
   private[this] var trackIndex = 0
   private[this] var track = 0
   private[this] var bit = 1
+  private[this] var sector : Option[Int] = None
+  private[this] var sectorBit,sectorData = 0
+  private[this] var headerFound = false
+  private[this] val ungcr = new UNGCR
   protected val disk = new RandomAccessFile(file, "rw")
   private[this] var trackIndexModified = false
   
   loadTracks
   val canBeEmulated = false
   val isReadOnly = false
-  val isFormattable = true
   lazy val totalTracks = tracks.length
   
   private[this] var trackChangeListener : Floppy#TrackListener = null
@@ -72,12 +75,32 @@ private[formats] class G64(val file:String) extends Diskette {
     track = 0
   }
   
+  @inline private def checkSector(b:Int) {
+    sectorData <<= 1
+    sectorData |= b
+    if (headerFound) {
+      sectorBit += 1
+      if (sectorBit == 20) { // sector found
+        headerFound = false
+        val sector = ungcr.gcr2Byte(sectorData & 0x3FF)
+        this.sector = Some(sector)
+      }
+    }
+    else
+    if ((sectorData & 0xFFFFF) == 1047881) { // found header
+      headerFound = true
+      sectorBit = 0
+    }
+  }
+  
   final def nextBit = {
     val b = (tracks(track)(trackIndex) >> (8 - bit)) & 1
     if (bit == 8) rotate else bit += 1
+    checkSector(b)
     b
   }
   final def writeNextBit(value:Boolean) {
+    checkSector(if (value) 1 else 0)
     trackIndexModified = true
     val mask = 1 << (8 - bit)
     if (value) tracks(track)(trackIndex) |= mask else tracks(track)(trackIndex) &= ~mask
@@ -88,7 +111,7 @@ private[formats] class G64(val file:String) extends Diskette {
   
   @inline private def rotate {
     bit = 1
-    if (trackIndexModified) {
+    if (trackIndexModified && canWriteOnDisk) {
       trackIndexModified = false
       disk.seek(trackOffsets(track) + trackIndex + 2)
       disk.write(tracks(track)(trackIndex))
@@ -96,19 +119,19 @@ private[formats] class G64(val file:String) extends Diskette {
     trackIndex = (trackIndex + 1) % tracks(track).length
   }
   
-  def notifyTrackSectorChangeListener {}
+  def notifyTrackSectorChangeListener {
+    if (trackChangeListener != null) trackChangeListener((track >> 1) + 1,(track & 1) == 1,sector)
+  }
   def currentTrack = track + 1
-  def currentSector = None
+  def currentSector = sector
   def changeTrack(trackSteps:Int) {
     track = trackSteps - 2
     trackIndex = 0
     bit = 1
-    if (trackChangeListener != null) trackChangeListener(trackSteps >> 1,(track & 1) == 1,None)
+    notifyTrackSectorChangeListener
   }
   def setTrackChangeListener(l:TrackListener) = trackChangeListener = l
-  
-  def format(diskName:String) {}
-  
+    
   def close = disk.close
   
   override def toString = s"G64 $file total tracks=$totalTracks"

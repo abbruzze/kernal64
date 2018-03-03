@@ -22,7 +22,7 @@ import ucesoft.cbm.peripheral.bus.IECBusLine
 import ucesoft.cbm.Clock
 import ucesoft.cbm.ClockEvent
 
-class C1571(val driveID: Int, 
+class D1571(val driveID: Int, 
             bus: IECBus, 
             ledListener: DriveLedListener,
             _1571Listener: Boolean => Unit) extends 
@@ -30,11 +30,12 @@ class C1571(val driveID: Int,
             TraceListener with 
             Drive {
   val driveType = DriveType._1571
-  val componentID = "C1571 Disk Drive " + driveID
+  val componentID = "D1571 Disk Drive " + driveID
+  val formatExtList = List("D64","D71","G64")
   override val MIN_SPEED_HZ = 985248
   override val MAX_SPEED_HZ = 1000000
   val isRom = false
-  val name = "C1571"
+  val name = "D1571"
   val startAddress = 0x0
   val length = 0x0800
   val isActive = true
@@ -145,8 +146,8 @@ class C1571(val driveID: Int,
     bus.registerListener(this)
     setSerialOUT(b => {
       if (busDataDirection == 1) {
-        bus.setLine(busid,IECBusLine.DATA,if (b) IECBus.GROUND else IECBus.VOLTAGE)
-        bus.triggerSRQ(busid)
+        bus.setLine(this,IECBusLine.DATA,if (b) IECBus.GROUND else IECBus.VOLTAGE)
+        bus.triggerSRQ(this)
       }
     })
   }
@@ -193,12 +194,12 @@ class C1571(val driveID: Int,
       super.write(address,value,chipID)
       (address & 0x0F) match {
         case PB|DDRB =>        
-          bus.setLine(busid,IECBusLine.DATA,data_out)
-          bus.setLine(busid,IECBusLine.CLK,clock_out)          
+          bus.setLine(this,IECBusLine.DATA,data_out)
+          bus.setLine(this,IECBusLine.CLK,clock_out)          
           autoacknwoledgeData
         case ad@(PA|PA2) =>
           busDataDirection = (value & 2) >> 1
-          if (busDataDirection == 0) bus.setLine(CIA.name,IECBusLine.DATA,IECBus.VOLTAGE)
+          if (busDataDirection == 0) bus.setLine(CIA,IECBusLine.DATA,IECBus.VOLTAGE)
           activeHead = (value & 4) >> 2
           if (floppy.side != activeHead) RW_HEAD.changeSide(activeHead)
           _1541Mode = (value & 0x20) == 0
@@ -214,7 +215,7 @@ class C1571(val driveID: Int,
     @inline private def autoacknwoledgeData {
       val atna = (regs(DDRB) & regs(PB) & 0x10) > 0
       val dataOut = (bus.atn == IECBus.GROUND) ^ atna
-      if (dataOut) bus.setLine(busid,IECBusLine.DATA,IECBus.GROUND) else bus.setLine(busid,IECBusLine.DATA,data_out)
+      if (dataOut) bus.setLine(this,IECBusLine.DATA,IECBus.GROUND) else bus.setLine(this,IECBusLine.DATA,data_out)
     }
     // state
     override protected def saveState(out:ObjectOutputStream) {
@@ -238,10 +239,7 @@ class C1571(val driveID: Int,
     private[this] val SYNC_DETECTION_LINE = 0x80
     private[this] var isDiskChanged = true
     private[this] var isDiskChanging = false
-    private[this] var isReadOnly = false
-    
-    def setReadOnly(readOnly:Boolean) = isReadOnly = readOnly
-  
+      
     def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
       floppy = driveReader
       RW_HEAD.setFloppy(floppy)
@@ -267,7 +265,7 @@ class C1571(val driveID: Int,
     
     override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
       case PB =>
-        val wps = if (isDiskChanging) isDiskChanged else isReadOnly | floppy.isReadOnly
+        val wps = if (isDiskChanging) isDiskChanged else RW_HEAD.isWriteProtected
         (super.read(address, chipID) & ~(WRITE_PROTECT_SENSE | SYNC_DETECTION_LINE)) |
           (if (RW_HEAD.isSync) 0x00 else SYNC_DETECTION_LINE) |
           (if (wps) 0x00 else WRITE_PROTECT_SENSE)
@@ -338,20 +336,18 @@ class C1571(val driveID: Int,
       super.saveState(out)
       out.writeBoolean(isDiskChanged)
       out.writeBoolean(isDiskChanging)
-      out.writeBoolean(isReadOnly)
     }
     override protected def loadState(in:ObjectInputStream) {
       super.loadState(in)
       isDiskChanged = in.readBoolean
       isDiskChanging = in.readBoolean
-      isReadOnly = in.readBoolean
     }
   }
-   /************************************************************************************************************
+  /************************************************************************************************************
    * WD1770 Controller
    * 
    ***********************************************************************************************************/
-  private[this] val WD1770 = new WD1770(RW_HEAD)
+  private[this] val WD1770 = new WD1770(RW_HEAD,0x2000)
   /************************************************************************************************************
    * Memory: Kernal (32K) + RAM (2K)
    * 
@@ -437,7 +433,7 @@ class C1571(val driveID: Int,
     this.canSleep = canSleep
     awake
   }
-  override def setReadOnly(readOnly:Boolean) = VIA2.setReadOnly(readOnly)
+  override def setReadOnly(readOnly:Boolean) = RW_HEAD.setWriteProtected(readOnly)
   
   def init {
     Log.info("Initializing C1571...")

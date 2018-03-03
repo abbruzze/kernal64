@@ -7,7 +7,7 @@ import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.ChipID
 
 object CPU6510 {
-  class CPUJammedException extends Exception
+  class CPUJammedException(val cpuID:ChipID.ID,val pcError:Int) extends Exception
   
   object Instruction extends Enumeration {
     type CODE = Value

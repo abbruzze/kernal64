@@ -123,12 +123,14 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private[this] var traceItem,traceDiskItem : JCheckBoxMenuItem = _
   // -------------------- DISK -----------------
   private[this] var isDiskActive = true
-  private[this] var isDiskActive9 = false
+  private[this] var isDiskActive9,disk9Enabled = false
+  private[this] val diskFlusher = new FloppyFlushUI(vicDisplayFrame)
   private[this] val driveLeds = Array(new DriveLed,new DriveLed)
   private[this] val diskProgressPanels = Array(new DriveLoadProgressPanel,new DriveLoadProgressPanel)
   private[this] val flyerIEC = new FlyerIEC(bus,file => attachDiskFile(0,file,false))
   private[this] var isFlyerEnabled = false
   private[this] val drives : Array[Drive with TraceListener] = Array.ofDim(2)
+  private[this] val floppyComponents = Array.ofDim[FloppyComponent](2)
   private[this] var device10Drive : Drive = _
   private[this] var device10DriveEnabled = false
   private[this] var FSDIRasInput = true
@@ -231,31 +233,48 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     id match {
       case 0 =>        
         drives(0) = driveType match {
-          case DriveType._1571 => new C1571(0x00,bus,DriveLed8Listener,_1571mode _)
-          case DriveType._1541 => new C1541(0x00,bus,DriveLed8Listener)
+          case DriveType._1571 =>
+            DriveLed8Listener.setPowerLedMode(false)
+            new D1571(0x00,bus,DriveLed8Listener,_1571mode _)
+          case DriveType._1541 =>
+            DriveLed8Listener.setPowerLedMode(false)
+            new C1541(0x00,bus,DriveLed8Listener)
+          case DriveType._1581 =>
+            DriveLed8Listener.setPowerLedMode(true)            
+            new D1581(0x00,bus,DriveLed8Listener)
         }
         drives(0).setIsRunningListener(diskRunning => isDiskActive = diskRunning)
         isDiskActive = true
       case 1 =>
         drives(1) = driveType match {
-          case DriveType._1571 => new C1571(0x01,bus,DriveLed9Listener,_ => {})
-          case DriveType._1541 => new C1541(0x01,bus,DriveLed9Listener)
+          case DriveType._1571 =>
+            DriveLed9Listener.setPowerLedMode(false)
+            new D1571(0x01,bus,DriveLed9Listener,_ => {})
+          case DriveType._1541 =>
+            DriveLed9Listener.setPowerLedMode(false)
+            new C1541(0x01,bus,DriveLed9Listener)
+          case DriveType._1581 => 
+            DriveLed9Listener.setPowerLedMode(true)            
+            new D1581(0x01,bus,DriveLed9Listener)
         }
-        drives(1).setIsRunningListener(diskRunning => isDiskActive9 = diskRunning)
-        isDiskActive9 = true
-    }
+        drives(1).setIsRunningListener(diskRunning => isDiskActive9 = disk9Enabled && diskRunning)
+        if (!isDiskActive9) drives(1).setActive(false)
+    }    
     
     old match {
       case None =>
         add(drives(id))
       case Some(c) =>
+        floppyComponents(id).drive = drives(id)
+        c.getFloppy.close
         c.disconnect
         drives(id).initComponent
         change(c,drives(id))
-        drives(id).setDriveReader(c.getFloppy,false)
         inspectDialog.updateRoot
-        diskTraceDialog.mem = drives(id).getMem
-        diskTraceDialog.traceListener = drives(id)        
+        if (id == 0) {
+          diskTraceDialog.mem = drives(id).getMem
+          diskTraceDialog.traceListener = drives(id)    
+        }
     }
   }
   
@@ -282,8 +301,10 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     add(expansionPort)
     add(rs232)    
     rs232.setRS232Listener(rs232StatusPanel)
-    add(new FloppyComponent(8,drives(0),driveLeds(0)))
-    add(new FloppyComponent(9,drives(1),driveLeds(1)))
+    floppyComponents(0) = new FloppyComponent(8,drives(0),driveLeds(0))
+    add(floppyComponents(0))
+    floppyComponents(1) = new FloppyComponent(9,drives(1),driveLeds(1))
+    add(floppyComponents(1))
     // -----------------------
     val vicMemory = mmu
     ExpansionPort.setMemoryForEmptyExpansionPort(mmu)
@@ -311,8 +332,8 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       
       setSerialOUT(bitOut => {
         if (!FSDIRasInput && !c64Mode) {
-          bus.setLine(busid,IECBusLine.DATA,if (bitOut) IECBus.GROUND else IECBus.VOLTAGE)
-          bus.triggerSRQ(busid)
+          bus.setLine(this,IECBusLine.DATA,if (bitOut) IECBus.GROUND else IECBus.VOLTAGE)
+          bus.triggerSRQ(this)
         }
       })
     }
@@ -448,7 +469,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     t match {
       case j:CPUJammedException =>
         JOptionPane.showConfirmDialog(vicDisplayFrame,
-            "CPU jammed at " + Integer.toHexString(cpu.getCurrentInstructionPC) + ". Do you want to open debugger or reset ?",
+            s"CPU[${j.cpuID}] jammed at " + Integer.toHexString(j.pcError) + ". Do you want to open debugger or reset ?",
             "CPU jammed",
             JOptionPane.YES_NO_OPTION,
             JOptionPane.ERROR_MESSAGE) match {
@@ -536,7 +557,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   
   def fastSerialDirection(input:Boolean) {
     FSDIRasInput = input
-    if (input) bus.setLine(cia1.name,IECBusLine.DATA,IECBus.VOLTAGE)
+    if (input) bus.setLine(cia1.asInstanceOf[IECBusListener],IECBusLine.DATA,IECBus.VOLTAGE)
     //println(s"FSDIR set to input $input")
   }
   
@@ -713,6 +734,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         changeLocalDriveDir
       case "DRIVE_9_ENABLED" =>
         val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        disk9Enabled = enabled
         drives(1).setActive(enabled)
         driveLeds(1).setVisible(enabled)
         adjustRatio
@@ -818,6 +840,11 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         kbef.setVisible(true)
       case "LOAD_KEYB" =>
         loadKeyboard
+      case "DRIVE_1581" =>
+        clock.pause
+        initDrive(0,DriveType._1581)
+        initDrive(1,DriveType._1581)
+        clock.play
       case "DRIVE_1571" =>
         clock.pause
         initDrive(0,DriveType._1571)
@@ -1134,15 +1161,18 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   
   private def attachDiskFile(driveID:Int,file:File,autorun:Boolean) {
     try {      
+      val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
+      if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
       val isG64 = file.getName.toUpperCase.endsWith(".G64")
       val disk = Diskette(file.toString)
       disk.canWriteOnDisk = canWriteOnDisk
+      disk.flushListener = diskFlusher
       drives(driveID).getFloppy.close
       if (!traceDialog.isTracing) clock.pause
       drives(driveID).setDriveReader(disk,true)
       clock.play
             
-      loadFileItems(driveID).setEnabled(isG64)
+      loadFileItems(driveID).setEnabled(!isG64)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
       if (autorun) {
         insertTextIntoKeyboardBuffer("LOAD\"*\",8,1" + 13.toChar + "RUN" + 13.toChar)
@@ -1329,12 +1359,8 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new javax.swing.filechooser.FileFilter {
-      def accept(f:File) = f.isDirectory || 
-                           f.getName.toUpperCase.endsWith(".D64") ||
-                           f.getName.toUpperCase.endsWith(".D71") ||
-                           f.getName.toUpperCase.endsWith(".D81") ||
-                           f.getName.toUpperCase.endsWith(".G64")
-      def getDescription = "D64/71/81 or G64 files"
+      def accept(f:File) = f.isDirectory || drives(driveID).formatExtList.exists { ext => try { f.toString.toUpperCase.endsWith(ext) } catch { case _:Throwable=> false } }
+      def getDescription = s"${drives(driveID).formatExtList.mkString(",")} files"
     })
     fc.showOpenDialog(vicDisplayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
@@ -1843,6 +1869,11 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     _1571TypeItem.setActionCommand("DRIVE_1571")
     _1571TypeItem.addActionListener(this)  
     driveTypeItem.add(_1571TypeItem)
+    val _1581TypeItem = new JRadioButtonMenuItem("1581")
+    group12.add(_1581TypeItem)
+    _1581TypeItem.setActionCommand("DRIVE_1581")
+    _1581TypeItem.addActionListener(this)  
+    driveTypeItem.add(_1581TypeItem)
     val _1541TypeItem = new JRadioButtonMenuItem("1541")
     group12.add(_1541TypeItem)
     _1541TypeItem.setActionCommand("DRIVE_1541")

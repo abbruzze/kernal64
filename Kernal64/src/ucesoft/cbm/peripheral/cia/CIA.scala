@@ -296,6 +296,10 @@ class CIA(val name:String,
     sdr = 0
     icrMask = 0
     sdrIndex = 0
+    shiftRegister = 0
+    sdrLoaded = false
+    sdrOut = false
+    SP = false
   }
   
   def setFlagLow = irqHandling(IRQ_FLAG)
@@ -320,6 +324,9 @@ class CIA(val name:String,
   override def getProperties = {
     properties.setProperty("Interrupt control register",Integer.toHexString(icr))
     properties.setProperty("Interrupt mask register",Integer.toHexString(icrMask))
+    properties.setProperty("Shift register",Integer.toHexString(shiftRegister))
+    properties.setProperty("SDR index",Integer.toHexString(sdrIndex))
+    properties.setProperty("SDR out",sdrOut.toString)
     super.getProperties
   }
   
@@ -408,11 +415,13 @@ class CIA(val name:String,
       }
       Log.debug(s"${name} ICR's value is ${Integer.toBinaryString(value)} => ICR = ${Integer.toBinaryString(icrMask)}")
     case CRA =>
+      val oldSerialOut = timerA.readCR & 0x40
       timerA.writeCR(value)
-      if (!timerA.isStarted) {
+      val serialOut = value & 0x40
+      if (oldSerialOut != serialOut) {
         sdrIndex = 0
-        sdrLoaded = false
-        sdrOut = false
+        //sdrLoaded = false
+        //sdrOut = false
       }
     case CRB => timerB.writeCR(value)
   }
@@ -453,7 +462,7 @@ class CIA(val name:String,
       SP = sp
       shiftRegister <<= 1
       if (SP) shiftRegister |= 0x01 else shiftRegister &= 0xFE
-      sdrIndex += 1
+      sdrIndex += 1      
       if (sdrIndex == 8) {
         sdrIndex = 0
         irqHandling(IRQ_SERIAL)

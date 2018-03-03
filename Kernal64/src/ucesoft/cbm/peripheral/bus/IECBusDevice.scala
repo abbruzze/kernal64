@@ -216,7 +216,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
   }
   
   private def set(line:IECBusLine.Line,value:Int) {    
-    bus.setLine(busid,line,value)
+    bus.setLine(this,line,value)
   }
   
   protected def resetSignals {

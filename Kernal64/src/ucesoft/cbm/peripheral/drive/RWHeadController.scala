@@ -5,6 +5,7 @@ import ucesoft.cbm.CBMComponentType
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
+import javax.swing.SwingUtilities
 
 abstract class RWHeadController(protected var floppy:Floppy,
                        ledListener:DriveLedListener) extends CBMComponent {
@@ -16,6 +17,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
   protected var byteReadySignal = 1
   protected var track = 1
   protected var currentFilename = ""
+  protected var writeProtect = false
   
   var canSetByteReady = false
   
@@ -45,6 +47,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
   protected var lastWrite = 0x55
   protected var nextWrite = 0
   protected var lastByteReady = false
+  private[this] var lastNotifiedTrack,lastNotifiedSector = 0
   
   def init {
     
@@ -67,12 +70,21 @@ abstract class RWHeadController(protected var floppy:Floppy,
     lastByteReady = false
   }
   
+  final def isWriteProtected : Boolean = writeProtect | floppy.isReadOnly
+  final def setWriteProtected(wp:Boolean) = writeProtect = wp
   def isOnIndexHole : Boolean = floppy.isOnIndexHole
   final def getCurrentFileName = currentFilename
   final def resetByteReadySignal = byteReadySignal = 1
   final def getByteReadySignal = byteReadySignal
-  final def getLastByteReady : Boolean = lastByteReady
-  final def setWriting(on:Boolean) = isWriting = on
+  final def getLastByteReady : Boolean = {
+    val lbr = lastByteReady
+    lastByteReady = false
+    lbr
+  }
+  final def setWriting(on:Boolean) {
+    isWriting = on
+    ledListener.writeMode(on)
+  }
   final def getLastRead : Int = lastRead
   final def setSpeedZone(newSpeedZone:Int) {
     if (speedZone != newSpeedZone) {
@@ -90,20 +102,40 @@ abstract class RWHeadController(protected var floppy:Floppy,
     resetByteReadySignal
   }
   final def setCurrentFileName(fn:String) = currentFilename = fn
-  final def getTrack : Int = track
+  def getTrack : Int = track
   final def isMotorOn : Boolean = motorOn
   final def setMotor(on:Boolean) {
     motorOn = on
     if (on && floppy.isEmpty) floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
   }
+  @inline private def fmt2(i:Int) : String = if (i < 10) "0" + i else i.toString
   private def updateTrackSectorLabelProgress(track:Int,halfTrack:Boolean,sector:Option[Int]) {
     if (ledListener != null) {      
       sector match {
         case None =>
-          val trackFormat = if (halfTrack) "%02d." else "%02d "
-          ledListener.beginLoadingOf(s"%s $trackFormat".format(currentFilename,track),true)
+          if (track != lastNotifiedTrack) {
+            lastNotifiedTrack = track
+            SwingUtilities.invokeLater(new Runnable {
+              def run {
+                var trackFormat = fmt2(track)
+                if (halfTrack) trackFormat += "."
+                ledListener.beginLoadingOf(s"$currentFilename $trackFormat",true)
+              }
+            })
+          }
         case Some(sec) =>
-          ledListener.beginLoadingOf("%s %02d/%02d".format(currentFilename,track,sec),true)
+          if (track != lastNotifiedTrack || sec != lastNotifiedSector) {
+            lastNotifiedTrack = track
+            lastNotifiedSector = sec
+            SwingUtilities.invokeLater(new Runnable {
+              def run {
+                var trackFormat = fmt2(track)
+                val secFormat = fmt2(sec)
+                if (halfTrack) trackFormat += "."
+                ledListener.beginLoadingOf(s"$currentFilename $trackFormat/$secFormat",true)
+              }
+            })
+          }
       }
     }
   }

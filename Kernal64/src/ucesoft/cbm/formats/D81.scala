@@ -14,6 +14,7 @@ private[formats] class D81(val file: String) extends Diskette {
   override protected final val DIR_SECTOR = 3
   override protected final val BAM_SECTOR = 1
   private[this] final val HEADER_SECTOR = 0
+  private[this] final val MFM_HEADER_MARKS = MFM.SYNC_MARK << 8 | MFM.SYNC_MARK_HEADER_NEXT
   
   override final val minTrack = 1
   override final val maxTrack = totalTracks
@@ -55,6 +56,11 @@ private[formats] class D81(val file: String) extends Diskette {
   private[this] var track = 1
   private[this] var trackOffset = 0
   private[this] var trackChangeListener : TrackListener = null
+  private[this] var sector : Option[Int] = None
+  private[this] var sectorData, sectorBytes = 0
+  private[this] var sectorHeader = false
+  private[this] var trackModified = false
+  private[this] val trackModificationMap = Array.ofDim[Boolean](2,80)
   protected val disk = new RandomAccessFile(file, "rw")
   private[this] val physicalTracks : Array[Array[Array[Int]]] = {
     val sides = Array.ofDim[Array[Array[Int]]](2)
@@ -115,48 +121,88 @@ private[formats] class D81(val file: String) extends Diskette {
       818944 0x0C7F00  |    80;39     |   79;00;10   +256 | last block
    * 
    */
+  
   /**
    * 0 <= t <= 79
    * 1 <= s <= 10
-   * 1 <= h <= 0
+   * 0 <= h <= 1
    */
-  @inline private def p2l(h:Int,t:Int,s:Int) : Array[Int] = {
+  @inline private def seekLogical(h:Int,t:Int,s:Int) {
     var offset = t * 0x2800
     if (h == 0) offset += 20 * 256
     offset += (s - 1) * 2 * 256
-    val buffer = Array.ofDim[Byte](512)
     disk.seek(offset)
+  }  
+  @inline private def readLogical(h:Int,t:Int,s:Int) : Array[Int] = {
+    seekLogical(h,t,s)
+    val buffer = Array.ofDim[Byte](512)    
     disk.readFully(buffer)    
     buffer map { _.toInt & 0xFF }
+  }
+  @inline private def writeLogical(h:Int,t:Int,s:Int,buffer:Array[Int]) {
+    //println(s"Writing back side $h track $t sector $s")
+    seekLogical(h,t,s)    
+    if (buffer.length != 512) throw new IllegalArgumentException(s"Cannot write to D81 format: sector $s on side $h track $t has illegal size of ${buffer.length}")
+    var i = 0
+    while (i < 512) {
+      disk.write(buffer(i))
+      i += 1
+    }
+    
   }
     
   private def init {
     for(side <- 0 to 1;
         track <- 0 to 79) {
-      MFM.buildPhysicalTrack(1 - side,2,track,physicalTracks(1 - side)(track),p2l _)
+      MFM.buildPhysicalTrack(1 - side,2,track,physicalTracks(1 - side)(track),readLogical _)
     }
   }
   
   override def isOnIndexHole = trackOffset < 5
   
   final override def side = _side
-  final override def side_=(newSide:Int) =_side = newSide
+  final override def side_=(newSide:Int) {
+    _side = newSide
+  }
+  
+  @inline private def checkSector(byte:Int) {
+    sectorData <<= 8
+    sectorData |= byte
+    if (sectorHeader) {
+      sectorBytes += 1
+      if (sectorBytes == 3) {
+        sector = Some(byte)
+        sectorHeader = false
+      }
+    }
+    else {
+      if ((sectorData & 0x1FFFF) == MFM_HEADER_MARKS) { // found header
+        sectorBytes = 0
+        sectorHeader = true
+      }
+    }
+  }
   
   final def nextByte : Int = {
     val byte = physicalTracks(_side)(track - 1)(trackOffset)
-    trackOffset = (trackOffset + 1) % physicalTracks(_side)(track).length
+    trackOffset = (trackOffset + 1) % physicalTracks(_side)(track - 1).length
+    checkSector(byte)
     byte
   }
   final def writeNextByte(b:Int) {
+    //println(s"Wrote ${b.toHexString} on " + physicalTracks(_side)(track - 1)(trackOffset).toHexString)
     physicalTracks(_side)(track - 1)(trackOffset) = b
-    trackOffset = (trackOffset + 1) % physicalTracks(_side)(track).length
+    trackModificationMap(_side)(track - 1) = true
+    trackModified = true
+    trackOffset = (trackOffset + 1) % physicalTracks(_side)(track - 1).length
+    checkSector(b)
   }
   
-  final def nextBit : Int = ???
-  final def writeNextBit(bit:Boolean) = ???
+  final def nextBit : Int = 0
+  final def writeNextBit(bit:Boolean) {}
   
   final def currentTrack = track
-  final def currentSector = None
+  final def currentSector = sector
   /**
    * trackSteps > 0 inc track
    * trackSteps < 0 dec track
@@ -168,15 +214,35 @@ private[formats] class D81(val file: String) extends Diskette {
     else {
       if (track > minTrack) track -= 1
     }
+    sectorHeader = false
+    //println(s"New track is $track")
     notifyTrackSectorChangeListener
   }
   final def setTrackChangeListener(l:TrackListener) = trackChangeListener = l
-  final def notifyTrackSectorChangeListener = if (trackChangeListener != null) trackChangeListener(track,false,None)
+  final def notifyTrackSectorChangeListener = if (trackChangeListener != null) trackChangeListener(track,false,sector)
   
   override def defaultZoneFor(track:Int) = 4 // 250.0000 bit/sec
   
   override def flush {
-    // TODO
+    if (trackModified && canWriteOnDisk) {
+      trackModified = false
+      flushListener.flushing(file.toString,{
+        var s,t,p = 0
+        while (s < 2) {
+          t = 0
+          while (t < 80) {
+            if (trackModificationMap(s)(t)) {          
+              MFM.physicalTrackToLogical(s,physicalTracks(s)(t),writeLogical _)
+              trackModificationMap(s)(t) = false              
+            }
+            t += 1
+            p += 1
+            flushListener.update(((p / 16.0) * 10).toInt)
+          }
+          s += 1
+        }
+      })
+    }
   }
   
   final def close {
@@ -185,23 +251,20 @@ private[formats] class D81(val file: String) extends Diskette {
   }
   final def reset {
     _side = 0
-    track = 0
+    track = 1
     trackOffset = 0
   }
+  
+  override def toString = s"Disk fileName=$file totalTracks=$totalTracks t=$track s=$sector"
   // state
   final def save(out:ObjectOutputStream) {
-    
+    out.writeInt(_side)
+    out.writeInt(track)
+    out.writeInt(trackOffset)
   }
   final def load(in:ObjectInputStream) {
-    
+    _side = in.readInt
+    track = in.readInt
+    trackOffset = in.readInt
   }
 }
-
-//object D81 extends App {
-//  val d81 = new D81("/Users/ealeame/Desktop/C64/C128/graphicbooster_c_128.d81")
-//  d81.init
-//  for((b,i) <- d81.physicalTracks(0)(39).zipWithIndex) {
-//    println("#" + i + " " + b.toHexString)
-//    io.StdIn.readLine
-//  }
-//}

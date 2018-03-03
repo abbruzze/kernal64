@@ -8,6 +8,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.DataOutputStream
 import ucesoft.cbm.formats.Diskette
+import ucesoft.cbm.misc.FloppyFlushListener
 
 object Floppy {
   def load(in:ObjectInputStream) : Option[Floppy] = {
@@ -46,6 +47,7 @@ object Floppy {
 trait Floppy {
   type TrackListener = (Int,Boolean,Option[Int]) => Unit
   var canWriteOnDisk = true
+  var flushListener : FloppyFlushListener = _
   
   val isReadOnly : Boolean
   val totalTracks : Int
@@ -102,13 +104,14 @@ trait Floppy {
   }
 }
 
-object EmptyFloppy extends Floppy {
+object EmptyFloppy extends EmptyFloppy
+class EmptyFloppy extends Floppy {
   val isReadOnly = false
   val totalTracks = 35
   val file = ""
   override val isEmpty = true
   
-  private[this] var track = 1
+  protected var track = 1
   private[this] var listener : TrackListener = _
   
   def nextBit = 0

@@ -30,7 +30,7 @@ object CIA2Connectors {
       bank = value & 3
       mem.setVideoBank(bank)
       
-      bus.setLine(busid,if ((value & 8) > 0) GROUND else VOLTAGE,  // ATN
+      bus.setLine(this,if ((value & 8) > 0) GROUND else VOLTAGE,  // ATN
                         if ((value & 32) > 0) GROUND else VOLTAGE, // DATA
                         if ((value & 16) > 0) GROUND else VOLTAGE) // CLOCK
       if ((ddr & 4) > 0) rs232.setTXD((data >> 2) & 1)      

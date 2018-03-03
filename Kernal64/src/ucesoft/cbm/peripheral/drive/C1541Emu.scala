@@ -38,6 +38,7 @@ object C1541Emu {
 class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) extends IECBusDevice(bus, device) with Drive {
   val driveType = DriveType.OTHER
   val componentID = "C1541 Emu"
+  val formatExtList = List("D64")
   override val busid = "C1541Emu_" + device
 
   // register itself to bus

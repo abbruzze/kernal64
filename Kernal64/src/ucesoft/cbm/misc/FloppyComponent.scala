@@ -8,7 +8,7 @@ import java.io.ObjectInputStream
 import javax.swing.JFrame
 import ucesoft.cbm.peripheral.drive.Floppy
 
-class FloppyComponent(device:Int,drive:Drive,driveLed:DriveLed) extends CBMComponent {
+class FloppyComponent(device:Int,var drive:Drive,driveLed:DriveLed) extends CBMComponent {
     val componentID = "Mounted floppy " + device
     val componentType = CBMComponentType.FLOPPY
     final private[this] val deviceID = device - 8 
@@ -26,6 +26,7 @@ class FloppyComponent(device:Int,drive:Drive,driveLed:DriveLed) extends CBMCompo
     
     def init {}
     def reset = drive.getFloppy.reset
+    
     // state
     protected def saveState(out:ObjectOutputStream) {
       Floppy.save(out,if (drive.getFloppy.isEmpty) None else Some(drive.getFloppy))

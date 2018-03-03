@@ -64,6 +64,11 @@ import ucesoft.cbm.misc.NMISwitcher
 import ucesoft.cbm.misc.DNDHandler
 import ucesoft.cbm.misc.KeyboardEditor
 import ucesoft.cbm.util.MouseCage
+import ucesoft.cbm.peripheral.drive.DriveType
+import ucesoft.cbm.peripheral.drive.D1571
+import ucesoft.cbm.peripheral.drive.D1581
+import ucesoft.cbm.trace.InspectPanelDialog
+import ucesoft.cbm.misc.FloppyFlushUI
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -131,7 +136,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   private[this] var cpuTracer : TraceListener = cpu
   private[this] var traceDialog : TraceDialog = _
   private[this] var diskTraceDialog : TraceDialog = _
-  private[this] var inspectDialog : JDialog = _
+  private[this] var inspectDialog : InspectPanelDialog = _
   private[this] var traceItem,traceDiskItem : JCheckBoxMenuItem = _
   private[this] val busSnooper = new BusSnoop(bus)
   private[this] var busSnooperActive = false
@@ -139,8 +144,10 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   private[this] var remote : Option[RemoteC64] = None
   // -------------------- DISK -----------------
   private[this] var isDiskActive = true
-  private[this] var isDiskActive9 = false
+  private[this] var isDiskActive9,disk9Enabled = false
+  private[this] val diskFlusher = new FloppyFlushUI(displayFrame)
   private[this] val driveLeds = Array(new DriveLed,new DriveLed)
+  private[this] val floppyComponents = Array.ofDim[FloppyComponent](2)
   private[this] val diskProgressPanels = Array(new DriveLoadProgressPanel,new DriveLoadProgressPanel)
   private[this] val c1541 = new C1541Emu(bus,DriveLed8Listener)
   private[this] val flyerIEC = new FlyerIEC(bus,file => attachDiskFile(0,file,false))
@@ -232,21 +239,53 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     driveLeds(1).setVisible(false)
   }  
   
-  private def initDrive(id:Int) {
+  private def initDrive(id:Int,driveType:DriveType.Value) {
     val old = Option(drives(id))
     id match {
       case 0 =>        
-        drives(0) = new C1541(0x00,bus,DriveLed8Listener)
+        drives(0) = driveType match {
+          case DriveType._1571 =>
+            DriveLed8Listener.setPowerLedMode(false)
+            new D1571(0x00,bus,DriveLed8Listener,_ => {})
+          case DriveType._1541 =>
+            DriveLed8Listener.setPowerLedMode(false)
+            new C1541(0x00,bus,DriveLed8Listener)
+          case DriveType._1581 =>
+            DriveLed8Listener.setPowerLedMode(true)            
+            new D1581(0x00,bus,DriveLed8Listener)
+        }
         drives(0).setIsRunningListener(diskRunning => isDiskActive = diskRunning)
+        isDiskActive = true
       case 1 =>
-        drives(1) = new C1541(0x01,bus,DriveLed9Listener)
-        drives(1).setIsRunningListener(diskRunning => isDiskActive9 = diskRunning)
+        drives(1) = driveType match {
+          case DriveType._1571 =>
+            DriveLed9Listener.setPowerLedMode(false)
+            new D1571(0x01,bus,DriveLed9Listener,_ => {})
+          case DriveType._1541 =>
+            DriveLed9Listener.setPowerLedMode(false)
+            new C1541(0x01,bus,DriveLed9Listener)
+          case DriveType._1581 => 
+            DriveLed9Listener.setPowerLedMode(true)            
+            new D1581(0x01,bus,DriveLed9Listener)
+        }
+        drives(1).setIsRunningListener(diskRunning => isDiskActive9 = disk9Enabled && diskRunning)
+        if (!isDiskActive9) drives(1).setActive(false)
     }
+    
     old match {
       case None =>
         add(drives(id))
       case Some(c) =>
+        floppyComponents(id).drive = drives(id)
+        c.getFloppy.close
+        c.disconnect
+        drives(id).initComponent
         change(c,drives(id))
+        inspectDialog.updateRoot
+        if (id == 0) {
+          diskTraceDialog.mem = drives(id).getMem
+          diskTraceDialog.traceListener = drives(id)    
+        }        
     }
   }
   
@@ -263,8 +302,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     Log.info("Building the system ...")
     ExpansionPort.addConfigurationListener(mem)
     // drive
-    initDrive(0)
-    initDrive(1)
+    initDrive(0,DriveType._1541)
+    initDrive(1,DriveType._1541)
     // -----------------------    
     add(clock)
     add(mem)
@@ -383,7 +422,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     t match {
       case j:CPUJammedException =>
         JOptionPane.showConfirmDialog(displayFrame,
-            "CPU jammed at " + Integer.toHexString(cpu.getCurrentInstructionPC) + ". Do you want to open debugger or reset ?",
+            s"CPU[${j.cpuID}] jammed at " + Integer.toHexString(j.pcError) + ". Do you want to open debugger or reset ?",
             "CPU jammed",
             JOptionPane.YES_NO_OPTION,
             JOptionPane.ERROR_MESSAGE) match {
@@ -602,6 +641,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         changeLocalDriveDir
       case "DRIVE_9_ENABLED" =>
         val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        disk9Enabled = enabled
         drives(1).setActive(enabled)
         driveLeds(1).setVisible(enabled)
         adjustRatio
@@ -681,6 +721,21 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         kbef.setVisible(true)
       case "LOAD_KEYB" =>
         loadKeyboard
+      case "DRIVE_1581" =>
+        clock.pause
+        initDrive(0,DriveType._1581)
+        initDrive(1,DriveType._1581)
+        clock.play
+      case "DRIVE_1571" =>
+        clock.pause
+        initDrive(0,DriveType._1571)
+        initDrive(1,DriveType._1571)
+        clock.play
+      case "DRIVE_1541" =>
+        clock.pause
+        initDrive(0,DriveType._1541)
+        initDrive(1,DriveType._1541)
+        clock.play
       case "WRITE_ON_DISK" =>
         val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         canWriteOnDisk = enabled
@@ -962,6 +1017,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   
   private def attachDiskFile(driveID:Int,file:File,autorun:Boolean) {
     try {      
+      val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
+      if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
       val isD64 = file.getName.toUpperCase.endsWith(".D64")
       if (drives(driveID) == c1541 && !isD64) {
         JOptionPane.showMessageDialog(displayFrame,"Format not allowed on a 1541 not in true emulation mode", "Disk attaching error",JOptionPane.ERROR_MESSAGE)
@@ -969,6 +1026,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
       }
       val disk = Diskette(file.toString)
       disk.canWriteOnDisk = canWriteOnDisk
+      disk.flushListener = diskFlusher
       drives(driveID).getFloppy.close
       if (!traceDialog.isTracing) clock.pause
       drives(driveID).setDriveReader(disk,true)
@@ -1152,9 +1210,9 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     fc.setAccessory(new javax.swing.JScrollPane(new D64Canvas(fc,mem.CHAR_ROM)))
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-    fc.setFileFilter(new FileFilter {
-      def accept(f:File) = f.isDirectory || f.getName.toUpperCase.endsWith(".D64") || f.getName.toUpperCase.endsWith(".G64")
-      def getDescription = "D64 or G64 files"
+    fc.setFileFilter(new javax.swing.filechooser.FileFilter {
+      def accept(f:File) = f.isDirectory || drives(driveID).formatExtList.exists { ext => try { f.toString.toUpperCase.endsWith(ext) } catch { case _:Throwable=> false } }
+      def getDescription = s"${drives(driveID).formatExtList.mkString(",")} files"
     })
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
@@ -1616,6 +1674,28 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     
     val diskItem = new JMenu("Drive")
     optionMenu.add(diskItem)
+    
+    val driveTypeItem = new JMenu("Drive Type")
+    diskItem.add(driveTypeItem)
+    val group12 = new ButtonGroup
+    val _1571TypeItem = new JRadioButtonMenuItem("1571")
+    group12.add(_1571TypeItem)
+    _1571TypeItem.setSelected(false)
+    _1571TypeItem.setActionCommand("DRIVE_1571")
+    _1571TypeItem.addActionListener(this)  
+    driveTypeItem.add(_1571TypeItem)
+    val _1581TypeItem = new JRadioButtonMenuItem("1581")
+    group12.add(_1581TypeItem)
+    _1581TypeItem.setSelected(false)
+    _1581TypeItem.setActionCommand("DRIVE_1581")
+    _1581TypeItem.addActionListener(this)  
+    driveTypeItem.add(_1581TypeItem)
+    val _1541TypeItem = new JRadioButtonMenuItem("1541")
+    group12.add(_1541TypeItem)
+    _1541TypeItem.setActionCommand("DRIVE_1541")
+    _1541TypeItem.addActionListener(this)  
+    _1541TypeItem.setSelected(true)
+    driveTypeItem.add(_1541TypeItem)
     
     val diskReadOnlyItem = new JCheckBoxMenuItem("Read only disk")
     diskReadOnlyItem.setSelected(false)

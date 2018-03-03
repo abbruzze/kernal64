@@ -15,7 +15,7 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
   protected case class DirEntry(name:String,byteSize:Int,isDirectory:Boolean)
   
   // register itself to bus
-  bus.registerListener(this)
+  //bus.registerListener(this)
   
   def isDeviceReady = true
   def init {}

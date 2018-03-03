@@ -48,7 +48,6 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   private[this] val trackChangeBitMap = Array.ofDim[Long](70)
   
   @inline private def trackSectorModified(t:Int,s:Int) = trackChangeBitMap(t - 1) |= 1 << s
-  @inline private def isTrackSectorModified(t:Int,s:Int) = (trackChangeBitMap(t - 1) & (1 << s)) > 0 
   @inline private def isTrackModified(t:Int) = trackChangeBitMap(t - 1) > 0
   @inline private def clearModification = java.util.Arrays.fill(trackChangeBitMap,0)
   
@@ -112,23 +111,28 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   override def flush {
     if (sectorModified && canWriteOnDisk) {
       sectorModified = false
-      val gcrTrack = new collection.mutable.ArrayBuffer[Int](400 * 20)
-      for(t <- 1 to TOTAL_TRACKS) {
-        if (isTrackModified(t)) {
-          gcrTrack.clear
-          val ss = TRACK_ALLOCATION(t)        
-          for(s <- 0 until ss) {
-            gcrTrack.appendAll(gcrImageOf(t, s))
-          }
-          GCR.GCR2track(gcrTrack.toArray,ss,(track,sector,data) => {
-            //println(s"Writing back track $track sector $sector") 
-            disk.seek(absoluteSector(track,sector) * BYTES_PER_SECTOR)
-            for(b <- 0 until data.length) {
-              disk.write(data(b))
+      flushListener.flushing(file.toString,{
+        val gcrTrack = new collection.mutable.ArrayBuffer[Int](400 * 20)
+        val tracks = TOTAL_TRACKS
+        for(t <- 1 to tracks) {
+          if (isTrackModified(t)) {
+            gcrTrack.clear
+            val ss = TRACK_ALLOCATION(t)        
+            for(s <- 0 until ss) {
+              gcrTrack.appendAll(gcrImageOf(t, s))
             }
-          })
+            GCR.GCR2track(gcrTrack.toArray,ss,(track,sector,data) => {
+              //println(s"Writing back track $track sector $sector") 
+              disk.seek(absoluteSector(track,sector) * BYTES_PER_SECTOR)
+              for(b <- 0 until data.length) {
+                disk.write(data(b))
+              }
+            })
+          }
+          flushListener.update((t * 100.0 / tracks).toInt)
         }
-      }
+        clearModification
+      })
     }
   }
   
@@ -168,7 +172,6 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   }
   // --------------------- Floppy -------------------------
   val isReadOnly = false
-  val isFormattable = false
   val totalTracks = TOTAL_TRACKS
   override lazy val singleSide = bamInfo.singleSide
   
@@ -281,7 +284,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   
   def setTrackChangeListener(l:Floppy#TrackListener) = trackChangeListener = l
   
-  override def toString = s"D64 fileName=$file totalTracks=$TOTAL_TRACKS t=$track s=$sector"
+  override def toString = s"Disk fileName=$file totalTracks=$TOTAL_TRACKS t=$track s=$sector"
   // state
   def save(out:ObjectOutputStream) {
     out.writeInt(_side)

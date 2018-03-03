@@ -40,7 +40,7 @@ class TraceDialog private (displayFrame: JFrame,
   private[this] var tracing = false
   private[this] var tracingFile : PrintWriter = _
   
-  private def s2a(address: String) = address(0) match {
+  private def s2a(address: String) = address.trim()(0) match {
     case '$' => Integer.parseInt(address.substring(1), 16)
     case '%' => Integer.parseInt(address.substring(1), 2)
     case _ => address.toInt
@@ -98,6 +98,24 @@ class TraceDialog private (displayFrame: JFrame,
       case "READ" =>
         Option(JOptionPane.showInputDialog(this, "Address to read:")) match {
           case Some(address) =>
+            if (address.startsWith("find")) {
+              val FINDRE = """find\s+(\d+)-(\d+)\s+'([^']+)'""".r
+              address match {
+                case FINDRE(from,to,what) =>
+                  for(a <- s2a(from) to s2a(to) - what.length) {
+                    var c = 0
+                    while (c < what.length && mem.read(a + c) == what(c)) c += 1
+                    if (c == what.length) {
+                      Log.info("Found at address $" + a.toHexString)
+                      return
+                    }
+                  }
+                  Log.info(s"$what not found")
+                case _ =>
+                  Log.info("Bad find command")
+              }
+            }
+            else
             if (address.contains("-")) {
               val addresses = address split "-" map s2a
               var col = 0

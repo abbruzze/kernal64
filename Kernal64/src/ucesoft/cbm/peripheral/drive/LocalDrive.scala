@@ -13,7 +13,10 @@ import ucesoft.cbm.formats.Diskette
 class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device) {
   val driveType = DriveType.LOCAL
   val componentID = "Local Drive"
+  val formatExtList = Nil
   override val busid = "LocalDrive_" + device
+  
+  bus.registerListener(this)
   
   final private[this] val STATUS_OK = 0
   final private[this] val STATUS_SYNTAX_ERROR = 30

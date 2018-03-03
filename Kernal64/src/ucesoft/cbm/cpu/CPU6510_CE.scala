@@ -1824,7 +1824,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	    mem.write(ar,A & X & (ar2 + 1))
 		Last
 	  }
-	  case 1 => () => { Last ; throw new CPU6510.CPUJammedException }
+	  case 1 => () => { Last ; throw new CPU6510.CPUJammedException(id,CURRENT_OP_PC) }
 	  case RESET => () => { 
 	    if (ready) {
 	      PC = readWordFrom(0xfffc, mem)

@@ -21,6 +21,7 @@ import ucesoft.cbm.ClockEvent
 class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends TraceListener with Drive {
   val driveType = DriveType._1541
   val componentID = "C1541 Disk Drive " + jackID
+  val formatExtList = List("D64","D71","G64")
   override val MIN_SPEED_HZ = 985248
   override val MAX_SPEED_HZ = 1000000
   
@@ -95,8 +96,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       super.write(address,value,chipID)
       (address & 0x0F) match {
         case PB|DDRB =>        
-          bus.setLine(busid,IECBusLine.DATA,data_out)
-          bus.setLine(busid,IECBusLine.CLK,clock_out)
+          bus.setLine(this,IECBusLine.DATA,data_out)
+          bus.setLine(this,IECBusLine.CLK,clock_out)
           
           autoacknwoledgeData
         case ad@(PA|PA2) =>
@@ -114,7 +115,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     @inline private def autoacknwoledgeData {
       val atna = (regs(DDRB) & regs(PB) & 0x10) > 0
       val dataOut = (bus.atn == IECBus.GROUND) ^ atna
-      if (dataOut) bus.setLine(busid,IECBusLine.DATA,IECBus.GROUND) else bus.setLine(busid,IECBusLine.DATA,data_out)
+      if (dataOut) bus.setLine(this,IECBusLine.DATA,IECBus.GROUND) else bus.setLine(this,IECBusLine.DATA,data_out)
     }
     // state
     override protected def saveState(out:ObjectOutputStream) {
@@ -139,10 +140,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     private[this] val SYNC_DETECTION_LINE = 0x80
     private[this] var isDiskChanged = true
     private[this] var isDiskChanging = false
-    private[this] var isReadOnly = false
-    
-    def setReadOnly(readOnly:Boolean) = isReadOnly = readOnly
-  
+      
     def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
       floppy = driveReader
       RW_HEAD.setFloppy(floppy)
@@ -167,7 +165,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     
     override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
       case PB =>
-        val wps = if (isDiskChanging) isDiskChanged else isReadOnly | floppy.isReadOnly
+        val wps = if (isDiskChanging) isDiskChanged else RW_HEAD.isWriteProtected
         (super.read(address, chipID) & ~(WRITE_PROTECT_SENSE | SYNC_DETECTION_LINE)) |
           (if (RW_HEAD.isSync) 0x00 else SYNC_DETECTION_LINE) |
           (if (wps) 0x00 else WRITE_PROTECT_SENSE)
@@ -236,13 +234,11 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       super.saveState(out)
       out.writeBoolean(isDiskChanged)
       out.writeBoolean(isDiskChanging)
-      out.writeBoolean(isReadOnly)
     }
     override protected def loadState(in:ObjectInputStream) {
       super.loadState(in)
       isDiskChanged = in.readBoolean
       isDiskChanging = in.readBoolean
-      isReadOnly = in.readBoolean
     }
   }
   
@@ -273,7 +269,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     bus.unregisterListener(viaBus)
   }
   
-  override def setReadOnly(readOnly:Boolean) = viaDisk.setReadOnly(readOnly)
+  override def setReadOnly(readOnly:Boolean) = RW_HEAD.setWriteProtected(readOnly)
   
   override def setSpeedHz(speed:Int) {
     currentSpeedHz = speed
@@ -387,6 +383,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
           cpu.fetchAndExecute(2)
           viaDisk.clock(cycles)
           viaBus.clock(cycles)
+          if (RW_HEAD.rotate) viaDisk.byteReady
         }
         else cpu.fetchAndExecute(1)
       }

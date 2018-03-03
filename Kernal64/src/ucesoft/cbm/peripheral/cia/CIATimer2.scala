@@ -60,7 +60,7 @@ class CIATimerA2(ciaName: String,
     toggleValue = false
     started = false
     countExternal = false
-    systemClock.cancel(EVENT_ID)
+    if (autoClock) systemClock.cancel(EVENT_ID)
   }
   
   override def getProperties = {
