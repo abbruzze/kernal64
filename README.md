@@ -1,8 +1,13 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.4.2
+Kernal64 ver 1.4.3
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
+
+### What's new in 1.4.3 (Mar 3rd 2018)
+* Added 1581 disk drive support (MFM format)
+* Added new menù (under Settings) to select drives type (1541/71/81)
+* Added "write changes on disk" flag under File menù: when the flag is off the disk changes will not be stored on local disk
 
 ### What's new in 1.4.2 (Feb 2nd 2018)
 * Added 1571 disk drive support (MFM format will be ready for 1581)
