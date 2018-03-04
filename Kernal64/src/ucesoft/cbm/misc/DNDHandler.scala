@@ -23,7 +23,9 @@ class DNDHandler(handleDND:(File) => Unit) extends TransferHandler {
             false
           case Some(f) =>
             val name = f.getName.toUpperCase
-            if (name.endsWith(".D64") ||
+            if (name.endsWith(".D71") ||
+                name.endsWith(".D81") ||
+                name.endsWith(".D64") ||
                 name.endsWith(".G64") ||
                 name.endsWith(".TAP") || 
                 name.endsWith(".PRG") || 
