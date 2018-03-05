@@ -143,7 +143,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   
   private def bamInfo = {    
     disk.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 3)
-    val singleSide = file.toUpperCase.endsWith(".D64") || disk.read != 0x80
+    val singleSide = file.toUpperCase.endsWith(".D64")// || disk.read != 0x80
     disk.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)
     val diskName = new StringBuilder
     var i = 0

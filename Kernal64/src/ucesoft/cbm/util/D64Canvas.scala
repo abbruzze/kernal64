@@ -69,7 +69,7 @@ class D64Canvas(fc:JFileChooser,charRom:Memory) extends CBMCanvas(charRom) with 
 	    d64.close
     }
     catch {
-      case t:IllegalArgumentException =>
+      case t:Throwable =>
         add("FORMAT NOT SUPPORTED.")
     }
     end
