@@ -30,6 +30,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     val sid = new RESID
     sid.set_chip_model(ISIDDefs.chip_model.MOS6581)
     sid.set_sampling_parameters(CPU_FREQ,ISIDDefs.sampling_method.SAMPLE_FAST, SAMPLE_RATE,-1, 0.97)
+    sid.enable_filter(true)
     sid
   }
   private[this] val POTX_OFS = 0x19

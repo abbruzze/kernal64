@@ -20,7 +20,6 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
     dataLine    
   }
   private[this] val volume : FloatControl = if (dataLine != null) dataLine.getControl(FloatControl.Type.MASTER_GAIN).asInstanceOf[FloatControl] else null
-  private[this] val mute : BooleanControl = if (dataLine != null) dataLine.getControl(BooleanControl.Type.MUTE).asInstanceOf[BooleanControl] else null
   private[this] var vol = 0
   private[this] val buffer = Array.ofDim[Byte](256)
   private[this] var pos = 0
@@ -47,12 +46,25 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
       dataLine.write(buffer, 0, bsize)
     }
   }
-  final def reset = pos = 0
+  final def reset {
+    pos = 0
+    if (dataLine != null) dataLine.flush
+  }
   def discard {
     if (dataLine != null) {
       dataLine.stop
       dataLine.flush
     }
   }
-  def setSoundOn(on:Boolean) = if (mute != null) mute.setValue(!on)
+  def setSoundOn(on:Boolean) {
+    //if (mute != null) mute.setValue(!on)
+    if (dataLine != null) {
+      if (on) dataLine.start
+      else {
+        dataLine.stop
+        dataLine.flush
+        pos = 0
+      }
+    }
+  }
 }

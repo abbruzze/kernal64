@@ -491,9 +491,9 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
       case "MAXSPEED" =>
         val maxSpeedItem = e.getSource.asInstanceOf[JCheckBoxMenuItem]
         clock.maximumSpeed = maxSpeedItem.isSelected
-        //clock.pause
+        clock.pause
         sid.setFullSpeed(maxSpeedItem.isSelected)
-        //clock.play
+        clock.play
       case "ADJUSTRATIO" =>
         adjustRatio
       case "AUTORUN_DISK" =>
@@ -563,6 +563,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         keypadControlPort.setLightPenEmulation(true)
       case "MOUSE_ENABLED" =>
         val mouseEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        keypadControlPort.setMouse1351Emulation(mouseEnabled)
         sid.setMouseEnabled(mouseEnabled)
         if (mouseEnabled) MouseCage.enableMouseCageOn(display) else MouseCage.disableMouseCage
       case "EXIT" => close

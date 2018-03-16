@@ -10,6 +10,7 @@ import java.util.Properties
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
+import javax.swing.SwingUtilities
 
 abstract class ControlPort extends CBMComponent {
   val componentType = CBMComponentType.INPUT_DEVICE
@@ -17,6 +18,7 @@ abstract class ControlPort extends CBMComponent {
     
   private[this] var emulatedBit = 0
   private[this] var lightPenEmulationEnabled = false
+  private[this] var mouse1351EmulationEnabled = false
   
   def init {}
   def reset {
@@ -41,6 +43,8 @@ abstract class ControlPort extends CBMComponent {
   
   def setLightPenEmulation(enabled:Boolean) = lightPenEmulationEnabled = enabled
   def isLightPenEmulationEnabled = lightPenEmulationEnabled
+  def setMouse1351Emulation(enabled:Boolean) = mouse1351EmulationEnabled = enabled
+  def isMouse1351EmulationEnabled = mouse1351EmulationEnabled
   // state
   protected def saveState(out:ObjectOutputStream) {}
   protected def loadState(in:ObjectInputStream) {}
@@ -64,8 +68,16 @@ object ControlPort {
     def mouseClicked(e:MouseEvent) {}
     def mouseEntered(e:MouseEvent) {}
     def mouseExited(e:MouseEvent) {}
-    def mousePressed(e:MouseEvent) = if (!isLightPenEmulationEnabled) mask |= 16
-    def mouseReleased(e:MouseEvent) = if (!isLightPenEmulationEnabled) mask &= ~16
+    def mousePressed(e:MouseEvent) {
+      if (SwingUtilities.isRightMouseButton(e) && isMouse1351EmulationEnabled) mask |= 1 // 1351 right button emulates joy-UP
+      else
+      if (!isLightPenEmulationEnabled) mask |= 16
+    }
+    def mouseReleased(e:MouseEvent) {
+      if (SwingUtilities.isRightMouseButton(e) && isMouse1351EmulationEnabled) mask &= ~1
+      else
+      if (!isLightPenEmulationEnabled) mask &= ~16
+    }
     
     def keyPressed(e: KeyEvent) = mask |= getKeyMask(e)
     

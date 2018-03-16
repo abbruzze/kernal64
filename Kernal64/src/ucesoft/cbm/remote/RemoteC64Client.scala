@@ -18,7 +18,7 @@ object RemoteC64Client extends App {
   }
   try {
     val video = new RemoteC64Frame("Remote Kernal64")
-    video.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)  
+    video.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE)  
     video.setVisible(true)
     
     val server = new RemoteC64Client(args(0),args(1).toInt,video)

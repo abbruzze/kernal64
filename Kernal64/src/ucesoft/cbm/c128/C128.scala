@@ -586,9 +586,9 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       case "MAXSPEED" =>
         val maxSpeedItem = e.getSource.asInstanceOf[JCheckBoxMenuItem]
         clock.maximumSpeed = maxSpeedItem.isSelected
-        //clock.pause
+        clock.pause
         sid.setFullSpeed(maxSpeedItem.isSelected)
-        //clock.play
+        clock.play
       case "ADJUSTRATIO" =>
         adjustRatio
       case "AUTORUN_DISK" =>
@@ -658,6 +658,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         keypadControlPort.setLightPenEmulation(true)
       case "MOUSE_ENABLED" =>
         val mouseEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        keypadControlPort.setMouse1351Emulation(mouseEnabled)
         sid.setMouseEnabled(mouseEnabled)
         if (mouseEnabled) MouseCage.enableMouseCageOn(vicDisplay) else MouseCage.disableMouseCage
       case "EXIT" => close
@@ -859,6 +860,9 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         canWriteOnDisk = enabled
         for(d <- 0 to 1) drives(d).getFloppy.canWriteOnDisk = canWriteOnDisk
+      case "RAM_256K" =>
+        val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        mmu.RAM.setExpansionBanks(enabled)
     }
   }
   
@@ -2053,6 +2057,14 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     cpmItem.setActionCommand("CP/M")
     cpmItem.addActionListener(this)
     IOItem.add(cpmItem)
+    
+    val ramItem = new JMenu("RAM")
+    optionMenu.add(ramItem)
+    val _256RamEnabledItem = new JCheckBoxMenuItem("256K")
+    _256RamEnabledItem.setSelected(false)
+    ramItem.add(_256RamEnabledItem)
+    _256RamEnabledItem.setActionCommand("RAM_256K")
+    _256RamEnabledItem.addActionListener(this)
     
     // cartridge
     val cartButtonItem = new JMenuItem("Press cartridge button...")
