@@ -315,8 +315,10 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     add(expansionPort)
     add(rs232)    
     rs232.setRS232Listener(rs232StatusPanel)
-    add(new FloppyComponent(8,drives(0),driveLeds(0)))
-    add(new FloppyComponent(9,drives(1),driveLeds(1)))
+    floppyComponents(0) = new FloppyComponent(8,drives(0),driveLeds(0))
+    add(floppyComponents(0))
+    floppyComponents(1) = new FloppyComponent(9,drives(1),driveLeds(1))
+    add(floppyComponents(1))
     // -----------------------
     val vicMemory = new C64VICMemory(mem,mem.CHAR_ROM) 
     add(vicMemory)
