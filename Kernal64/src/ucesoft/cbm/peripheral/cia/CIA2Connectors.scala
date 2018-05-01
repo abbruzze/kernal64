@@ -7,6 +7,7 @@ import ucesoft.cbm.peripheral.drive.ParallelCable
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import ucesoft.cbm.peripheral.vic.VICMemory
+import ucesoft.cbm.expansion.DigiMAX
 
 object CIA2Connectors {
   val CIA2_PORTA_BUSID = "CIA2_PortA"
@@ -33,7 +34,11 @@ object CIA2Connectors {
       bus.setLine(this,if ((value & 8) > 0) GROUND else VOLTAGE,  // ATN
                         if ((value & 32) > 0) GROUND else VOLTAGE, // DATA
                         if ((value & 16) > 0) GROUND else VOLTAGE) // CLOCK
-      if ((ddr & 4) > 0) rs232.setTXD((data >> 2) & 1)      
+      if ((ddr & 4) > 0) rs232.setTXD((data >> 2) & 1)     
+      if (DigiMAX.isEnabledOnUserPort) {
+        val a0a1 = (data >> 2) & 3
+        DigiMAX.selectChannel(a0a1)
+      }
     }
     // state
     override protected def saveState(out:ObjectOutputStream) {
@@ -62,6 +67,9 @@ object CIA2Connectors {
         ParallelCable.write(data)
       }
       else rs232.setOthers(data/* | ~ddr*/)
+      if (DigiMAX.isEnabledOnUserPort) {
+        DigiMAX.write(data)
+      }
     }
   }
 }

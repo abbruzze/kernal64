@@ -95,6 +95,7 @@ object ExpansionPort {
     final override def freezeButton = expansionPort.freezeButton
     final override def isFreezeButtonSupported = expansionPort.isFreezeButtonSupported
     final override def eject = expansionPort.eject
+    final override def shutdown = expansionPort.shutdown
     // state
     final override protected def saveState(out:ObjectOutputStream) = expansionPort.saveState(out)
     final override protected def loadState(in:ObjectInputStream) = expansionPort.loadState(in)
@@ -115,6 +116,7 @@ object ExpansionPort {
   def setMemoryForEmptyExpansionPort(mem:LastByteReadMemory) = memoryForEmptyExpansionPort = mem
   def setExpansionPort(expansionPort: ExpansionPort) = {
     this.expansionPort = expansionPort
+    expansionPort.init
     Log.info("Setting new expansion port: " + expansionPort.name + " listeners are " + listeners)
     updateListeners(expansionPort.GAME,expansionPort.EXROM)
   }

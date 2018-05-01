@@ -5,6 +5,9 @@ import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.expansion.ExpansionPort
 import ucesoft.cbm.Clock
 import ucesoft.cbm.ClockEvent
+import ucesoft.cbm.misc.M93C86
+import java.util.Properties
+import ucesoft.cbm.Log
 
 object ExpansionPortFactory {
   private class CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends ExpansionPort {
@@ -58,6 +61,56 @@ object ExpansionPortFactory {
     override def toString = s"ExpansionPort{crt=${crt} game=${game} exrom=${exrom} romlBanks=${romlBanks.mkString("<", ",", ">")} romhBanks=${romhBanks.mkString("<", ",", ">")}}"
   }
   // ================================= CARTRIDGE IMPL ===================================================
+  private class GMOD2CartridgeExpansionPort(crt: Cartridge,ram:Memory,config:Properties) extends CartridgeExpansionPort(crt,ram) {
+    private[this] val CONFIGURATION_GMOD2_FILE = "gmod2.file"
+    private[this] var reg = 0
+    private[this] val m93c86 = new M93C86(x16 = true)
+    
+    override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+      if (address == 0xDE00) m93c86.output << 7 else 0      
+    }
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+      if (address == 0xDE00) {
+        reg = value
+        if ((value & 0x40) == 0) {
+          m93c86.chipSelect(false)
+          val bank = value & 0x3F
+          romlBankIndex = bank
+          romhBankIndex = bank
+        }
+        else {
+          m93c86.chipSelect(true)
+          m93c86.clock((value & 0x20) > 0)
+          m93c86.input((value >> 4) & 1)
+        }
+      }
+    }
+    override def reset {
+      romlBankIndex = 0
+      romhBankIndex = 0
+    }
+    override def eject = saveEeprom
+    override def shutdown = saveEeprom
+    override def init {
+      Option(config.getProperty(CONFIGURATION_GMOD2_FILE)) match {
+        case None =>
+        case Some(eeprom) =>
+          val file = new java.io.File(eeprom)
+          if (file.exists) {
+            m93c86.load(file)
+            Log.info(s"EEPROM loaded from $file")
+          }
+      }
+    }
+    private def saveEeprom {
+      Option(config.getProperty(CONFIGURATION_GMOD2_FILE)) match {
+        case None =>
+        case Some(eeprom) =>
+          m93c86.save(new java.io.File(eeprom))
+          Log.info(s"EEPROM saved to $eeprom")
+      }
+    }
+  }
   private class SimonsBasicCartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       val target = address - startAddress
@@ -239,11 +292,11 @@ object ExpansionPortFactory {
     private[this] val io2mem = Array.ofDim[Int](256)
     
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
-      if (address >= 0xDF00) io2mem(address - 0xDF00) else 0
+      if (address >= 0xDF00) io2mem(address & 0xFF) else 0
     }
     
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
-      if (address >= 0xDF00) io2mem(address - 0xDF00) = value
+      if (address >= 0xDF00) io2mem(address & 0xFF) = value
       else {
         if ((address & 2) == 0) {//(address == 0xDE00) {
           val bank = value & 0x3F
@@ -253,7 +306,7 @@ object ExpansionPortFactory {
         }
         else 
         /*if (address == 0xDE02)*/ {
-          //println(s"EasyFlash Control = $value")
+          //println(s"EasyFlash Control = $value (${address.toHexString})")
           val gameControlledViaBit0 = (value & 4) == 4
           exrom = (value & 2) == 0
           game = if (gameControlledViaBit0) (value & 1) == 0 else false
@@ -263,10 +316,11 @@ object ExpansionPortFactory {
     }
     
     override def reset {
-      game = crt.GAME
-      exrom = crt.EXROM
+      game = false//crt.GAME
+      exrom = true//crt.EXROM
       romlBankIndex = 0
       romhBankIndex = 0
+      notifyMemoryConfigurationChange
     }
   }
 
@@ -397,7 +451,7 @@ object ExpansionPortFactory {
     }
   }
   // ====================================================================================================
-  def loadExpansionPort(crtName: String, irqAction: (Boolean) => Unit, nmiAction: (Boolean) => Unit, ram: Memory): ExpansionPort = {
+  def loadExpansionPort(crtName: String, irqAction: (Boolean) => Unit, nmiAction: (Boolean) => Unit, ram: Memory,config:Properties): ExpansionPort = {
     val crt = new Cartridge(crtName)
     crt.ctrType match {
       case 1 => new Type1CartridgeExpansionPort(crt,nmiAction,ram)
@@ -415,7 +469,9 @@ object ExpansionPortFactory {
       case 8 => new Type8CartridgeExpansionPort(crt,ram)
       case 10 => new Type10CartridgeExpansionPort(crt,ram)
       case 13 => new Type13CartridgeExpansionPort(crt,ram)
-      case _ => throw new IllegalArgumentException(s"Unsupported cartridge type ${crt.ctrType} for ${crt.name}")
+      case 60 => new GMOD2CartridgeExpansionPort(crt,ram,config)
+      case _ =>        
+        throw new IllegalArgumentException(s"Unsupported cartridge type ${crt.ctrType} for ${crt.name}")
     }
   }
 

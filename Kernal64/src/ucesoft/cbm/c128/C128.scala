@@ -45,6 +45,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
   private[this] val CONFIGURATION_FRAME_DIM = "frame.dim"
   private[this] val CONFIGURATION_KEYB_MAP_FILE = "keyb.map.file"
+  private[this] val CONFIGURATION_GMOD2_FILE = "gmod2.file"
   
   private[this] val configuration = {
     val props = new Properties
@@ -863,6 +864,28 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       case "RAM_256K" =>
         val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
         mmu.RAM.setExpansionBanks(enabled)
+      case "DIGIMAX_DISABLED" =>
+        DigiMAX.enabled(false,false)
+        if (ExpansionPort.getExpansionPort.isInstanceOf[DigiMaxCart]) ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+      case "DIGIMAX_USERPORT" =>
+        DigiMAX.enabled(true,true)
+      case "DIGIMAX_DE00" =>
+        ExpansionPort.getExpansionPort.eject
+        ExpansionPort.setExpansionPort(new DigiMaxCart(0xDE00))
+      case "DIGIMAX_DF00" =>
+        ExpansionPort.getExpansionPort.eject
+        ExpansionPort.setExpansionPort(new DigiMaxCart(0xDF00))
+      case "GMOD2" =>
+        var gmod2Path = configuration.getProperty(CONFIGURATION_GMOD2_FILE,"./gmod2_eeprom")
+        val fc = new JFileChooser
+        fc.setCurrentDirectory(new File(gmod2Path).getParentFile)
+        fc.setDialogTitle("Choose a file where to save gmod2 cart eeprom")
+        fc.showOpenDialog(vicDisplayFrame) match {
+          case JFileChooser.APPROVE_OPTION =>
+            gmod2Path = fc.getSelectedFile.toString
+          case _ =>
+        }
+        configuration.setProperty(CONFIGURATION_GMOD2_FILE,gmod2Path)
     }
   }
   
@@ -1144,7 +1167,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private def loadCartridgeFile(file:File) {
     try {          
       if (Thread.currentThread != Clock.systemClock) clock.pause
-      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.expPortIRQ _,nmiSwitcher.expansionPortNMI _,mmu.RAM)
+      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.expPortIRQ _,nmiSwitcher.expansionPortNMI _,mmu.RAM,configuration)
       println(ep)
       if (ep.isFreezeButtonSupported) cartMenu.setVisible(true)
       ExpansionPort.setExpansionPort(ep)
@@ -1790,6 +1813,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     
     val vicSnapshotItem = new JMenuItem("VIC ...")
     vicSnapshotItem.setActionCommand("SNAPSHOT_VIC")
+    vicSnapshotItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S,java.awt.event.InputEvent.ALT_DOWN_MASK))
     vicSnapshotItem.addActionListener(this)
     snapMenu.add(vicSnapshotItem)
     val vdcSnapshotItem = new JMenuItem("VDC ...")
@@ -2053,6 +2077,40 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     
     IOItem.addSeparator
     
+    val digimaxItem = new JMenu("DigiMAX")
+    IOItem.add(digimaxItem)
+    val group6 = new ButtonGroup
+    val digimaxDisabledItem = new JRadioButtonMenuItem("Disabled")
+    digimaxDisabledItem.setSelected(true)
+    digimaxDisabledItem.setActionCommand("DIGIMAX_DISABLED")
+    digimaxDisabledItem.addActionListener(this)
+    digimaxItem.add(digimaxDisabledItem)
+    group6.add(digimaxDisabledItem)
+    val digimaxOnUserPortItem = new JRadioButtonMenuItem("On UserPort")
+    digimaxOnUserPortItem.setActionCommand("DIGIMAX_USERPORT")
+    digimaxOnUserPortItem.addActionListener(this)
+    group6.add(digimaxOnUserPortItem)
+    digimaxItem.add(digimaxOnUserPortItem)
+    val digimaxDE00Item = new JRadioButtonMenuItem("On DE00")
+    digimaxDE00Item.setActionCommand("DIGIMAX_DE00")
+    digimaxDE00Item.addActionListener(this)
+    group6.add(digimaxDE00Item)
+    digimaxItem.add(digimaxDE00Item)
+    val digimaxDF00Item = new JRadioButtonMenuItem("On DF00")
+    digimaxDF00Item.setActionCommand("DIGIMAX_DF00")
+    digimaxDF00Item.addActionListener(this)
+    group6.add(digimaxDF00Item)
+    digimaxItem.add(digimaxDF00Item)
+    
+    IOItem.addSeparator
+    
+    val gmod2Item = new JMenuItem("GMOD2 eeprom file...")
+    gmod2Item.setActionCommand("GMOD2")
+    gmod2Item.addActionListener(this)
+    IOItem.add(gmod2Item)
+    
+    IOItem.addSeparator
+    
     val cpmItem = new JRadioButtonMenuItem("CP/M Cartdrige")
     cpmItem.setActionCommand("CP/M")
     cpmItem.addActionListener(this)
@@ -2162,6 +2220,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     catch {
       case io:IOException =>
     }
+    shutdownComponent
     sys.exit(0)
   }
   
