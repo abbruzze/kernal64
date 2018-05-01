@@ -1,8 +1,16 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.4.3
+Kernal64 ver 1.4.4
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
+
+### What's new in 1.4.4 (May 1st 2018)
+* Added DigiMax UserPort support
+* Added GMOD2 cart support: new menu (Settings -> IO -> Gmod2 eeprom file ...) for eeprom state savings.
+
+Sam's Journey snapshot:
+
+![](https://github.com/abbruzze/kernal64/blob/master/images/sam_journey.png)
 
 ### What's new in 1.4.3 (Mar 3rd 2018)
 * Added 1581 disk drive support (MFM format)
