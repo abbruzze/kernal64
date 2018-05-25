@@ -81,7 +81,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private[this] val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c128",C128KeyboardMapper)
   private[this] val keyb = new keyboard.Keyboard(keybMapper,nmiSwitcher.keyboardNMIAction _,true)	// key listener
   private[this] val vicDisplayFrame = {
-    val f = new JFrame("Kernal128 emulator ver. " + ucesoft.cbm.Version.VERSION)
+    val f = new JFrame("Kernal128 " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
       override def windowClosing(e:WindowEvent) {
         close
@@ -91,7 +91,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     f
   }
   private[this] val vdcDisplayFrame = {
-    val f = new JFrame("Kernal128 emulator ver. " + ucesoft.cbm.Version.VERSION) {
+    val f = new JFrame("Kernal128 " + ucesoft.cbm.Version.VERSION) {
       override def getInsets = new Insets(0,0,0,0)
     }
     f.addWindowListener(new WindowAdapter {

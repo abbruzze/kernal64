@@ -116,7 +116,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   private[this] val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c64",C64KeyboardMapper)
   private[this] val keyb = new keyboard.Keyboard(keybMapper,nmiSwitcher.keyboardNMIAction _)	// key listener
   private[this] val displayFrame = {
-    val f = new JFrame("Kernal64 emulator ver. " + ucesoft.cbm.Version.VERSION)
+    val f = new JFrame("Kernal64 " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
       override def windowClosing(e:WindowEvent) {
         close

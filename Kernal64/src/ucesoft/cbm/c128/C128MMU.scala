@@ -77,6 +77,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   final private[this] val MMU_CR1 = 0xD500
   final private[this] val MMU_CR = 0xFF00
   final private[this] val D500_REGS = Array.ofDim[Int](0xB) // index 0 not used, see cr_reg, 0xB is not used
+  final private[this] var D508Latch,D50ALatch = 0
   final private[this] val FF00_REGS = Array.ofDim[Int](0x5) // index 0 not used, see cr_reg  
   private[this] var cr_reg = 0
   private[this] var z80enabled = true
@@ -470,11 +471,13 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // ----------------------------------------------------------------------------
   @inline private[this] def MMU_D507_write(value:Int) {
     D500_REGS(7) = value
+    D500_REGS(8) = D508Latch | 0xF0
     ram.setDivertedPage(0,value,D500_REGS(8))
   }
   // ----------------------------------------------------------------------------
   @inline private[this] def MMU_D509_write(value:Int) {
     D500_REGS(9) = value
+    D500_REGS(0xA) = D50ALatch | 0xF0
     ram.setDivertedPage(1,value,D500_REGS(0xA))
   }
   // ----------------------------------------------------------------------------
@@ -554,9 +557,9 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     if (address == 0xD505) MMU_D505_write(value)
     else if (address == 0xD506) MMU_D506_write(value)
     else if (address == 0xD507) MMU_D507_write(value)
-    else if (address == 0xD508) D500_REGS(8) = value | 0xF0
+    else if (address == 0xD508) D508Latch = value
     else if (address == 0xD509) MMU_D509_write(value)
-    else if (address == 0xD50A) D500_REGS(0xA) = value | 0xF0
+    else if (address == 0xD50A) D50ALatch = value
     else if (address != 0xD50B) {
       D500_REGS(address & 0xF) = value
       Log.debug(s"D505_REG(${address & 0xF})=${Integer.toHexString(value)}")
