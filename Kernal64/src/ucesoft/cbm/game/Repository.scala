@@ -18,6 +18,7 @@ import scala.util.Success
 import scala.util.Failure
 import java.net.HttpURLConnection
 import java.io.InputStream
+import java.net.URLConnection
 
 class Repository(provider:GameProvider) {
   import ZIP._
@@ -145,8 +146,7 @@ class Repository(provider:GameProvider) {
         getArchiveFor(game)
     }
   }
-  protected def openDownloadURL(game:Game) : (InputStream,String) = {
-    var connection = game.downloadPageURL.get.openConnection
+  protected def extractFileName(connection:URLConnection) : String = {
     var fileName = ""
     if (connection.isInstanceOf[HttpURLConnection]) {
       val cd = connection.getHeaderField("content-disposition")
@@ -159,16 +159,36 @@ class Repository(provider:GameProvider) {
           case _ =>
         }
       }
-      val hc = connection.asInstanceOf[HttpURLConnection]
-      val status = hc.getResponseCode
-      if (status != HttpURLConnection.HTTP_OK) {
-        if (status == HttpURLConnection.HTTP_MOVED_TEMP || 
-            status == HttpURLConnection.HTTP_MOVED_PERM ||            
-				    status == HttpURLConnection.HTTP_SEE_OTHER) {
-          val newUrl = new URL(hc.getHeaderField("Location"))
-          game.downloadPageURL = Some(newUrl)
-          connection.getInputStream.close
-          connection = newUrl.openConnection
+      else {
+        val file = new File(connection.getURL.getFile)
+        fileName = file.getName
+        println(s"FILE=$fileName")
+      }
+    }
+    
+    fileName
+  }
+  protected def openDownloadURL(game:Game) : (InputStream,String) = {
+    var connection = game.downloadPageURL.get.openConnection
+    var fileName = ""
+    if (connection.isInstanceOf[HttpURLConnection]) {
+      fileName = extractFileName(connection)
+      var keepRedirecting = true
+      while (keepRedirecting) {
+        keepRedirecting = false
+        val hc = connection.asInstanceOf[HttpURLConnection]
+        var status = hc.getResponseCode
+        if (status != HttpURLConnection.HTTP_OK) {
+          if (status == HttpURLConnection.HTTP_MOVED_TEMP || 
+              status == HttpURLConnection.HTTP_MOVED_PERM ||            
+  				    status == HttpURLConnection.HTTP_SEE_OTHER) {
+            val newUrl = new URL(hc.getHeaderField("Location"))
+            game.downloadPageURL = Some(newUrl)
+            connection.getInputStream.close
+            connection = newUrl.openConnection
+            fileName = extractFileName(connection)   
+            keepRedirecting = true
+          }
         }
       }
     }

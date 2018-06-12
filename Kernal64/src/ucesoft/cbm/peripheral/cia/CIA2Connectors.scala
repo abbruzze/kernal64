@@ -24,7 +24,7 @@ object CIA2Connectors {
     import IECBus._
     final def read = {
       import bus._
-      (~((clk << 6) | (data << 7)) & 0xC0) | (latch & 0x3C) | bank | rs232.getTXD << 2
+      (~((clk << 6) | (data << 7)) & 0xC0) | (latch & 0x38) | bank | rs232.getTXD << 2
     }
     final protected def performWrite(data:Int) = {
       val value = data | ~ddr // WHY ??
@@ -34,7 +34,7 @@ object CIA2Connectors {
       bus.setLine(this,if ((value & 8) > 0) GROUND else VOLTAGE,  // ATN
                         if ((value & 32) > 0) GROUND else VOLTAGE, // DATA
                         if ((value & 16) > 0) GROUND else VOLTAGE) // CLOCK
-      if ((ddr & 4) > 0) rs232.setTXD((data >> 2) & 1)     
+      rs232.setTXD((value >> 2) & 1)
       if (DigiMAX.isEnabledOnUserPort) {
         val a0a1 = (data >> 2) & 3
         DigiMAX.selectChannel(a0a1)
