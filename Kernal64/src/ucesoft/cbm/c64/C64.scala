@@ -71,26 +71,26 @@ import ucesoft.cbm.trace.InspectPanelDialog
 import ucesoft.cbm.misc.FloppyFlushUI
 import ucesoft.cbm.expansion.DigiMAX
 import ucesoft.cbm.expansion.DigiMaxCart
+import ucesoft.cbm.peripheral.drive.EmptyFloppy
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
   val c64 = new C64
-  c64.run
-  if (args.length > 0) {
-    c64.handleDND(new File(args(0)))
-  }
+  c64.run(args)  
 }
 
 class C64 extends CBMComponent with ActionListener with GamePlayer {
   val componentID = "Commodore 64"
   val componentType = CBMComponentType.INTERNAL
   
+  private[this] val settings = new ucesoft.cbm.misc.Settings
   private[this] val CONFIGURATION_FILENAME = "C64.config"
   private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
   private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
   private[this] val CONFIGURATION_FRAME_DIM = "frame.dim"
   private[this] val CONFIGURATION_KEYB_MAP_FILE = "keyb.map.file"
   private[this] val CONFIGURATION_GMOD2_FILE = "gmod2.file"
+  private[this] val CONFIGURATION_AUTOSAVE = "autosave"
   private[this] val configuration = {
     val props = new Properties
     val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
@@ -234,7 +234,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   // ------------------------------------ Drag and Drop ----------------------------
-  private[this] val DNDHandler = new DNDHandler(handleDND _)
+  private[this] val DNDHandler = new DNDHandler(handleDND(_,true))
   
   private object DriveLed8Listener extends AbstractDriveLedListener(driveLeds(0),diskProgressPanels(0))
   
@@ -244,6 +244,10 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   
   private def initDrive(id:Int,driveType:DriveType.Value) {
     val old = Option(drives(id))
+    old match {
+      case Some(od) if od.driveType == driveType => return
+      case _ =>
+    }
     id match {
       case 0 =>        
         drives(0) = driveType match {
@@ -420,7 +424,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
 	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)    
     // deactivate drive 9
     drives(1).setActive(false)    
-    driveLeds(1).setVisible(false)    
+    driveLeds(1).setVisible(false)        
   }
   
   private def errorHandler(t:Throwable) {
@@ -443,7 +447,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         t.printStackTrace(Log.getOut)
         t.printStackTrace
         JOptionPane.showMessageDialog(displayFrame,t.toString + " [PC=" + Integer.toHexString(cpu.getCurrentInstructionPC) + "]", "Fatal error",JOptionPane.ERROR_MESSAGE)
-        trace(true,true)
+        //trace(true,true)
+        reset(true)
     }    
   }
   
@@ -507,6 +512,10 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         attachDisk(0,false)
       case "ATTACH_DISK_1" =>
         attachDisk(1,false)
+      case "EJECT_DISK_0" =>
+        ejectDisk(0)
+      case "EJECT_DISK_1" =>
+        ejectDisk(1)
       case "LOAD_FILE_0" =>
         loadFileFromAttachedFile(0,true)
       case "LOAD_FILE_1" =>
@@ -524,9 +533,9 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
       case "ZOOM1" =>
         zoom(1)
       case "ZOOM2" =>
-        zoom(1.5)
-      case "ZOOM3" =>
         zoom(2)
+      case "ZOOM4" =>
+        zoom(4)
       case "PAUSE" =>
         if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) Clock.systemClock.pause
         else Clock.systemClock.play
@@ -568,8 +577,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         keypadControlPort.setLightPenEmulation(true)
       case "MOUSE_ENABLED" =>
         val mouseEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        keypadControlPort.setMouse1351Emulation(mouseEnabled)
-        sid.setMouseEnabled(mouseEnabled)
+        enableMouse(mouseEnabled)
         if (mouseEnabled) MouseCage.enableMouseCageOn(display) else MouseCage.disableMouseCage
       case "EXIT" => close
       case "TAPE" =>
@@ -594,21 +602,19 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         printerGraphicsDriver.clearPages
       case "PRINT_EXPORT_AS_PNG" =>
         printerSaveImage
-      case "PRINTER_ENABLED" =>
-        printerEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        printer.setActive(printerEnabled)
+      case "PRINTER_ENABLED" =>        
+        enablePrinter(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
       case "VOLUME" =>
         volumeDialog.setVisible(true)
       case "CRT_PRESS" => ExpansionPort.getExpansionPort.freezeButton
       case "NO_REU" =>
-        ExpansionPort.getExpansionPort.eject
-        ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+        setREU(None,None)
       case "REU_128" => 
-        ExpansionPort.setExpansionPort(REU.getREU(REU.REU_1700,mem,setDMA _,irqSwitcher.expPortIRQ _,None))
+        setREU(Some(REU.REU_1700),None)
       case "REU_256" => 
-        ExpansionPort.setExpansionPort(REU.getREU(REU.REU_1764,mem,setDMA _,irqSwitcher.expPortIRQ _,None))
+        setREU(Some(REU.REU_1764),None)
       case "REU_512" => 
-        ExpansionPort.setExpansionPort(REU.getREU(REU.REU_1750,mem,setDMA _,irqSwitcher.expPortIRQ _,None))
+        setREU(Some(REU.REU_1750),None)
       case "REU_16M" => 
         val fc = new JFileChooser
   	    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
@@ -620,8 +626,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   	    fc.showOpenDialog(displayFrame) match {
   	      case JFileChooser.APPROVE_OPTION|JFileChooser.CANCEL_OPTION => 
   	        try {
-  	          val reu = REU.getREU(REU.REU_16M,mem,setDMA _,irqSwitcher.expPortIRQ _,Option(fc.getSelectedFile))	          
-  	          ExpansionPort.setExpansionPort(reu)
+  	          setREU(Some(REU.REU_16M),Option(fc.getSelectedFile.toString))  	          
   	        }
   	        catch {
   	          case t:Throwable =>
@@ -640,17 +645,12 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         }
         else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
       case "DEVICE10_DISABLED" =>
-        device10DriveEnabled = false
+        enableDrive10(false,None)        
       case "LOCAL_DRIVE_ENABLED" =>        
-        device10Drive = new LocalDrive(bus,10)
-        device10DriveEnabled = true
-        changeLocalDriveDir
+        enableDrive10(true,None)
       case "DRIVE_9_ENABLED" =>
         val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        disk9Enabled = enabled
-        drives(1).setActive(enabled)
-        driveLeds(1).setVisible(enabled)
-        adjustRatio
+        enableDrive9(enabled)        
       case "SID_6581" =>
         sid.setModel(true)
       case "SID_8580" =>
@@ -728,24 +728,14 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
       case "LOAD_KEYB" =>
         loadKeyboard
       case "DRIVE_1581" =>
-        clock.pause
-        initDrive(0,DriveType._1581)
-        initDrive(1,DriveType._1581)
-        clock.play
+        setDriveType(DriveType._1581)
       case "DRIVE_1571" =>
-        clock.pause
-        initDrive(0,DriveType._1571)
-        initDrive(1,DriveType._1571)
-        clock.play
+        setDriveType(DriveType._1571)
       case "DRIVE_1541" =>
-        clock.pause
-        initDrive(0,DriveType._1541)
-        initDrive(1,DriveType._1541)
-        clock.play
+        setDriveType(DriveType._1541)
       case "WRITE_ON_DISK" =>
         val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        canWriteOnDisk = enabled
-        for(d <- 0 to 1) drives(d).getFloppy.canWriteOnDisk = canWriteOnDisk
+        writeOnDiskSetting(enabled)
       case "DIGIMAX_DISABLED" =>
         DigiMAX.enabled(false,false)
         if (ExpansionPort.getExpansionPort.isInstanceOf[DigiMaxCart]) ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
@@ -768,8 +758,75 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
           case _ =>
         }
         configuration.setProperty(CONFIGURATION_GMOD2_FILE,gmod2Path)
+      case "AUTOSAVE" =>
+        val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+        configuration.setProperty(CONFIGURATION_AUTOSAVE,enabled.toString)
+      case "SAVE_SETTINGS" =>
+        saveSettings(true)
+      case "LIST_BASIC" =>
+        ucesoft.cbm.misc.BasicListExplorer.list(mem,0x801)
+      case "RENDERING_DEFAULT" =>
+        setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
+      case "RENDERING_BILINEAR" =>
+        setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+      case "RENDERING_BICUBIC" =>
+        setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
     }
   }
+  
+  // ======================================== Settings ==============================================
+  private def writeOnDiskSetting(enabled:Boolean) {    
+    canWriteOnDisk = enabled
+    for(d <- 0 to 1) drives(d).getFloppy.canWriteOnDisk = canWriteOnDisk
+  }
+  private def enableDrive9(enabled:Boolean) {
+    disk9Enabled = enabled
+    drives(1).setActive(enabled)
+    driveLeds(1).setVisible(enabled)
+    adjustRatio
+  }
+  private def enableDrive10(enabled:Boolean,fn:Option[String]) {    
+    if (enabled) {
+      device10Drive = new LocalDrive(bus,10)
+      changeLocalDriveDir(fn)
+    }
+    device10DriveEnabled = enabled
+  }
+  private def enableMouse(mouseEnabled:Boolean) {
+    keypadControlPort.setMouse1351Emulation(mouseEnabled)
+    sid.setMouseEnabled(mouseEnabled)
+  }
+  private def enablePrinter(enable:Boolean) {
+    printerEnabled = enable
+    printer.setActive(enable)
+  }
+  private def setDriveType(dt:DriveType.Value,dontPlay:Boolean = false) {
+    clock.pause
+    initDrive(0,dt)
+    initDrive(1,dt)
+    if (!dontPlay) clock.play
+  }
+  private def setREU(reu:Option[Int],reu16FileName:Option[String]) {
+    reu match {
+      case None =>
+      case Some(REU.REU_1700) =>
+        ExpansionPort.getExpansionPort.eject
+        ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+      case Some(REU.REU_16M) =>
+        val reu = REU.getREU(REU.REU_16M,mem,setDMA _,irqSwitcher.expPortIRQ _,reu16FileName map { new File(_) } )	          
+  	    ExpansionPort.setExpansionPort(reu)
+  	    reu16FileName match {
+          case Some(file) => REU.attached16MFileName = file
+          case None =>
+        }
+      case Some(reuSize) =>
+        ExpansionPort.setExpansionPort(REU.getREU(reuSize,mem,setDMA _,irqSwitcher.expPortIRQ _,None))
+    }    
+  }
+  private def setDisplayRendering(hints:java.lang.Object) {
+    display.setRenderingHints(hints)
+  }
+  // ================================================================================================
   
   private def loadKeyboard {
     JOptionPane.showConfirmDialog(displayFrame,"Would you like to set default keyboard or load a configuration from file ?","Keyboard layout selection", JOptionPane.YES_NO_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE) match {
@@ -883,15 +940,20 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     displayFrame.pack
   } 
     
-  private def changeLocalDriveDir {
-    val fc = new JFileChooser
-    fc.setCurrentDirectory(device10Drive.asInstanceOf[LocalDrive].getCurrentDir)
-    fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
-    fc.setDialogTitle("Choose the current device 9 local directory")
-    fc.showOpenDialog(displayFrame) match {
-      case JFileChooser.APPROVE_OPTION =>
-        device10Drive.asInstanceOf[LocalDrive].setCurrentDir(fc.getSelectedFile)
-      case _ =>
+  private def changeLocalDriveDir(fileName:Option[String] = None) {
+    fileName match {
+      case None =>
+        val fc = new JFileChooser
+        fc.setCurrentDirectory(device10Drive.asInstanceOf[LocalDrive].getCurrentDir)
+        fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
+        fc.setDialogTitle("Choose the current device 10 local directory")
+        fc.showOpenDialog(displayFrame) match {
+          case JFileChooser.APPROVE_OPTION =>
+            device10Drive.asInstanceOf[LocalDrive].setCurrentDir(fc.getSelectedFile)
+          case _ =>
+        }
+      case Some(fn) =>
+        device10Drive.asInstanceOf[LocalDrive].setCurrentDir(new File(fn))
     }
   }
   
@@ -956,13 +1018,18 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   }
   def attachDevice(file:File) : Unit = attachDevice(file,false)
   
-  private def handleDND(file:File) {
+  private def handleDND(file:File,resetAndPlay:Boolean = true) {
     val name = file.getName.toUpperCase
     if (name.endsWith(".CRT")) loadCartridgeFile(file)
     else {
-      reset(false)
-      clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => { attachDevice(file,true) }))
-      clock.play
+      if (resetAndPlay) {
+        reset(false)
+        clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => { attachDevice(file,true) }))
+        clock.play
+      }
+      else {
+        attachDevice(file,false)
+      }
     }
   }
   
@@ -1028,6 +1095,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
       println(ep)
       if (ep.isFreezeButtonSupported) cartMenu.setVisible(true)
       ExpansionPort.setExpansionPort(ep)
+      ExpansionPort.currentCartFileName = file.toString
       Log.info(s"Attached cartridge ${ExpansionPort.getExpansionPort.name}")
       reset(false)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)  
@@ -1043,8 +1111,19 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     }
   }
   
+  private def ejectDisk(driveID:Int) {
+    drives(driveID).getFloppy.close
+    driveLeds(driveID).setToolTipText("")
+    if (!traceDialog.isTracing) clock.pause
+    if (drives(driveID).driveType == DriveType._1581) drives(driveID).setDriveReader(D1581.MFMEmptyFloppy,true) 
+    else drives(driveID).setDriveReader(EmptyFloppy,true)
+    loadFileItems(driveID).setEnabled(false)
+    clock.play
+  }
+  
   private def attachDiskFile(driveID:Int,file:File,autorun:Boolean) {
-    try {      
+    try {   
+      if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
       val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
       if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
       val isD64 = file.getName.toUpperCase.endsWith(".D64")
@@ -1104,8 +1183,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     JOptionPane.showMessageDialog(displayFrame,about,"About",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))    
   }
   
-  private def zoom(f:Double) {
-    val dim = new Dimension((vicChip.VISIBLE_SCREEN_WIDTH * f).toInt,(vicChip.VISIBLE_SCREEN_HEIGHT * f).toInt)
+ private def zoom(f:Int) {
+    val dim = new Dimension(vicChip.VISIBLE_SCREEN_WIDTH * f,vicChip.VISIBLE_SCREEN_HEIGHT * f)
     display.setPreferredSize(dim)
     display.invalidate
     display.repaint()
@@ -1216,6 +1295,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     }
     detachCtrItem.setEnabled(false)
     cartMenu.setVisible(false)
+    ExpansionPort.currentCartFileName = ""
   }
   
   private def attachCtr {
@@ -1346,6 +1426,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   }
   
   private def setMenu {
+    import ucesoft.cbm.misc.Settings._
+    
     val menuBar = new JMenuBar
     val fileMenu = new JMenu("File")
     val editMenu = new JMenu("Edit")
@@ -1419,11 +1501,18 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     attachDisk0Item.setActionCommand("ATTACH_DISK_0")
     attachDisk0Item.addActionListener(this)
     fileMenu.add(attachDisk0Item)
+    // For settings see below, after drive type    
     
-    val attachDisk1Item = new JMenuItem("Attach disk 9...")
-    attachDisk1Item.setActionCommand("ATTACH_DISK_1")
-    attachDisk1Item.addActionListener(this)
-    fileMenu.add(attachDisk1Item)
+    val ejectMenu = new JMenu("Eject disk")
+    fileMenu.add(ejectMenu)
+    val ejectDisk0Item = new JMenuItem("Eject disk 8...")
+    ejectDisk0Item.setActionCommand("EJECT_DISK_0")
+    ejectDisk0Item.addActionListener(this)
+    ejectMenu.add(ejectDisk0Item)
+    val ejectDisk1Item = new JMenuItem("Eject disk 9...")
+    ejectDisk1Item.setActionCommand("EJECT_DISK_1")
+    ejectDisk1Item.addActionListener(this)
+    ejectMenu.add(ejectDisk1Item)
         
     loadFileItems(0).setEnabled(false)
     loadFileItems(0).setActionCommand("LOAD_FILE_0")
@@ -1450,6 +1539,17 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     drive9EnabledItem.setActionCommand("DRIVE_9_ENABLED")
     drive9EnabledItem.addActionListener(this)
     fileMenu.add(drive9EnabledItem)
+    // Setting ---------------------------
+    settings.add("drive9-enabled",
+                 "Enabled/disable driver 9",
+                 "DRIVE_9_ENABLED",
+                 (d9e:Boolean) => {
+                   drive9EnabledItem.setSelected(d9e)
+                   enableDrive9(d9e)
+                 },
+                 drive9EnabledItem.isSelected
+    )
+    // -----------------------------------
     
     val localDriveItem = new JMenu("Drive on device 10 ...")
     fileMenu.add(localDriveItem)
@@ -1465,12 +1565,36 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     localDriveEnabled.addActionListener(this)
     group0.add(localDriveEnabled)
     localDriveItem.add(localDriveEnabled)
+    // Setting ---------------------------
+    settings.add("drive10-local-path",
+                 "Enabled driver 10 to the given local path",
+                 "DRIVE_10_PATH",
+                 (d10p:String) => {
+                   val enabled = d10p != ""
+                   enableDrive10(enabled,if (enabled) Some(d10p) else None)
+                   localDriveEnabled.setSelected(enabled)
+                 },
+                 if (device10DriveEnabled) device10Drive.asInstanceOf[LocalDrive].getCurrentDir.toString
+                 else ""
+    )
+    // -----------------------------------
     
     val writeOnDiskCheckItem = new JCheckBoxMenuItem("Write changes on disk")
     writeOnDiskCheckItem.setSelected(true)
     writeOnDiskCheckItem.setActionCommand("WRITE_ON_DISK")
     writeOnDiskCheckItem.addActionListener(this)
     fileMenu.add(writeOnDiskCheckItem)
+    // Setting ---------------------------
+    settings.add("write-on-disk",
+                 "Tells if the modifications made on disks must be written on file",
+                 "WRITE_ON_DISK",
+                 (wod:Boolean) => {
+                   writeOnDiskCheckItem.setSelected(wod)
+                   writeOnDiskSetting(wod)
+                 },
+                 writeOnDiskCheckItem.isSelected
+    )
+    // -----------------------------------
     
     fileMenu.addSeparator
     
@@ -1486,11 +1610,33 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     attachCtrItem.setActionCommand("ATTACH_CTR")
     attachCtrItem.addActionListener(this)
     fileMenu.add(attachCtrItem)
+    // Setting ---------------------------
+    settings.add("cart",
+                 "Attach the given cartridge",
+                 "ATTACH_CTR",
+                 (cart:String) => if (cart != "") loadCartridgeFile(new File(cart))
+                 ,
+                 ExpansionPort.currentCartFileName
+    )
+    // -----------------------------------
         
     detachCtrItem.setEnabled(false)
     detachCtrItem.setActionCommand("DETACH_CTR")
     detachCtrItem.addActionListener(this)
     fileMenu.add(detachCtrItem)
+    
+    fileMenu.addSeparator
+    
+    val autoSaveCheckItem = new JCheckBoxMenuItem("Autosave settings on exit")
+    autoSaveCheckItem.setSelected(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
+    autoSaveCheckItem.setActionCommand("AUTOSAVE")
+    autoSaveCheckItem.addActionListener(this)
+    fileMenu.add(autoSaveCheckItem)
+    
+    val saveSettingsCheckItem = new JMenuItem("Save settings")
+    saveSettingsCheckItem.setActionCommand("SAVE_SETTINGS")
+    saveSettingsCheckItem.addActionListener(this)
+    fileMenu.add(saveSettingsCheckItem)
     
     fileMenu.addSeparator
     
@@ -1506,6 +1652,11 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     pasteItem.setActionCommand("PASTE")
     pasteItem.addActionListener(this)
     editMenu.add(pasteItem)
+    val listItem = new JMenuItem("List BASIC to editor")
+    listItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L,java.awt.Event.ALT_MASK))
+    listItem.setActionCommand("LIST_BASIC")
+    listItem.addActionListener(this)
+    editMenu.add(listItem)
     
     //state
     val saveStateItem = new JMenuItem("Save state ...")
@@ -1576,19 +1727,68 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     optionMenu.add(adjustRatioItem)
     
     val zoomItem = new JMenu("Zoom")
+    val groupZ = new ButtonGroup
     optionMenu.add(zoomItem)
-    val zoom1Item = new JMenuItem("Zoom x 1")
+    val zoom1Item = new JRadioButtonMenuItem("Zoom x 1")
     zoom1Item.setActionCommand("ZOOM1")
     zoom1Item.addActionListener(this)
     zoomItem.add(zoom1Item)
-    val zoom2Item = new JMenuItem("Zoom x 1.5")
+    groupZ.add(zoom1Item)
+    val zoom2Item = new JRadioButtonMenuItem("Zoom x 2")
     zoom2Item.setActionCommand("ZOOM2")
     zoom2Item.addActionListener(this)
     zoomItem.add(zoom2Item)
-    val zoom4Item = new JMenuItem("Zoom x 2")
-    zoom4Item.setActionCommand("ZOOM3")
+    groupZ.add(zoom2Item)
+    val zoom4Item = new JRadioButtonMenuItem("Zoom x 4")
+    zoom4Item.setActionCommand("ZOOM4")
     zoom4Item.addActionListener(this)
     zoomItem.add(zoom4Item)
+    groupZ.add(zoom4Item)
+    
+    val renderingItem = new JMenu("Rendering")
+    val groupR = new ButtonGroup
+    optionMenu.add(renderingItem)
+    val renderingDefault1Item = new JRadioButtonMenuItem("Default")
+    renderingDefault1Item.setActionCommand("RENDERING_DEFAULT")
+    renderingDefault1Item.addActionListener(this)
+    renderingItem.add(renderingDefault1Item)
+    groupR.add(renderingDefault1Item)
+    val renderingBilinear1Item = new JRadioButtonMenuItem("Bilinear")
+    renderingBilinear1Item.setActionCommand("RENDERING_BILINEAR")
+    renderingBilinear1Item.addActionListener(this)
+    renderingItem.add(renderingBilinear1Item)
+    groupR.add(renderingBilinear1Item)
+    val renderingBicubic1Item = new JRadioButtonMenuItem("Bicubic")
+    renderingBicubic1Item.setActionCommand("RENDERING_BICUBIC")
+    renderingBicubic1Item.addActionListener(this)
+    renderingItem.add(renderingBicubic1Item)
+    groupR.add(renderingBicubic1Item)
+    // Setting ---------------------------
+    settings.add("rendering-type",
+                 "Set the rendering type (default,bilinear,bicubic)",
+                 "RENDERING_TYPE",
+                 (dt:String) => {
+                   dt match {
+                     case "bilinear" => 
+                       setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+                       renderingBilinear1Item.setSelected(true)
+                     case "bicubic"|"" => 
+                       setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+                       renderingBicubic1Item.setSelected(true)
+                     case "default" =>
+                       setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
+                       renderingDefault1Item.setSelected(true)
+                     case _ =>
+                   }
+                 },
+                 if (renderingDefault1Item.isSelected) "default"
+                 else
+                 if (renderingBilinear1Item.isSelected) "bilinear"
+                 else
+                 if (renderingBicubic1Item.isSelected) "bicubic"
+                 else "default"
+    )
+    // -----------------------------------
     
     optionMenu.addSeparator
         
@@ -1657,6 +1857,18 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     printerEnabledItem.setActionCommand("PRINTER_ENABLED")
     printerEnabledItem.addActionListener(this)
     optionMenu.add(printerEnabledItem)
+    // Setting ---------------------------
+    settings.add("printer-enabled",
+                 "Enable printer",
+                 "PRINTER_ENABLED",
+                 (pe:Boolean) => {
+                   enablePrinter(pe)
+                   printerEnabledItem.setSelected(pe)
+                 },
+                 printerEnabledItem.isSelected
+    )
+    // -----------------------------------
+
     
     optionMenu.addSeparator
     
@@ -1677,6 +1889,17 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     sid8580Item.addActionListener(this)
     sidTypeItem.add(sid8580Item)
     group7.add(sid8580Item)
+    // Setting ---------------------------
+    settings.add("sid-8580",
+                 "Enable sid 8580 type",
+                 "SID_8580",
+                 (sid8580:Boolean) => {
+                   sid.setModel(!sid8580)
+                   sid8580Item.setSelected(sid8580)
+                 },
+                 sid8580Item.isSelected
+    )
+    // -----------------------------------
     val sid2Item = new JMenu("Dual SID")
     sidItem.add(sid2Item)
     val group8 = new ButtonGroup
@@ -1725,6 +1948,57 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     _1541TypeItem.addActionListener(this)  
     _1541TypeItem.setSelected(true)
     driveTypeItem.add(_1541TypeItem)
+    // Setting ---------------------------
+    settings.add("driver-type",
+                 "Set the driver's type (1541,1571,1581)",
+                 "DRIVER_TYPE",
+                 (dt:String) => {
+                   dt match {
+                     case "1541" => 
+                       setDriveType(DriveType._1541,true)
+                       _1541TypeItem.setSelected(true)
+                     case "1571" => 
+                       setDriveType(DriveType._1571,true)
+                       _1571TypeItem.setSelected(true)
+                     case "1581" => 
+                       setDriveType(DriveType._1581,true)
+                       _1581TypeItem.setSelected(true)
+                     case _ =>
+                   }
+                 },
+                 if (_1541TypeItem.isSelected) "1541"
+                 else
+                 if (_1571TypeItem.isSelected) "1571"
+                 else
+                 if (_1581TypeItem.isSelected) "1581"
+                 else "1541"
+    )
+    // -----------------------------------
+    // Setting ---------------------------
+    settings.add("drive8-file",
+                 "Attach a file to drive 8",
+                 "DRIVE_8_FILE",
+                 (d8f:String) => {
+                   if (d8f != "") attachDiskFile(0,new File(d8f),false)
+                 },
+                 floppyComponents(0).drive.getFloppy.file
+    )
+    // -----------------------------------
+    
+    val attachDisk1Item = new JMenuItem("Attach disk 9...")
+    attachDisk1Item.setActionCommand("ATTACH_DISK_1")
+    attachDisk1Item.addActionListener(this)
+    fileMenu.add(attachDisk1Item)
+    // Setting ---------------------------
+    settings.add("drive9-file",
+                 "Attach a file to drive 9",
+                 "DRIVE_9_FILE",
+                 (d9f:String) => {
+                   if (d9f != "") attachDiskFile(1,new File(d9f),false)
+                 },
+                 floppyComponents(1).drive.getFloppy.file
+    )
+    // -----------------------------------
     
     val diskReadOnlyItem = new JCheckBoxMenuItem("Read only disk")
     diskReadOnlyItem.setSelected(false)
@@ -1866,9 +2140,43 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     reu16MItem.setActionCommand("REU_16M")
     reu16MItem.addActionListener(this)
     group5.add(reu16MItem)
-    reuItem.add(reu16MItem)
-    
+    reuItem.add(reu16MItem)    
     IOItem.add(reuItem)
+    // Setting ---------------------------
+    settings.add("reu-type",
+                 "Set the reu type (none,128,256,512,16384)",
+                 "REU_TYPE",
+                 (reu:String) => {
+                   val reuPars = reu.split(",")
+                   if (reuPars(0) == "" || reuPars(0) == "none") setREU(None,None)
+                   else
+                   reuPars(0).toInt match {
+                     case REU.REU_1700 => 
+                       setREU(Some(REU.REU_1700),None)
+                       reu128Item.setSelected(true)
+                     case REU.REU_1750 => 
+                       setREU(Some(REU.REU_1750),None)
+                       reu512Item.setSelected(true)
+                     case REU.REU_1764 => 
+                       setREU(Some(REU.REU_1764),None)
+                       reu256Item.setSelected(true)                       
+                     case REU.REU_16M => 
+                       setREU(Some(REU.REU_16M),if (reuPars.length == 2 && reuPars(1) != "null") Some(reuPars(1)) else None)
+                       reu16MItem.setSelected(true)
+                   }
+                 },
+                 if (noReuItem.isSelected) "none"
+                 else
+                 if (reu128Item.isSelected) "128"
+                 else
+                 if (reu256Item.isSelected) "256"
+                 else
+                 if (reu512Item.isSelected) "512"
+                 else
+                 if (reu16MItem.isSelected) "16384," + REU.attached16MFileName
+                 else "none"
+    )
+    // -----------------------------------
     
     IOItem.addSeparator
     
@@ -1992,21 +2300,29 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   }
   
   private def close {
+    saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
+    shutdownComponent
+    sys.exit(0)
+  }
+  
+  private def saveSettings(save:Boolean) {
     configuration.setProperty(CONFIGURATION_FRAME_XY,displayFrame.getX + "," + displayFrame.getY)
     configuration.setProperty(CONFIGURATION_FRAME_DIM,displayFrame.getSize.width + "," + displayFrame.getSize.height)
+    if (save) {
+      settings.save(configuration)
+      println("Settings saved")
+    }
     try {
       val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
       val out = new FileWriter(propsFile)
       configuration.store(out, "C64 configuration file")
-      out.close
+      out.close      
       for(d <- drives)
         d.getFloppy.close
     }
     catch {
       case io:IOException =>
     }
-    shutdownComponent
-    sys.exit(0)
   }
   
   // ------------------------------- TRACE LISTENER ------------------------------------------
@@ -2044,17 +2360,23 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   // -----------------------------------------------------------------------------------------
   
-  def run {
-    //build
+  def run(args:Array[String]) {
     initComponent
-    setMenu
+    setMenu    
+    // VIC
     displayFrame.pack
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
       displayFrame.setSize(dim(0),dim(1))
-      adjustRatio
     }
     displayFrame.setVisible(true)
+    // SETTINGS
+    settings.load(configuration)
+    // AUTOPLAY
+    if (args.length > 0) {
+      handleDND(new File(args(0)),false)
+    }
+    // PLAY
     clock.play
   }
 }
