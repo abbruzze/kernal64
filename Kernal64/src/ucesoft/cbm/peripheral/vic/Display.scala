@@ -47,11 +47,18 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   private[this] var zoomFactorX,zoomFactorY = 0.0
   private[this] var remote : ucesoft.cbm.remote.RemoteC64 = _
   private[this] var showRemotingLabel = true
+  private[this] var interlaced = false
+  private[this] var renderingHints = RenderingHints.VALUE_INTERPOLATION_BICUBIC
   
   addMouseMotionListener(this)
   
+  def setRenderingHints(hints:java.lang.Object) {
+    renderingHints = hints
+  }
+  
   def displayMem : Array[Int] = ptrDisplayMem
   def setInterlaceMode(enabled:Boolean) {
+    interlaced = enabled
     if (enabled) {
       ptrDisplayMem = interlacedDisplayMem
       displayImage = interlacedDisplayImage
@@ -116,8 +123,9 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       Log.debug(s"New screen dimension ${dimension.width} x ${dimension.height}")      
       zoomFactorX = dimension.width.toDouble / (if (clipArea != null) clipArea._2.x - clipArea._1.x else screen.getWidth(this))
       zoomFactorY = dimension.height.toDouble / (if (clipArea != null) clipArea._2.y - clipArea._1.y else screen.getHeight(this))
-      println(s"New screen dimension ${dimension.width} x ${dimension.height} width/height=${dimension.width.toDouble/dimension.height}")
+      //println(s"New screen dimension ${dimension.width} x ${dimension.height} width/height=${dimension.width.toDouble/dimension.height}")
     }
+    g.asInstanceOf[Graphics2D].setRenderingHint(RenderingHints.KEY_INTERPOLATION,renderingHints)
     val srcImage = if (drawRasterLine) {
       val dg = debugImage.getGraphics
       dg.drawImage(screen, 0, 0, null)
@@ -130,7 +138,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   }
   
   final def showFrame(x1: Int, y1: Int, x2: Int, y2: Int) {
-    if (x1 != -1) {
+    if (x1 != -1) {      
       displayImage.newPixels(x1, y1, x2, y2)      
       repaint()
       if (remote != null) remote.updateVideo(x1,y1,x2,y2)
