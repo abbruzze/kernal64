@@ -105,6 +105,7 @@ object ExpansionPort {
   private[this] var expansionPort = emptyExpansionPort
   private[this] var listeners: List[ExpansionPortConfigurationListener] = Nil
   private[this] var memoryForEmptyExpansionPort : LastByteReadMemory = _
+  var currentCartFileName = ""
 
   def addConfigurationListener(l: ExpansionPortConfigurationListener) {
     listeners = l :: listeners
