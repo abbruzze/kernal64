@@ -20,6 +20,23 @@ import ucesoft.cbm.Log
 import ucesoft.cbm.peripheral.bus.IECBusLine
 import ucesoft.cbm.formats.MFM
 
+object D1581 {
+  object MFMEmptyFloppy extends EmptyFloppy {
+    override val totalTracks = 80
+    var offset = 0
+    override def changeTrack(trackSteps:Int) {
+      if (trackSteps > 0) track +=1 else track -= 1
+      notifyTrackSectorChangeListener
+    }
+    override def nextByte = {
+      offset = (offset + 1) % MFM.TRACK_SIZE
+      0
+    }
+    
+    override def isOnIndexHole = offset < 5
+  }
+}
+
 class D1581(val driveID: Int, 
             bus: IECBus, 
             ledListener: DriveLedListener) extends 
@@ -35,22 +52,7 @@ class D1581(val driveID: Int,
   val name = "D1581"
   val startAddress = 0x0
   val length = 0x2000
-  val isActive = true
-  
-  private object MFMEmptyFloppy extends EmptyFloppy {
-    override val totalTracks = 80
-    var offset = 0
-    override def changeTrack(trackSteps:Int) {
-      if (trackSteps > 0) track +=1 else track -= 1
-      notifyTrackSectorChangeListener
-    }
-    override def nextByte = {
-      offset = (offset + 1) % MFM.TRACK_SIZE
-      0
-    }
-    
-    override def isOnIndexHole = offset < 5
-  }
+  val isActive = true  
   
   private[this] final val WD1772 = false
   private[this] final val _1581_WAIT_LOOP_ROUTINE = 0xB106
@@ -62,7 +64,7 @@ class D1581(val driveID: Int,
   private[this] val clk = Clock.systemClock
   private[this] var running = true
   private[this] var tracing = false
-  private[this] var floppy : Floppy = MFMEmptyFloppy
+  private[this] var floppy : Floppy = D1581.MFMEmptyFloppy
   private[this] var busDataDirection = 0
   private[this] var activeHead = 0
   private[this] var awakeCycles = 0L
