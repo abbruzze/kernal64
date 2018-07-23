@@ -19,6 +19,8 @@ object REU {
   val REU_8M = 8192
   val REU_16M = 16384
   
+  var attached16MFileName : String = null 
+  
   def getREU(size:Int,mem:Memory,setDMA: (Boolean) => Unit,setIRQ: (Boolean) => Unit,file:Option[File]) : ExpansionPort = {
     val reu = new REUImpl(size,mem,setDMA,setIRQ)
     file match {
