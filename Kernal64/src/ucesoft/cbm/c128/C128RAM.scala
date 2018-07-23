@@ -71,19 +71,6 @@ private[c128] class C128RAM extends RAMComponent {
     // only the first two banks are initialized
     mem(0) = Array.ofDim[Int](0x10000)
     mem(1) = Array.ofDim[Int](0x10000)
-  }
-  
-  final def reset {
-    processorBank = 0
-    VICbank = 0
-    commonAreaSize = 0
-    commonArea = NO_COMMON_RAM
-    commonAreaBottomLimit = COMMON_RAM_SIZE_FROM_BOTTOM(commonAreaSize + 1)
-    commonAreaTopLimit = COMMON_RAM_SIZE_FROM_TOP(commonAreaSize + 1)
-    page_0 = 0
-    page_0_bank = 0
-    page_1 = 1
-    page_1_bank = 0
     for(m <- 0 until 4;if mem(m) != null) {
       var i = 0
       while (i < mem(m).length) {
@@ -97,6 +84,19 @@ private[c128] class C128RAM extends RAMComponent {
         }
       }
     }
+  }
+  
+  final def reset {
+    processorBank = 0
+    VICbank = 0
+    commonAreaSize = 0
+    commonArea = NO_COMMON_RAM
+    commonAreaBottomLimit = COMMON_RAM_SIZE_FROM_BOTTOM(commonAreaSize + 1)
+    commonAreaTopLimit = COMMON_RAM_SIZE_FROM_TOP(commonAreaSize + 1)
+    page_0 = 0
+    page_0_bank = 0
+    page_1 = 1
+    page_1_bank = 0    
   }
   
   final def getBanksNumber : Int = if (expanded) 4 else 2
