@@ -59,16 +59,17 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // Color & ROMS ------------------------------
   final private[this] val COLOR_RAM = new ColorRAM
   // 64
-  final private[this] val KERNAL64_ROM = new ROM(ram, "KERNAL64", KERNAL64_ADDR, 0x2000,"roms/kernal.rom")
+  final private[this] val KERNAL64_ROM_NAME = System.getProperty("kernal64")
+  final private[this] val KERNAL64_ROM = new ROM(ram, "KERNAL64", KERNAL64_ADDR, 0x2000,if (KERNAL64_ROM_NAME != null) KERNAL64_ROM_NAME else "roms/kernal.rom")
   final private[this] val BASIC64_ROM = new ROM(ram, "BASIC64", BASIC64_ADDR, 0x2000, "roms/basic.rom")
   final private[this] val CHARACTERS64_ROM = new ROM(ram, "CHARACTERS64", CHARACTERS64_ADDR, 0x1000, "roms/128/characters.rom",0x0)
   final private[this] val ROML = new ExtendedROM(ram,"ROML",ROML64_ADDR)
   final private[this] val ROMH = new ExtendedROM(ram,"ROMH",BASIC64_ADDR)
   final private[this] val ROMH_ULTIMAX = new ExtendedROM(ram,"ROMH_ULTIMAX",KERNAL64_ADDR)
   // 128  
-  final private[this] val KERNAL_ROM = System.getProperty("kernal")
+  final private[this] val KERNAL_ROM_NAME = System.getProperty("kernal")
   final private[this] val BASIC128_ROM = new ROM(ram,"BASIC128_LOW_HI",BASIC_LOW_ADDR,0x8000,"roms/128/basic.rom")
-  final private[this] val KERNAL128_ROM = new ROM(ram, "KERNAL128", KERNAL_ADDR, 0x4000,if (KERNAL_ROM != null) KERNAL_ROM else "roms/128/kernal.rom")
+  final private[this] val KERNAL128_ROM = new ROM(ram, "KERNAL128", KERNAL_ADDR, 0x4000,if (KERNAL_ROM_NAME != null) KERNAL_ROM_NAME else "roms/128/kernal.rom")
   final private[this] val CHARACTERS128_ROM = new ROM(ram, "CHARACTERS128", CHARACTERS128_ADDR, 0x1000, "roms/128/characters.rom",0x1000)
   private[this] var c128Mode = true
   private[this] val expansionPort = ExpansionPort.getExpansionPort
@@ -109,7 +110,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   private[this] var vicBaseAddress = 0
   private[this] var memLastByteRead = 0
   // Internal & External function ROM =========================================================
-  private[this] var internalFunctionROM_mid,internalFunctionROM_high,externalFunctionROM_mid,externalFunctionROM_high : Array[Int] = _
+  private[this] var internalFunctionROM,internalFunctionROM_mid,internalFunctionROM_high,externalFunctionROM_mid,externalFunctionROM_high : Array[Int] = _
+  private[this] var internalROMType : FunctionROMType.Value = FunctionROMType.NORMAL
   // ==========================================================================================
   def getBank0RAM : Memory = ram.getBank0
   def colorRAM = COLOR_RAM
@@ -161,25 +163,40 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     add(vdc)    
   }
   
-  def configureFunctionROM(internal:Boolean,_rom:Array[Byte]) {
+  def configureFunctionROM(internal:Boolean,_rom:Array[Byte],romType:FunctionROMType.Value) {
     if (_rom == null) {
-      if (internal) internalFunctionROM_mid = null else externalFunctionROM_mid = null
+      if (internal) {
+        internalFunctionROM_mid = null
+        internalFunctionROM_high = null
+        internalFunctionROM = null
+      }
+      else {
+        externalFunctionROM_mid = null
+        externalFunctionROM_high = null
+      }
       return  
     }
-    
+    internalROMType = romType
     val rom = _rom map { _.toInt & 0xFF }
     if (_rom.length <= 16384) { // only mid affected      
       if (internal) internalFunctionROM_mid = rom else externalFunctionROM_mid = rom
     }
-    else if (_rom.length <= 32768) {
+    else {
       val midRom = Array.ofDim[Int](16384)
       Array.copy(rom,0,midRom,0,16384)
       if (internal) internalFunctionROM_mid = midRom else externalFunctionROM_mid = midRom
       val highRom = Array.ofDim[Int](16384)
       Array.copy(rom,16384,highRom,0,16384)
       if (internal) internalFunctionROM_high = highRom else externalFunctionROM_high = highRom
+      if (romType != FunctionROMType.NORMAL) internalFunctionROM = rom
     }
-    else throw new IllegalArgumentException("Invalid function ROM: size must be less than 32K")
+    //else throw new IllegalArgumentException("Invalid function ROM: size must be less than 32K")
+  }
+  
+  private def setInternalROMPage(page:Int) {
+    val offset = page << 15
+    Array.copy(internalFunctionROM,offset,internalFunctionROM_mid,0,16384)
+    Array.copy(internalFunctionROM,offset + 16384,internalFunctionROM_high,0,16384)
   }
   
   override def afterInitHook {
@@ -587,7 +604,10 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // VDC ---------------------------------------------------------------
     else if (address < 0xD700) vdc.write(address,value)
     // Unused I/O --------------------------------------------------------
-    else if (address < 0xD800) return
+    else if (address < 0xD800) {
+      if (address == 0xD700 && internalROMType == FunctionROMType.MEGABIT) setInternalROMPage(value)
+      return
+    }
     // Color RAM ---------------------------------------------------------
     else if (address < 0xDC00) COLOR_RAM.write(address,value & 0x0F)
      // CIA 1 -------------------------------------------------------------
