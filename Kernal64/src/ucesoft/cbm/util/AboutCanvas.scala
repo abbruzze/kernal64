@@ -11,6 +11,7 @@ class AboutCanvas(charRom:Memory,version:String) extends CBMCanvas(charRom) {
   add(center("KERNAL64",WIDTH)).newLine.newLine
   standardWidth
   add(center("VER " + version,WIDTH)).newLine
+  add(center("JVM VERSION " + scala.util.Properties.javaVersion.replaceAll("_","-"),WIDTH)).newLine
   newLine
   white
   add(center("A COMMODORE 64/128 EMULATOR WRITTEN IN SCALA",WIDTH)).newLine
