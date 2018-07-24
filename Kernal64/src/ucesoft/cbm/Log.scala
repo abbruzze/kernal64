@@ -13,7 +13,7 @@ object Log {
   private val FINE = 1
   private val DEBUG = 2
   private val INFO = 4
-  private var severity = INFO
+  private var severity = 0
   private var out : PrintWriter = new PrintWriter(System.out,true)
   
   def setInfo = severity = INFO
