@@ -289,6 +289,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   def init {
     val sw = new StringWriter
     Log.setOutput(new PrintWriter(sw))
+    Log.setInfo
     
     Log.info("Building the system ...")
     ExpansionPort.addConfigurationListener(mmu)       
@@ -2504,7 +2505,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     IOItem.add(reuItem)
     // Setting ---------------------------
     settings.add("reu-type",
-                 "Set the reu type (none,128,256,512,16384)",
+                 "Set the reu type (none,128,256,512,16384). In case of 16384: 16384,<filename>",
                  "REU_TYPE",
                  (reu:String) => {
                    val reuPars = reu.split(",")
@@ -2742,9 +2743,14 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   // -----------------------------------------------------------------------------------------
   
-  def run(args:Array[String]) {    
-    initComponent
+  def run(args:Array[String]) {        
     setMenu
+    // check help
+    if (settings.checkForHelp(args)) {
+      settings.printUsage
+      sys.exit(0)
+    }
+    initComponent
     // VDC
     vdcDisplayFrame.pack
     vdcDisplayFrame.setVisible(true)    
@@ -2768,10 +2774,12 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     } 
     vicDisplayFrame.setVisible(true)
     // SETTINGS
-    settings.load(configuration)
+    settings.load(configuration)    
     // AUTOPLAY
-    if (args.length > 0) {
-      handleDND(new File(args(0)),false)
+    settings.parseAndLoad(args) match {
+      case None =>
+      case Some(f) =>
+        handleDND(new File(f),false)
     }
     // PLAY    
     vdc.play

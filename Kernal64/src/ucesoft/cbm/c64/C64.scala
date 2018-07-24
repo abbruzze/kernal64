@@ -305,6 +305,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   def init {
     val sw = new StringWriter
     Log.setOutput(new PrintWriter(sw))
+    Log.setInfo
     
     Log.info("Building the system ...")
     ExpansionPort.addConfigurationListener(mem)
@@ -2361,8 +2362,13 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   // -----------------------------------------------------------------------------------------
   
   def run(args:Array[String]) {
+    setMenu
+    // check help
+    if (settings.checkForHelp(args)) {
+      settings.printUsage
+      sys.exit(0)
+    }
     initComponent
-    setMenu    
     // VIC
     displayFrame.pack
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
@@ -2373,8 +2379,10 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     // SETTINGS
     settings.load(configuration)
     // AUTOPLAY
-    if (args.length > 0) {
-      handleDND(new File(args(0)),false)
+    settings.parseAndLoad(args) match {
+      case None =>
+      case Some(f) =>
+        handleDND(new File(f),false)
     }
     // PLAY
     clock.play
