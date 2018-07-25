@@ -1,8 +1,33 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.4.4
+Kernal64 ver 1.4.5
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
+
+### Installation
+Go to https://github.com/abbruzze/kernal64/releases/latest and download and unzip on your computer the latest version.
+Be sure to have a jre (1.8 or above) in the path and launch the **k64.bat** or **k64.sh** or **k128** equivalent for 128 emulator batch file, depending on your operating system.
+I experienced a boost in performance using the new JRE 1.9.
+
+The scripts start java with the -server option for performance reason. It could happen that your Java installation does not support the server option. In this case edit the script and remove the -server option.
+
+If you want to load a 16M REU modify the memory settings inside the start scripts: for example, you could set -Xmx128M.
+
+### Wiki
+Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.4.5 (Jul 25th 2018)
+- Added settings saving: now you can save the (majority) of the current settings
+- Added support for function rom "Megabit" (C128 only)
+- Fixed minor bugs that prevented the restoring of main window's size
+- Added new menus for display settings (aspect ratio, zoom, rendering)
+- Modified the display rendering type in order to improve image quality
+- Added command line options (--help does work on Linux based system, on Windows the kxxx.bat script must be modified to see the usage)
+- Added new utility under Edit menù: List BASIC to editor. List the BASIC program stored in memory to the default external editor
+- Added the Eject disk menù under File
+- VDC window is now resizable
+
+Thanks to Mirkosoft for testing.
 
 ### What's new in 1.4.4 (May 1st 2018)
 * Added DigiMax UserPort support
@@ -117,15 +142,3 @@ Here the main features:
 * RS-232 3-way UserPort implementations useful to connect with BBS on internet. The Telnet implementation can be used to connect to a telnet server (like BBSs); the TCP implementation can be used to connect with a generic TCP/IP server. The File implementation can be used to read/write to local files.
 * RS-232 **SwiftLink** cartridge implementation. Tried with NovaTerm 9.6 and other terminal software. 
 * ... and more
-
-### Installation
-Go to https://github.com/abbruzze/kernal64/releases/latest and download and unzip on your computer the latest version.
-Be sure to have a jre (1.8 or above) in the path and launch the **k64.bat** or **k64.sh** or **k128** equivalent for 128 emulator batch file, depending on your operating system.
-I experienced a boost in performance using the new JRE 1.9.
-
-The scripts start java with the -server option for performance reason. It could happen that your Java installation does not support the server option. In this case edit the script and remove the -server option.
-
-If you want to load a 16M REU modify the memory settings inside the start scripts: for example, you could set -Xmx128M.
-
-### Wiki
-Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
