@@ -649,7 +649,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // ============================================================================
   
   // C64 Management =============================================================
-  @inline private[this] def read64(address: Int): Int = {
+  @inline private[this] def read64(_address: Int): Int = {
+    val address = _address & 0xFFFF
     if (ULTIMAX) {
       if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return lastByteRead
     }

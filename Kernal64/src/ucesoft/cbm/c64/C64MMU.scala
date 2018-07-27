@@ -52,9 +52,7 @@ object C64MMU {
     
     final val isActive = true
     def init {
-      Log.info("Initialaizing RAM memory ...")
-    }
-    def reset {
+      Log.info("Initializing RAM memory ...")
       var i = 0
       while (i < mem.length) {
         for(j <- 1 to 64) {
@@ -67,6 +65,7 @@ object C64MMU {
         }
       }
     }
+    def reset {}
     
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (ULTIMAX && chipID == ChipID.CPU) {
@@ -141,7 +140,7 @@ object C64MMU {
       //addBridge(ram,COLOR_RAM,1024 + 24) // + 24 unused bytes
       addBridge(colorRam)
       //addBridge(ram,SID_RAM,1024)
-      addBridge(ExpansionPort.getExpansionPort)
+      addBridge(ExpansionPort.getExpansionPort)      
     }
     // state
     protected def saveState(out:ObjectOutputStream) {}
