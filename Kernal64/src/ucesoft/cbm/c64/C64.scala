@@ -2382,7 +2382,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     settings.parseAndLoad(args) match {
       case None =>
       case Some(f) =>
-        handleDND(new File(f),false)
+        handleDND(new File(f),true)
     }
     // PLAY
     clock.play

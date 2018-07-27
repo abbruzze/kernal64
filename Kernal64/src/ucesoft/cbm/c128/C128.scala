@@ -2779,7 +2779,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     settings.parseAndLoad(args) match {
       case None =>
       case Some(f) =>
-        handleDND(new File(f),false)
+        handleDND(new File(f),true)
     }
     // PLAY    
     vdc.play
