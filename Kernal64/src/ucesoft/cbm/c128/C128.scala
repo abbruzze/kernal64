@@ -2415,7 +2415,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     frMenu.add(frLoadInternalMegabitItem)
     // Setting ---------------------------
     settings.add("internal-fun-rom",
-                 "Set the internal function rom",
+                 "Set the internal function rom: <type=NORMAL|MEGABIT>,<path to rom>",
                  "INTERNAL_FUNCTION_ROM",
                  (ifr:String) => {
                    val ifrPars = ifr.split(",")
@@ -2446,6 +2446,20 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     frLoadExternalItem.addActionListener(this)
     frExtGroup.add(frLoadExternalItem)
     frMenu.add(frLoadExternalItem)
+    // Setting ---------------------------
+    settings.add("external-fun-rom",
+                 "Set the external function rom: <path to rom>",
+                 "EXTERNAL_FUNCTION_ROM",
+                 (ifr:String) => {
+                   if (ifr != "none" && ifr != "") {
+                     loadFunctionROM(false,Some(ifr),FunctionROMType.NORMAL)
+                     frLoadExternalItem.setSelected(true)
+                   }                   
+                 },
+                 if (frLoadExternalItem.isSelected) externalFunctionROMFileName
+                 else "none"
+    )
+    // -----------------------------------
     
     optionMenu.addSeparator
     
