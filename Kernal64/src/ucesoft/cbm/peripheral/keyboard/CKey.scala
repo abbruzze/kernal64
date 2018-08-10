@@ -61,7 +61,7 @@ object CKey extends Enumeration {
 	  val STAR		= Value(0x61)
 	  val SEMICOL	= Value(0x62)
 	  val CLR_HOME	= Value(0x63)
-	  //val R_SHIFT	= Value(0x64) // not used
+	  val R_SHIFT	= Value(0x64)
 	  val EQUAL		= Value(0x65)
 	  val EXP		= Value(0x66)
 	  val SLASH		= Value(0x67)

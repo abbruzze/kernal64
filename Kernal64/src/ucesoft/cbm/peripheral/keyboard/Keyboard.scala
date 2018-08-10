@@ -91,6 +91,8 @@ class Keyboard(keyMapper: KeyboardMapper, nmiAction: (Boolean) => Unit = x => {}
               nmiAction(true)
               nmiAction(false) // clears immediately NMI
             }
+            else
+            if (key == L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed += R_SHIFT
             else keysPressed += key
         }      
       }
@@ -118,6 +120,8 @@ class Keyboard(keyMapper: KeyboardMapper, nmiAction: (Boolean) => Unit = x => {}
                 //else nmiAction(false)
           }
         case Some(key) =>
+          if (key == L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed -= R_SHIFT
+          else
           if (key != RESTORE) keysPressed -= key else nmiAction(false)
       }
     }
