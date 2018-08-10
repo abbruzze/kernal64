@@ -53,7 +53,9 @@ object REU {
     private[this] var commandRegister = 0x10
     // addressing registers
     private[this] var c64Address,reuAddress,transferRegister = 0
-    private[this] var shadowC64Address,shadowReuAddress,shadowTransferRegister = 0
+    private[this] var shadowC64Address = 0
+    private[this] var shadowReuAddress = 0xF80000
+    private[this] var shadowTransferRegister = 0xFF
     // control registers
     private[this] var interruptMaskRegister = 0x1F
     private[this] var addressControlRegister = 0x3F
@@ -113,12 +115,12 @@ object REU {
       addressControlRegister = 0x3F
       currentOperation = IDLE_OP
       shadowC64Address = 0
-      shadowReuAddress = 0
-      shadowTransferRegister = 0
+      shadowReuAddress = 0xF80000
+      shadowTransferRegister = 0xFF
     }
     
     final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
-      if (currentOperation == IDLE_OP && address >= 0xDF00 && address < 0xE000) readREU((address - 0xDF00) & 0x1F)
+      if (currentOperation == IDLE_OP && address >= 0xDF00 && address < 0xE000) readREU(address & 0x1F)
       else super.read(address,chipID)
     }
     
@@ -131,13 +133,8 @@ object REU {
       else
       if (currentOperation == IDLE_OP && address >= 0xDF00 && address < 0xE000) {
         //println(s"Writing REU at ${Integer.toHexString(address)}")
-        writeREU((address - 0xDF00) & 0x1F,value)
+        writeREU(address & 0x1F,value)
       }
-//      else {
-//        if (currentOperation != IDLE_OP) {
-//          println(s"Writing to ${Integer.toHexString(address)} = ${value} currentOperation=${currentOperation} clk=${clk.currentCycles}")
-//        }
-//      }
     }
     
     private def readREU(offset:Int) = {
@@ -146,16 +143,16 @@ object REU {
           val oldReg = statusRegister
           statusRegister &= 0x1F
           setIRQ(false)
-          oldReg | J1
+          (oldReg | J1) & 0xF8 // 0-3 bits are 0
         case 1 => commandRegister
         case 2 => c64Address & 0xFF
         case 3 => c64Address >> 8
         case 4 => reuAddress & 0xFF
         case 5 => reuAddress >> 8
-        case 6 => (reuAddress >> 16) & 0xFF
+        case 6 => ((reuAddress >> 16) & 0xFF) | 0xF8
         case 7 => transferRegister & 0xFF
         case 8 => transferRegister >> 8
-        case 9 => interruptMaskRegister
+        case 9 => interruptMaskRegister | 0x1F
         case 10 => addressControlRegister | 0x3F
         case _ => 0xFF
       }
@@ -168,45 +165,47 @@ object REU {
           checkOperation
         case 2 =>
           shadowC64Address &= 0xff00
-		  shadowC64Address |= (value & 0xff)
-		  c64Address = shadowC64Address
+    		  shadowC64Address |= (value & 0xff)
+    		  c64Address = shadowC64Address
         case 3 => 
           shadowC64Address &= 0x00ff
-		  shadowC64Address |= (value & 0xff) << 8
-	      c64Address = shadowC64Address
+		      shadowC64Address |= (value & 0xff) << 8
+	        c64Address = shadowC64Address
         case 4 =>
           shadowReuAddress &= 0xffff00
-		  shadowReuAddress |= (value & 0xff)
-		  /* copy bits, keep Bank */
-		  reuAddress &= REU_WRAP_ADDRESS & 0xff0000
-		  reuAddress |= shadowReuAddress & 0xffff
-		  reuAddress &= REU_WRAP_ADDRESS
+    		  shadowReuAddress |= (value & 0xff)
+    		  /* copy bits, keep Bank */
+    		  reuAddress &= REU_WRAP_ADDRESS & 0xff0000
+    		  reuAddress |= shadowReuAddress & 0xffff
+    		  reuAddress &= REU_WRAP_ADDRESS
         case 5 => 
           shadowReuAddress &= 0xff00ff
-		  shadowReuAddress |= (value & 0xff) << 8
-		  /* copy bits, keep Bank */
-		  reuAddress &= REU_WRAP_ADDRESS & 0xff0000
-		  reuAddress |= shadowReuAddress & 0xffff
-		  reuAddress &= REU_WRAP_ADDRESS
+		      shadowReuAddress |= (value & 0xff) << 8
+    		  /* copy bits, keep Bank */
+    		  reuAddress &= REU_WRAP_ADDRESS & 0xff0000
+    		  reuAddress |= shadowReuAddress & 0xffff
+    		  reuAddress &= REU_WRAP_ADDRESS
         case 6 => 
           /*
-		   * Modify bank and shadow copy of bank, kept on the high bits of
-		   * ramAddr, which is a deviation from hardware's behavior.
-		   */
-		  reuAddress &= 0xffff
-		  reuAddress |= (value & 0xff) << 16
-		  reuAddress &= REU_WRAP_ADDRESS
-		  shadowReuAddress &= 0xffff
-		  shadowReuAddress |= (value & 0xff) << 16
+    		   * Modify bank and shadow copy of bank, kept on the high bits of
+    		   * ramAddr, which is a deviation from hardware's behavior.
+    		   */
+    		  reuAddress &= 0xffff
+    		  reuAddress |= (value & 0xff) << 16
+    		  reuAddress &= REU_WRAP_ADDRESS
+    		  shadowReuAddress &= 0xffff
+    		  shadowReuAddress |= (value & 0xff) << 16
         case 7 =>
           shadowTransferRegister &= 0xff00
-		  shadowTransferRegister |= (value & 0xff)
-		  transferRegister = shadowTransferRegister
+    		  shadowTransferRegister |= (value & 0xff)
+    		  transferRegister = shadowTransferRegister
         case 8 => 
           shadowTransferRegister &= 0x00ff
-		  shadowTransferRegister |= (value & 0xff) << 8
-		  transferRegister = shadowTransferRegister
-        case 9 => interruptMaskRegister = value
+    		  shadowTransferRegister |= (value & 0xff) << 8
+    		  transferRegister = shadowTransferRegister
+        case 9 => 
+          interruptMaskRegister = value
+          checkInterrupt
         case 10 => addressControlRegister = value
         case _ => 
       }
@@ -218,10 +217,11 @@ object REU {
         clk.schedule(new ClockEvent("REUStartOperation",clk.nextCycles,cycles => startOperation))
         //startOperation
       }
-	  if (ff00) {
-	    //println(s"Start of operation ${currentOperation} deferred clk=${clk.currentCycles}")
-	    mem.setForwardWriteTo(Some(this))
-	  }      
+  	  if (ff00) {
+  	    //println(s"Start of operation ${currentOperation} deferred clk=${clk.currentCycles}")
+  	    mem.setForwardWriteTo(Some(this))
+  	  }      
+  	  else mem.setForwardWriteTo(None)
     }
   
     private def startOperation {
@@ -252,8 +252,8 @@ object REU {
           incrementAddresses
           if (transferRegister == 0x01) {
             statusRegister |= STATUS_END_OF_BLOCK
-            //clk.schedule(new ClockEvent("REUEndOperation",clk.nextCycles,cycles => endOperation))
-            endOperation
+            clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 2,cycles => endOperation))
+            //endOperation
           }
           else {
             transferRegister = (transferRegister - 1) & 0xFFFF
@@ -274,15 +274,15 @@ object REU {
         incrementAddresses
         if (transferRegister == 0x01) {
           statusRegister |= STATUS_END_OF_BLOCK
-          //clk.schedule(new ClockEvent("REUEndOperation",clk.nextCycles,cycles => endOperation))
-          endOperation
+          clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 2,cycles => endOperation))
+          //endOperation
         }
         else {
           transferRegister = (transferRegister - 1) & 0xFFFF
           if ((statusRegister & STATUS_VERIFY_ERROR) > 0) {
             if (transferRegister == 0x01) statusRegister |= STATUS_END_OF_BLOCK
-            //clk.schedule(new ClockEvent("REUEndOperation",clk.nextCycles,cycles => endOperation))
-            endOperation
+            clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 3,cycles => endOperation))
+            //endOperation
           }
           else
           clk.schedule(new ClockEvent("REUVerify",clk.nextCycles,cycles => verifyOperation))
@@ -293,14 +293,15 @@ object REU {
     }
     
     private def transferOperation(isC64Source:Boolean) {
+      //println(s"Transfer balow=$baLow op=${currentOperation} clk=${clk.currentCycles} c64Addr=${Integer.toHexString(c64Address)} reuAddr=${Integer.toHexString(reuAddress)} length=${Integer.toHexString(transferRegister)}")
       if (!baLow) { // transfer
         if (isC64Source) reuMem(reuAddress) = mem.read(c64Address)
         else mem.write(c64Address,reuMem(reuAddress))
         incrementAddresses
         if (transferRegister == 0x01) {
           statusRegister |= STATUS_END_OF_BLOCK
-          //clk.schedule(new ClockEvent("REUEndOperation",clk.nextCycles,cycles => endOperation))
-          endOperation
+          clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 2,cycles => endOperation))
+          //endOperation
         }
         else {
           transferRegister = (transferRegister - 1) & 0xFFFF
@@ -309,6 +310,17 @@ object REU {
       }
       else 
       clk.schedule(new ClockEvent("REUTransfer",clk.nextCycles,cycles => transferOperation(isC64Source)))
+    }
+    
+    private def checkInterrupt {
+      if ((interruptMaskRegister & CTRL_IRQ_MASK) > 0) {        
+        val irq = ((statusRegister & STATUS_END_OF_BLOCK) > 0 && (interruptMaskRegister & CTRL_IRQ_END_OF_BLOCK_MASK) > 0) ||
+                  ((statusRegister & STATUS_VERIFY_ERROR) > 0 && (interruptMaskRegister & CTRL_IRQ_VERIFY_ERROR_MASK) > 0)
+        if (irq) {
+          setIRQ(true)
+          statusRegister |= 0x80
+        }
+      }
     }
     
     private def endOperation {            
@@ -320,11 +332,7 @@ object REU {
       // released DMA
       setDMA(false)
       // check IRQ
-      if ((interruptMaskRegister & CTRL_IRQ_MASK) > 0) {
-        // TODO
-        if ((statusRegister & STATUS_END_OF_BLOCK) > 0 && (interruptMaskRegister & CTRL_IRQ_END_OF_BLOCK_MASK) > 0) setIRQ(true)
-        if ((statusRegister & STATUS_VERIFY_ERROR) > 0 && (interruptMaskRegister & CTRL_IRQ_VERIFY_ERROR_MASK) > 0) setIRQ(true)
-      }
+      checkInterrupt
       // check autoload
       if ((commandRegister & CMD_AUTOLOAD) > 0) {
         //println(s"Autoload ${currentOperation} clk=${clk.currentCycles} c64Addr=${Integer.toHexString(c64Address)} reuAddr=${Integer.toHexString(reuAddress)} length=${Integer.toHexString(transferRegister)}")
