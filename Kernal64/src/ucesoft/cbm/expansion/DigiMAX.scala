@@ -31,18 +31,23 @@ class DigiMaxCart(digiAddress:Int) extends ExpansionPort {
   }
   override def eject {
     DigiMAX.enabled(false,false)
-  }
+  }  
 }
 
 object DigiMAX {
-  private[this] var _enabled,enabledOnUserPort = false
-  private[this] final val SAMPLE_RATE = 44100
-  private[this] final val BUFFER_SIZE = SAMPLE_RATE * 2
+  private[this] var _enabled,enabledOnUserPort = false   
+  private[this] final val DEFAULT_SAMPLE_RATE = 44100
+  private[this] var sampleRate = DEFAULT_SAMPLE_RATE
   
-  private[this] lazy val lines = {
+  private[this] var lines : Array[SourceDataLine] = _
+  private[this] lazy val buffers = Array.ofDim[Byte](4,256)
+  private[this] lazy val pos = Array.ofDim[Int](4)
+  private[this] var channel = 0
+  
+  private def createLines(fHz:Int) = {
     (for(i <- 0 to 3) yield {
-      val af = new AudioFormat(SAMPLE_RATE,8,1,false, false)
-      val dli = new DataLine.Info(classOf[SourceDataLine], af, BUFFER_SIZE)
+      val af = new AudioFormat(fHz,8,1,false, false)
+      val dli = new DataLine.Info(classOf[SourceDataLine], af, fHz * 2)
       val dataLine = try {
         AudioSystem.getLine(dli).asInstanceOf[SourceDataLine] 
       }
@@ -51,13 +56,21 @@ object DigiMAX {
           null
       }
     
-    if (dataLine != null) dataLine.open(dataLine.getFormat,BUFFER_SIZE)
+    if (dataLine != null) dataLine.open(dataLine.getFormat,fHz * 2)
     dataLine
     }).toArray
   }
-  private[this] lazy val buffers = Array.ofDim[Byte](4,256)
-  private[this] lazy val pos = Array.ofDim[Int](4)
-  private[this] var channel = 0
+  
+  def getSampleRate : Int = sampleRate
+  
+  def setSampleRate(fHz:Int) {
+    sampleRate = fHz
+    if (lines != null) {
+      for(l <- lines) if (l != null) l.close
+    }
+    lines = createLines(fHz)
+    if (_enabled) for(l <- lines) if (l != null) l.start
+  }
   
   def selectChannel(channel:Int) {
     this.channel = channel
@@ -67,6 +80,7 @@ object DigiMAX {
   
   def enabled(on:Boolean,enabledOnUserPort:Boolean = false) {
     _enabled = on
+    if (on && lines == null) setSampleRate(DEFAULT_SAMPLE_RATE)
     this.enabledOnUserPort = enabledOnUserPort
     for(dl <- lines) { 
       if (dl != null) on match {        
