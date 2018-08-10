@@ -21,6 +21,7 @@ import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.vic.VICMemory
 import ucesoft.cbm.cpu.Z80
 import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.misc.TestCart
 
 trait MMUChangeListener {
   def frequencyChanged(f:Int) // 1 or 2
@@ -277,6 +278,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       if (z80enabled) writeZ80(address,value) else write128(address,value)
     }
     else write64(address,value)
+    // TestCart
+    if (TestCart.enabled) TestCart.write(address,value)
   }
   
   /**
@@ -459,6 +462,9 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     _d505
   }
   // ----------------------------------------------------------------------------
+  def go64 {
+    MMU_D505_write(D500_REGS(5) | 0x41)
+  }
   @inline private[this] def MMU_D505_write(value:Int) {    
     D500_REGS(5) = value
     // Z80/8502 check
