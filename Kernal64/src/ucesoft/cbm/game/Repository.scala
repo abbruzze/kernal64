@@ -155,14 +155,14 @@ class Repository(provider:GameProvider) {
         cd match {
           case FILENAME(fn) =>
             fileName = fn
-            println("FILENAME=" + fn)
+            //println("FILENAME=" + fn)
           case _ =>
         }
       }
       else {
         val file = new File(connection.getURL.getFile)
         fileName = file.getName
-        println(s"FILE=$fileName")
+        //println(s"FILE=$fileName")
       }
     }
     
