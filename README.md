@@ -9,6 +9,8 @@ Go to https://github.com/abbruzze/kernal64/releases/latest and download and unzi
 Be sure to have a jre (1.8 or above) in the path and launch the **k64.bat** or **k64.sh** or **k128** equivalent for 128 emulator batch file, depending on your operating system.
 I experienced a boost in performance using the new JRE 1.9.
 
+Windows users that want shell support (for --help command line, for example) could use the **k64s.bat** or **k128s.bat** scripts.
+
 The scripts start java with the -server option for performance reason. It could happen that your Java installation does not support the server option. In this case edit the script and remove the -server option.
 
 If you want to load a 16M REU modify the memory settings inside the start scripts: for example, you could set -Xmx128M.
@@ -25,6 +27,7 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 - REU fixed minor bugs about FF00 management. Fixed 128K size broken reu.
 - Digimax now the user can choose which is the sampling frequency. Now modplay runs properly (used 11K)
 - 128 MMU fixed page1 pointer at startup
+- added k64s.bat & k128s.bat to run emulator with shell support on Windows
 
 ### What's new in 1.4.5 (Jul 25th 2018)
 - Added settings saving: now you can save the (majority) of the current settings
