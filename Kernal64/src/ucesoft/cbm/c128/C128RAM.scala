@@ -34,7 +34,8 @@ private[c128] class C128RAM extends RAMComponent {
   private[this] var commonAreaBottomLimit = COMMON_RAM_SIZE_FROM_BOTTOM(commonAreaSize + 1)
   private[this] var commonAreaTopLimit = COMMON_RAM_SIZE_FROM_TOP(commonAreaSize + 1)
   // page 0 & 1 ------------------------------------
-  private[this] var page_0,page_1,page_0_bank,page_1_bank = 0
+  private[this] var page_0,page_0_bank,page_1_bank = 0
+  private[this] var page_1 = 1
   // -----------------------------------------------
   private object Bank0 extends Memory {
     val isRom = false
