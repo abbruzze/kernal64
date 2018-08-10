@@ -52,7 +52,7 @@ class Settings {
     }
     
     def save(p:Properties) {
-      p.setProperty(key,saveF.toString)
+      if (saveF != null) p.setProperty(key,saveF.toString)
     }
     
     def consume : Int = settingConv.consume
@@ -66,7 +66,13 @@ class Settings {
             loadF : T => Unit,
             saveF : => T)(implicit settingConv:SettingConv[T]) {
     settings += new Setting(cmdLine,description,key,loadF,saveF)
-  }   
+  } 
+  
+  def add[T](cmdLine : String,
+            description : String,
+            loadF : T => Unit)(implicit settingConv:SettingConv[T]) {
+    settings += new Setting(cmdLine,description,"",loadF,null.asInstanceOf[T])
+  } 
   
   def load(p:Properties) {
     for(s <- settings) s.load(p)
@@ -91,8 +97,14 @@ class Settings {
     while (p < args.length && args(p).startsWith("--")) {
       settings find { _.cmdLine == args(p).substring(2) } match {
         case Some(s) if s.consume == 0 =>
-          s.load("true")
-          p += 1
+          if (p + 1 < args.length && !args(p + 1).startsWith("--")) {
+            s.load(args(p + 1))
+            p += 2
+          }
+          else {
+            s.load("true")
+            p += 1
+          }
         case Some(s) if s.consume == 1 =>
           if (p + 1 < args.length) s.load(args(p + 1))
           else throw new IllegalArgumentException("Value for setting " + args(p) + " not found")
