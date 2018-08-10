@@ -31,7 +31,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
    * 3		25-30	266.667 bit/s
    * 4		31-35	250.000 bit/s
    */
-  private[this] val C1541_CLOCK_HZ = 1000000
+  private[this] val C1541_CLOCK_HZ = 1000000 * 1.025 // constant used to calibrate rpm to 300
   private[this] val rotationCyclesForBit = Array[Double](
       250000.0 / C1541_CLOCK_HZ,  // zone 4
       266667.0 / C1541_CLOCK_HZ,  // zone 3
