@@ -12,6 +12,7 @@ import ucesoft.cbm.expansion.LastByteReadMemory
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
+import ucesoft.cbm.misc.TestCart
 
 object C64MMU {
   final val M_ROML = 0x8000
@@ -370,6 +371,8 @@ object C64MMU {
         check0001
       }
       else bank.write(address,value,chipID)           
+      // TestCart
+      if (TestCart.enabled) TestCart.write(address,value)
     }
     
     override def toString = ram.toString + banks.map(_.toString).mkString("[",",","]")
