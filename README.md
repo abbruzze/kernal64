@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.4.5
+Kernal64 ver 1.4.6
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 
@@ -15,6 +15,16 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.4.6 (Aug 10th 2018)
+- Minor bug fixing. Added more command line options (see them with --help). Fixed REU 128K.
+- Added support for right shift key
+- Rotation calibrated with a correction factor of 1.025: Now the rpm is about 300 and most of the non running demos now run properly
+- Added test cart to execute test bench (Writing at $D7FF will force the emulator to exit with the given exit code)
+- Keyboard Editor: fixed TAB key handling
+- REU fixed minor bugs about FF00 management. Fixed 128K size broken reu.
+- Digimax now the user can choose which is the sampling frequency. Now modplay runs properly (used 11K)
+- 128 MMU fixed page1 pointer at startup
 
 ### What's new in 1.4.5 (Jul 25th 2018)
 - Added settings saving: now you can save the (majority) of the current settings
