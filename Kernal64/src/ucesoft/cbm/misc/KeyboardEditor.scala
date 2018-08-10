@@ -107,6 +107,7 @@ class KeyboardEditor(keybm:KeyboardMapper,isC64:Boolean) extends JPanel with Act
   statusPanel.add(saveButton)
   statusPanel.add(statusLabel)
   addKeyListener(this)
+  setFocusTraversalKeysEnabled(false)
   saveButton.addActionListener(this)
   saveButton.setActionCommand("SAVE")
   
