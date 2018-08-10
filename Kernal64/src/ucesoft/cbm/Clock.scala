@@ -71,6 +71,9 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   private[this] var lastPerformance = 0
   private[this] var throttleStartedAt = 0L
   // -------------------------------------------
+  private[this] var limitCycles = -1L
+  
+  def limitCyclesTo(cycles:Long) = limitCycles = cycles
   
   def setDefaultClockHz = setClockHz(DEFAULT_CLOCK_HZ)
   
@@ -135,7 +138,8 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       	    externalEvents = next
       	  }
       	}
-      	cycles += 1  
+      	cycles += 1
+      	if (limitCycles > 0 && cycles > limitCycles) sys.exit(0xFF)
       	throttle
       }
       catch {
