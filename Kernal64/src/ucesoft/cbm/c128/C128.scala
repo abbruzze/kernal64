@@ -63,6 +63,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     props
   }
     
+  private[this] var headless = false // used with --headless command line option
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mmu = new C128MMU(this)
   private[this] val cpu = CPU6510.make(mmu)  
@@ -215,7 +216,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   // ------------------------------------ Drag and Drop ----------------------------
-  private[this] val DNDHandler = new DNDHandler(handleDND(_,true))
+  private[this] val DNDHandler = new DNDHandler(handleDND(_,true,true))
   
   private object DriveLed8Listener extends AbstractDriveLedListener(driveLeds(0),diskProgressPanels(0))
   
@@ -883,6 +884,12 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       case "DIGIMAX_DISABLED" =>
         DigiMAX.enabled(false,false)
         if (ExpansionPort.getExpansionPort.isInstanceOf[DigiMaxCart]) ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+      case "DIGIMAX_SAMPLERATE" =>
+        Option(JOptionPane.showInputDialog(vicDisplayFrame,"DigiMax sample rate Hz",DigiMAX.getSampleRate.toString)) match {
+          case None =>
+          case Some(rate) =>
+            DigiMAX.setSampleRate(rate.toInt)
+        }
       case "DIGIMAX_USERPORT" =>
         DigiMAX.enabled(true,true)
       case "DIGIMAX_DE00" =>
@@ -973,7 +980,6 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private def setREU(reu:Option[Int],reu16FileName:Option[String]) {
     reu match {
       case None =>
-      case Some(REU.REU_1700) =>
         ExpansionPort.getExpansionPort.eject
         ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
       case Some(REU.REU_16M) =>
@@ -1235,16 +1241,16 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   def play(file:File) = {
     ExpansionPort.getExpansionPort.eject
     ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
-    handleDND(file)
+    handleDND(file,true,true)
   }
   def attachDevice(file:File) : Unit = attachDevice(file,false)
   
-  private def handleDND(file:File,resetAndPlay:Boolean = true) {
+  private def handleDND(file:File,_reset:Boolean,autorun:Boolean) {
     val name = file.getName.toUpperCase
     if (name.endsWith(".CRT")) loadCartridgeFile(file)
     else {
-      if (resetAndPlay) {
-        reset(false)
+      if (_reset) reset(false)
+      if (autorun) {
         clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => { attachDevice(file,true) }))
         clock.play
       }
@@ -2557,6 +2563,10 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     
     val digimaxItem = new JMenu("DigiMAX")
     IOItem.add(digimaxItem)
+    val digiMaxSampleRateItem  = new JMenuItem("DigiMax sample rate ...")
+    digiMaxSampleRateItem.setActionCommand("DIGIMAX_SAMPLERATE")
+    digiMaxSampleRateItem.addActionListener(this)
+    digimaxItem.add(digiMaxSampleRateItem)
     val group6 = new ButtonGroup
     val digimaxDisabledItem = new JRadioButtonMenuItem("Disabled")
     digimaxDisabledItem.setSelected(true)
@@ -2608,6 +2618,30 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     cartButtonItem.addActionListener(this)
     cartMenu.add(cartButtonItem)
     
+    // non-saveable settings
+    settings.add("go64",
+                 "Run in 64 mode",
+                 (go64:Boolean) => if (go64) mmu.go64
+    )
+    settings.add("warp",
+                 "Run warp mode",
+                 (warp:Boolean) => if (warp) {
+                   clock.maximumSpeed = true
+                   maxSpeedItem.setSelected(true)
+                 }
+    )
+    settings.add("headless",
+                 "Run with no windows",
+                 (hl:Boolean) => if (hl) headless = true                 
+    )
+    settings.add("testcart",
+                 "Run with test cart",
+                 (tc:Boolean) => if (tc) TestCart.enabled = true                 
+    )
+    settings.add("limitcycles",
+                 "Run at most the number of cycles specified",
+                 (cycles:Int) => if (cycles > 0) clock.limitCyclesTo(cycles)                 
+    )
     // games
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])
     var providers = loader.iterator
@@ -2761,40 +2795,42 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     setMenu
     // check help
     if (settings.checkForHelp(args)) {
+      println(s"Kernal64, Commodore 128 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
       settings.printUsage
       sys.exit(0)
     }
     initComponent
     // VDC
-    vdcDisplayFrame.pack
-    vdcDisplayFrame.setVisible(true)    
+    SwingUtilities.invokeLater(() => vdcDisplayFrame.pack)    
     if (configuration.getProperty(CONFIGURATION_VDC_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_VDC_FRAME_DIM) split "," map { _.toInt }
-      vdcDisplayFrame.setSize(dim(0),dim(1))
+      SwingUtilities.invokeLater(() => vdcDisplayFrame.setSize(dim(0),dim(1)))
     }
     if (configuration.getProperty(CONFIGURATION_VDC_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_VDC_FRAME_XY) split "," map { _.toInt }
-      vdcDisplayFrame.setLocation(xy(0),xy(1))
+      SwingUtilities.invokeLater(() => vdcDisplayFrame.setLocation(xy(0),xy(1)))
     } 
     // VIC
     vicDisplayFrame.pack
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
-      vicDisplayFrame.setSize(dim(0),dim(1))
+      SwingUtilities.invokeLater(() => vicDisplayFrame.setSize(dim(0),dim(1)))
     }
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }
-      vicDisplayFrame.setLocation(xy(0),xy(1))
-    } 
-    vicDisplayFrame.setVisible(true)
+      SwingUtilities.invokeLater(() => vicDisplayFrame.setLocation(xy(0),xy(1)))
+    }     
     // SETTINGS
-    settings.load(configuration)    
+    settings.load(configuration)       
     // AUTOPLAY
     settings.parseAndLoad(args) match {
       case None =>
       case Some(f) =>
-        handleDND(new File(f),true)
+        handleDND(new File(f),false,true)
     }
+    // VIEW
+    if (headless) vdcDisplayFrame.setVisible(false)
+    SwingUtilities.invokeLater(() => vicDisplayFrame.setVisible(!headless))
     // PLAY    
     vdc.play
     clock.play

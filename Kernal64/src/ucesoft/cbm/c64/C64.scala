@@ -72,6 +72,7 @@ import ucesoft.cbm.misc.FloppyFlushUI
 import ucesoft.cbm.expansion.DigiMAX
 import ucesoft.cbm.expansion.DigiMaxCart
 import ucesoft.cbm.peripheral.drive.EmptyFloppy
+import ucesoft.cbm.misc.TestCart
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -104,6 +105,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     }
     props
   }
+  private[this] var headless = false // used with --testcart command options
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mem = new C64MMU.MAIN_MEMORY
   private[this] val cpu = CPU6510.make(mem)  
@@ -234,7 +236,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   }
   // ------------------------------------ Drag and Drop ----------------------------
-  private[this] val DNDHandler = new DNDHandler(handleDND(_,true))
+  private[this] val DNDHandler = new DNDHandler(handleDND(_,true,true))
   
   private object DriveLed8Listener extends AbstractDriveLedListener(driveLeds(0),diskProgressPanels(0))
   
@@ -740,6 +742,12 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
       case "DIGIMAX_DISABLED" =>
         DigiMAX.enabled(false,false)
         if (ExpansionPort.getExpansionPort.isInstanceOf[DigiMaxCart]) ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+      case "DIGIMAX_SAMPLERATE" =>
+        Option(JOptionPane.showInputDialog(displayFrame,"DigiMax sample rate Hz",DigiMAX.getSampleRate.toString)) match {
+          case None =>
+          case Some(rate) =>
+            DigiMAX.setSampleRate(rate.toInt)
+        }
       case "DIGIMAX_USERPORT" =>
         DigiMAX.enabled(true,true)
       case "DIGIMAX_DE00" =>
@@ -810,7 +818,6 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   private def setREU(reu:Option[Int],reu16FileName:Option[String]) {
     reu match {
       case None =>
-      case Some(REU.REU_1700) =>
         ExpansionPort.getExpansionPort.eject
         ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
       case Some(REU.REU_16M) =>
@@ -1015,16 +1022,16 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   def play(file:File) = {
     ExpansionPort.getExpansionPort.eject
     ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
-    handleDND(file)
+    handleDND(file,true,true)
   }
   def attachDevice(file:File) : Unit = attachDevice(file,false)
   
-  private def handleDND(file:File,resetAndPlay:Boolean = true) {
+  private def handleDND(file:File,_reset:Boolean,autorun:Boolean) {
     val name = file.getName.toUpperCase
     if (name.endsWith(".CRT")) loadCartridgeFile(file)
     else {
-      if (resetAndPlay) {
-        reset(false)
+      if (_reset) reset(false)
+      if (autorun) {
         clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => { attachDevice(file,true) }))
         clock.play
       }
@@ -2183,6 +2190,10 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     
     val digimaxItem = new JMenu("DigiMAX")
     IOItem.add(digimaxItem)
+    val digiMaxSampleRateItem  = new JMenuItem("DigiMax sample rate ...")
+    digiMaxSampleRateItem.setActionCommand("DIGIMAX_SAMPLERATE")
+    digiMaxSampleRateItem.addActionListener(this)
+    digimaxItem.add(digiMaxSampleRateItem)
     val group6 = new ButtonGroup
     val digimaxDisabledItem = new JRadioButtonMenuItem("Disabled")
     digimaxDisabledItem.setSelected(true)
@@ -2226,6 +2237,26 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     cartButtonItem.addActionListener(this)
     cartMenu.add(cartButtonItem)
     
+    // non-saveable settings
+    settings.add("warp",
+                 "Run warp mode",
+                 (warp:Boolean) => if (warp) {
+                   clock.maximumSpeed = true
+                   maxSpeedItem.setSelected(true)
+                 }
+    )
+    settings.add("headless",
+                 "Run with no windows",
+                 (hl:Boolean) => if (hl) headless = true                 
+    )
+    settings.add("testcart",
+                 "Run with test cart",
+                 (tc:Boolean) => if (tc) TestCart.enabled = true                 
+    )
+    settings.add("limitcycles",
+                 "Run at most the number of cycles specified",
+                 (cycles:Int) => if (cycles > 0) clock.limitCyclesTo(cycles)                 
+    )
     // games
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])
     var providers = loader.iterator
@@ -2365,25 +2396,27 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     setMenu
     // check help
     if (settings.checkForHelp(args)) {
+      println(s"Kernal64, Commodore 64 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
       settings.printUsage
       sys.exit(0)
     }
     initComponent
     // VIC
-    displayFrame.pack
+    SwingUtilities.invokeLater(() => displayFrame.pack)
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
-      displayFrame.setSize(dim(0),dim(1))
-    }
-    displayFrame.setVisible(true)
+      SwingUtilities.invokeLater(() => displayFrame.setSize(dim(0),dim(1)))
+    }    
     // SETTINGS
     settings.load(configuration)
     // AUTOPLAY
     settings.parseAndLoad(args) match {
       case None =>
       case Some(f) =>
-        handleDND(new File(f),true)
+        handleDND(new File(f),false,true)
     }
+    // VIEW
+    SwingUtilities.invokeLater(() => displayFrame.setVisible(!headless))
     // PLAY
     clock.play
   }
