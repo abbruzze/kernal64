@@ -2392,20 +2392,24 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   // -----------------------------------------------------------------------------------------
   
+  private def swing(f: => Unit) {
+    SwingUtilities.invokeAndWait(() => f)
+  }
+  
   def run(args:Array[String]) {
-    setMenu
+    swing { setMenu }
     // check help
     if (settings.checkForHelp(args)) {
       println(s"Kernal64, Commodore 64 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
       settings.printUsage
       sys.exit(0)
     }
-    initComponent
+    swing { initComponent }
     // VIC
-    SwingUtilities.invokeLater(() => displayFrame.pack)
+    swing {displayFrame.pack }
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
-      SwingUtilities.invokeLater(() => displayFrame.setSize(dim(0),dim(1)))
+      swing { displayFrame.setSize(dim(0),dim(1)) }
     }    
     // SETTINGS
     settings.load(configuration)
@@ -2416,7 +2420,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         handleDND(new File(f),false,true)
     }
     // VIEW
-    SwingUtilities.invokeLater(() => displayFrame.setVisible(!headless))
+    swing { displayFrame.setVisible(!headless) }
     // PLAY
     clock.play
   }

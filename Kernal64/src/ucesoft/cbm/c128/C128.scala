@@ -2791,34 +2791,38 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
   // -----------------------------------------------------------------------------------------
   
+  private def swing(f: => Unit) {
+    SwingUtilities.invokeAndWait(() => f)
+  }
+  
   def run(args:Array[String]) {        
-    setMenu
+    swing { setMenu }
     // check help
     if (settings.checkForHelp(args)) {
       println(s"Kernal64, Commodore 128 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
       settings.printUsage
       sys.exit(0)
     }
-    initComponent
+    swing{ initComponent }
     // VDC
-    SwingUtilities.invokeLater(() => vdcDisplayFrame.pack)    
+    swing { vdcDisplayFrame.pack }    
     if (configuration.getProperty(CONFIGURATION_VDC_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_VDC_FRAME_DIM) split "," map { _.toInt }
-      SwingUtilities.invokeLater(() => vdcDisplayFrame.setSize(dim(0),dim(1)))
+      swing { vdcDisplayFrame.setSize(dim(0),dim(1)) }
     }
     if (configuration.getProperty(CONFIGURATION_VDC_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_VDC_FRAME_XY) split "," map { _.toInt }
-      SwingUtilities.invokeLater(() => vdcDisplayFrame.setLocation(xy(0),xy(1)))
+      swing { vdcDisplayFrame.setLocation(xy(0),xy(1)) }
     } 
     // VIC
     vicDisplayFrame.pack
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
-      SwingUtilities.invokeLater(() => vicDisplayFrame.setSize(dim(0),dim(1)))
+      swing { vicDisplayFrame.setSize(dim(0),dim(1)) }
     }
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }
-      SwingUtilities.invokeLater(() => vicDisplayFrame.setLocation(xy(0),xy(1)))
+      swing { vicDisplayFrame.setLocation(xy(0),xy(1)) }
     }     
     // SETTINGS
     settings.load(configuration)       
@@ -2830,7 +2834,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     }
     // VIEW
     if (headless) vdcDisplayFrame.setVisible(false)
-    SwingUtilities.invokeLater(() => vicDisplayFrame.setVisible(!headless))
+    swing { vicDisplayFrame.setVisible(!headless) }
     // PLAY    
     vdc.play
     clock.play
