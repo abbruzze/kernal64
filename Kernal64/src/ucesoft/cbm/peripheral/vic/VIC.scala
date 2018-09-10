@@ -87,8 +87,9 @@ final class VIC(mem: VICMemory,
   private[this] var traceRasterLineInfo = false
   final private[this] val traceRasterLineBuffer = Array.fill(SCREEN_WIDTH)("")
   private[this] var traceRasterLine = 0
-  // ------------------------ C128 $D030 test bit ---------------------------------------------------------
+  // ------------------------ C128 $D030 test bit & others ------------------------------------------------
   private[this] var c128TestBitEnabled = false
+  private[this] var refreshCycle = false
   // ------------------------ PUBLIC REGISTERS ------------------------------------------------------------
   /*
    * $D000 - $D00F
@@ -993,7 +994,7 @@ final class VIC(mem: VICMemory,
       gfxShifter.reset
       return
     }
-    
+    refreshCycle = false
     drawCycle
     
     if (rasterCycle == RASTER_CYCLES) {
@@ -1053,9 +1054,9 @@ final class VIC(mem: VICMemory,
       case 10 =>
         sprites(7).readMemoryData(false)
         setBaLow((spriteDMAon & 0x80) > 0) // 7
-        //setBaLow(false) // ***
       case 11 =>
         mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+        refreshCycle = true
         setBaLow(false)
       // ---------------------------------------------------------------
       case 55 =>
@@ -1136,15 +1137,19 @@ final class VIC(mem: VICMemory,
         (rasterCycle : @switch) match {
           case 12 =>
             mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+            refreshCycle = true
           case 13 =>
             mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+            refreshCycle = true
           case 14 =>
             mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+            refreshCycle = true
             vc = vcbase
             vmli = 0
             if (badLine) rc = 0
           case 15 =>
             mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
+            refreshCycle = true
             // c-access
             if (_baLow) readAndStoreVideoMemory
           case 16 =>
@@ -1372,6 +1377,8 @@ final class VIC(mem: VICMemory,
   def c128TestBitEnabled(enabled:Boolean) {
     c128TestBitEnabled = enabled
   }
+  
+  def isRefreshCycle = refreshCycle
 
   def dump = {
     val sb = new StringBuffer("VIC dump:\n")
