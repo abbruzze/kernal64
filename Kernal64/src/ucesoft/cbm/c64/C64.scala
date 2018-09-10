@@ -1509,6 +1509,10 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     attachDisk0Item.setActionCommand("ATTACH_DISK_0")
     attachDisk0Item.addActionListener(this)
     fileMenu.add(attachDisk0Item)
+    val attachDisk1Item = new JMenuItem("Attach disk 9...")
+    attachDisk1Item.setActionCommand("ATTACH_DISK_1")
+    attachDisk1Item.addActionListener(this)
+    fileMenu.add(attachDisk1Item)
     // For settings see below, after drive type    
     
     val ejectMenu = new JMenu("Eject disk")
@@ -1777,10 +1781,10 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
                  "RENDERING_TYPE",
                  (dt:String) => {
                    dt match {
-                     case "bilinear" => 
+                     case "bilinear"|"" => 
                        setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
                        renderingBilinear1Item.setSelected(true)
-                     case "bicubic"|"" => 
+                     case "bicubic" => 
                        setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
                        renderingBicubic1Item.setSelected(true)
                      case "default" =>
@@ -1991,12 +1995,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
                  },
                  floppyComponents(0).drive.getFloppy.file
     )
-    // -----------------------------------
-    
-    val attachDisk1Item = new JMenuItem("Attach disk 9...")
-    attachDisk1Item.setActionCommand("ATTACH_DISK_1")
-    attachDisk1Item.addActionListener(this)
-    fileMenu.add(attachDisk1Item)
+    // -----------------------------------       
     // Setting ---------------------------
     settings.add("drive9-file",
                  "Attach a file to drive 9",
