@@ -264,7 +264,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     ROMH_ULTIMAX.setActive(c64MC.romhultimax)
   }
     
-  final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
+  final def read(_address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
+    val address = _address & 0xFFFF
     if (chipID == ChipID.VIC) return vicRead(address)
     ioacc = false
     if (c128Mode) {
@@ -272,7 +273,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     }
     else read64(address)
   }
-  final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+  final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    val address = _address & 0xFFFF
     ioacc = false
     if (c128Mode) {
       if (z80enabled) writeZ80(address,value) else write128(address,value)
@@ -655,8 +657,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // ============================================================================
   
   // C64 Management =============================================================
-  @inline private[this] def read64(_address: Int): Int = {
-    val address = _address & 0xFFFF
+  @inline private[this] def read64(address: Int): Int = {
     if (ULTIMAX) {
       if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return lastByteRead
     }
@@ -689,6 +690,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
           if (address == 0xD50B) return MMU_D50B_read
           // -------------------------------------------------------------------
         }
+        if (address >= 0xD600 && address < 0xD700) return vdc.read(address)
         if (address < 0xD800) return sid.read(address)
         if (address < 0xDC00) return COLOR_RAM.read(address)
         if (address < 0xDD00) return cia_dc00.read(address)
@@ -738,6 +740,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
         // MMU REGS ----------------------------------------------------------
         else if (address == MMU_CR1) MMU_CR_write(value)
         else if (address > 0xD500 && address < 0xD50C) mem_write_D5xx(address,value)
+        else if (address >= 0xD600 && address < 0xD700) vdc.write(address,value)
         // -------------------------------------------------------------------
         else if (address < 0xD800) sid.write(address,value)
         else if (address < 0xDC00) COLOR_RAM.write(address,value)
