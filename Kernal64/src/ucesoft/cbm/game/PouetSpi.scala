@@ -78,7 +78,7 @@ abstract class PouetSpi(genre:String) extends GameProvider {
           case _ =>
         }
       }
-      Game(name,imageURL,downloadURL,genre,date,group)
+      Game(name,imageURL,downloadURL,date,genre,group)
     }
   } 
   
