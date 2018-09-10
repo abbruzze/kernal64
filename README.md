@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.4.6
+Kernal64 ver 1.4.7
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 
@@ -17,6 +17,24 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.4.7 (Sep 10th 2018)
+
+**Lots of improvements in VDC handling.**
+
+- fixed clocks needed to draw a line depending on several parameters and
+not only by xchars_total
+- improved x smooth handling
+- most of the Soci's test run properly
+- regs 34 & 35 not yet implemented, need more investigation
+- added customization of VDC total scan line: the user can enter the
+total number of CRT scan line instead of having 312 PAL lines. New menù under Settings -> Adjust display -> VDC scan lines
+- VDC was not included in the MMU in C64 mode, so in C64 mode it was not possible to see VDC running
+- light pen support added (can't be used with light pen mouse emulation)
+
+**General**
+- 2Mhz mode has been improved: the VIC refresh cycles are treated as I/O.
+- minor bug fixing
 
 ### What's new in 1.4.6 (Aug 10th 2018)
 - Minor bug fixing. Added more command line options (see them with --help). Fixed REU 128K.
