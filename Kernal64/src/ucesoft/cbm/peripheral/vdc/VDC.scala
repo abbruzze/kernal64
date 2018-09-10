@@ -19,7 +19,7 @@ object VDC {
   final val HSYNC_MAX_40 = 62
   final val PREFERRED_FRAME_SIZE = new java.awt.Dimension(SCREEN_WIDTH,SCREEN_HEIGHT * 2)
   
-  object VideoMode extends Enumeration {
+  private object VideoMode extends Enumeration {
     val IDLE = Value
     val TEXT = Value
     val BITMAP = Value
@@ -97,7 +97,7 @@ class VDC extends RAMComponent {
   private[this] var display : Display = _     
   private[this] var bitmap : Array[Int] = _
   private[this] var videoMode = VideoMode.IDLE
-  private[this] var screenHeight = SCREEN_HEIGHT
+  private[this] var screenHeight,currentScreenHeight = SCREEN_HEIGHT
   private[this] var nextFrameScreenHeight = -1
   private[this] var oneLineDrawn = false
   // =====================================================
@@ -117,6 +117,9 @@ class VDC extends RAMComponent {
   private[this] var ram_adr = 0                     // REG 12/13 ram adr
   private[this] var ypos = 0
   private[this] var ram_base_ptr,attr_base_ptr = 0
+  // light pen
+  private[this] var lpFlag = 0                      // 0 = no new values of lp coords, 0x40 new values
+  private[this] var clkStartLine = 0L               // clock cycles when the last line begun
   // -----------------------------------------------------
   private[this] var rasterLine = 0
   private[this] var currentCharScanLine = 0
@@ -127,6 +130,7 @@ class VDC extends RAMComponent {
   private[this] var geometryUpdateListener : (String) => Unit = _
   private[this] var useCacheForNextFrame,writeOnPrevFrame = false
   private[this] var updateGeometryOnNextFrame = false
+  private[this] var blankMode = false // TO BE IMPLEMENTED PROPERLY
   // COLOR PALETTE =======================================
   private[this] val PALETTE = Array(
       0xFF000000,  // 00 Black
@@ -172,6 +176,7 @@ class VDC extends RAMComponent {
       play
     }
   }
+  
   // =====================================================
   def setGeometryUpdateListener(geometryUpdateListener:(String) => Unit) {
     this.geometryUpdateListener = geometryUpdateListener  
@@ -207,6 +212,8 @@ class VDC extends RAMComponent {
     display.setInterlaceMode(false)
     bitmap = display.displayMem
     nextFrameScreenHeight = SCREEN_HEIGHT
+    currentScreenHeight = SCREEN_HEIGHT
+    setScanLines(SCREEN_HEIGHT)
     play
   }
   
@@ -228,7 +235,7 @@ class VDC extends RAMComponent {
   }
   
   @inline private[this] def read_status : Int = {
-    0x80 | (if (vblank) 0x20 else 0) | vdc_revision // always status = 1
+    lpFlag | 0x80 | (if (vblank) 0x20 else 0) | vdc_revision // always status = 1
   }
   
   @inline private[this] def currentMemoryAddress = (regs(18) << 8 | regs(19)) & RAM_ADDR_MASK
@@ -245,6 +252,9 @@ class VDC extends RAMComponent {
     if (address_reg > 36) return 0xFF
     
     address_reg match {
+      case 16|17 =>
+        lpFlag = 0
+        regs(address_reg)
       case 28 => // to set the memory size 16K or 64K
         regs(28) | (if (RAM_ADDR_MASK == 0xFFFF) 0x1F else 0x0F)
       case 31 =>
@@ -266,6 +276,7 @@ class VDC extends RAMComponent {
         xchars_total = value + 1
         if (debug) println(s"VDC: REG 0 Horizontal Total: $xchars_total")
         recalculate_xsync
+        updateGeometryOnNextFrame = true
       case 1 => // REG 1 Horizontal Displayed
         if (debug) println(s"VDC: REG 1 Horizontal Displayed: $value")
         updateGeometryOnNextFrame = true
@@ -289,7 +300,7 @@ class VDC extends RAMComponent {
         interlaceMode = (value & 3) == 3
         display.setInterlaceMode(interlaceMode)
         bitmap = display.displayMem
-        nextFrameScreenHeight = if (interlaceMode) SCREEN_HEIGHT << 1 else SCREEN_HEIGHT
+        nextFrameScreenHeight = if (interlaceMode) currentScreenHeight << 1 else currentScreenHeight
         updateGeometryOnNextFrame = true
       case 9 => // REG 9 Character Total Vertical
         ychars_total = value & 0x1F        
@@ -298,7 +309,7 @@ class VDC extends RAMComponent {
         if (debug) println(s"VDC: REG 9 Character Total Vertical: $value ychars_total=$ychars_total bytes_per_char=$bytes_per_char attr_offset=$attr_offset")
         updateGeometryOnNextFrame = true
       case 10 => // R10  Cursor Mode, Start Scan
-        if (debug) println(s"VDC: R10  Cursor Mode, Start Scan: $value")
+        if (debug) println(s"VDC: R10  Cursor Mode, Start Scan: ${value & 0x1F} mode: ${(value & 0xE0) >> 5}")
       case 11 => // R11 Cursor End Scan
         if (debug) println(s"VDC R11 Cursor End Scan: $value")
       case 12|13 => // R12  Display Start Address hi, R13  Display Start Address lo
@@ -312,8 +323,9 @@ class VDC extends RAMComponent {
         if (debug) println(s"VDC: new Attribute Address($address_reg): ${Integer.toHexString(attr_adr)}")
       case 22 => // REG 22 Character Horizontal Size Control
         charVisibleWidth = value & 0x0F
-        if (debug) println(s"VCD: REG 22 Character Horizontal Size Control: $charVisibleWidth")
+        if (debug) println(s"VCD: REG 22 char visible width: $charVisibleWidth total char width: " + (1 + (regs(22) >> 4)))
         updateGeometryOnNextFrame = true
+        recalculate_xsync
       case 23 => // REG 23 Vert. Character Pxl Spc
         ychars_visible = value & 0x1F
         if (debug) println(s"VDC: REG 23 Vert. Character Pxl Spc: $ychars_visible")
@@ -326,8 +338,9 @@ class VDC extends RAMComponent {
         }
         if ((value & 0x80) != (oldValue & 0x80)) updateGeometry // bitmap
         if (debug) println(s"VDC: REG 25 xsmooth=$xsmooth Video Mode = ${if ((value & 0x80) > 0) "bitmap" else "text"} Color source ${if ((value & 0x40) > 0) "attribute space" else "REG 26"} Semigraph-mode ${if ((value & 0x20) > 0) "on" else "off"} Double pixel mode ${if ((value & 0x10) > 0) "on" else "off"} rasterLine=$rasterLine vblank=$vblank")
+        recalculate_xsync
       case 26 => // REG 26 background, foregorund colors
-        if (debug) println(s"VCD: REG 26 background color ${value & 0xF} foreground color ${(value >> 4) & 0xF}")
+        //if (debug) println(s"VCD: REG 26 background color ${value & 0xF} foreground color ${(value >> 4) & 0xF}")
       case 27 => // REG 27 Row/Adrs. Increment
         if (debug) println(s"VDC REG 27 Row/Adrs. Increment ${value}")
       case 28 => // R28 chargen address
@@ -350,8 +363,11 @@ class VDC extends RAMComponent {
   
   // ============================================================================  
   @inline private def recalculate_xsync {
-    cycles_per_line = (xchars_total >> 1) - 1// xchars_total * 8 * 1Mhz_cycles / 16M_cycles
-    if (debug) println(s"VDC: cycles per line set to $cycles_per_line")
+    val charWidth = if((regs(25) & 0x10) > 0) (regs(22) >> 4) << 1 /* double pixel a.k.a 40column mode */
+                    else 1 + (regs(22) >> 4)
+    
+    cycles_per_line = xchars_total * charWidth >> 4//(xchars_total >> 1) - 1// xchars_total * 8 * 1Mhz_cycles / 16M_cycles
+    if (debug) println(s"VDC: cycles per line set to $cycles_per_line, xchars_total=$xchars_total charWidth=$charWidth")
   }
   
   @inline private[this] def copyorfill {
@@ -397,16 +413,21 @@ class VDC extends RAMComponent {
   }
   
   final def drawLine(cycles:Long) {
-    reschedule
+    clkStartLine = cycles
+    reschedule    
+
     if (rasterLine == 0) nextFrame       
     
     vblank = rasterLine < borderHeight || rasterLine >= borderHeight + visibleScreenHeightPix || rasterLine >= screenHeight - 1
+    
     if (!useCacheForNextFrame)
     try {      
       oneLineDrawn = true
       if (vblank || currentCharScanLine > ychars_visible) {
+        val vm = videoMode
         videoMode = VideoMode.IDLE
         drawTextLine
+        videoMode = vm
       }
       else
       if ((regs(25) & 0x80) == 0) {
@@ -421,7 +442,6 @@ class VDC extends RAMComponent {
     catch {
       case t:ArrayIndexOutOfBoundsException =>
     }
-        
     // NEXT RASTER LINE =====================================================
     rasterLine = rasterLine + 1
     if (rasterLine > screenHeight) rasterLine = 0
@@ -433,11 +453,10 @@ class VDC extends RAMComponent {
         }
         else ram_base_ptr += virtualScreenWidth
       }
-      
       currentCharScanLine += 1
     }    
     
-    if (currentCharScanLine > ychars_total) {
+    if (currentCharScanLine > ychars_total) {      
       currentCharScanLine = 0
       ypos += 1            
       attr_base_ptr += virtualScreenWidth
@@ -447,8 +466,7 @@ class VDC extends RAMComponent {
   
   @inline private def updateGeometry {
     visibleTextRows = regs(6)
-    visibleScreenHeightPix = visibleTextRows * (ychars_total + 1)
-    
+    visibleScreenHeightPix = visibleTextRows * (ychars_total + 1)// + regs(5)
     var charWidth = 0
     if((regs(25) & 0x10) > 0) { /* double pixel a.k.a 40column mode */
       charWidth = 2 * (regs(22) >> 4)
@@ -458,11 +476,11 @@ class VDC extends RAMComponent {
       charWidth = 1 + (regs(22) >> 4)
       borderWidth = (HSYNC_MAX_80 << 3) - regs(2) * charWidth
     }
-    //borderWidth = (xchars_total - regs(2) - ((regs(3) & 0x0F) - 1))// * charWidth
+    //borderWidth = (xchars_total - regs(2) - ((regs(3) & 0x0F) - 1)) * charWidth
     if (borderWidth < 0) borderWidth = 0
     val textMode = (regs(25) & 0x80) == 0
     if (geometryUpdateListener != null) {
-      if (textMode) geometryUpdateListener(s"Text mode ${regs(1)}x${visibleTextRows}")
+      if (textMode) geometryUpdateListener(s"Text mode ${regs(1)}x${visibleTextRows} ${if (interlaceMode) "interlaced" else ""}")
       else geometryUpdateListener(s"Bitmap mode ${regs(1) * charVisibleWidth}x${visibleScreenHeightPix} ${charWidth}x${if (interlaceMode) (ychars_total + 1) >> 1 else (ychars_total + 1)} ${if (interlaceMode) "interlaced" else ""}")    
     }
     if (debug) println(s"VDC: updated geometry. Text mode=$textMode interlaced=$interlaceMode ${regs(1) * charVisibleWidth}x${visibleScreenHeightPix} new borderWidth=$borderWidth")
@@ -478,11 +496,11 @@ class VDC extends RAMComponent {
     ypos = 0
     borderHeight = (regs(4) + 1 - regs(7)) * /* total number of screen rows - vertical sync position by */
                    (ychars_total + 1) -      /* height of each row (R9) minus */
-                   (regs(3) >> 4)            /* vertical sync pulse width */                   
+                   (regs(3) >> 4)            /* vertical sync pulse width */   
     if (borderHeight < 0 || borderHeight > SCREEN_HEIGHT) borderHeight = 0
     
     visibleTextRows = regs(6)
-    visibleScreenHeightPix = visibleTextRows * ((regs(9) & 0x1F) + 1)
+    visibleScreenHeightPix = visibleTextRows * (ychars_total + 1)// + regs(5)
     //println(s"New borderHeight=$borderHeight visibleScreenHeightPix=$visibleScreenHeightPix")
     // char blinking
     val blinkMode = regs(24) & 0x20
@@ -524,35 +542,45 @@ class VDC extends RAMComponent {
   @inline private def drawTextLine {
     val backgroundColor = PALETTE(regs(26) & 0x0F)    
     val bitmapOffset = rasterLine * SCREEN_WIDTH
-    if (videoMode == VideoMode.IDLE) {
-      if (bitmapOffset + SCREEN_WIDTH < bitmap.length) java.util.Arrays.fill(bitmap,bitmapOffset,bitmapOffset + SCREEN_WIDTH,backgroundColor)
-      return
-    }
+    val blankColLeft = regs(35)
+    val blankColRight = regs(34)
+    
+//    if (videoMode == VideoMode.IDLE) {
+//      if (bitmapOffset + SCREEN_WIDTH < bitmap.length) java.util.Arrays.fill(bitmap,bitmapOffset,bitmapOffset + SCREEN_WIDTH,backgroundColor)
+//      return
+//    }
     val foregroundColor = PALETTE((regs(26) >> 4) & 0x0F)
     val virtualScreenWidth = (regs(1) + regs(27))
-    val yoffset = ypos * virtualScreenWidth
+    val yoffset = ram_adr + ypos * virtualScreenWidth
     
     var ram_ptr = ram_base_ptr
     var attr_ptr = attr_base_ptr
     var col = 0
     val doublePixFeature = (regs(25) & 0x10) > 0
-    val charWidth = if (doublePixFeature) (regs(22) >> 4) << 1 else 1 + (regs(22) >> 4)     
+    val realCharWidth = 1 + (regs(22) >> 4)
+    val charWidth = if (doublePixFeature) (realCharWidth - 1) << 1 else realCharWidth  
     val charVisibleWidth = this.charVisibleWidth << (if (doublePixFeature) 1 else 0) 
-    val rightBorderPix = borderWidth + regs(1) * charWidth - (7 - xsmooth)
+    val rightBorderPix = borderWidth + regs(1) * charWidth - (charWidth - 1 - xsmooth)
     var colPix = 0
     var char_col = 0
     val useAttributes = (regs(25) & 0x40) > 0
     val cursorMode = regs(10) & 0x60
     val cursorTopLine = regs(10) & 0x1F
     val cursorBottomLine = regs(11) & 0x1F
-    val semigraphicMode = (regs(25) & 0x20) > 0    
+    val semigraphicMode = (regs(25) & 0x20) > 0 
     
-    while (col < xchars_total) {      
-      if (colPix < borderWidth || // TODO Horizontal blanking pos.
-          colPix >= rightBorderPix) {
+    while (col < xchars_total) {
+      // TODO
+//      if (col == blankColLeft) blankMode = true
+//      else
+//      if (col == blankColRight) blankMode = false
+
+      val outRow = colPix < borderWidth || colPix >= rightBorderPix
+      if (videoMode == VideoMode.IDLE || outRow) {
         var x = 0
+        val bkc = if (blankMode) PALETTE(0) else backgroundColor
         while (x < charWidth && colPix + x < SCREEN_WIDTH) {
-          bitmap(bitmapOffset + colPix + x) = backgroundColor
+          bitmap(bitmapOffset + colPix + x) = bkc
           x += 1
         }
         colPix += charWidth
@@ -581,7 +609,8 @@ class VDC extends RAMComponent {
         val showCursor = yoffset + char_col == cursor_pos && cursorMode != 0x20        
                 
         if (showCursor) {
-          val isCursorLine = currentCharScanLine >= cursorTopLine && currentCharScanLine <= cursorBottomLine 
+          val isCursorLine = if (cursorTopLine < cursorBottomLine) currentCharScanLine >= cursorTopLine && currentCharScanLine <= cursorBottomLine
+                             else currentCharScanLine < cursorBottomLine || currentCharScanLine > cursorTopLine
           reverse ^= isCursorLine
           if (cursorMode != 0x00 && isCursorLine) reverse ^= cursorOn // cursor blinking
         }
@@ -592,22 +621,35 @@ class VDC extends RAMComponent {
         
         if (blink) showChar ^= charBlinkOn
         
-        var mask = if (char_col == 0) 1 << xsmooth else 0x80        
-        var xpos = if (char_col == 0) (7 - xsmooth) else 0
-        val bitmapStart = bitmapOffset + colPix
-        var lastColor = 0
+        var mask = 0x80       
+        var xpos = 0
+        var bitmapStart = bitmapOffset + colPix
+        
+        if (char_col == 0) {      
+          var xshift = realCharWidth - xsmooth
+          if (xshift > 7) {
+            bitmapStart += realCharWidth
+            xshift -= 7
+            xpos = charWidth
+          }
+          mask = 1 << (8 - xshift)
+          xpos += xshift - 1
+          if (doublePixFeature) {
+            xpos <<= 1
+          }
+        }
         var count = 0
-        while (xpos < charWidth) {          
+        while (xpos < charWidth) {      
           val bit = showChar && ((charBitmap & mask) > 0 || underline)
-          val color = if (xpos < charVisibleWidth) {
+          val color = if (xpos <= charVisibleWidth) {
             if (bit ^ reverse) fg else backgroundColor
           }
           else {
-            if (semigraphicMode) lastColor else backgroundColor
+            if (semigraphicMode) bitmap(bitmapStart + charVisibleWidth) else backgroundColor
           }
-          bitmap(bitmapStart + count) = color
+          if (blankMode) bitmap(bitmapStart + count) = PALETTE(0)
+          else bitmap(bitmapStart + count) = color
           
-          if (xpos < charVisibleWidth) lastColor = color
           if (doublePixFeature) {
             if ((count & 1) == 1)  mask >>= 1
           }
@@ -626,6 +668,9 @@ class VDC extends RAMComponent {
   }
   
   @inline private def drawBitmapLine {
+    val doublePixFeature = (regs(25) & 0x10) > 0
+    val realCharWidth = 1 + (regs(22) >> 4)
+    val charWidth = if (doublePixFeature) (realCharWidth - 1) << 1 else realCharWidth
     val backgroundColor = PALETTE(regs(26) & 0x0F)    
     val bitmapOffset = rasterLine * SCREEN_WIDTH
     val foregroundColor = PALETTE((regs(26) >> 4) & 0x0F)
@@ -636,8 +681,8 @@ class VDC extends RAMComponent {
     var attr_ptr = attr_base_ptr + interlaceAttrOffset + attr_offset
     
     var col = 0
-    val charWidth =  1 + (regs(22) >> 4)     
-    val rightBorderPix = borderWidth + regs(1) * charWidth - (7 - xsmooth)
+    //val charWidth =  1 + (regs(22) >> 4)     
+    val rightBorderPix = borderWidth + regs(1) * charWidth - (charWidth - 1 - xsmooth)
     var colPix = 0
     var char_col = 0
     val useAttributes = (regs(25) & 0x40) > 0
@@ -669,16 +714,34 @@ class VDC extends RAMComponent {
           bg = PALETTE((attr >> 4) & 0x0F)
         }
         
-        var mask = if (char_col == 0) 1 << xsmooth else 0x80        
-        var xpos = if (char_col == 0) (7 - xsmooth) else 0
+        var mask = 0x80       
+        var xpos = 0
+        var bitmapStart = bitmapOffset + colPix
+        
+        if (char_col == 0) {      
+          var xshift = realCharWidth - xsmooth
+          if (xshift > 7) {
+            bitmapStart += realCharWidth
+            xshift -= 7
+            xpos = charWidth
+          }
+          mask = 1 << (8 - xshift)
+          xpos += xshift - 1
+          if (doublePixFeature) {
+            xpos <<= 1
+          }
+        }
         var count = 0
-        val bitmapStart = bitmapOffset + colPix
         while (xpos < charWidth) {          
           val bit = ((gfx & mask) > 0) ^ reverse
-          val color = if (bit && xpos < charVisibleWidth) fg else bg 
+          val color = if (bit && xpos <= charVisibleWidth) fg else bg 
           bitmap(bitmapStart + count) = color
           
-          mask >>= 1
+          if (doublePixFeature) {
+            if ((count & 1) == 1)  mask >>= 1
+          }
+          else mask >>= 1
+
           xpos += 1
           colPix += 1
           count += 1
@@ -689,6 +752,31 @@ class VDC extends RAMComponent {
       
       col += 1
     }
+  }
+  
+  def setScanLines(lines:Int) {
+    display.setNewResolution(lines)
+    bitmap = display.displayMem
+    currentScreenHeight = lines
+    screenHeight = if (interlaceMode) lines << 1 else lines
+  }
+  
+  def triggerLightPen {
+    lpFlag = 0x40
+    regs(16) = ypos
+    val delta = clk.currentCycles - clkStartLine
+    regs(17) = ((delta / cycles_per_line.toDouble) * xchars_total).toInt
+  }
+  
+  // =============== Properties ==========================
+  override def getProperties = {    
+    properties.setProperty("Status",read_status.toString)
+    properties.setProperty("Video mode",videoMode.toString)
+    properties.setProperty("Cycles per line",cycles_per_line.toString)
+    for(i <- 0 until regs.length) {
+      properties.setProperty(s"Regs($i)",s"0x${regs(i).toHexString}")
+    }
+    super.getProperties
   }
   
   // state -----------------------------------------------  

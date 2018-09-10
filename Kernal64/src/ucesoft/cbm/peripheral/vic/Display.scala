@@ -23,19 +23,19 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   private[this] var totalFrameCounter,frameCounter = 0L
   private[this] var framePerSecond = 0
   private[this] var ts = 0L
-  private[this] val normalDisplayMem = Array.fill(width * height)(0xFF000000)
-  private[this] val interlacedDisplayMem = Array.fill(width * height * 2)(0xFF000000)
+  private[this] var normalDisplayMem = Array.fill(width * height)(0xFF000000)
+  private[this] var interlacedDisplayMem = Array.fill(width * height * 2)(0xFF000000)
   private[this] var ptrDisplayMem = normalDisplayMem
-  private[this] val normalDisplayImage = new MemoryImageSource(width, height, normalDisplayMem, 0, width)
-  private[this] val interlacedDisplayImage = new MemoryImageSource(width, height * 2, interlacedDisplayMem, 0, width)
+  private[this] var normalDisplayImage = new MemoryImageSource(width, height, normalDisplayMem, 0, width)
+  private[this] var interlacedDisplayImage = new MemoryImageSource(width, height * 2, interlacedDisplayMem, 0, width)
   private[this] var displayImage = normalDisplayImage
   private[this] var debugImage: Image = _
-  private[this] val normalScreen = {
+  private[this] var normalScreen = {
     normalDisplayImage.setAnimated(true);
     normalDisplayImage.setFullBufferUpdates(false)
     createImage(normalDisplayImage)
   }
-  private[this] val interlacedScreen = {
+  private[this] var interlacedScreen = {
     interlacedDisplayImage.setAnimated(true);
     interlacedDisplayImage.setFullBufferUpdates(false)
     createImage(interlacedDisplayImage)
@@ -48,9 +48,24 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   private[this] var remote : ucesoft.cbm.remote.RemoteC64 = _
   private[this] var showRemotingLabel = true
   private[this] var interlaced = false
-  private[this] var renderingHints = RenderingHints.VALUE_INTERPOLATION_BICUBIC
+  private[this] var renderingHints = RenderingHints.VALUE_INTERPOLATION_BILINEAR
   
   addMouseMotionListener(this)
+  
+  def setNewResolution(height:Int) {
+    Log.debug(s"New resolution: $width x $height")
+    normalDisplayMem = Array.fill(width * height)(0xFF000000)
+    interlacedDisplayMem = Array.fill(width * height * 2)(0xFF000000)
+    normalDisplayImage = new MemoryImageSource(width, height, normalDisplayMem, 0, width)
+    interlacedDisplayImage = new MemoryImageSource(width, height * 2, interlacedDisplayMem, 0, width)
+    normalDisplayImage.setAnimated(true);
+    normalDisplayImage.setFullBufferUpdates(false)
+    normalScreen = createImage(normalDisplayImage)
+    interlacedDisplayImage.setAnimated(true);
+    interlacedDisplayImage.setFullBufferUpdates(false)
+    interlacedScreen = createImage(interlacedDisplayImage)
+    setInterlaceMode(interlaced)    
+  }
   
   def setRenderingHints(hints:java.lang.Object) {
     renderingHints = hints
