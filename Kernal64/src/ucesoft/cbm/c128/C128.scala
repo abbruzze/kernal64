@@ -95,9 +95,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     f
   }
   private[this] val vdcDisplayFrame = {
-    val f = new JFrame("Kernal128 " + ucesoft.cbm.Version.VERSION) {
-      override def getInsets = new Insets(0,0,0,0)
-    }
+    val f = new JFrame("Kernal128 " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
       override def windowClosing(e:WindowEvent) {
         close
@@ -322,7 +320,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     import cia._
     // control ports
     val cia1CP1 = new CIA1Connectors.PortAConnector(keyb,controlPortA)
-    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb,controlPortB,() => vicChip.triggerLightPen)
+    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb,controlPortB,() => { vicChip.triggerLightPen ; vdc.triggerLightPen })
     add(cia1CP1)
     add(cia1CP2)    
     
@@ -526,7 +524,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     if (z80Active) z80.clock(cycles,4) 
     else {
       cpu.fetchAndExecute(1)
-      if (cpuFrequency == 2 && !mmu.isIOACC) cpu.fetchAndExecute(1)
+      if (cpuFrequency == 2 && !mmu.isIOACC && !vicChip.isRefreshCycle) cpu.fetchAndExecute(1)
     }
   }
   
@@ -931,7 +929,11 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
       case "RENDERING_BICUBIC" =>
         setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-
+      case "VDC_SCAN_LINES" =>
+        val lines = JOptionPane.showInputDialog(vdcDisplayFrame,"Insert VDC scan lines", "VDC Scan Lines",JOptionPane.QUESTION_MESSAGE,null,null,"312")
+        if (lines != null) {
+          vdc.setScanLines(lines.toString.toInt)
+        }
     }
   }
   
@@ -1730,6 +1732,10 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     attachDisk0Item.setActionCommand("ATTACH_DISK_0")
     attachDisk0Item.addActionListener(this)
     fileMenu.add(attachDisk0Item)
+    val attachDisk1Item = new JMenuItem("Attach disk 9...")
+    attachDisk1Item.setActionCommand("ATTACH_DISK_1")
+    attachDisk1Item.addActionListener(this)
+    fileMenu.add(attachDisk1Item)
     // For settings see below, after drive type    
     
     val ejectMenu = new JMenu("Eject disk")
@@ -1938,6 +1944,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     )
     // -----------------------------------
     val vdcEnabled = new JCheckBoxMenuItem("VDC enabled")
+    vdcEnabled.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_E,java.awt.event.InputEvent.ALT_DOWN_MASK))
     vdcEnabled.setSelected(true)
     vdcEnabled.setActionCommand("VDCENABLED")
     vdcEnabled.addActionListener(this)    
@@ -2059,6 +2066,11 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     fullScreenItem.addActionListener(this)
     adjustMenu.add(fullScreenItem)
     
+    val vdcScanLinesItem = new JMenuItem("VDC scan lines ...")
+    vdcScanLinesItem.setActionCommand("VDC_SCAN_LINES")
+    vdcScanLinesItem.addActionListener(this)
+    adjustMenu.add(vdcScanLinesItem)
+    
     val renderingItem = new JMenu("Rendering")
     val groupR = new ButtonGroup
     adjustMenu.add(renderingItem)
@@ -2083,10 +2095,10 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
                  "RENDERING_TYPE",
                  (dt:String) => {
                    dt match {
-                     case "bilinear" => 
+                     case "bilinear"|"" => 
                        setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
                        renderingBilinear1Item.setSelected(true)
-                     case "bicubic"|"" => 
+                     case "bicubic" => 
                        setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
                        renderingBicubic1Item.setSelected(true)
                      case "default" =>
@@ -2302,11 +2314,6 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
                  floppyComponents(0).drive.getFloppy.file
     )
     // -----------------------------------
-    
-    val attachDisk1Item = new JMenuItem("Attach disk 9...")
-    attachDisk1Item.setActionCommand("ATTACH_DISK_1")
-    attachDisk1Item.addActionListener(this)
-    fileMenu.add(attachDisk1Item)
     // Setting ---------------------------
     settings.add("drive9-file",
                  "Attach a file to drive 9",
