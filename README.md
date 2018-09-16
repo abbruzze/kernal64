@@ -22,6 +22,8 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
 **Lots of improvements in VDC handling.**
 
+- fixed 8x1 mode
+- fixed monochrome interlaced mode
 - fixed clocks needed to draw a line depending on several parameters and
 not only by xchars_total
 - improved x smooth handling
