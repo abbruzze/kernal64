@@ -113,7 +113,7 @@ class VDC extends RAMComponent {
   private[this] var xsmooth = 0                     // REG 25
   private[this] var chargen_adr = 0                 // REG 26 chargen_adr
   private[this] var attr_adr = 0                    // REG 20/21 attribute adr
-  private[this] var attr_offset = 0
+  private[this] var attr_offset,ram_base_offset = 0 // used for 8x1 trick
   private[this] var ram_adr = 0                     // REG 12/13 ram adr
   private[this] var ypos = 0
   private[this] var ram_base_ptr,attr_base_ptr = 0
@@ -305,9 +305,22 @@ class VDC extends RAMComponent {
       case 9 => // REG 9 Character Total Vertical
         ychars_total = value & 0x1F        
         bytes_per_char = if (ychars_total < 16) 16 else 32
-        if (ychars_total == 0) attr_offset == 3
-        if (debug) println(s"VDC: REG 9 Character Total Vertical: $value ychars_total=$ychars_total bytes_per_char=$bytes_per_char attr_offset=$attr_offset")
-        updateGeometryOnNextFrame = true
+        if (ychars_total == 0) {
+          if (ypos == 0) {
+            ram_base_offset = 34 * regs(1)
+            attr_offset = regs(1)
+          }
+          else attr_offset = 3
+          
+          updateGeometry
+        }
+        else {
+          ram_base_offset = 0
+          attr_offset = 0
+          updateGeometryOnNextFrame = true
+        }
+        if (debug) println(s"VDC: REG 9 Character Total Vertical: $value ychars_total=$ychars_total ychars_visible=$ychars_visible bytes_per_char=$bytes_per_char attr_offset=$attr_offset rasterLine=$rasterLine vblank=$vblank")
+        //updateGeometryOnNextFrame = true
       case 10 => // R10  Cursor Mode, Start Scan
         if (debug) println(s"VDC: R10  Cursor Mode, Start Scan: ${value & 0x1F} mode: ${(value & 0xE0) >> 5}")
       case 11 => // R11 Cursor End Scan
@@ -320,7 +333,7 @@ class VDC extends RAMComponent {
         //if (debug) println(s"VDC: new cursor pos($address_reg): ${Integer.toHexString(cursor_pos)}")
       case 20|21 => // REG 20-1 Attribute Start Address hi/lo
         //attr_adr = regs(20) << 8 | regs(21)
-        if (debug) println(s"VDC: new Attribute Address($address_reg): ${Integer.toHexString(attr_adr)}")
+        if (debug) println(s"VDC: new Attribute Address($address_reg): ${Integer.toHexString(regs(20) << 8 | regs(21))}")
       case 22 => // REG 22 Character Horizontal Size Control
         charVisibleWidth = value & 0x0F
         if (debug) println(s"VCD: REG 22 char visible width: $charVisibleWidth total char width: " + (1 + (regs(22) >> 4)))
@@ -449,7 +462,7 @@ class VDC extends RAMComponent {
     if (videoMode != VideoMode.IDLE) {     
       if (videoMode == VideoMode.BITMAP) {
         if (interlaceMode) {
-          if ((currentCharScanLine & 1) == 1) ram_base_ptr += virtualScreenWidth
+          if ((rasterLine & 1) == 1) ram_base_ptr += virtualScreenWidth
         }
         else ram_base_ptr += virtualScreenWidth
       }
@@ -490,11 +503,12 @@ class VDC extends RAMComponent {
     if (oneLineDrawn) display.showFrame(0,0,SCREEN_WIDTH,screenHeight)
     else display.showFrame(-1,-1,-1,-1)     
     
-    attr_offset = 0
+//    ram_base_offset = 0
+//    attr_offset = 0
     oneLineDrawn = false
     currentCharScanLine = (regs(24) & 0x1F) // vertical smooth scrolling
     ypos = 0
-    borderHeight = (regs(4) + 1 - regs(7)) * /* total number of screen rows - vertical sync position by */
+    borderHeight = (regs(4) - regs(7)) * /* total number of screen rows - vertical sync position by */
                    (ychars_total + 1) -      /* height of each row (R9) minus */
                    (regs(3) >> 4)            /* vertical sync pulse width */   
     if (borderHeight < 0 || borderHeight > SCREEN_HEIGHT) borderHeight = 0
@@ -675,10 +689,18 @@ class VDC extends RAMComponent {
     val bitmapOffset = rasterLine * SCREEN_WIDTH
     val foregroundColor = PALETTE((regs(26) >> 4) & 0x0F)
     val virtualScreenWidth = (regs(1) + regs(27))
-    val interlaceRamOffset = if (interlaceMode && (currentCharScanLine & 1) == 1) virtualScreenWidth * (visibleScreenHeightPix >> 1) else 0
-    val interlaceAttrOffset = if (interlaceMode && (currentCharScanLine & 1) == 1) visibleTextRows * virtualScreenWidth else 0
-    var ram_ptr = ram_base_ptr + interlaceRamOffset
+    val interlaceRamOffset = if (interlaceMode && (rasterLine & 1) == 1) virtualScreenWidth * (visibleScreenHeightPix >> 1) else 0
+    val interlaceAttrOffset = if (interlaceMode) {
+      //if (interlaceMode && (rasterLine & 1) == 1) visibleTextRows * virtualScreenWidth else 0
+      val yhalf = (ychars_total + 1) >> 1
+      if (currentCharScanLine < yhalf) 0 else visibleTextRows * virtualScreenWidth
+//      //if ((ypos & 1) == 1) 0 else visibleTextRows * virtualScreenWidth
+    } 
+    else 0
+    var ram_ptr = ram_base_ptr + interlaceRamOffset + ram_base_offset
     var attr_ptr = attr_base_ptr + interlaceAttrOffset + attr_offset
+    
+    //if (interlaceMode) println(s"1stfield=${Integer.toHexString(ram_adr)}/${Integer.toHexString(attr_adr)} 2ndfield=${Integer.toHexString(ram_adr + interlaceRamOffset)}/${Integer.toHexString(interlaceAttrOffset)} virtualScreenWidth=$virtualScreenWidth visibleScreenHeightPix=$visibleScreenHeightPix")
     
     var col = 0
     //val charWidth =  1 + (regs(22) >> 4)     
