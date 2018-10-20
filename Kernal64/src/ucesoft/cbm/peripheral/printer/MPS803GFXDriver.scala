@@ -125,7 +125,7 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
           quote += 1
           operations += Print(ch)
         } else {
-          if (quote % 2 == 1 && ((ch >= 0x00 && ch <= 0x1F) || (ch >= 0x80 && ch <= 0x9F))) { // odd number of " with special char
+          if (quote % 2 == 1 && ch != 13 && ((ch >= 0x00 && ch <= 0x1F) || (ch >= 0x80 && ch <= 0x9F))) { // odd number of " with special char
             operations += RvsOn
             if (ch >= 0x00 && ch <= 0x1F) operations += Print(ch + 0x40)
             else operations += Print(ch - 0x20)

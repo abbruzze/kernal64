@@ -2,3 +2,5 @@
 /.cache-main
 /src/ucesoft/cbm/Version.scala
 /dist/
+/.worksheet/
+/Kernal64.iml
