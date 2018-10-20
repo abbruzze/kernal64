@@ -51,6 +51,7 @@ object Z80 {
     
     // state
 	  def saveState(out:ObjectOutputStream) {
+      out.writeInt(im)
 	  	out.writeInt(A1)
 	  	out.writeInt(B1)
 	  	out.writeInt(C1)
@@ -80,6 +81,7 @@ object Z80 {
 	  	out.writeInt(additionalClockCycles)
 	  }
 	  def loadState(in:ObjectInputStream) {
+	    im = in.readInt
 	  	A1 = in.readInt
 	  	B1 = in.readInt
 	  	C1 = in.readInt
