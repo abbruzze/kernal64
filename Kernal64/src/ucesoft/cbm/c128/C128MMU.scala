@@ -85,6 +85,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   private[this] var z80enabled = true
   private[this] var ramBank,vicBank = 0
   private[this] var ioacc = false
+  private[this] var lastByteOnBUS = 0
   // IO =======================================================================================
   private[this] var cia_dc00,cia_dd00 : CIA = _
   private[this] var vic : VIC = _
@@ -263,15 +264,18 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     KERNAL64_ROM.setActive(c64MC.kernal)
     ROMH_ULTIMAX.setActive(c64MC.romhultimax)
   }
+
+  final override def byteOnBUS: Int = lastByteOnBUS
     
   final def read(_address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     val address = _address & 0xFFFF
     if (chipID == ChipID.VIC) return vicRead(address)
     ioacc = false
-    if (c128Mode) {
+    lastByteOnBUS = if (c128Mode) {
       if (z80enabled) readZ80(address) else read128(address)
     }
     else read64(address)
+    lastByteOnBUS
   }
   final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
     val address = _address & 0xFFFF
@@ -282,6 +286,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     else write64(address,value)
     // TestCart
     if (TestCart.enabled) TestCart.write(address,value)
+    lastByteOnBUS = value
   }
   
   /**
