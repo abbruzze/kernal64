@@ -228,6 +228,8 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     }
   }
   
+  def isPaused = suspendedConfim
+  
   def pause {
     if (Thread.currentThread == this) return
     
