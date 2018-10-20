@@ -105,6 +105,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     }
     props
   }
+  private[this] var cartButtonRequested = false
   private[this] var headless = false // used with --testcart command options
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mem = new C64MMU.MAIN_MEMORY
@@ -468,6 +469,11 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
     if (printerEnabled) printer.clock(cycles)
     // Flyer
     if (isFlyerEnabled) flyerIEC.clock(cycles)
+    // check cart freezing button
+    if (cartButtonRequested && cpu.isFetchingInstruction) {
+      cartButtonRequested = false
+      ExpansionPort.getExpansionPort.freezeButton
+    }
     // CPU PHI2
     cpu.fetchAndExecute(1)
   }
@@ -609,7 +615,8 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         enablePrinter(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
       case "VOLUME" =>
         volumeDialog.setVisible(true)
-      case "CRT_PRESS" => ExpansionPort.getExpansionPort.freezeButton
+      case "CRT_PRESS" => 
+        cartButtonRequested = true
       case "NO_REU" =>
         setREU(None,None)
       case "REU_128" => 
@@ -974,9 +981,12 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
       case Some(rs) => (rs,rs.connectionInfo)
     }
     val choice = JOptionPane.showInputDialog(displayFrame,"Choose an rs-232 implementation","RS-232",JOptionPane.QUESTION_MESSAGE,null,choices,currentChoice)
-    if (choice == choices(0) && activeRs232.isDefined) {
-      activeRs232.get.setEnabled(false)      
-      activeRs232 = None
+    if (choice == choices(0)) {
+      if (activeRs232.isDefined) {    
+        activeRs232.get.setEnabled(false)      
+        activeRs232 = None
+        rs232StatusPanel.setVisible(false)
+      }
     }
     else
     if (choice != null) {
@@ -2232,6 +2242,7 @@ class C64 extends CBMComponent with ActionListener with GamePlayer {
         
     // cartridge
     val cartButtonItem = new JMenuItem("Press cartridge button...")
+    cartButtonItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Z,java.awt.event.InputEvent.ALT_DOWN_MASK))
     cartButtonItem.setActionCommand("CRT_PRESS")
     cartButtonItem.addActionListener(this)
     cartMenu.add(cartButtonItem)

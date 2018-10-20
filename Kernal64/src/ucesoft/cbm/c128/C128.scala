@@ -62,7 +62,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     }
     props
   }
-    
+  private[this] var cartButtonRequested = false
   private[this] var headless = false // used with --headless command line option
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mmu = new C128MMU(this)
@@ -397,6 +397,9 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       override def keyPressed(e:KeyEvent) {
         e.getKeyCode match {
           // mouse
+          case java.awt.event.KeyEvent.VK_P if e.isAltDown => 
+            if (Clock.systemClock.isPaused) Clock.systemClock.play
+            else Clock.systemClock.pause
           case java.awt.event.KeyEvent.VK_M if e.isAltDown =>
             mouseEnabled = !mouseEnabled
             sid.setMouseEnabled(mouseEnabled)
@@ -521,13 +524,18 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     // Flyer
     if (isFlyerEnabled) flyerIEC.clock(cycles)
     // CPU PHI2
-    if (z80Active) z80.clock(cycles,4) 
+    // check cart freezing button
+    if (cartButtonRequested && cpu.isFetchingInstruction) {
+      cartButtonRequested = false
+      ExpansionPort.getExpansionPort.freezeButton
+    }
+    if (z80Active) z80.clock(cycles,2) 
     else {
       cpu.fetchAndExecute(1)
       if (cpuFrequency == 2 && !mmu.isIOACC && !vicChip.isRefreshCycle) cpu.fetchAndExecute(1)
     }
   }
-  
+
   private def irqRequest(low:Boolean) {
     cpu.irqRequest(low)
     z80.irq(low)
@@ -539,12 +547,9 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   }
   
   private def baLow(low:Boolean) {
-    // ignore BA in 2Mhz mode
-    //if (cpuFrequency == 1) {
-      baLow = low
-      if (z80Active) z80.requestBUS(baLow) else cpu.setBaLow(low)
-      expansionPort.setBaLow(low)
-    //}
+    baLow = low
+    if (z80Active) z80.requestBUS(baLow) else cpu.setBaLow(low)
+    expansionPort.setBaLow(low)
   }
   
   // MMU change listener
@@ -552,6 +557,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     Log.debug(s"Frequency set to $f Mhz")
     mmuStatusPanel.frequencyChanged(f)
     cpuFrequency = f
+    vicChip.set2MhzMode(f == 2)
   }
   def cpuChanged(is8502:Boolean) {
     if (is8502) {
@@ -716,7 +722,8 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         printer.setActive(printerEnabled)
       case "VOLUME" =>
         volumeDialog.setVisible(true)
-      case "CRT_PRESS" => ExpansionPort.getExpansionPort.freezeButton
+      case "CRT_PRESS" => 
+        cartButtonRequested = true
       case "NO_REU" =>
         setREU(None,None)
       case "REU_128" => 
@@ -1195,9 +1202,12 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       case Some(rs) => (rs,rs.connectionInfo)
     }
     val choice = JOptionPane.showInputDialog(vicDisplayFrame,"Choose an rs-232 implementation","RS-232",JOptionPane.QUESTION_MESSAGE,null,choices,currentChoice)
-    if (choice == choices(0) && activeRs232.isDefined) {
-      activeRs232.get.setEnabled(false)      
-      activeRs232 = None
+    if (choice == choices(0)) {
+      if (activeRs232.isDefined) {    
+        activeRs232.get.setEnabled(false)      
+        activeRs232 = None
+        rs232StatusPanel.setVisible(false)
+      }
     }
     else
     if (choice != null) {
@@ -2621,6 +2631,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     
     // cartridge
     val cartButtonItem = new JMenuItem("Press cartridge button...")
+    cartButtonItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Z,java.awt.event.InputEvent.ALT_DOWN_MASK))
     cartButtonItem.setActionCommand("CRT_PRESS")
     cartButtonItem.addActionListener(this)
     cartMenu.add(cartButtonItem)
