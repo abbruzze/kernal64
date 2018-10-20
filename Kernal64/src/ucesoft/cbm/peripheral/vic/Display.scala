@@ -14,12 +14,18 @@ import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
+import java.awt.event.MouseListener
 
-class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = Clock.systemClock) extends JComponent with MouseMotionListener with CBMComponent {
+class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = Clock.systemClock) extends JComponent with MouseMotionListener with MouseListener with CBMComponent {
   val componentID = "Display"
   val componentType = CBMComponentType.OUTPUT_DEVICE  
   private[this] val dimension = new Dimension(0, 0)
-  private[this] var clipArea: Tuple2[Point, Point] = null
+  private[this] var dashIndex = 0
+  private[this] var mouseZoomStartPoint,mouseZoomEndPoint = new Point
+  private[this] var mouseZoomLineColors = Array(Color.WHITE,Color.YELLOW, Color.RED)
+  private[this] var mouseZoomColorIndex = 0
+  private[this] var mouseZoomEnabled = false
+  private[this] var clipArea,zoomArea: Tuple2[Point, Point] = null
   private[this] var totalFrameCounter,frameCounter = 0L
   private[this] var framePerSecond = 0
   private[this] var ts = 0L
@@ -29,7 +35,6 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   private[this] var normalDisplayImage = new MemoryImageSource(width, height, normalDisplayMem, 0, width)
   private[this] var interlacedDisplayImage = new MemoryImageSource(width, height * 2, interlacedDisplayMem, 0, width)
   private[this] var displayImage = normalDisplayImage
-  private[this] var debugImage: Image = _
   private[this] var normalScreen = {
     normalDisplayImage.setAnimated(true);
     normalDisplayImage.setFullBufferUpdates(false)
@@ -51,8 +56,9 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   private[this] var renderingHints = RenderingHints.VALUE_INTERPOLATION_BILINEAR
   
   addMouseMotionListener(this)
+  addMouseListener(this)
   
-  def setNewResolution(height:Int) {
+  def setNewResolution(height:Int,width:Int) {
     Log.debug(s"New resolution: $width x $height")
     normalDisplayMem = Array.fill(width * height)(0xFF000000)
     interlacedDisplayMem = Array.fill(width * height * 2)(0xFF000000)
@@ -89,6 +95,43 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   def init {}
   def reset {}
   
+  @inline private def isZoomEvent(e:MouseEvent) : Boolean = {
+    import java.awt.event.InputEvent._
+    val zoomMod = SHIFT_DOWN_MASK | CTRL_DOWN_MASK
+    (e.getModifiersEx & zoomMod) == zoomMod
+  }
+  def mouseClicked(e:MouseEvent) {}
+  def mousePressed(e:MouseEvent) {
+    if (isZoomEvent(e)) {
+      if (SwingUtilities.isRightMouseButton(e)) {
+        mouseZoomEnabled = false
+        zoomArea = null
+        repaint()
+      }
+      else {
+        setCursor(new java.awt.Cursor(java.awt.Cursor.CROSSHAIR_CURSOR))
+        mouseZoomEnabled = true
+        mouseZoomStartPoint.x = e.getX
+        mouseZoomStartPoint.y = e.getY
+        mouseZoomEndPoint.x = e.getX
+        mouseZoomEndPoint.y = e.getY
+      }
+    }
+  }
+  def mouseReleased(e:MouseEvent) {
+    if (mouseZoomEnabled) {
+      setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR))
+      mouseZoomEnabled = false
+      val zoomR = zoomRec
+      val interlacedFactor = if (interlaced) 2.0 else 1.0
+      zoomArea = (new Point((zoomR.x / zoomFactorX).toInt, (zoomR.y / zoomFactorY * interlacedFactor).toInt), new Point(((zoomR.x + zoomR.width) / zoomFactorX).toInt,((zoomR.y + zoomR.height) / zoomFactorY * interlacedFactor).toInt))
+      println(zoomArea)
+      repaint()
+    }
+  }
+  def mouseEntered(e:MouseEvent) {}
+  def mouseExited(e:MouseEvent) {}
+  
   // light pen events
   def mouseDragged(e:MouseEvent) { mouseMoved(e) }
   def mouseMoved(e:MouseEvent) {
@@ -96,6 +139,10 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     mouseY = (e.getY / zoomFactorY).toInt
     lpX =  mouseX + (if (clipArea != null) clipArea._1.x else 0)
     lpY = mouseY + (if (clipArea != null) clipArea._1.y else 0)
+    if (mouseZoomEnabled) {
+      mouseZoomEndPoint.x = e.getX
+      mouseZoomEndPoint.y = e.getY
+    }
   }
   
   def getLightPenX = lpX
@@ -134,22 +181,45 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     if (dimension.width != getWidth || dimension.height != getHeight) {
       dimension.width = getWidth
       dimension.height = getHeight
-      if (debugImage == null) debugImage = createImage(width, height)
       Log.debug(s"New screen dimension ${dimension.width} x ${dimension.height}")      
-      zoomFactorX = dimension.width.toDouble / (if (clipArea != null) clipArea._2.x - clipArea._1.x else screen.getWidth(this))
-      zoomFactorY = dimension.height.toDouble / (if (clipArea != null) clipArea._2.y - clipArea._1.y else screen.getHeight(this))
+      zoomFactorX = dimension.width.toDouble / (if (clipArea != null) clipArea._2.x - clipArea._1.x else screen.getWidth(null))
+      zoomFactorY = dimension.height.toDouble / (if (clipArea != null) clipArea._2.y - clipArea._1.y else screen.getHeight(null))
+      println(zoomFactorX + " " + zoomFactorY)
       //println(s"New screen dimension ${dimension.width} x ${dimension.height} width/height=${dimension.width.toDouble/dimension.height}")
     }
     g.asInstanceOf[Graphics2D].setRenderingHint(RenderingHints.KEY_INTERPOLATION,renderingHints)
-    val srcImage = if (drawRasterLine) {
-      val dg = debugImage.getGraphics
-      dg.drawImage(screen, 0, 0, null)
-      dg.setColor(Color.RED)
-      dg.drawLine(0, rasterLine, screen.getWidth(null), rasterLine)
-      debugImage
-    } else screen
-    if (clipArea == null) g.drawImage(srcImage, 0, 0, dimension.width, dimension.height, null)
-    else g.drawImage(srcImage, 0, 0, dimension.width, dimension.height, clipArea._1.x, clipArea._1.y, clipArea._2.x, clipArea._2.y, null)
+    // clipping
+    var clip : Tuple2[Point,Point] = null
+    if (clipArea != null) clip = clipArea
+    if (zoomArea != null) {
+      if (clip == null) clip = zoomArea
+      else 
+      clip = (new Point(clip._1.x + zoomArea._1.x,clip._1.y + zoomArea._1.y),new Point(clip._1.x + zoomArea._2.x,clip._1.y + zoomArea._2.y)) 
+    }
+    if (clip == null) g.drawImage(screen, 0, 0, dimension.width, dimension.height, null)
+    else 
+    g.drawImage(screen, 0, 0, dimension.width, dimension.height, clip._1.x, clip._1.y, clip._2.x, clip._2.y, null)
+    if (drawRasterLine) {
+      g.setColor(Color.RED)
+      g.drawLine(0, rasterLine, screen.getWidth(null), rasterLine)
+    }
+    if (mouseZoomEnabled) {
+      if ((totalFrameCounter % 10) == 0) mouseZoomColorIndex = (mouseZoomColorIndex + 1) % mouseZoomLineColors.length
+      g.setColor(mouseZoomLineColors(mouseZoomColorIndex))
+      val zoomR = zoomRec   
+      dashIndex = (dashIndex + 1) % 10
+      val dash = new BasicStroke(2, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL,10, Array(10.0f),dashIndex)
+      g.asInstanceOf[Graphics2D].setStroke(dash)
+      g.drawRect(zoomR.x,zoomR.y,zoomR.width,zoomR.height)
+    }
+  }
+  
+  @inline private def zoomRec : Rectangle = {
+    val zx = if (mouseZoomStartPoint.x < mouseZoomEndPoint.x) mouseZoomStartPoint.x else mouseZoomEndPoint.x
+    val zy = if (mouseZoomStartPoint.y < mouseZoomEndPoint.y) mouseZoomStartPoint.y else mouseZoomEndPoint.y
+    val dx = math.abs(mouseZoomStartPoint.x - mouseZoomEndPoint.x)
+    val dy = math.abs(mouseZoomStartPoint.y - mouseZoomEndPoint.y)
+    new Rectangle(zx,zy,dx,dy)
   }
   
   final def showFrame(x1: Int, y1: Int, x2: Int, y2: Int) {
@@ -159,7 +229,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       if (remote != null) remote.updateVideo(x1,y1,x2,y2)
     }
     else
-    if (drawRasterLine) repaint()
+    if (drawRasterLine || mouseZoomEnabled) repaint()
     
     frameCounter += 1
     totalFrameCounter += 1
