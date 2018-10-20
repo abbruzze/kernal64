@@ -140,4 +140,5 @@ trait CPU6510 extends Chip with TraceListener {
   
   def setBaLow(low:Boolean) {}
   def setDMA(dma:Boolean) {}
+  def isFetchingInstruction : Boolean
 }

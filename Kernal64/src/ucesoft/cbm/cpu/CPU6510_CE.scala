@@ -1965,6 +1965,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       states(state)()
     }
   }
+  def isFetchingInstruction : Boolean = state == 0
   
   protected def formatDebug = s"[${id.toString}] ${CPU6510.disassemble(mem,PC).toString} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
   // state
