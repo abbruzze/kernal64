@@ -41,6 +41,7 @@ trait Memory {
   def isActive: Boolean  
   def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int
   def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU)
+  def byteOnBUS : Int = 0
   
   override def toString = s"${name}(${hex4(startAddress)}-${hex4(startAddress + length - 1)},active=${isActive})"
 }
