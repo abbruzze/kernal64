@@ -246,6 +246,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
 
   def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) = {
     viaDisk.setDriveReader(driveReader,emulateInserting)
+    RW_HEAD.setWriteProtected(floppy.isReadOnly)
   }
   override def setActive(active: Boolean) = {
     viaBus.setEnabled(active)
@@ -383,7 +384,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
           cpu.fetchAndExecute(2)
           viaDisk.clock(cycles)
           viaBus.clock(cycles)
-          if (RW_HEAD.rotate) viaDisk.byteReady
+          //if (RW_HEAD.rotate) viaDisk.byteReady
         }
         else cpu.fetchAndExecute(1)
       }

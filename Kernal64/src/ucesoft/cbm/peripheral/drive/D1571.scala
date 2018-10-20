@@ -423,6 +423,7 @@ class D1571(val driveID: Int,
   def getFloppy : Floppy = floppy
   def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
     VIA2.setDriveReader(driveReader,emulateInserting)    
+    RW_HEAD.setWriteProtected(floppy.isReadOnly)
   }
   override def setActive(active: Boolean) {
     VIA1.setEnabled(active)

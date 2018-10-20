@@ -260,6 +260,7 @@ class D1581(val driveID: Int,
   def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
     floppy = driveReader
     RW_HEAD.setFloppy(floppy)
+    RW_HEAD.setWriteProtected(floppy.isReadOnly)
     diskChanged = true
     
     awake   
@@ -283,6 +284,8 @@ class D1581(val driveID: Int,
     add(RW_HEAD)
     add(WD1770)
     if (ledListener != null) ledListener.turnOn
+    
+    RW_HEAD.setSpeedZone(4)
   }
   
   def reset {
@@ -300,6 +303,7 @@ class D1581(val driveID: Int,
       ledListener.turnPower(false)
     }
     java.util.Arrays.fill(ram,0)
+    RW_HEAD.setSpeedZone(4)
   }
   
   private def setFilename {
@@ -313,7 +317,6 @@ class D1581(val driveID: Int,
       c = ram(adr)
       len += 1
     }
-    println("Filename=" + sb)
     RW_HEAD.setCurrentFileName(sb.toString)
   }
   
@@ -327,7 +330,6 @@ class D1581(val driveID: Int,
     if (pc == _1581_WAIT_LOOP_ROUTINE && canSleep && !RW_HEAD.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
       running = false      
       goSleepingCycles = cycles
-      println("Go sleeping... " + driveID)
     }
   }
   

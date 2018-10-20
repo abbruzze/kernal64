@@ -7,7 +7,7 @@ import java.io.RandomAccessFile
 private[formats] class D81(val file: String) extends Diskette {
   import Diskette._
   val canBeEmulated = false
-  val isReadOnly = false
+  val isReadOnly = !new java.io.File(file).canWrite
   val totalTracks = 80
   override lazy val singleSide = true
   override protected final val DIR_TRACK = 40
@@ -61,7 +61,7 @@ private[formats] class D81(val file: String) extends Diskette {
   private[this] var sectorHeader = false
   private[this] var trackModified = false
   private[this] val trackModificationMap = Array.ofDim[Boolean](2,80)
-  protected val disk = new RandomAccessFile(file, "rw")
+  protected val disk = new RandomAccessFile(file, if (isReadOnly) "r" else "rw")
   private[this] val physicalTracks : Array[Array[Array[Int]]] = {
     val sides = Array.ofDim[Array[Array[Int]]](2)
     for(h <- 0 to 1) {

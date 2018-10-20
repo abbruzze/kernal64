@@ -7,6 +7,7 @@ import java.io.ObjectInputStream
 import ucesoft.cbm.formats.Diskette._
 
 private[formats] class G64(val file:String) extends Diskette {
+  val isReadOnly = !new java.io.File(file).canWrite
   private[this] var tracks : Array[Array[Int]] = _
   private[this] var trackOffsets : Array[Int] = _
   private[this] var speedZones : Array[Int] = _
@@ -17,12 +18,11 @@ private[formats] class G64(val file:String) extends Diskette {
   private[this] var sectorBit,sectorData = 0
   private[this] var headerFound = false
   private[this] val ungcr = new UNGCR
-  protected val disk = new RandomAccessFile(file, "rw")
+  protected val disk = new RandomAccessFile(file, if (isReadOnly) "r" else "rw")
   private[this] var trackIndexModified = false
   
   loadTracks
-  val canBeEmulated = false
-  val isReadOnly = false
+  val canBeEmulated = false  
   lazy val totalTracks = tracks.length
   
   private[this] var trackChangeListener : Floppy#TrackListener = null

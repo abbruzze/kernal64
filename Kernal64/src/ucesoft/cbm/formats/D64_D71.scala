@@ -41,8 +41,10 @@ private[formats] class D64_D71(val file: String) extends Diskette {
       else if (t <= 65) (t, 18)
       else (t,17)
     }).toMap
+    
+  val isReadOnly = !new java.io.File(file).canWrite
   
-  protected final val disk = new RandomAccessFile(file, "rw")
+  protected final val disk = new RandomAccessFile(file, if (isReadOnly) "r" else "rw")
   private[this] val absoluteSectorCache = new collection.mutable.HashMap[Int,Int]
   private[this] var _bam : BamInfo = bamInfo
   private[this] val trackChangeBitMap = Array.ofDim[Long](70)
@@ -170,8 +172,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
     }
     BamInfo(diskName.toString, diskID, dosType,singleSide,free)
   }
-  // --------------------- Floppy -------------------------
-  val isReadOnly = false
+  // --------------------- Floppy -------------------------  
   val totalTracks = TOTAL_TRACKS
   override lazy val singleSide = bamInfo.singleSide
   
