@@ -66,6 +66,7 @@ final class VIC(mem: VICMemory,
   private[this] var csel = 0 // 1 => 40 cols, 0 => 38 cols
   private[this] var mcm = false // multi color mode: true enabled
   private[this] var res = false // video enabled: false enabled
+  private[this] var internalDataBus = 0
   // borders
   private[this] var mainBorderFF = false // main border flip flop
   private[this] var verticalBorderFF = false // vertical border flip flop
@@ -90,6 +91,7 @@ final class VIC(mem: VICMemory,
   // ------------------------ C128 $D030 test bit & others ------------------------------------------------
   private[this] var c128TestBitEnabled = false
   private[this] var refreshCycle = false
+  private[this] var _2MhzMode = false
   // ------------------------ PUBLIC REGISTERS ------------------------------------------------------------
   /*
    * $D000 - $D00F
@@ -803,7 +805,7 @@ final class VIC(mem: VICMemory,
 
   final def read(address: Int, chipID: ChipID.ID): Int = {
     val offset = decodeAddress(address)
-    if (offset <= 0xF) spriteXYCoord(offset)
+    internalDataBus = if (offset <= 0xF) spriteXYCoord(offset)
     else if (offset >= 0x2F && offset <= 0x3F) 0xFF
     else
       (offset : @switch) match {
@@ -837,9 +839,11 @@ final class VIC(mem: VICMemory,
           sprites(index).color | 0xF0 // bit 7,6,5,4 always 1
         case _ => 0xFF // $D02F-$D03F
       }
+    internalDataBus
   }
   
   final def write(address: Int, value: Int, chipID: ChipID.ID) = {
+    internalDataBus = value
     val offset = decodeAddress(address)
     if (offset <= 0xF) {
       spriteXYCoord(offset) = value
@@ -973,7 +977,7 @@ final class VIC(mem: VICMemory,
   @inline private def setBaLow(low:Boolean) {
     if (low != _baLow) {
       _baLow = low
-      baLow(low)
+      if (!(_2MhzMode && low)) baLow(low)
     }
   }
     
@@ -1339,7 +1343,7 @@ final class VIC(mem: VICMemory,
 
   /*
    * A Bad Line Condition is given at any arbitrary clock cycle, if at the
- 	negative edge of ø0 at the beginning of the cycle RASTER >= $30 and RASTER
+ 	negative edge of ï¿½0 at the beginning of the cycle RASTER >= $30 and RASTER
  	<= $f7 and the lower three bits of RASTER are equal to YSCROLL and if the
  	DEN bit was set during an arbitrary cycle of raster line $30.
    */
@@ -1379,6 +1383,10 @@ final class VIC(mem: VICMemory,
   }
   
   def isRefreshCycle = refreshCycle
+
+  def set2MhzMode(enabled:Boolean) : Unit = {
+    _2MhzMode = enabled
+  }
 
   def dump = {
     val sb = new StringBuffer("VIC dump:\n")
