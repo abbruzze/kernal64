@@ -3,6 +3,7 @@
 Kernal64 ver 1.4.8
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
+<img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
 
 ### Installation
 Go to https://github.com/abbruzze/kernal64/releases/latest and download and unzip on your computer the latest version.
