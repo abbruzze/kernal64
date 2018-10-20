@@ -159,6 +159,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     telnetClient.connect(host,port)
     in = telnetClient.getInputStream
     out = telnetClient.getOutputStream
+    Log.info(s"SwiftLink connected to $host:$port")
   }
   
   private def disconnect {
@@ -183,7 +184,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   
   override def reset {
     ctrl = 0
-    cmd = RECEIVER_INTERRUPT_ENABLED
+    cmd = 0xE0 // found into desterm 128 
     status = TRANSMITTER_DATA_REGISTER_EMPTY
     nmiHandler(false)
     clk.cancel(RX_EVENT)
@@ -247,75 +248,83 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     modemIn.append("CONNECTION CLOSED!!" + 13.toChar)
   }
   
-  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = address match {
-    case STATUS => 
-      val status = overrun | receiverDataRegister | transmitterDataRegister | connected | irq
-      // maybe ?
-      irq = 0
-      status
-    case CTRL =>
-      ctrl
-    case CMD =>
-      cmd
-    case DATA =>
-      receiverDataRegister = RECEIVER_DATA_REGISTER_EMPTY
-      byteReceived
-    case _ =>
-      reu match {
-        case Some(r) =>
-          r.read(address, chipID)
-        case _ => 
-          0
-      }      
+  override def read(_address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+    val address = (_address & 0xFF00) | (_address & 3) 
+    address match {  
+      case STATUS => 
+        val status = overrun | receiverDataRegister | transmitterDataRegister | connected | irq
+        // maybe ?
+        irq = 0
+        status
+      case CTRL =>
+        ctrl
+      case CMD =>
+        cmd
+      case DATA =>
+        receiverDataRegister = RECEIVER_DATA_REGISTER_EMPTY
+        byteReceived
+      case _ =>
+        reu match {
+          case Some(r) =>
+            r.read(_address, chipID)
+          case _ => 
+            0
+        }      
+    }    
   }
-  override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = address match {
-    case STATUS =>
-      reset
-    case CTRL =>
-      ctrl = value
-      updateClockTicks
-    case CMD =>
-      cmd = value
-      statusListener.update(RS232.DTR,if (isDataTerminalReady) 1 else 0)
-      //println(s"CMD= $cmd DTR=${isDataTerminalReady} RX_IRQ=${isReceiverInterruptEnabled} TX_IRQ=${isTransmitterInterruptEnabled}")
-      updateClockTicks
-    case DATA =>      
-      statusListener.update(RS232.RTS,value & TRANSMITTER_INTERRUPT_CONTROL)
-      if (isModemMode) {
-        if (value != 13) {
-          if (value == 20) modemCmd = modemCmd.dropRight(1)
-          else modemCmd += value.toChar
+  override def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
+    val address = (_address & 0xFF00) | (_address & 3) 
+    
+    address match {  
+      case STATUS =>
+        reset
+      case CTRL =>
+        ctrl = value
+        updateClockTicks
+      case CMD =>
+        cmd = value
+        statusListener.update(RS232.DTR,if (isDataTerminalReady) 1 else 0)
+        statusListener.update(RS232.RTS,if (((cmd >> 2) & 3) != 0) 1 else 0)  
+        //println(s"CMD= $cmd DTR=${isDataTerminalReady} RX_IRQ=${isReceiverInterruptEnabled} TX_IRQ=${isTransmitterInterruptEnabled}")
+        updateClockTicks
+      case DATA =>      
+        statusListener.update(RS232.RTS,value & TRANSMITTER_INTERRUPT_CONTROL)
+        if (isModemMode) {
+          if (value != 13) {
+            if (value == 20) modemCmd = modemCmd.dropRight(1)
+            else modemCmd += value.toChar
+          }
+          else processModemCommand
         }
-        else processModemCommand
-      }
-      else
-      if (transmitterDataRegister == TRANSMITTER_DATA_REGISTER_EMPTY) {
-        statusListener.update(RS232.TXD,1)
-        //println(s"Sending $value ${value.toChar}")
-        transmitterDataRegister = TRANSMITTER_DATA_REGISTER_FULL
-        clk.schedule(new ClockEvent(RX_EVENT,clk.currentCycles + clockTicks,cycles => {
-          statusListener.update(RS232.TXD,0)
-          try {
-            out.write(value)
-            out.flush
-            if (outHPChecker.check(value.toChar)) hangUp                          
-          }
-          catch {
-            case t:Throwable =>
-              socketError(t)
-          }          
-          finally {
-            transmitterDataRegister = TRANSMITTER_DATA_REGISTER_EMPTY
-            if (isTransmitterInterruptEnabled) nmi
-          }
-        }))
-      }      
-    case _ =>
-      reu match {
-        case Some(r) =>
-          r.write(address,value,chipID)
-        case _ => 
-      }
+        else
+        if (transmitterDataRegister == TRANSMITTER_DATA_REGISTER_EMPTY) {
+          statusListener.update(RS232.TXD,1)
+          //println(s"Sending $value ${value.toChar}")
+          transmitterDataRegister = TRANSMITTER_DATA_REGISTER_FULL
+          clk.schedule(new ClockEvent(RX_EVENT,clk.currentCycles + clockTicks,cycles => {
+            statusListener.update(RS232.TXD,0)
+            try {
+              out.write(value)
+              out.flush
+              if (outHPChecker.check(value.toChar)) hangUp                          
+            }
+            catch {
+              case t:Throwable =>
+                socketError(t)
+            }          
+            finally {
+              transmitterDataRegister = TRANSMITTER_DATA_REGISTER_EMPTY
+              if (isTransmitterInterruptEnabled) nmi
+            }
+          }))
+        }      
+      case _ =>
+        reu match {
+          case Some(r) =>
+            r.write(_address,value,chipID)
+          case _ => 
+        }
+    }
   }
   
   private def updateClockTicks {
@@ -324,7 +333,8 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     val parityBit = (cmd & 0x20) >> 5
     
     val baud = SPEEDS(ctrl & 0x0f)
-    clockTicks = (985248.0 / baud * (1 + stopBits + wordLength + parityBit)).toInt
+    //clockTicks = (985248.0 / baud * (1 + stopBits + wordLength + parityBit)).toInt
+    clockTicks = (985248.0 / baud).toInt
     
     if (baud != lastBaud) {
       lastBaud = baud
@@ -342,9 +352,9 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     if (cmd == "") return
     
     if (cmd.toUpperCase.startsWith("AD") && cmd.length > 4) {
-      val conf = cmd.substring(3).trim
-      setConfiguration(conf)
+      val conf = cmd.substring(3).trim      
       try {
+        setConfiguration(conf)
         connect
       }
       catch {
