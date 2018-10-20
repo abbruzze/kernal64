@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.4.7
+Kernal64 ver 1.4.8
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 
@@ -17,6 +17,23 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.4.8 (Oct 20th 2018)
+**VDC improvements.**
+- Improved screen resolution and aspect ratio
+- Different handling of borders: seems better than before but need more investigation
+- Added handling of 16K/64K bit
+- Fixed interlace bitmap color mode: seems a lot better than before. For sure need more investigation.
+- Fixed double pixel mode in bitmap mode
+- Added busy flag emulation on copy/fill operations
+- HBlank is not yet implemented
+
+**General**
+- Improved cart button functionality for freezers: now the freezer will activate interrupt only if the CPU is in the fetching state.
+- VIC BA requests skipped when 2Mhz mode is on
+- Improved 1581 speed cycles in order to run fast loaders in C64 mode properly
+- All disk now are write protected if the corresponding file on local drive is read-only
+- New scala 2.12.7 libraries
 
 ### What's new in 1.4.7 (Sep 10th 2018)
 
