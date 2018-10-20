@@ -36,7 +36,8 @@ abstract class RWHeadController(protected var floppy:Floppy,
       250000.0 / C1541_CLOCK_HZ,  // zone 4
       266667.0 / C1541_CLOCK_HZ,  // zone 3
       285714.0 / C1541_CLOCK_HZ,  // zone 2
-      307692.0 / C1541_CLOCK_HZ   // zone 1 
+      307692.0 / C1541_CLOCK_HZ,  // zone 1
+      256000.0 / C1541_CLOCK_HZ   // zone 0 for 1581 256
   )
     
   protected var speedZone = 3
@@ -62,8 +63,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
     track = 1
     currentFilename = ""
     bitCounter = 0
-    speedZone = 3
-    bitCycleWait = rotationCyclesForBit(speedZone)
+    setSpeedZone(3)
     rotationCycleCounter = 0.0
     lastRead = 0
     lastWrite = 0x55
