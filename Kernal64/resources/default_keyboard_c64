@@ -5,7 +5,6 @@
                 VK_8 = N_8
              VK_LESS = CBM
                 VK_4 = N_4
-        VK_CAPS_LOCK = RUN_STOP
            VK_PERIOD = PERIOD
                 VK_9 = N_9
                 VK_N = N
@@ -37,20 +36,24 @@
                 VK_B = B
            VK_INSERT = AT
              VK_PLUS = EXP
+           #16777452 = MINUS
                 VK_P = P
                VK_F1 = F1
                 VK_0 = N_0
+           #16777448 = STAR
                 VK_2 = N_2
                 VK_C = C
-            VK_SHIFT = L_SHIFT
            VK_DELETE = RESTORE
+           #16777465 = EQUAL
                 VK_H = H
                 VK_W = W
              VK_DOWN = CRSR_UD
                 VK_7 = N_7
                VK_F3 = F3
+           #16777458 = SEMICOL
        VK_BACK_SPACE = INST_DEL
                 VK_K = K
+           #16777440 = COLON
                 VK_R = R
              VK_HOME = CLR_HOME
                 VK_3 = N_3
@@ -59,14 +62,4 @@
                 VK_Z = Z
                 VK_S = S
             VK_QUOTE = PLUS
-[cmap]
-                   ù = EQUAL
-           é/shifted = STAR
-                   à = SEMICOL
-           °/shifted = SEMICOL
-                   ì = MINUS
-           ç/shifted = COLON
-                   ò = COLON
-           ^/shifted = MINUS
-                   è = STAR
 [keypad_map]

@@ -16,7 +16,6 @@ class Keyboard(keyMapper: KeyboardMapper, nmiAction: (Boolean) => Unit = x => {}
   private[this] val keysPressed = collection.mutable.Set.empty[CKey.Key]
   private[this] val keyMap = keyMapper.map
   private[this] val keyPadMap = keyMapper.keypad_map
-  private[this] val keyMapChar = keyMapper.cmap
   private[this] val rowSelector,c128ExtendedRowSelector = Array.fill(8)(false)
   private[this] val colSelector = Array.fill(8)(false)
   private[this] var enabled,keypadEnabled = true
@@ -69,22 +68,10 @@ class Keyboard(keyMapper: KeyboardMapper, nmiAction: (Boolean) => Unit = x => {}
       }
     }
     else {
-      if ((e.getModifiers & java.awt.Event.ALT_MASK) == 0) {
-        keyMap get e.getKeyCode match {
+      if (!e.isAltDown) {
+        val key = if (e.getKeyCode != KeyEvent.VK_UNDEFINED) e.getKeyCode else e.getExtendedKeyCode
+        keyMap get key match {
           case None =>
-            keyMapChar get e.getKeyChar match {
-              case None => //Log.debug("Unknown char: " + e)
-              case Some((key,shift)) =>
-                //Log.debug("Char pressed: " + KeyEvent.getKeyText(e.getKeyCode) + " loc:" + e.getKeyLocation)
-                if (key == RESTORE) {
-                  nmiAction(true)
-                  nmiAction(false) // clears immediately NMI
-                }
-                else { 
-                  keysPressed += key
-                  if (shift) keysPressed += CKey.L_SHIFT 
-                }
-            }           
           case Some(key) =>
             //Log.debug("Pressed: " + KeyEvent.getKeyText(e.getKeyCode) + " loc:" + e.getKeyLocation)
             if (key == RESTORE) {
@@ -108,21 +95,13 @@ class Keyboard(keyMapper: KeyboardMapper, nmiAction: (Boolean) => Unit = x => {}
       }
     }
     else {
-      keyMap get e.getKeyCode match {
+      val key = if (e.getKeyCode != KeyEvent.VK_UNDEFINED) e.getKeyCode else e.getExtendedKeyCode
+      keyMap get key match {
         case None =>
-          keyMapChar get e.getKeyChar match {
-              case None =>
-              case Some((key,shift)) =>
-                if (key != RESTORE) {
-                  keysPressed -= key 
-                  if (shift) keysPressed -= CKey.L_SHIFT
-                }
-                //else nmiAction(false)
-          }
         case Some(key) =>
           if (key == L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed -= R_SHIFT
           else
-          if (key != RESTORE) keysPressed -= key else nmiAction(false)
+          if (key != RESTORE) keysPressed -= key// else nmiAction(false)
       }
     }
   }

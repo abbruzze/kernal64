@@ -9,22 +9,31 @@ import java.io.FileInputStream
 
 trait KeyboardMapper {
 	val map : Map[Int,CKey.Key]
-	val cmap : Map[Char,(CKey.Key,Boolean)]
 	val keypad_map : Map[Int,CKey.Key]
 }
 
 object KeyboardMapperStore {
-  val KEY_EVENT_MAP = getKeyEventMap
+  private val KEY_EVENT_MAP = getKeyEventMap
   private val KEY_EVENT_REV_MAP = getKeyEventMap map { kv => (kv._2,kv._1) }
+
+  def getKey(code:Int) : String = KEY_EVENT_MAP get code match {
+    case None =>
+      KeyEvent.getKeyText(code)
+    case Some(k) =>
+      k.substring(3)
+  }
+
+  def isExtendedKey(code:Int) : Boolean = !KEY_EVENT_MAP.contains(code)
   
   def store(km:KeyboardMapper,out:PrintWriter) {
     out.println("[map]")
     for(kv <- km.map) {
-      out.println("%20s = %s".format(s"${KEY_EVENT_MAP(kv._1)}",s"${kv._2}"))
-    }
-    out.println("[cmap]")
-    for(kv <- km.cmap) {
-      out.println("%20s = %s".format(s"${kv._1}${if (kv._2._2) "/shifted" else ""}",s"${kv._2._1}"))
+      KEY_EVENT_MAP get kv._1 match {
+        case Some(k) =>
+          out.println("%20s = %s".format(s"$k",s"${kv._2}"))
+        case None =>
+          out.println("%20s = %s".format(s"#${kv._1}",s"${kv._2}"))
+      }
     }
     out.println("[keypad_map]")
     for(kv <- km.keypad_map) {
@@ -51,7 +60,6 @@ object KeyboardMapperStore {
   
   def load(in:BufferedReader) : KeyboardMapper = {
     val e_map = new collection.mutable.HashMap[Int,CKey.Key]
-    val e_cmap = new collection.mutable.HashMap[Char,(CKey.Key,Boolean)]
     val e_keypad_map = new collection.mutable.HashMap[Int,CKey.Key]
     
     var line = in.readLine
@@ -62,19 +70,14 @@ object KeyboardMapperStore {
         case 0 =>  
           if (line == "[map]") section += 1
         case 1 => // map
-          if (line == "[cmap]") section += 1
-          else {
-            val Array(n,v) = line.split("=")
-            e_map += KEY_EVENT_REV_MAP(n.trim) -> CKey.withName(v.trim)
-          }
-        case 2 => // cmap
           if (line == "[keypad_map]") section += 1
           else {
             val Array(n,v) = line.split("=")
-            val (ch,shifted) = if (n.trim.endsWith("/shifted")) (n.split("/")(0).charAt(0),true) else (n.charAt(0),false)
-            e_cmap += ch -> (CKey.withName(v.trim),shifted)
+            val k = n.trim
+            val key = if (k.charAt(0) == '#') k.substring(1).toInt else KEY_EVENT_REV_MAP(k)
+            e_map += key -> CKey.withName(v.trim)
           }
-        case 3 => // keypad_map
+        case 2 => // keypad_map
           val Array(n,v) = line.split("=")
           e_keypad_map += KEY_EVENT_REV_MAP(n.trim) -> CKey.withName(v.trim)
           
@@ -83,10 +86,12 @@ object KeyboardMapperStore {
     }
     
     if (section == 0) throw new IllegalArgumentException
+
+    // add l-shift button
+    e_map += KeyEvent.VK_SHIFT -> CKey.L_SHIFT
     
     new KeyboardMapper {
       val map = e_map.toMap
-      val cmap = e_cmap.toMap
       val keypad_map = e_keypad_map.toMap
     }
   }

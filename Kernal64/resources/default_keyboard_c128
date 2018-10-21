@@ -46,7 +46,6 @@
                 VK_0 = N_0
                 VK_2 = N_2
                 VK_C = C
-            VK_SHIFT = L_SHIFT
            VK_DELETE = RESTORE
                 VK_H = H
                 VK_W = W
@@ -66,16 +65,11 @@
               VK_F11 = TAB
                 VK_S = S
             VK_QUOTE = PLUS
-[cmap]
-                   ù = EQUAL
-           é/shifted = STAR
-                   à = SEMICOL
-           °/shifted = SEMICOL
-                   ì = MINUS
-           ç/shifted = COLON
-                   ò = COLON
-           ^/shifted = MINUS
-                   è = STAR
+           #16777452 = MINUS
+           #16777448 = STAR
+           #16777465 = EQUAL
+           #16777458 = SEMICOL
+           #16777440 = COLON
 [keypad_map]
           VK_NUMPAD5 = KEYPAD_N_5
             VK_ENTER = KEYPAD_ENTER

@@ -28,48 +28,40 @@ class KeyboardEditor(keybm:KeyboardMapper,isC64:Boolean) extends JPanel with Act
     for(kv <- keybm.map) m += ((kv._2,kv._1))
     m
   }
-  private val cmap = {
-    val m = new collection.mutable.HashMap[(CKey.Key,Boolean),Char]
-    for(kv <- keybm.cmap) if (!kv._2._2) m += ((kv._2,kv._1))
-    m
-  }
   private val keypad_map = {
     val m = new collection.mutable.HashMap[CKey.Key,Int]
     for(kv <- keybm.keypad_map) m += ((kv._2,kv._1))
     m
   }
   
-  private case class ButtonKey(key:CKey.Key,keyCode:Option[Int],keyChar:Option[Char]) {
+  private case class ButtonKey(key:CKey.Key,keyCode:Option[Int]) {
     override def toString = keyCode match {
-      case Some(k) => KeyboardMapperStore.KEY_EVENT_MAP(k)
-      case None => keyChar match {
-        case Some(c) => c.toString
-        case None => "EMPTY"
-      }
-    }
-    def getDesc : String = keyCode match {
-      case Some(kc) => java.awt.event.KeyEvent.getKeyText(kc)
-      case None => keyChar match {
-        case Some(c) => c.toString
-        case None => "Empty slot"
-      }
+      case Some(kc) => KeyboardMapperStore.getKey(kc)
+      case None => "EMPTY"
     }
   }
   
-  private val keys = CKey.values filter { k => if (isC64) !CKey.is128Key(k) else true } toArray
+  private val keys = (CKey.values filter { k => if (isC64) !CKey.is128Key(k) else true } filterNot { k => k == CKey.L_SHIFT || k == CKey.R_SHIFT } toArray) sortBy { k => k.toString }
   private val maxKeyLen = keys map { _.toString.length } max
   private val keyButtons : Array[ButtonKey] = keys map { k =>
     findKeyCode(k) match {
-      case Some(vk) => ButtonKey(k,Some(vk),None)
-      case None => findKeyChar(k) match {
-        case Some(c) => ButtonKey(k,None,Some(c))
-        case None => ButtonKey(k,None,None)
-      }        
+      case Some(vk) =>
+        ButtonKey(k,Some(vk))
+      case None =>
+        ButtonKey(k,None)
+    }
+  }
+  private def getButtonColor(bk:ButtonKey) : Color = {
+    bk.keyCode match {
+      case None =>
+        Color.RED
+      case Some(c) =>
+        if (KeyboardMapperStore.isExtendedKey(c)) Color.BLUE else Color.BLACK
     }
   }
   private val buttons = keyButtons map { k => 
     val b = new JButton(k.toString)
-    b.setToolTipText(k.getDesc)
+    b.setForeground(getButtonColor(k))
     b.setActionCommand(k.key.toString)
     b.addActionListener(this)
     b
@@ -89,15 +81,6 @@ class KeyboardEditor(keybm:KeyboardMapper,isC64:Boolean) extends JPanel with Act
   private val statusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
   private val saveButton = new JButton("Save as ...")
   
-  private val NON_SHIFTABLE_KEYS = Set(
-      CKey.CTRL,
-      CKey.CBM,
-      CKey.L_ARROW,
-      CKey.RESTORE,
-      CKey.RETURN,
-      CKey.EQUAL
-  )
-  
   setLayout(new BorderLayout)
   add("Center",new JScrollPane(gridPanel))
   add("South",statusPanel)
@@ -113,19 +96,11 @@ class KeyboardEditor(keybm:KeyboardMapper,isC64:Boolean) extends JPanel with Act
   
   private def findKeyCode(k:CKey.Key) : Option[Int] = {
     map get k match {
-      case s@Some(vk) => s
+      case s@Some(_) => s
       case None =>
         keypad_map get k
     }
   }
-  
-  private def findKeyChar(k:CKey.Key) : Option[Char] = {
-    cmap get ((k,true)) match {
-      case s@Some(c) => s
-      case None =>
-        cmap get ((k,false))
-    }
-  }  
   
   def actionPerformed(e:ActionEvent) {
     if (e.getActionCommand == "SAVE") {
@@ -141,10 +116,11 @@ class KeyboardEditor(keybm:KeyboardMapper,isC64:Boolean) extends JPanel with Act
   }
   
   def keyPressed(e:KeyEvent) {
-    val buttonKey = if (e.getKeyCode != KeyEvent.VK_UNDEFINED) ButtonKey(keys(waitingIndex),Some(e.getKeyCode),None)
-                    else ButtonKey(keys(waitingIndex),None,Some(e.getKeyChar))
+    val buttonKey = if (e.getKeyCode != KeyEvent.VK_UNDEFINED) ButtonKey(keys(waitingIndex),Some(e.getKeyCode))
+                    else ButtonKey(keys(waitingIndex),Some(e.getExtendedKeyCode))
     keyButtons(waitingIndex) = buttonKey
     buttons(waitingIndex).setText(buttonKey.toString)
+    buttons(waitingIndex).setForeground(getButtonColor(buttonKey))
     
     if (e.getKeyLocation == KeyEvent.KEY_LOCATION_NUMPAD) {
       if (isC64) JOptionPane.showMessageDialog(this,"Keypad must be used in C128 mode only","Error",JOptionPane.ERROR_MESSAGE,null)
@@ -152,14 +128,7 @@ class KeyboardEditor(keybm:KeyboardMapper,isC64:Boolean) extends JPanel with Act
     }
     else {
       if (e.getKeyCode != KeyEvent.VK_UNDEFINED) map(keys(waitingIndex)) = e.getKeyCode
-      else {
-        cmap((keys(waitingIndex),false)) = e.getKeyChar
-        if (!NON_SHIFTABLE_KEYS.contains(keys(waitingIndex))) {
-          val shifted = JOptionPane.showInputDialog(this,s"Type the char for the shifted key ${keys(waitingIndex)}","Complete with the shifted version",JOptionPane.QUESTION_MESSAGE)
-          if (shifted != null) cmap((keys(waitingIndex),true)) = shifted.charAt(0)
-          else cmap -= ((keys(waitingIndex),true))
-        }
-      }
+      else map(keys(waitingIndex)) = e.getExtendedKeyCode
     }
     
     for(b <- buttons) b.setEnabled(true)
@@ -171,7 +140,6 @@ class KeyboardEditor(keybm:KeyboardMapper,isC64:Boolean) extends JPanel with Act
   
   private def makeKeyboardMapper : KeyboardMapper = new KeyboardMapper {
     val map = KeyboardEditor.this.map map { kv => (kv._2,kv._1) } toMap
-    val cmap = KeyboardEditor.this.cmap map { kv => (kv._2,kv._1) } toMap
     val keypad_map = KeyboardEditor.this.keypad_map map { kv => (kv._2,kv._1) } toMap
   }
   

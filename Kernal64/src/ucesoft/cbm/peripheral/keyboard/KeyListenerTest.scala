@@ -7,7 +7,7 @@ import javax.swing.JPanel
 import ucesoft.cbm.Log
 import java.awt.event.KeyListener
 
-object KeyListenerTest extends App with KeyListener {
+object QKeyListenerTest extends App with KeyListener {
     Log.setDebug
 //	val kb = new Keyboard
 //	val cp = ControlPort.keypadControlPort
@@ -21,37 +21,26 @@ object KeyListenerTest extends App with KeyListener {
 	f.addKeyListener(this)
 	f.requestFocus()
 	f.setVisible(true)
+
+  var lastCode = 0
 	
 	def keyPressed(e:KeyEvent) {
-    println("Press " + e)    
+    printEvent("Pressed",e)
   }
     
   def keyReleased(e:KeyEvent) {
-    println("Release " + e)
-  } 
-  
-  def keyTyped(e:KeyEvent) {
-    
+    lastCode = 0
+    printEvent("Released",e)
+    lastCode = 0
   }
-	
-//	new Thread {
-//	  override def run {	    
-//	    while (true) {
-//	      Thread.sleep(10)
-//	      val joy = cp.readPort
-//	      if (joy != 0xff) println("Joy=" + joy)
-//	      kb.selectRow(0)
-//	      if (kb.readCol != 0xFF) {
-//	    	  var col = 0xFE
-//	    	  do {
-//	    	    kb.selectRow(col)
-//	    	    val read = kb.readCol
-//	    	    if (read != 0xFF) printf("%02X,%02X\n",col,read)
-//	    	    col = ((col << 1) | 1) & 0xFF
-//	    	  }
-//	    	  while (col != 0xFF)
-//	      }
-//	    }
-//	  }
-//	}.start	
+
+  private def printEvent(s:String,e:KeyEvent): Unit = {
+    val code = if (e.getKeyCode != 0) e.getKeyCode else e.getExtendedKeyCode
+    if (code != lastCode) {
+      lastCode = code
+      println(s + " " + code + " " + KeyEvent.getKeyText(code))
+    }
+  }
+  
+  def keyTyped(e:KeyEvent) {}
 }
