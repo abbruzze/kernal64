@@ -20,7 +20,7 @@ If you want to load a 16M REU modify the memory settings inside the start script
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
 ### What's new in 1.4.8 (Oct 20th 2018)
-**VDC improvements.**
+**VDC improvements**
 - Improved screen resolution and aspect ratio
 - Different handling of borders: seems better than before but need more investigation
 - Added handling of 16K/64K bit
@@ -33,8 +33,9 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 - Improved cart button functionality for freezers: now the freezer will activate interrupt only if the CPU is in the fetching state.
 - VIC BA requests skipped when 2Mhz mode is on
 - Improved 1581 speed cycles in order to run fast loaders in C64 mode properly
-- All disk now are write protected if the corresponding file on local drive is read-only
+- All disks now are write protected if the corresponding file on local drive is read-only
 - New scala 2.12.7 libraries
+- Changed keyboard handling of non-standard keys. Used extended key codes to handle non standard keys. Now the keyboard file layout is simpler. Old keyboard file layout does not work any more.
 
 ### What's new in 1.4.7 (Sep 10th 2018)
 
