@@ -60,7 +60,7 @@ class CIA(val name:String,
   private[this] val timerA = new CIATimerA2(name,IRQ_SRC_TA,irqHandling _,autoClock,Some(timerB))
   private[this] val tod = new TOD2//new TOD((timerB.readCR & 0x80) == 0)
   private[this] var icr = 0
-  private[this] var sdr,shiftRegister = 0
+  private[this] var sdr,sdrlatch,shiftRegister = 0
   private[this] var sdrLoaded,sdrOut = false
   private[this] var SP = false
   private[this] var serialOUTTrigger : Boolean => Unit = _
@@ -400,7 +400,11 @@ class CIA(val name:String,
     case TOD_MIN => tod.writeMin(value)
     case TOD_HR => tod.writeHour(value)
     case SDR => // serial register
-      sdr = value
+      if (sdrLoaded) sdrlatch = value
+      else {
+        sdr = value
+        sdrlatch = -1
+      }
       if ((timerA.readCR & 0x40) == 0x40) { // serial out
         sdrLoaded = true        
         //println(s"$name SDR=${Integer.toHexString(value)} '${value.toChar}'")
@@ -430,7 +434,7 @@ class CIA(val name:String,
     shiftRegister = sdr // load the shift register
     sdrLoaded = false
     sdrOut = true
-    //println("Shift register loaded with " + sdr)
+    //println("Shift register loaded with " + sdr + " latch=" + sdrlatch)
   }
   
   private def sendSerial {
@@ -447,6 +451,11 @@ class CIA(val name:String,
             irqHandling(IRQ_SERIAL)
             sdrIndex = 0
             sdrOut = false
+            if (sdrlatch != -1) {
+              sdr = sdrlatch
+              sdrlatch = -1
+              sdrLoaded = true
+            }
           }
         }
       }
