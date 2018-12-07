@@ -31,7 +31,8 @@ trait MMUChangeListener {
   def _1571mode(_1571Mode:Boolean)
 }
 
-class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with ExpansionPortConfigurationListener with VICMemory with Z80.IOMemory {  
+class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with ExpansionPortConfigurationListener with VICMemory with Z80.IOMemory {
+  import ROM._
   val componentID = "128 MMU"
   val componentType = CBMComponentType.MEMORY
   
@@ -60,18 +61,16 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // Color & ROMS ------------------------------
   final private[this] val COLOR_RAM = new ColorRAM
   // 64
-  final private[this] val KERNAL64_ROM_NAME = System.getProperty("kernal64")
-  final private[this] val KERNAL64_ROM = new ROM(ram, "KERNAL64", KERNAL64_ADDR, 0x2000,if (KERNAL64_ROM_NAME != null) KERNAL64_ROM_NAME else "roms/kernal.rom")
-  final private[this] val BASIC64_ROM = new ROM(ram, "BASIC64", BASIC64_ADDR, 0x2000, "roms/basic.rom")
-  final private[this] val CHARACTERS64_ROM = new ROM(ram, "CHARACTERS64", CHARACTERS64_ADDR, 0x1000, "roms/128/characters.rom",0x0)
+  final private[this] val KERNAL64_ROM = new ROM(ram, "KERNAL64", KERNAL64_ADDR, 0x2000,C64_KERNAL_ROM_PROP)
+  final private[this] val BASIC64_ROM = new ROM(ram, "BASIC64", BASIC64_ADDR, 0x2000, C64_BASIC_ROM_PROP)
+  final private[this] val CHARACTERS64_ROM = new ROM(ram, "CHARACTERS64", CHARACTERS64_ADDR, 0x1000, C128_CHAR_ROM_PROP,0x0)
   final private[this] val ROML = new ExtendedROM(ram,"ROML",ROML64_ADDR)
   final private[this] val ROMH = new ExtendedROM(ram,"ROMH",BASIC64_ADDR)
   final private[this] val ROMH_ULTIMAX = new ExtendedROM(ram,"ROMH_ULTIMAX",KERNAL64_ADDR)
   // 128  
-  final private[this] val KERNAL_ROM_NAME = System.getProperty("kernal")
-  final private[this] val BASIC128_ROM = new ROM(ram,"BASIC128_LOW_HI",BASIC_LOW_ADDR,0x8000,"roms/128/basic.rom")
-  final private[this] val KERNAL128_ROM = new ROM(ram, "KERNAL128", KERNAL_ADDR, 0x4000,if (KERNAL_ROM_NAME != null) KERNAL_ROM_NAME else "roms/128/kernal.rom")
-  final private[this] val CHARACTERS128_ROM = new ROM(ram, "CHARACTERS128", CHARACTERS128_ADDR, 0x1000, "roms/128/characters.rom",0x1000)
+  final private[this] val BASIC128_ROM = new ROM(ram,"BASIC128_LOW_HI",BASIC_LOW_ADDR,0x8000,C128_BASIC_ROM_PROP)
+  final private[this] val KERNAL128_ROM = new ROM(ram, "KERNAL128", KERNAL_ADDR, 0x4000,C128_KERNAL_ROM_PROP)
+  final private[this] val CHARACTERS128_ROM = new ROM(ram, "CHARACTERS128", CHARACTERS128_ADDR, 0x1000, C128_CHAR_ROM_PROP,0x1000)
   private[this] var c128Mode = true
   private[this] val expansionPort = ExpansionPort.getExpansionPort
   // MMU ======================================================================================

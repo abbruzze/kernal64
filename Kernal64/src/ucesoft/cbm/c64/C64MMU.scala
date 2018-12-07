@@ -15,6 +15,7 @@ import javax.swing.JFrame
 import ucesoft.cbm.misc.TestCart
 
 object C64MMU {
+  import ROM._
   final val M_ROML = 0x8000
   final val M_BASIC = 0xA000
   final val M_KERNAL = 0xE000
@@ -23,12 +24,9 @@ object C64MMU {
   final val SID_RAM = 0xD400
     
   // --------------------------------------
-  
-  private[this] val KERNAL_ROM = System.getProperty("kernal")
+  class BASIC_ROM(ram: Memory) extends ROM(ram, "BASIC", M_BASIC, 8192, C64_BASIC_ROM_PROP)
 
-  class BASIC_ROM(ram: Memory) extends ROM(ram, "BASIC", M_BASIC, 8192, "roms/basic.rom")
-
-  class KERNAL_ROM(ram: Memory) extends ROM(ram, "KERNAL", M_KERNAL, 8192, if (KERNAL_ROM != null) KERNAL_ROM else "roms/kernal.rom") {
+  class KERNAL_ROM(ram: Memory) extends ROM(ram, "KERNAL", M_KERNAL, 8192,C64_KERNAL_ROM_PROP) {
     override def getProperties = {
       super.getProperties
       properties.setProperty("Version",read(0xFF80).toString)
@@ -36,7 +34,7 @@ object C64MMU {
     }
   }
   
-  class CHARACTERS_ROM(ram: Memory) extends ROM(ram, "CHARACTERS", M_CHARACTERS, 4096, "roms/chargen.rom")
+  class CHARACTERS_ROM(ram: Memory) extends ROM(ram, "CHARACTERS", M_CHARACTERS, 4096, C64_CHAR_ROM_PROP)
 
   class RAM extends RAMComponent {
     val componentID = "RAM"
