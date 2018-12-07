@@ -2198,6 +2198,7 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   val ctx = new Context(mem,this)
   private[this] var irqLow,nmiLow,nmiOnNegativeEdge = false
   private[this] var cpuWaitUntil = 0L
+  private[this] var cpuRestCycles = 0.0
   private[this] var busREQ = false
   private[this] var tracing = false
   private[this] var stepCallBack : (String) => Unit = _
@@ -2381,9 +2382,13 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   }
   
   // ======================================== Clock ==========================================================
-  final def clock(cycles:Long,scaleFactor:Int = 1) {
-    val canExecCPU = cycles > cpuWaitUntil && !busREQ    
-    if (canExecCPU) cpuWaitUntil = cycles + (fetchAndExecute - 1) / scaleFactor
+  final def clock(cycles:Long,scaleFactor:Double = 1) {
+    val canExecCPU = cycles > cpuWaitUntil && !busREQ
+    if (canExecCPU) {
+      val nextCPUCycles = cpuRestCycles + cycles + (fetchAndExecute - 1) / scaleFactor
+      cpuWaitUntil = nextCPUCycles.toInt
+      cpuRestCycles = nextCPUCycles - cpuWaitUntil
+    }
   }
   
   // state
