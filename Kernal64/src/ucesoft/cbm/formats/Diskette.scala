@@ -166,18 +166,12 @@ abstract class Diskette extends Floppy {
   }
   
   // =======================================================================
-  def loadInMemory(mem: Memory, fileName: String, relocate: Boolean,c64Mode:Boolean=true) = {
+  def loadInMemory(mem: Memory, fileName: String, relocate: Boolean,c64Mode:Boolean,drive:Int) : Unit = {
     load(fileName) match {
       case FileData(fn, startAddress, data) =>
-        val initialAddress = relocate match {
-          case true => startAddress
-          case false => ProgramLoader.startBASICAddress(mem,c64Mode)
-        }
-        for (m <- initialAddress until initialAddress + data.length) mem.write(m, data(m - initialAddress))
-        val endAddress = initialAddress + data.length
-        println("Loaded " + fn + " from " + initialAddress + " to " + endAddress)
-        ProgramLoader.updateBASICPointers(mem,initialAddress, endAddress,c64Mode)
-        endAddress
+        val (start,end) = ProgramLoader.loadPRG(mem,data,if (relocate) Some(startAddress) else None,c64Mode,drive)
+        println(s"Loaded $fn from $start to $end")
+      case _ =>
     }
   }
   
