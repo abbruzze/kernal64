@@ -1,30 +1,29 @@
-package ucesoft.cbm.util
+package ucesoft.cbm.misc
 
-import java.awt.event.MouseAdapter
-import java.awt.Robot
-import scala.util.Try
+import java.awt.event._
+import java.awt._
+
 import javax.swing.JComponent
-import java.awt.event.MouseEvent
-import java.awt.Point
-import java.awt.MouseInfo
+
+import scala.util.Try
 
 object MouseCage extends MouseAdapter {
   private val mousePointer = new Point
   private val robot : Robot = Try(new Robot).getOrElse(null)
   private var component : JComponent = _
-  
+
   def x = if (robot != null) mousePointer.x else MouseInfo.getPointerInfo.getLocation.x
   def y = if (robot != null) mousePointer.y else MouseInfo.getPointerInfo.getLocation.y
-  
+
   @inline private def robotMove(p:Point) {
     if (robot != null) robot.mouseMove(p.x, p.y)
   }
-  
+
   private def center : Point = {
     val loc = component.getLocationOnScreen
     new Point(loc.x + component.getWidth / 2,loc.y + component.getHeight / 2)
   }
-  
+
   def enableMouseCageOn(c:JComponent) {
     component = c
     val p = center
@@ -36,7 +35,7 @@ object MouseCage extends MouseAdapter {
     component.addMouseMotionListener(this)
     robotMove(p)
   }
-  
+
   def disableMouseCage {
     if (component != null) {
       component.removeMouseListener(this)
@@ -44,15 +43,15 @@ object MouseCage extends MouseAdapter {
       component.setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR))
     }
   }
-  
+
   override def mouseExited(e:MouseEvent) = robotMove(center)
-  
+
   override def mouseMoved(e:MouseEvent) {
     val compCenter = center
     mousePointer.x += e.getXOnScreen - compCenter.x
     mousePointer.y += e.getYOnScreen - compCenter.y
     robotMove(compCenter)
   }
-  
-  override def mouseDragged(e:MouseEvent) = mouseMoved(e)  
+
+  override def mouseDragged(e:MouseEvent) = mouseMoved(e)
 }
