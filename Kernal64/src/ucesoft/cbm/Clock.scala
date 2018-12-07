@@ -53,10 +53,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   @volatile private[this] var suspended = true
   @volatile private[this] var suspendedConfim = false
   private[this] val suspendedLock = new Object
-  // external threads
-  @volatile private[this] var externalEvents : EventList = null
-  private[this] val externalEventsLock = new Object
-  
+
   // ------ PERFORMANCE MANAGEMENT -------------
   final private[this] val DEFAULT_CLOCK_HZ = 985248.0
   private[this] var C64_CLOCK_HZ = DEFAULT_CLOCK_HZ
@@ -129,15 +126,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       	  events.next = null 	// cut from list
       	  events = next
       	}
-      	if (externalEvents != null) externalEventsLock.synchronized {
-      	  while (externalEvents != null) {
-      	    val extEvent = externalEvents.e
-      	    schedule(extEvent)
-      	    val next = externalEvents.next
-      	    externalEvents.next = null
-      	    externalEvents = next
-      	  }
-      	}
+
       	cycles += 1
       	if (limitCycles > 0 && cycles > limitCycles) sys.exit(0xFF)
       	throttle
@@ -186,27 +175,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       }
     }
   }
-  
-  def scheduleExternal(e:ClockEvent) = externalEventsLock.synchronized {
-    if (externalEvents == null) {
-      externalEvents = new EventList(e)
-    }
-    else
-    if (e.when <= externalEvents.e.when) {
-      externalEvents = new EventList(e,externalEvents)
-    }
-    else {
-      var ptr = externalEvents
-      var ptrNext = externalEvents.next
-      val when = e.when
-      while (ptrNext != null && when > ptrNext.e.when) {
-        ptr = ptrNext
-        ptrNext = ptrNext.next
-      }
-      ptr.next = new EventList(e,ptrNext)
-    }
-  }
-  
+
   final def schedule(e:ClockEvent) {
     //require(e.when > cycles,"Can't schedule an event in the past " + e.when + "(" + cycles + ")")
     if (events == null) {
