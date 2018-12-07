@@ -36,7 +36,7 @@ object FileRS232 extends StreamRS232 {
       }
       
       Log.info(s"Opening files ...")
-      setStreams(new FileInputStream(inFile),new FileOutputStream(outFile))
+      setStreams(new FileInputStream(inFile),new FileOutputStream(outFile),"N/A")
     }
     else {
       val (in,out) = getStreams

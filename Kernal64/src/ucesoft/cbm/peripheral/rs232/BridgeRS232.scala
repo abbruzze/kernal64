@@ -1,5 +1,6 @@
 package ucesoft.cbm.peripheral.rs232
 
+import ucesoft.cbm.Log
 import ucesoft.cbm.peripheral.cia.CIA
 
 object BridgeRS232 extends RS232 {
@@ -7,7 +8,7 @@ object BridgeRS232 extends RS232 {
   private[this] var rs232 : RS232 = _
   private[this] var txd = 0
   private[this] var others = 0XFF
-  private[this] var cia2 : CIA = _
+  private[this] var cia1,cia2 : CIA = _
   private[this] var statusListener : RS232StatusListener = _
   
   def init {}
@@ -32,14 +33,27 @@ object BridgeRS232 extends RS232 {
   def getConfiguration : String = if (rs232 == null) "" else rs232.getConfiguration
   def isEnabled : Boolean = if (rs232 != null) rs232.isEnabled else false
   def setEnabled(enabled:Boolean) = if (rs232 != null) rs232.setEnabled(enabled)
-  def setCIA(cia2:CIA) = this.cia2 = cia2
+  def setCIA12(cia1:CIA,cia2:CIA) = {
+    this.cia1 = cia1
+    this.cia2 = cia2
+  }
   def getDescription : String = "No RS-232 attached"
   def connectionInfo = if (rs232 != null) rs232.connectionInfo else ""
+  override def setFlowControlEnabled(enabled:Boolean) {
+    super.setFlowControlEnabled(enabled)
+    Log.info(s"RS232 flow control set to $enabled")
+    if (rs232 != null) rs232.setFlowControlEnabled(enabled)
+  }
   
   def setRS232(rs232:RS232) {
     this.rs232 = rs232
     rs232.setRS232Listener(statusListener)
-    rs232.setCIA(cia2)
-    rs232.setOthers(others)    
-  }    
+    rs232.setCIA12(cia1,cia2)
+    rs232.setOthers(others)
+    rs232.setFlowControlEnabled(flowControlEnabled)
+  }
+
+  def unsetRS232: Unit = {
+    rs232 = null
+  }
 }

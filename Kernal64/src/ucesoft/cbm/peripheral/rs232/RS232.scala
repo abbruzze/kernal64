@@ -27,6 +27,10 @@ object RS232 {
 
 trait RS232 extends CBMComponent {
   val componentType = CBMComponentType.USER_PORT
+  private[this] var flowControl = false
+
+  def flowControlEnabled = flowControl
+  def setFlowControlEnabled(enabled:Boolean) = flowControl = enabled
   
   def setTXD(high:Int)
   def getTXD : Int
@@ -56,7 +60,7 @@ trait RS232 extends CBMComponent {
   def isEnabled : Boolean
   def setEnabled(enabled:Boolean)
   
-  def setCIA(cia2:CIA)
+  def setCIA12(cia1:CIA,cia2:CIA)
   
   def getDescription : String
   

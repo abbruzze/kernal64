@@ -1,5 +1,7 @@
 package ucesoft.cbm.peripheral.rs232
 
+import java.io.IOException
+
 import ucesoft.cbm.Log
 import java.net.Socket
 
@@ -38,13 +40,21 @@ class TCPRS232 extends StreamRS232 {
     if (!enabled) {
       super.setEnabled(enabled)
       Log.info(s"Disconnecting from $host...")
-      try { socket.close } catch { case _t:Throwable => }
+      try { socket.close } catch { case _:Throwable => }
+      disconnect
     }
     else {      
       Log.info(s"Connecting to $host:$port ...")
-      socket = new Socket(host,port)
-      setStreams(socket.getInputStream,socket.getOutputStream)
-      super.setEnabled(enabled)
+      try {
+        socket = new Socket(host, port)
+        setStreams(socket.getInputStream, socket.getOutputStream,s"$host:$port")
+        super.setEnabled(enabled)
+      }
+      catch {
+        case io:IOException =>
+          Log.info(s"Telnet: Cannot connect to $host:$port. " + io)
+          disconnect
+      }
     }
   }
   
