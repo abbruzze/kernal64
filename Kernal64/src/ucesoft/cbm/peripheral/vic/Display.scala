@@ -125,7 +125,6 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       val zoomR = zoomRec
       val interlacedFactor = if (interlaced) 2.0 else 1.0
       zoomArea = (new Point((zoomR.x / zoomFactorX).toInt, (zoomR.y / zoomFactorY * interlacedFactor).toInt), new Point(((zoomR.x + zoomR.width) / zoomFactorX).toInt,((zoomR.y + zoomR.height) / zoomFactorY * interlacedFactor).toInt))
-      println(zoomArea)
       repaint()
     }
   }
@@ -184,7 +183,6 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       Log.debug(s"New screen dimension ${dimension.width} x ${dimension.height}")      
       zoomFactorX = dimension.width.toDouble / (if (clipArea != null) clipArea._2.x - clipArea._1.x else screen.getWidth(null))
       zoomFactorY = dimension.height.toDouble / (if (clipArea != null) clipArea._2.y - clipArea._1.y else screen.getHeight(null))
-      println(zoomFactorX + " " + zoomFactorY)
       //println(s"New screen dimension ${dimension.width} x ${dimension.height} width/height=${dimension.width.toDouble/dimension.height}")
     }
     g.asInstanceOf[Graphics2D].setRenderingHint(RenderingHints.KEY_INTERPOLATION,renderingHints)
