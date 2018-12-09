@@ -1,9 +1,7 @@
 package ucesoft.cbm.misc
 
-import ucesoft.cbm.peripheral.keyboard.KeyboardMapper
+import ucesoft.cbm.peripheral.keyboard.{CKey, Keyboard, KeyboardMapper, KeyboardMapperStore}
 import javax.swing._
-import ucesoft.cbm.peripheral.keyboard.CKey
-import ucesoft.cbm.peripheral.keyboard.KeyboardMapperStore
 import java.awt.FlowLayout
 import java.awt.GridLayout
 import java.awt.event.ActionListener
@@ -15,14 +13,14 @@ import java.awt.Color
 import java.awt.Font
 
 object KeyboardEditor extends App {
-  val ke = new KeyboardEditor(ucesoft.cbm.c128.C128KeyboardMapper,true)
+  val ke = new KeyboardEditor(null,ucesoft.cbm.c128.C128KeyboardMapper,true)
   val f = new JFrame  
   f.getContentPane.add("Center",ke)
   f.pack
   f.setVisible(true)
 }
 
-class KeyboardEditor(keybm:KeyboardMapper,isC64:Boolean) extends JPanel with ActionListener with KeyListener {
+class KeyboardEditor(keyboard:Keyboard,keybm:KeyboardMapper,isC64:Boolean) extends JPanel with ActionListener with KeyListener {
   private val map = {
     val m = new collection.mutable.HashMap[CKey.Key,Int]
     for(kv <- keybm.map) m += ((kv._2,kv._1))
@@ -121,7 +119,13 @@ class KeyboardEditor(keybm:KeyboardMapper,isC64:Boolean) extends JPanel with Act
     keyButtons(waitingIndex) = buttonKey
     buttons(waitingIndex).setText(buttonKey.toString)
     buttons(waitingIndex).setForeground(getButtonColor(buttonKey))
-    
+
+    val alreadyExists = keypad_map.filter( kv => kv._1 != keys(waitingIndex) && kv._2 == e.getKeyCode ) ++ map.filter( kv => kv._1 != keys(waitingIndex) && kv._2 == e.getKeyCode )
+    if (!alreadyExists.isEmpty) {
+      val keys = alreadyExists.keys.mkString(",")
+      JOptionPane.showMessageDialog(this,s"Other keys have the same binding: $keys","Key binding warning",JOptionPane.WARNING_MESSAGE,null)
+    }
+
     if (e.getKeyLocation == KeyEvent.KEY_LOCATION_NUMPAD) {
       if (isC64) JOptionPane.showMessageDialog(this,"Keypad must be used in C128 mode only","Error",JOptionPane.ERROR_MESSAGE,null)
       else keypad_map(keys(waitingIndex)) = e.getKeyCode
@@ -129,6 +133,8 @@ class KeyboardEditor(keybm:KeyboardMapper,isC64:Boolean) extends JPanel with Act
     else {
       if (e.getKeyCode != KeyEvent.VK_UNDEFINED) map(keys(waitingIndex)) = e.getKeyCode
       else map(keys(waitingIndex)) = e.getExtendedKeyCode
+
+      keyboard.setKeyboardMapper(makeKeyboardMapper)
     }
     
     for(b <- buttons) b.setEnabled(true)
