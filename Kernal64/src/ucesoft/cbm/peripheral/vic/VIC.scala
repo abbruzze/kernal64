@@ -1076,7 +1076,7 @@ final class VIC(mem: VICMemory,
           vc = (vc + 1) & 0x3FF //% 1024          
           vmli = (vmli + 1) & 0x3F 
         }
-        else dataToDraw = mem.read(if (ecm) 0x39ff else 0x3fff,ChipID.VIC)
+        else dataToDraw = if (_2MhzMode) mem.byteOnBUS else mem.read(if (ecm) 0x39ff else 0x3fff,ChipID.VIC)
       case 56 =>
         mem.read(0x3FFF,ChipID.VIC)
         var c = 0
@@ -1132,11 +1132,11 @@ final class VIC(mem: VICMemory,
           vc = (vc + 1) & 0x3FF
           vmli = (vmli + 1) & 0x3F
           // c-access
-          if (_baLow) readAndStoreVideoMemory
+          if (badLine) readAndStoreVideoMemory
         } 
         else 
         if (!isInDisplayState && rasterCycle >= 16) {
-          dataToDraw = mem.read(if (ecm) 0x39ff else 0x3fff,ChipID.VIC)
+          dataToDraw = if (_2MhzMode) mem.byteOnBUS else mem.read(if (ecm) 0x39ff else 0x3fff,ChipID.VIC)
         } 
         (rasterCycle : @switch) match {
           case 12 =>
@@ -1320,14 +1320,16 @@ final class VIC(mem: VICMemory,
    * To be called on bad lines
    */
   @inline private def readAndStoreVideoMemory {
-    val charCode = mem.readPhi2(videoMatrixAddress | vc)
-    val color = colorMem.read(COLOR_ADDRESS | vc) & 0x0F
+    val charCode = if (_2MhzMode) internalDataBus else mem.readPhi2(videoMatrixAddress | vc)
+    val color = if (_2MhzMode) mem.byteOnBUS & 0x0F else colorMem.read(COLOR_ADDRESS | vc) & 0x0F
     vml_p(vmli) = charCode
     vml_c(vmli) = color
     //Log.fine(s"Reading video memory at ${videoMatrixAddress + offset}: charCode=${charCode} color=${color}")
   }
   
   @inline private def readCharFromMemory : Int = {
+    if (_2MhzMode) mem.byteOnBUS
+    else
     if (bmm) {
       val offset = bitmapAddress | ((vc & 0x3ff) << 3) | rc
       val bitmap = mem.read(offset,ChipID.VIC)
@@ -1343,7 +1345,7 @@ final class VIC(mem: VICMemory,
 
   /*
    * A Bad Line Condition is given at any arbitrary clock cycle, if at the
- 	negative edge of �0 at the beginning of the cycle RASTER >= $30 and RASTER
+ 	negative edge of phi0 at the beginning of the cycle RASTER >= $30 and RASTER
  	<= $f7 and the lower three bits of RASTER are equal to YSCROLL and if the
  	DEN bit was set during an arbitrary cycle of raster line $30.
    */
