@@ -2,6 +2,7 @@ package ucesoft.cbm.c128
 
 import javax.swing._
 import java.awt.event._
+
 import ucesoft.cbm.game.GamePlayer
 import ucesoft.cbm.trace._
 import ucesoft.cbm._
@@ -11,21 +12,24 @@ import ucesoft.cbm.misc._
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.rs232._
-import ucesoft.cbm.util._
 import java.awt._
 import java.util.Properties
 import java.io._
+
 import ucesoft.cbm.formats._
 import java.awt.datatransfer.DataFlavor
+
 import scala.util.Success
 import scala.util.Failure
 import java.util.ServiceLoader
+
 import ucesoft.cbm.game.GameUI
 import ucesoft.cbm.peripheral.controlport.JoystickSettingDialog
 import ucesoft.cbm.peripheral.bus.IECBusLine
 import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.remote.RemoteC64
 import ucesoft.cbm.peripheral.bus.IECBusListener
+import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.vdc.VDC
 
 object C128 extends App {
@@ -34,7 +38,7 @@ object C128 extends App {
   c128.run(args)  
 }
 
-class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChangeListener {
+class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   val componentID = "Commodore 128"
   val componentType = CBMComponentType.INTERNAL
   
@@ -60,6 +64,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         case io:IOException =>
       }
     }
+    ROM.props = props
     props
   }
   private[this] var cartButtonRequested = false
@@ -109,7 +114,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   // ------------- MMU Status Panel ------------
   private[this] val mmuStatusPanel = new MMUStatusPanel
   // -------------- MENU ITEMS -----------------
-  private[this] val maxSpeedItem = new JCheckBoxMenuItem("Maximum speed")
+  private[this] val maxSpeedItem = new JCheckBoxMenuItem("Warp mode")
   private[this] val loadFileItems = Array(new JMenuItem("Load file from attached disk 8 ..."), new JMenuItem("Load file from attached disk 9 ..."))
   private[this] val tapeMenu = new JMenu("Tape control...")
   private[this] val detachCtrItem = new JMenuItem("Detach cartridge")
@@ -125,12 +130,12 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private[this] var inspectDialog : InspectPanelDialog = _
   private[this] var traceItem,traceDiskItem : JCheckBoxMenuItem = _
   // -------------------- DISK -----------------
-  private[this] var isDiskActive = true
-  private[this] var isDiskActive9,disk9Enabled = false
+  private[this] val drivesRunning = Array(true,true)
+  private[this] val drivesEnabled = Array(true,true)
   private[this] val diskFlusher = new FloppyFlushUI(vicDisplayFrame)
   private[this] val driveLeds = Array(new DriveLed,new DriveLed)
   private[this] val diskProgressPanels = Array(new DriveLoadProgressPanel,new DriveLoadProgressPanel)
-  private[this] val flyerIEC = new FlyerIEC(bus,file => attachDiskFile(0,file,false))
+  private[this] val flyerIEC = new FlyerIEC(bus,file => attachDiskFile(0,file,false,None))
   private[this] var isFlyerEnabled = false
   private[this] val drives : Array[Drive with TraceListener] = Array.ofDim(2)
   private[this] val floppyComponents = Array.ofDim[FloppyComponent](2)
@@ -142,14 +147,12 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private[this] var datassette : c2n.Datassette = _
   // ----------------- RS-232 ------------------
   private[this] val rs232 = BridgeRS232
-  private[this] var activeRs232 : Option[RS232] = None 
   private[this] val AVAILABLE_RS232 : Array[RS232] = Array(TelnetRS232,
                                                            TCPRS232,
                                                            FileRS232,
                                                            SwiftLink.getSL(nmiSwitcher.expansionPortNMI,None),
                                                            SwiftLink.getSL(nmiSwitcher.expansionPortNMI _,Some(REU.getREU(REU.REU_1750,mmu,setDMA _,irqSwitcher.expPortIRQ _,None))),
                                                            ProcessRS232)
-  private[this] val rs232StatusPanel = new RS232StatusPanel
   // -------------------- PRINTER --------------
   private[this] var printerEnabled = false
   private[this] val printerGraphicsDriver = new ucesoft.cbm.peripheral.printer.MPS803GFXDriver(new ucesoft.cbm.peripheral.printer.MPS803ROM)
@@ -163,12 +166,10 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     val buttonPanel = new JPanel
     val exportPNGBUtton = new JButton("Export as PNG")
     buttonPanel.add(exportPNGBUtton)
-    exportPNGBUtton.setActionCommand("PRINT_EXPORT_AS_PNG")
-    exportPNGBUtton.addActionListener(this)
+    exportPNGBUtton.addActionListener(_ => printerSaveImage )
     val clearButton = new JButton("Clear")
     buttonPanel.add(clearButton)
-    clearButton.setActionCommand("PRINT_CLEAR")
-    clearButton.addActionListener(this)
+    clearButton.addActionListener(_ => printerGraphicsDriver.clearPages )
     dialog.getContentPane.add("South",buttonPanel)
     dialog.pack
     dialog
@@ -229,8 +230,9 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     clockSpeed = 1
     clock.maximumSpeed = false
     maxSpeedItem.setSelected(false)
+    ProgramLoader.reset
   }
-  
+
   private def initDrive(id:Int,driveType:DriveType.Value) {
     val old = Option(drives(id))
     old match {
@@ -238,20 +240,18 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       case _ =>
     }
     id match {
-      case 0 =>        
+      case 0 =>
         drives(0) = driveType match {
           case DriveType._1571 =>
             DriveLed8Listener.setPowerLedMode(false)
-            new D1571(0x00,bus,DriveLed8Listener,_1571mode _)
+            new D1571(0x00,bus,DriveLed8Listener,_ => {})
           case DriveType._1541 =>
             DriveLed8Listener.setPowerLedMode(false)
             new C1541(0x00,bus,DriveLed8Listener)
           case DriveType._1581 =>
-            DriveLed8Listener.setPowerLedMode(true)            
+            DriveLed8Listener.setPowerLedMode(true)
             new D1581(0x00,bus,DriveLed8Listener)
         }
-        drives(0).setIsRunningListener(diskRunning => isDiskActive = diskRunning)
-        isDiskActive = true
       case 1 =>
         drives(1) = driveType match {
           case DriveType._1571 =>
@@ -260,14 +260,12 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
           case DriveType._1541 =>
             DriveLed9Listener.setPowerLedMode(false)
             new C1541(0x01,bus,DriveLed9Listener)
-          case DriveType._1581 => 
-            DriveLed9Listener.setPowerLedMode(true)            
+          case DriveType._1581 =>
+            DriveLed9Listener.setPowerLedMode(true)
             new D1581(0x01,bus,DriveLed9Listener)
         }
-        drives(1).setIsRunningListener(diskRunning => isDiskActive9 = disk9Enabled && diskRunning)
-        if (!isDiskActive9) drives(1).setActive(false)
-    }    
-    
+    }
+
     old match {
       case None =>
         add(drives(id))
@@ -280,9 +278,13 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         inspectDialog.updateRoot
         if (id == 0) {
           diskTraceDialog.mem = drives(id).getMem
-          diskTraceDialog.traceListener = drives(id)    
+          diskTraceDialog.traceListener = drives(id)
         }
-    }    
+    }
+
+    drives(id).runningListener = running => {
+      drivesRunning(id) = running
+    }
   }
   
   def init {
@@ -291,12 +293,15 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     Log.setInfo
     
     Log.info("Building the system ...")
+    RS232ConfigPanel.registerAvailableRS232Drivers(vicDisplayFrame,AVAILABLE_RS232)
     ExpansionPort.addConfigurationListener(mmu)       
     // drive
     initDrive(0,DriveType._1571)
     initDrive(1,DriveType._1571)
+    drivesEnabled(1) = false
     // -----------------------
-    clock.setClockHz(1000000)
+    ProgramLoader.cpu = cpu
+    //clock.setClockHz(1000000)
     mmu.setKeyboard(keyb)
     add(clock)
     add(mmu)
@@ -308,7 +313,6 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     add(bus)
     add(expansionPort)
     add(rs232)    
-    rs232.setRS232Listener(rs232StatusPanel)
     floppyComponents(0) = new FloppyComponent(8,drives(0),driveLeds(0))
     add(floppyComponents(0))
     floppyComponents(1) = new FloppyComponent(9,drives(1),driveLeds(1))
@@ -355,7 +359,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     				   cia2CP1,
     				   cia2CP2,
     				   nmiSwitcher.cia2NMIAction _)
-    rs232.setCIA(cia2)
+    rs232.setCIA12(cia1,cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
     vicChip = new vic.VIC(vicMemory,mmu.colorRAM,irqSwitcher.vicIRQ _,baLow _)
@@ -462,7 +466,6 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     rowPanel.add("South",row2Panel)
     val tapePanel = new TapeState
     datassette.setTapeListener(tapePanel)
-    row1Panel.add(rs232StatusPanel)
     row1Panel.add(tapePanel)
     row1Panel.add(tapePanel.progressBar)
     row1Panel.add(diskProgressPanels(0))
@@ -475,6 +478,17 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     vicDisplayFrame.getContentPane.add("South",infoPanel)
     vicDisplayFrame.setTransferHandler(DNDHandler)    
     Log.info(sw.toString)
+  }
+
+  private def loadSettings(args:Array[String]) : Unit = {
+    settings.load(configuration)
+    // AUTOPLAY
+    settings.parseAndLoad(args) match {
+      case None =>
+      case Some(f) =>
+        handleDND(new File(f),false,true)
+    }
+    DrivesConfigPanel.registerDrives(vicDisplayFrame,drives.toList,setDriveType(_,_,false),enableDrive _,attachDisk _,drivesEnabled)
   }
   
   override def afterInitHook {    
@@ -516,8 +530,12 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     // VIC PHI1
     vicChip.clock
     //DRIVES
-    if (isDiskActive) drives(0).clock(cycles)
-    if (isDiskActive9) drives(1).clock(cycles)
+    var d = 0
+    while (d < 2) {
+      if (drivesEnabled(d) && drivesRunning(d)) drives(d).clock(cycles)
+
+      d += 1
+    }
     if (device10DriveEnabled) device10Drive.clock(cycles)
     // printer
     if (printerEnabled) printer.clock(cycles)
@@ -529,8 +547,9 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       cartButtonRequested = false
       ExpansionPort.getExpansionPort.freezeButton
     }
-    if (z80Active) z80.clock(cycles,2) 
+    if (z80Active) z80.clock(cycles,2.0299) // 2Mhz / 985248
     else {
+      ProgramLoader.checkLoadingInWarpMode(c64Mode)
       cpu.fetchAndExecute(1)
       if (cpuFrequency == 2 && !mmu.isIOACC && !vicChip.isRefreshCycle) cpu.fetchAndExecute(1)
     }
@@ -557,7 +576,8 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     Log.debug(s"Frequency set to $f Mhz")
     mmuStatusPanel.frequencyChanged(f)
     cpuFrequency = f
-    vicChip.set2MhzMode(f == 2)
+    val _2MhzMode = f == 2
+    vicChip.set2MhzMode(_2MhzMode)
   }
   def cpuChanged(is8502:Boolean) {
     if (is8502) {
@@ -590,369 +610,15 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   def _1571mode(_1571Mode:Boolean) {
     mmuStatusPanel._1571mode(_1571Mode)
   }
-  // ---------------------------------- GUI HANDLING -------------------------------
-    
-  final def actionPerformed(e:ActionEvent) {
-    e.getActionCommand match {
-      case "TRACE" =>
-      	val traceItem = e.getSource.asInstanceOf[JCheckBoxMenuItem]
-      	trace(true,traceItem.isSelected)
-      case "TRACE_DISK" =>
-      	val traceItem = e.getSource.asInstanceOf[JCheckBoxMenuItem]
-      	trace(false,traceItem.isSelected)
-      case "INSPECT" =>
-        val selected = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        inspectDialog.setVisible(selected)
-      case "RESET" =>
-        reset(true)
-      case "ATTACH_CTR" => 
-        attachCtr
-      case "DETACH_CTR" =>
-        detachCtr
-      case "MAXSPEED" =>
-        val maxSpeedItem = e.getSource.asInstanceOf[JCheckBoxMenuItem]
-        clock.maximumSpeed = maxSpeedItem.isSelected
-        clock.pause
-        sid.setFullSpeed(maxSpeedItem.isSelected)
-        clock.play
-      case "ADJUSTRATIO" =>
-        adjustRatio(true)
-      case "ADJUSTRATIO_VDC" =>
-        adjustRatio(false,true)
-      case "VDC_NORMAL_SIZE" =>
-        adjustRatio(false)
-      case "AUTORUN_DISK" =>
-        attachDisk(0,true)
-      case "ATTACH_DISK_0" =>
-        attachDisk(0,false)
-      case "ATTACH_DISK_1" =>
-        attachDisk(1,false)
-      case "EJECT_DISK_0" =>
-        ejectDisk(0)
-      case "EJECT_DISK_1" =>
-        ejectDisk(1)
-      case "LOAD_FILE_0" =>
-        loadFileFromAttachedFile(0,true)
-      case "LOAD_FILE_1" =>
-        loadFileFromAttachedFile(1,true)
-      case "JOY" =>
-        joySettings
-      case "PASTE" =>
-        paste
-      case "SNAPSHOT_VIC" =>
-        takeSnapshot(true)
-      case "SNAPSHOT_VDC" =>
-        takeSnapshot(false)
-      case "LOADPRG" =>
-        loadPrg
-      case "SAVEPRG" =>
-        savePrg
-      case "ZOOM1" =>
-        zoom(1)
-      case "ZOOM2" =>
-        zoom(2)
-      case "ZOOM4" =>
-        zoom(4)
-      case "PAUSE" =>
-        if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) Clock.systemClock.pause
-        else Clock.systemClock.play
-      case "SWAP_JOY" =>
-        swapJoysticks
-      case "DISK_RO" =>
-        drives foreach { _.setReadOnly(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) }
-      case "DISK_CAN_GO_SLEEP" =>
-        val canGoSleep = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        drives foreach { _.setCanSleep(canGoSleep) }
-      case "PARALLEL_CABLE" =>
-        val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        ParallelCable.enabled = enabled
-      case "DISK_EXP_RAM_2000" =>
-        C1541Mems.RAM_EXP_2000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-      case "DISK_EXP_RAM_4000" =>
-        C1541Mems.RAM_EXP_4000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-      case "DISK_EXP_RAM_6000" =>
-        C1541Mems.RAM_EXP_6000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-      case "DISK_EXP_RAM_8000" =>
-        C1541Mems.RAM_EXP_8000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-      case "DISK_EXP_RAM_A000" =>
-        C1541Mems.RAM_EXP_A000.isActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-      case "DISK_MIN_SPEED" =>
-        for(d <- drives) d.setSpeedHz(d.MIN_SPEED_HZ)
-      case "DISK_MAX_SPEED" =>
-        for(d <- drives) d.setSpeedHz(d.MAX_SPEED_HZ)
-      case "NO_PEN" =>
-        lightPenButtonEmulation = LIGHT_PEN_NO_BUTTON
-        keypadControlPort.setLightPenEmulation(false)
-        vicChip.enableLightPen(false)
-      case "PEN_UP" =>
-        lightPenButtonEmulation = LIGHT_PEN_BUTTON_UP
-        vicChip.enableLightPen(true)
-        keypadControlPort.setLightPenEmulation(true)
-      case "PEN_LEFT" =>
-        lightPenButtonEmulation = LIGHT_PEN_BUTTON_LEFT
-        vicChip.enableLightPen(true)
-        keypadControlPort.setLightPenEmulation(true)
-      case "MOUSE_ENABLED" =>
-        val mouseEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        enableMouse(mouseEnabled)
-        if (mouseEnabled) MouseCage.enableMouseCageOn(vicDisplay) else MouseCage.disableMouseCage
-      case "EXIT" => close
-      case "TAPE" =>
-        loadFileFromTape
-      case "TAPE_PLAY" =>
-        datassette.pressPlay
-      case "TAPE_STOP" =>
-        datassette.pressStop
-      case "TAPE_RECORD" =>
-        datassette.pressRecordAndPlay
-      case "TAPE_REWIND" =>
-        datassette.pressRewind
-      case "ATTACH_TAPE" =>
-        attachTape 
-      case "ABOUT" =>
-        showAbout
-      case "PRINTER_PREVIEW" =>
-        showPrinterPreview
-      case "PRINT_CLEAR" =>
-        printerGraphicsDriver.clearPages
-      case "PRINT_EXPORT_AS_PNG" =>
-        printerSaveImage
-      case "PRINTER_ENABLED" =>
-        printerEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        printer.setActive(printerEnabled)
-      case "VOLUME" =>
-        volumeDialog.setVisible(true)
-      case "CRT_PRESS" => 
-        cartButtonRequested = true
-      case "NO_REU" =>
-        setREU(None,None)
-      case "REU_128" => 
-        setREU(Some(REU.REU_1700),None)
-      case "REU_256" => 
-        setREU(Some(REU.REU_1764),None)
-      case "REU_512" => 
-        setREU(Some(REU.REU_1750),None)
-      case "REU_16M" => 
-        val fc = new JFileChooser
-  	    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-  	    fc.setFileView(new C64FileView)
-  	    fc.setFileFilter(new javax.swing.filechooser.FileFilter {
-  	      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".REU")
-  	      def getDescription = "REU files"
-  	    })
-  	    fc.showOpenDialog(vicDisplayFrame) match {
-  	      case JFileChooser.APPROVE_OPTION|JFileChooser.CANCEL_OPTION => 
-  	        try {
-  	          setREU(Some(REU.REU_16M),Option(fc.getSelectedFile.toString))
-  	        }
-  	        catch {
-  	          case t:Throwable =>
-  	            JOptionPane.showMessageDialog(vicDisplayFrame,t.toString, "REU loading error",JOptionPane.ERROR_MESSAGE)
-  	        }
-  	      case _ =>
-  	    }	   
-      case "MAKE_DISK" =>
-        makeDisk
-      case "RS232" =>
-        manageRS232
-      case "CP/M" =>
-        ExpansionPort.getExpansionPort.eject
-        if (e.getSource.asInstanceOf[JRadioButtonMenuItem].isSelected) {
-          ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,setDMA _,setTraceListener _))
-        }
-        else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
-      case "DEVICE10_DISABLED" =>
-        enableDrive10(false,None)
-      case "LOCAL_DRIVE_ENABLED" =>        
-        enableDrive10(true,None)
-      case "DRIVE_9_ENABLED" =>
-        val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        enableDrive9(enabled)
-      case "SID_6581" =>
-        sid.setModel(true)
-      case "SID_8580" =>
-        sid.setModel(false)
-      case "NO_DUAL_SID" =>
-        expansionPort.eject
-        sid.setStereo(false)
-        ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
-      case "DUAL_SID_DE00" =>
-        expansionPort.eject
-        sid.setStereo(true)
-        ExpansionPort.setExpansionPort(new DualSID(sid,0xDE00))
-      case "DUAL_SID_DF00" =>
-        expansionPort.eject
-        sid.setStereo(true)
-        ExpansionPort.setExpansionPort(new DualSID(sid,0xDF00))
-      case "FLYER ENABLED" =>
-        val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        if (enabled != isFlyerEnabled) flyerIEC.reset
-        isFlyerEnabled = enabled
-      case "FLYER DIR" =>
-        val fc = new JFileChooser
-        fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
-  	    fc.setCurrentDirectory(flyerIEC.getFloppyRepository)
-  	    fc.showOpenDialog(vicDisplayFrame) match {
-  	      case JFileChooser.APPROVE_OPTION =>
-  	        flyerIEC.setFloppyRepository(fc.getSelectedFile)
-  	      case _ =>
-        }
-      case "REMOTE_OFF" =>
-        remote match {
-          case Some(rem) => 
-            rem.stopRemoting
-            vicDisplay.setRemote(None)
-            remote = None
-          case None =>
-        }
-      case "REMOTE_ON" =>
-        val source = e.getSource.asInstanceOf[JRadioButtonMenuItem]
-        if (remote.isDefined) remote.get.stopRemoting
-        val listeningPort = JOptionPane.showInputDialog(vicDisplayFrame,"Listening port", "Remoting port configuration",JOptionPane.QUESTION_MESSAGE,null,null,"8064")
-        if (listeningPort == null) {
-          source.setSelected(false)
-          vicDisplay.setRemote(None)
-        }
-        else {
-          try {
-            val clip = vicDisplay.getClipArea
-            val remote = new ucesoft.cbm.remote.RemoteC64Server(listeningPort.toString.toInt,keyboardControlPort :: keyb :: keypadControlPort :: Nil,vicDisplay.displayMem,vicChip.SCREEN_WIDTH,vicChip.SCREEN_HEIGHT,clip._1.x,clip._1.y,clip._2.x,clip._2.y)
-            this.remote = Some(remote)            
-        	  vicDisplay.setRemote(this.remote)
-        	  remote.start
-          }
-          catch {
-            case io:IOException =>
-              JOptionPane.showMessageDialog(vicDisplayFrame,io.toString, "Remoting init error",JOptionPane.ERROR_MESSAGE)
-              source.setSelected(false)
-              vicDisplay.setRemote(None)
-          }
-        }
-      case "SAVE_STATE" =>
-        saveState
-      case "LOAD_STATE" =>
-        loadState
-      case "ZIP" =>
-        attachZip
-      case "KEYPAD" =>
-        keyb.enableKeypad(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
-      case "MMUSTATUS" =>
-        enableMMUPanel(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
-      case "NO_FR_INTERNAL" =>
-        mmu.configureFunctionROM(true,null,FunctionROMType.NORMAL)
-      case "NO_FR_EXTERNAL" =>
-        mmu.configureFunctionROM(false,null,FunctionROMType.NORMAL)
-      case "LOAD_FR_INTERNAL" =>
-        loadFunctionROM(true,None,FunctionROMType.NORMAL)
-      case "LOAD_FR_MEGABIT_INTERNAL" =>
-        loadFunctionROM(true,None,FunctionROMType.MEGABIT)
-      case "LOAD_FR_EXTERNAL" =>
-        loadFunctionROM(false)
-      case "80COLATSTARTUP" =>
-        enableVDC80(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
-      case "VDCENABLED" =>
-        enabledVDC(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
-      case "VDCTHREAD" =>
-        vdcOnItsOwnThread = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        if (vdcOnItsOwnThread) vdc.setOwnThread else vdc.stopOwnThread
-      case "KEYB_EDITOR" =>
-        val source = configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE,"default")
-        val kbef = new JFrame(s"Keyboard editor ($source)")
-        val kbe = new KeyboardEditor(keybMapper,false)
-        kbef.getContentPane.add("Center",kbe)
-        kbef.pack
-        kbef.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
-        kbef.setVisible(true)
-      case "LOAD_KEYB" =>
-        loadKeyboard
-      case "DRIVE_1581" =>
-        clock.pause
-        initDrive(0,DriveType._1581)
-        initDrive(1,DriveType._1581)
-        clock.play
-      case "DRIVE_1571" =>
-        clock.pause
-        initDrive(0,DriveType._1571)
-        initDrive(1,DriveType._1571)
-        clock.play
-      case "DRIVE_1541" =>
-        clock.pause
-        initDrive(0,DriveType._1541)
-        initDrive(1,DriveType._1541)
-        clock.play
-      case "WRITE_ON_DISK" =>
-        val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        writeOnDiskSetting(enabled)
-      case "RAM_256K" =>
-        val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        mmu.RAM.setExpansionBanks(enabled)
-      case "DIGIMAX_DISABLED" =>
-        DigiMAX.enabled(false,false)
-        if (ExpansionPort.getExpansionPort.isInstanceOf[DigiMaxCart]) ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
-      case "DIGIMAX_SAMPLERATE" =>
-        Option(JOptionPane.showInputDialog(vicDisplayFrame,"DigiMax sample rate Hz",DigiMAX.getSampleRate.toString)) match {
-          case None =>
-          case Some(rate) =>
-            DigiMAX.setSampleRate(rate.toInt)
-        }
-      case "DIGIMAX_USERPORT" =>
-        DigiMAX.enabled(true,true)
-      case "DIGIMAX_DE00" =>
-        ExpansionPort.getExpansionPort.eject
-        ExpansionPort.setExpansionPort(new DigiMaxCart(0xDE00))
-      case "DIGIMAX_DF00" =>
-        ExpansionPort.getExpansionPort.eject
-        ExpansionPort.setExpansionPort(new DigiMaxCart(0xDF00))
-      case "GMOD2" =>
-        var gmod2Path = configuration.getProperty(CONFIGURATION_GMOD2_FILE,"./gmod2_eeprom")
-        val fc = new JFileChooser
-        fc.setCurrentDirectory(new File(gmod2Path).getParentFile)
-        fc.setDialogTitle("Choose a file where to save gmod2 cart eeprom")
-        fc.showOpenDialog(vicDisplayFrame) match {
-          case JFileChooser.APPROVE_OPTION =>
-            gmod2Path = fc.getSelectedFile.toString
-          case _ =>
-        }
-        configuration.setProperty(CONFIGURATION_GMOD2_FILE,gmod2Path)
-      case "AUTOSAVE" =>
-        val enabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-        configuration.setProperty(CONFIGURATION_AUTOSAVE,enabled.toString)
-      case "SAVE_SETTINGS" =>
-        saveSettings(true)
-      case "LIST_BASIC" =>
-        ucesoft.cbm.misc.BasicListExplorer.list(mmu,if (c64Mode) 0x801 else 0x1C01)
-      case "VIC_FULL_SCREEN" =>
-        ucesoft.cbm.misc.FullScreenMode.goFullScreen(vicDisplayFrame,
-                                                     vicDisplay,
-                                                     vicChip.SCREEN_WIDTH,
-                                                     vicChip.SCREEN_HEIGHT,
-                                                     keypadControlPort,
-                                                     keyb,
-                                                     keypadControlPort,
-                                                     keyboardControlPort)
-      case "RENDERING_DEFAULT" =>
-        setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
-      case "RENDERING_BILINEAR" =>
-        setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-      case "RENDERING_BICUBIC" =>
-        setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-      case "VDC_SCAN_LINES" =>
-        val lines = JOptionPane.showInputDialog(vdcDisplayFrame,"Insert VDC scan lines", "VDC Scan Lines",JOptionPane.QUESTION_MESSAGE,null,null,"312")
-        if (lines != null) {
-          vdc.setScanLines(lines.toString.toInt)
-        }
-    }
-  }
-  
   // ======================================== Settings ==============================================
   private def writeOnDiskSetting(enabled:Boolean) {    
     canWriteOnDisk = enabled
     for(d <- 0 to 1) drives(d).getFloppy.canWriteOnDisk = canWriteOnDisk
   }
-  private def enableDrive9(enabled:Boolean) {
-    disk9Enabled = enabled
-    drives(1).setActive(enabled)
-    driveLeds(1).setVisible(enabled)
+  private def enableDrive(id:Int,enabled:Boolean) {
+    drivesEnabled(id) = enabled
+    drives(id).setActive(enabled)
+    driveLeds(id).setVisible(enabled)
     adjustRatio(true)
   }
   private def enableDrive10(enabled:Boolean,fn:Option[String]) {    
@@ -965,15 +631,15 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private def enableMouse(mouseEnabled:Boolean) {
     keypadControlPort.setMouse1351Emulation(mouseEnabled)
     sid.setMouseEnabled(mouseEnabled)
+    if (mouseEnabled) MouseCage.enableMouseCageOn(vicDisplay) else MouseCage.disableMouseCage
   }
   private def enablePrinter(enable:Boolean) {
     printerEnabled = enable
     printer.setActive(enable)
   }
-  private def setDriveType(dt:DriveType.Value,dontPlay:Boolean = false) {
+  private def setDriveType(drive:Int,dt:DriveType.Value,dontPlay:Boolean = false) {
     clock.pause
-    initDrive(0,dt)
-    initDrive(1,dt)
+    initDrive(drive,dt)
     if (!dontPlay) clock.play
   }
   private def enableVDC80(enabled:Boolean) {
@@ -1005,6 +671,190 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   private def setDisplayRendering(hints:java.lang.Object) {
     vicDisplay.setRenderingHints(hints)
     vdcDisplay.setRenderingHints(hints)
+  }
+
+  private def warpMode(warpOn:Boolean): Unit = {
+    clock.maximumSpeed = warpOn
+    clock.pause
+    sid.setFullSpeed(warpOn)
+    clock.play
+  }
+
+  private def setLightPen(setting:Int): Unit = {
+    lightPenButtonEmulation = setting
+    vicChip.enableLightPen(setting != LIGHT_PEN_NO_BUTTON)
+    keypadControlPort.setLightPenEmulation(setting != LIGHT_PEN_NO_BUTTON)
+  }
+
+  private def choose16MREU: Unit = {
+    val fc = new JFileChooser
+    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+    fc.setFileView(new C64FileView)
+    fc.setFileFilter(new javax.swing.filechooser.FileFilter {
+      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".REU")
+      def getDescription = "REU files"
+    })
+    fc.showOpenDialog(vicDisplayFrame) match {
+      case JFileChooser.APPROVE_OPTION|JFileChooser.CANCEL_OPTION =>
+        try {
+          setREU(Some(REU.REU_16M),if (fc.getSelectedFile == null) None else Some(fc.getSelectedFile.toString))
+        }
+        catch {
+          case t:Throwable =>
+            JOptionPane.showMessageDialog(vicDisplayFrame,t.toString, "REU loading error",JOptionPane.ERROR_MESSAGE)
+        }
+      case _ =>
+    }
+  }
+
+  private def enableCPMCart(enabled:Boolean): Unit = {
+    ExpansionPort.getExpansionPort.eject
+    if (enabled) ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,setDMA _,setTraceListener _))
+    else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+  }
+
+  private def setDualSID(address:Option[Int]): Unit = {
+    address match {
+      case Some(a) =>
+        expansionPort.eject
+        sid.setStereo(true)
+        ExpansionPort.setExpansionPort(new DualSID(sid,a))
+      case None =>
+        expansionPort.eject
+        sid.setStereo(false)
+        ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+    }
+  }
+
+  private def enableFlyer(enabled:Boolean): Unit = {
+    if (enabled != isFlyerEnabled) flyerIEC.reset
+    isFlyerEnabled = enabled
+  }
+
+  private def chooseFlyerDir: Unit = {
+    val fc = new JFileChooser
+    fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
+    fc.setCurrentDirectory(flyerIEC.getFloppyRepository)
+    fc.showOpenDialog(vicDisplayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        flyerIEC.setFloppyRepository(fc.getSelectedFile)
+      case _ =>
+    }
+  }
+
+  private def setRemote(source:Option[JRadioButtonMenuItem]): Unit = {
+    source match {
+      case Some(source) =>
+        if (remote.isDefined) remote.get.stopRemoting
+        val listeningPort = JOptionPane.showInputDialog(vicDisplayFrame,"Listening port", "Remoting port configuration",JOptionPane.QUESTION_MESSAGE,null,null,"8064")
+        if (listeningPort == null) {
+          source.setSelected(false)
+          vicDisplay.setRemote(None)
+        }
+        else {
+          try {
+            val clip = vicDisplay.getClipArea
+            val remote = new ucesoft.cbm.remote.RemoteC64Server(listeningPort.toString.toInt,keyboardControlPort :: keyb :: keypadControlPort :: Nil,vicDisplay.displayMem,vicChip.SCREEN_WIDTH,vicChip.SCREEN_HEIGHT,clip._1.x,clip._1.y,clip._2.x,clip._2.y)
+            this.remote = Some(remote)
+            vicDisplay.setRemote(this.remote)
+            remote.start
+          }
+          catch {
+            case io:IOException =>
+              JOptionPane.showMessageDialog(vicDisplayFrame,io.toString, "Remoting init error",JOptionPane.ERROR_MESSAGE)
+              source.setSelected(false)
+              vicDisplay.setRemote(None)
+          }
+        }
+    case None =>
+      remote match {
+        case Some(rem) =>
+          rem.stopRemoting
+          vicDisplay.setRemote(None)
+          remote = None
+        case None =>
+      }
+    }
+  }
+
+  private def showKeyboardEditor: Unit = {
+    val source = configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE,"default")
+    val kbef = new JFrame(s"Keyboard editor ($source)")
+    val kbe = new KeyboardEditor(keyb,keybMapper,false)
+    kbef.getContentPane.add("Center",kbe)
+    kbef.pack
+    kbef.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
+    kbef.setVisible(true)
+  }
+
+  private def setDigiMax(on:Boolean,address:Option[Int]): Unit = {
+    if (on) {
+      address match {
+        case None =>
+          DigiMAX.enabled(true,true)
+        case Some(a) =>
+          ExpansionPort.getExpansionPort.eject
+          ExpansionPort.setExpansionPort(new DigiMaxCart(a))
+      }
+    }
+    else {
+      DigiMAX.enabled(false,false)
+      if (ExpansionPort.getExpansionPort.isInstanceOf[DigiMaxCart]) ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+    }
+  }
+
+  private def chooseDigiMaxSampleRate: Unit = {
+    Option(JOptionPane.showInputDialog(vicDisplayFrame,"DigiMax sample rate Hz",DigiMAX.getSampleRate.toString)) match {
+      case None =>
+      case Some(rate) =>
+        DigiMAX.setSampleRate(rate.toInt)
+    }
+  }
+
+  private def chooseGMod2: Unit = {
+    var gmod2Path = configuration.getProperty(CONFIGURATION_GMOD2_FILE,"./gmod2_eeprom")
+    val fc = new JFileChooser
+    fc.setCurrentDirectory(new File(gmod2Path).getParentFile)
+    fc.setDialogTitle("Choose a file where to save gmod2 cart eeprom")
+    fc.showOpenDialog(vicDisplayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        gmod2Path = fc.getSelectedFile.toString
+      case _ =>
+    }
+    configuration.setProperty(CONFIGURATION_GMOD2_FILE,gmod2Path)
+  }
+
+  private def setVicFullScreen: Unit = {
+    ucesoft.cbm.misc.FullScreenMode.goFullScreen(vicDisplayFrame,
+                                                vicDisplay,
+                                                vicChip.SCREEN_WIDTH,
+                                                vicChip.SCREEN_HEIGHT,
+                                                keypadControlPort,
+                                                keyb,
+                                                keypadControlPort,
+                                                keyboardControlPort)
+  }
+
+  private def chooseVicScanLines: Unit = {
+    val lines = JOptionPane.showInputDialog(vdcDisplayFrame,"Insert VDC scan lines", "VDC Scan Lines",JOptionPane.QUESTION_MESSAGE,null,null,"312")
+    if (lines != null) {
+      vdc.setScanLines(lines.toString.toInt)
+    }
+  }
+
+  private def checkFunctionROMS: Unit = {
+    val extFunRom = configuration.getProperty(ROM.C128_EXTERNAL_ROM_PROP)
+    if (extFunRom != null && extFunRom != "") loadFunctionROM(false,Some(extFunRom))
+    else mmu.configureFunctionROM(false,null,FunctionROMType.NORMAL)
+    val intFunRom = configuration.getProperty(ROM.C128_INTERNAL_ROM_PROP)
+    if (intFunRom != null && intFunRom != "") {
+      val (name,rt) = intFunRom.split(",") match {
+        case Array(n,t) => (n,FunctionROMType.withName(t))
+        case _ => (intFunRom,FunctionROMType.NORMAL)
+      }
+      loadFunctionROM(true,Some(name),rt)
+    }
+    else mmu.configureFunctionROM(true,null,FunctionROMType.NORMAL)
   }
   // ================================================================================================
   
@@ -1194,41 +1044,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   }
   
   private def manageRS232 {
-    val choices = Array.ofDim[Object](AVAILABLE_RS232.length + 1)
-    choices(0) = "None"
-    Array.copy(AVAILABLE_RS232,0,choices,1,AVAILABLE_RS232.length)
-    val (currentChoice,oldConfig) = activeRs232 match {
-      case None => (choices(0),"")
-      case Some(rs) => (rs,rs.connectionInfo)
-    }
-    val choice = JOptionPane.showInputDialog(vicDisplayFrame,"Choose an rs-232 implementation","RS-232",JOptionPane.QUESTION_MESSAGE,null,choices,currentChoice)
-    if (choice == choices(0)) {
-      if (activeRs232.isDefined) {    
-        activeRs232.get.setEnabled(false)      
-        activeRs232 = None
-        rs232StatusPanel.setVisible(false)
-      }
-    }
-    else
-    if (choice != null) {
-      val rs = choice.asInstanceOf[RS232]
-      val conf = JOptionPane.showInputDialog(vicDisplayFrame,s"<html><b>${rs.getDescription}</b><br>Type the configuration string:</html>", s"${rs.componentID}'s configuration",JOptionPane.QUESTION_MESSAGE,null,null,oldConfig)
-      if (conf != null) {
-        try {
-          rs.setConfiguration(conf.toString)
-          activeRs232 foreach { _.setEnabled(false) }                   
-          activeRs232 = Some(rs)
-          rs232.setRS232(rs)
-          rs232.setEnabled(true)
-          rs232StatusPanel.setVisible(true)
-          adjustRatio(true)
-        }
-        catch {
-          case t:Throwable =>
-            JOptionPane.showMessageDialog(vicDisplayFrame,t.toString, "RS-232 configuration error",JOptionPane.ERROR_MESSAGE)
-        }
-      }
-    }
+    RS232ConfigPanel.RS232ConfigDialog.setVisible(true)
   }
   
   private def makeDisk {
@@ -1277,7 +1093,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     
     if (name.endsWith(".PRG")) loadPRGFile(file,autorun)
     else    
-    if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun)
+    if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun,None)
     else
     if (name.endsWith(".TAP")) attachTapeFile(file,autorun)
     else
@@ -1301,28 +1117,13 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       case _ =>        
     }
   }
-  
-  private def loadPRGFile(file:File,autorun:Boolean) {    
-    val in = new FileInputStream(file)
-    val start = in.read + in.read * 256
-    var m = start
-    var b = in.read
-    var size = 0
-    val mem = mmu.getBank0RAM
-    while (b != -1) {
-      mem.write(m, b)
-      m += 1
-      size += 1
-      b = in.read
-    }
-    in.close
-    val end = start + size
-    ProgramLoader.updateBASICPointers(mem,start,end,c64Mode)
-    
-    Log.info(s"BASIC program loaded from ${start} to ${end} size=${size}")
+
+  private def loadPRGFile(file:File,autorun:Boolean) {
+    val (start,end) = ProgramLoader.loadPRG(mmu.getBank0RAM,file,c64Mode,8)
+    Log.info(s"BASIC program loaded from $start to $end")
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
     if (autorun) {
-      insertTextIntoKeyboardBuffer("RUN" + 13.toChar)
+      Keyboard.insertSmallTextIntoKeyboardBuffer("RUN" + 13.toChar,mmu,c64Mode)
     }
   }
   
@@ -1347,9 +1148,9 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       clock.play
     }
   }
-  
-  private def attachDiskFile(driveID:Int,file:File,autorun:Boolean) {
-    try {      
+
+  private def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String]) {
+    try {
       if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
       val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
       if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
@@ -1361,12 +1162,16 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       if (!traceDialog.isTracing) clock.pause
       drives(driveID).setDriveReader(disk,true)
       clock.play
-            
+
       loadFileItems(driveID).setEnabled(!isG64)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
-      if (autorun) {
-        if (c64Mode) insertTextIntoKeyboardBuffer("LOAD\"*\",8,1" + 13.toChar + "RUN" + 13.toChar)
-        else insertTextIntoKeyboardBuffer("RUN\"*\"" + 13.toChar)
+      fileToLoad match {
+        case Some(fn) =>
+          val cmd = s"""LOAD"$fn",8,1""" + 13.toChar + (if (autorun) "RUN" + 13.toChar else "")
+          Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,c64Mode)
+        case None if autorun =>
+          Keyboard.insertSmallTextIntoKeyboardBuffer("LOAD\"*\",8,1" + 13.toChar + "RUN" + 13.toChar,mmu,c64Mode)
+        case _ =>
       }
       driveLeds(driveID).setToolTipText(disk.toString)
     }
@@ -1382,7 +1187,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     tapeMenu.setEnabled(true)
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
     if (autorun) {
-      insertTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar)
+      Keyboard.insertSmallTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar,mmu,c64Mode)
     }
   }
   // -------------------------------------------------
@@ -1425,14 +1230,8 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     fc.showSaveDialog(vicDisplayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
         configuration.setProperty(CONFIGURATION_LASTDISKDIR,fc.getSelectedFile.getParentFile.toString)
-        val out = new FileOutputStream(fc.getSelectedFile)
-        val start = ProgramLoader.startAddress(mmu, c64Mode)
-        val end = ProgramLoader.endAddress(mmu, c64Mode) - 1
-  	    out.write(start & 0x0F)
-  	    out.write(start >> 8)
-        for (m <- start to end) out.write(mmu.getBank0RAM.read(m))
-        out.close
-        Log.info(s"BASIC program saved from ${start} to ${end}")
+        val (start,end) = ProgramLoader.savePRG(fc.getSelectedFile,mmu,c64Mode)
+        Log.info(s"BASIC program saved from $start to $end")
       case _ =>
     }
   }
@@ -1470,27 +1269,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     val contents = clipboard.getContents(null)
     if (contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
       val str = contents.getTransferData(DataFlavor.stringFlavor).toString
-      new Thread {
-        val maxLenAddr = if (c64Mode) 649 else 2592
-        val bufferAddr = if (c64Mode) 631 else 842
-        val lenAddr = if (c64Mode) 198 else 208
-        override def run {
-          val len = mmu.read(maxLenAddr)
-          var strpos = 0
-          while (strpos < str.length) {
-            val size = if (len < str.length - strpos) len else str.length - strpos            
-            for(i <- 0 until size) {
-              val c = str.charAt(strpos).toUpper
-              mmu.write(bufferAddr + i,if (c != '\n') c else 0x0D)
-              strpos += 1
-            }
-            mmu.write(lenAddr,size)
-            val ts = System.currentTimeMillis
-            // wait max 10 secs...
-            while (mmu.read(lenAddr) > 0 && System.currentTimeMillis - ts < 10000) Thread.sleep(1)
-          }
-        }
-      }.start
+      Keyboard.insertTextIntoKeyboardBuffer(str,mmu,c64Mode)
     }
   }
   
@@ -1553,10 +1332,13 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     loadFileItems(driveID).setEnabled(false)
     clock.play
   }
-  
+
   private def attachDisk(driveID:Int,autorun:Boolean) {
     val fc = new JFileChooser
-    fc.setAccessory(new javax.swing.JScrollPane(new D64Canvas(fc,mmu.CHAR_ROM)))
+    val canvas = new D64Canvas(fc,mmu.CHAR_ROM,c64Mode)
+    val sp = new javax.swing.JScrollPane(canvas)
+    canvas.sp = sp
+    fc.setAccessory(sp)
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new javax.swing.filechooser.FileFilter {
@@ -1565,7 +1347,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     })
     fc.showOpenDialog(vicDisplayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-        attachDiskFile(driveID,fc.getSelectedFile,autorun)
+        attachDiskFile(driveID,fc.getSelectedFile,autorun,canvas.selectedFile)
       case _ =>
     }
   }
@@ -1578,7 +1360,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
         case None =>
         case Some(fileName) =>
           try {
-            floppy.asInstanceOf[Diskette].loadInMemory(mmu.getBank0RAM,fileName,relocate,c64Mode)
+            floppy.asInstanceOf[Diskette].loadInMemory(mmu.getBank0RAM,fileName,relocate,c64Mode,driveID + 8)
           }
           catch {
             case t:Throwable =>
@@ -1590,7 +1372,10 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
   
   private def loadFileFromTape {
     val fc = new JFileChooser
-    fc.setAccessory(new javax.swing.JScrollPane(new T64Canvas(fc,mmu.CHAR_ROM)))
+    val canvas = new T64Canvas(fc,mmu.CHAR_ROM,c64Mode)
+    val sp = new javax.swing.JScrollPane(canvas)
+    canvas.sp = sp
+    fc.setAccessory(sp)
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new javax.swing.filechooser.FileFilter {
@@ -1614,7 +1399,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
           tape.loadInMemory(mmu.getBank0RAM,entry,c64Mode)
           configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
           if (autorun) {
-            insertTextIntoKeyboardBuffer("RUN" + 13.toChar)
+            Keyboard.insertSmallTextIntoKeyboardBuffer("RUN" + 13.toChar,mmu,c64Mode)
           }
       }
     }
@@ -1659,15 +1444,6 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     }
   }
   
-  private def insertTextIntoKeyboardBuffer(txt:String) {
-    val bufferAddr = if (c64Mode) 631 else 842
-    val lenAddr = if (c64Mode) 198 else 208
-    for(i <- 0 until txt.length) {
-      mmu.write(bufferAddr + i,txt.charAt(i))
-    }
-    mmu.write(lenAddr,txt.length)
-  }
-  
   private def setMenu {
     val menuBar = new JMenuBar
     val fileMenu = new JMenu("File")
@@ -1687,112 +1463,105 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     menuBar.add(cartMenu)
     menuBar.add(gamesMenu)
     menuBar.add(helpMenu)
+
+    val warpModeOnLoad = new JCheckBoxMenuItem("Warp mode on load")
+    warpModeOnLoad.setSelected(true)
+    warpModeOnLoad.addActionListener(e => ProgramLoader.loadingWithWarpEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected )
+    fileMenu.add(warpModeOnLoad)
+    // Setting ---------------------------
+    settings.add("warponload",
+      "Enabled/disable warp mode on load",
+      "WARPLOAD",
+      (wpl:Boolean) => {
+        ProgramLoader.loadingWithWarpEnabled = wpl
+        warpModeOnLoad.setSelected(wpl)
+      },
+      warpModeOnLoad.isSelected
+    )
+    // -----------------------------------
     
     val zipItem = new JMenuItem("Attach zip ...")
-    zipItem.setActionCommand("ZIP")
-    zipItem.addActionListener(this)
+    zipItem.addActionListener(_ => attachZip )
     fileMenu.add(zipItem)
     
     val tapeItem = new JMenuItem("Load file from tape ...")
-    tapeItem.setActionCommand("TAPE")
-    tapeItem.addActionListener(this)
+    tapeItem.addActionListener(_ => loadFileFromTape )
     fileMenu.add(tapeItem)
     
     val attachTapeItem = new JMenuItem("Attach tape ...")
-    attachTapeItem.setActionCommand("ATTACH_TAPE")
-    attachTapeItem.addActionListener(this)
+    attachTapeItem.addActionListener(_ => attachTape )
     fileMenu.add(attachTapeItem)
         
     tapeMenu.setEnabled(false)
     fileMenu.add(tapeMenu)
     
     val tapePlayItem = new JMenuItem("Cassette press play")
-    tapePlayItem.setActionCommand("TAPE_PLAY")
-    tapePlayItem.addActionListener(this)
+    tapePlayItem.addActionListener(_ => datassette.pressPlay )
     tapeMenu.add(tapePlayItem)
     
     val tapeStopItem = new JMenuItem("Cassette press stop")
-    tapeStopItem.setActionCommand("TAPE_STOP")
-    tapeStopItem.addActionListener(this)
+    tapeStopItem.addActionListener(_ => datassette.pressStop )
     tapeMenu.add(tapeStopItem)
     
     val tapeRecordItem = new JMenuItem("Cassette press record & play")
-    tapeRecordItem.setActionCommand("TAPE_RECORD")
-    tapeRecordItem.addActionListener(this)
+    tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay )
     tapeMenu.add(tapeRecordItem)
     
     val tapeRewindItem = new JMenuItem("Cassette press rewind")
-    tapeRewindItem.setActionCommand("TAPE_REWIND")
-    tapeRewindItem.addActionListener(this)
+    tapeRewindItem.addActionListener(_ => datassette.pressRewind )
     tapeMenu.add(tapeRewindItem)
     
     fileMenu.addSeparator
     
     val makeDiskItem = new JMenuItem("Make empty disk ...")
-    makeDiskItem.setActionCommand("MAKE_DISK")
-    makeDiskItem.addActionListener(this)
+    makeDiskItem.addActionListener(_ => makeDisk )
     fileMenu.add(makeDiskItem)
     
     val autorunDiskItem = new JMenuItem("Autorun disk ...")
-    autorunDiskItem.setActionCommand("AUTORUN_DISK")
-    autorunDiskItem.addActionListener(this)
+    autorunDiskItem.addActionListener(_ => attachDisk(0,true) )
     fileMenu.add(autorunDiskItem)
     
     val attachDisk0Item = new JMenuItem("Attach disk 8...")
-    attachDisk0Item.setActionCommand("ATTACH_DISK_0")
-    attachDisk0Item.addActionListener(this)
+    attachDisk0Item.addActionListener(_ => attachDisk(0,false) )
     fileMenu.add(attachDisk0Item)
     val attachDisk1Item = new JMenuItem("Attach disk 9...")
-    attachDisk1Item.setActionCommand("ATTACH_DISK_1")
-    attachDisk1Item.addActionListener(this)
+    attachDisk1Item.addActionListener(_ => attachDisk(1,false) )
     fileMenu.add(attachDisk1Item)
     // For settings see below, after drive type    
     
     val ejectMenu = new JMenu("Eject disk")
     fileMenu.add(ejectMenu)
     val ejectDisk0Item = new JMenuItem("Eject disk 8...")
-    ejectDisk0Item.setActionCommand("EJECT_DISK_0")
-    ejectDisk0Item.addActionListener(this)
+    ejectDisk0Item.addActionListener(_ => ejectDisk(0) )
     ejectMenu.add(ejectDisk0Item)
     val ejectDisk1Item = new JMenuItem("Eject disk 9...")
-    ejectDisk1Item.setActionCommand("EJECT_DISK_1")
-    ejectDisk1Item.addActionListener(this)
+    ejectDisk1Item.addActionListener(_ => ejectDisk(1) )
     ejectMenu.add(ejectDisk1Item)
         
     loadFileItems(0).setEnabled(false)
-    loadFileItems(0).setActionCommand("LOAD_FILE_0")
-    loadFileItems(0).addActionListener(this)
+    loadFileItems(0).addActionListener(_ => loadFileFromAttachedFile(0,true) )
     fileMenu.add(loadFileItems(0)) 
     loadFileItems(1).setEnabled(false)
-    loadFileItems(1).setActionCommand("LOAD_FILE_1")
-    loadFileItems(1).addActionListener(this)
+    loadFileItems(1).addActionListener(_ => loadFileFromAttachedFile(1,true) )
     fileMenu.add(loadFileItems(1))
     fileMenu.addSeparator
     
     val loadPrgItem = new JMenuItem("Load PRG file from local disk ...")
-    loadPrgItem.setActionCommand("LOADPRG")
-    loadPrgItem.addActionListener(this)
+    loadPrgItem.addActionListener(_ => loadPrg )
     fileMenu.add(loadPrgItem)
     
     val savePrgItem = new JMenuItem("Save PRG file to local disk ...")
-    savePrgItem.setActionCommand("SAVEPRG")
-    savePrgItem.addActionListener(this)
+    savePrgItem.addActionListener(_ => savePrg )
     fileMenu.add(savePrgItem)
     
-    val drive9EnabledItem = new JCheckBoxMenuItem("Drive 9 enabled")
-    drive9EnabledItem.setSelected(false)
-    drive9EnabledItem.setActionCommand("DRIVE_9_ENABLED")
-    drive9EnabledItem.addActionListener(this)
-    fileMenu.add(drive9EnabledItem)
     // Setting ---------------------------
     settings.add("drive9-enabled",
-                 "Enabled/disable driver 9",
-                 "DRIVE_9_ENABLED",
-                 (d9e:Boolean) => {
-                   drive9EnabledItem.setSelected(d9e)
-                   enableDrive9(d9e)
-                 },
-                 drive9EnabledItem.isSelected
+      "Enabled/disable driver 9",
+      "DRIVE_9_ENABLED",
+      (d9e:Boolean) => {
+        enableDrive(1,d9e)
+      },
+      drivesEnabled(1)
     )
     // -----------------------------------
     
@@ -1801,13 +1570,11 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     val group0 = new ButtonGroup
     val noLocalDriveItem = new JRadioButtonMenuItem("Disabled")
     noLocalDriveItem.setSelected(true)
-    noLocalDriveItem.setActionCommand("DEVICE10_DISABLED")
-    noLocalDriveItem.addActionListener(this)
+    noLocalDriveItem.addActionListener(_ => enableDrive10(false,None) )
     group0.add(noLocalDriveItem)
     localDriveItem.add(noLocalDriveItem)
     val localDriveEnabled = new JRadioButtonMenuItem("Local drive ...")
-    localDriveEnabled.setActionCommand("LOCAL_DRIVE_ENABLED")
-    localDriveEnabled.addActionListener(this)
+    localDriveEnabled.addActionListener(_ => enableDrive10(true,None) )
     group0.add(localDriveEnabled)
     localDriveItem.add(localDriveEnabled)
     // Setting ---------------------------
@@ -1826,8 +1593,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     
     val writeOnDiskCheckItem = new JCheckBoxMenuItem("Write changes on disk")
     writeOnDiskCheckItem.setSelected(true)
-    writeOnDiskCheckItem.setActionCommand("WRITE_ON_DISK")
-    writeOnDiskCheckItem.addActionListener(this)
+    writeOnDiskCheckItem.addActionListener(e => writeOnDiskSetting(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     fileMenu.add(writeOnDiskCheckItem)
     // Setting ---------------------------
     settings.add("write-on-disk",
@@ -1844,16 +1610,14 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     fileMenu.addSeparator
     
     val resetItem = new JMenuItem("Reset")
-    resetItem.setActionCommand("RESET")
     resetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    resetItem.addActionListener(this)
+    resetItem.addActionListener(_ => reset(true) )
     fileMenu.add(resetItem)
     
     fileMenu.addSeparator
     
     val attachCtrItem = new JMenuItem("Attach cartridge ...")
-    attachCtrItem.setActionCommand("ATTACH_CTR")
-    attachCtrItem.addActionListener(this)
+    attachCtrItem.addActionListener(_ => attachCtr )
     fileMenu.add(attachCtrItem)
     // Setting ---------------------------
     settings.add("cart",
@@ -1866,81 +1630,74 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     // -----------------------------------
         
     detachCtrItem.setEnabled(false)
-    detachCtrItem.setActionCommand("DETACH_CTR")
-    detachCtrItem.addActionListener(this)
+    detachCtrItem.addActionListener(_ => detachCtr )
     fileMenu.add(detachCtrItem)
     
     fileMenu.addSeparator
     
     val autoSaveCheckItem = new JCheckBoxMenuItem("Autosave settings on exit")
     autoSaveCheckItem.setSelected(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
-    autoSaveCheckItem.setActionCommand("AUTOSAVE")
-    autoSaveCheckItem.addActionListener(this)
+    autoSaveCheckItem.addActionListener(e => configuration.setProperty(CONFIGURATION_AUTOSAVE,e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected.toString) )
     fileMenu.add(autoSaveCheckItem)
     
     val saveSettingsCheckItem = new JMenuItem("Save settings")
-    saveSettingsCheckItem.setActionCommand("SAVE_SETTINGS")
-    saveSettingsCheckItem.addActionListener(this)
+    saveSettingsCheckItem.addActionListener(_ => saveSettings(true) )
     fileMenu.add(saveSettingsCheckItem)
     
     fileMenu.addSeparator
     
     val exitItem = new JMenuItem("Exit")
-    exitItem.setActionCommand("EXIT")
-    exitItem.addActionListener(this)
+    exitItem.addActionListener(_ => close )
     fileMenu.add(exitItem)
     
     // edit
         
     val pasteItem = new JMenuItem("Paste text")
     pasteItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V,java.awt.Event.CTRL_MASK))
-    pasteItem.setActionCommand("PASTE")
-    pasteItem.addActionListener(this)
+    pasteItem.addActionListener(_ => paste )
     editMenu.add(pasteItem)
     val listItem = new JMenuItem("List BASIC to editor")
-    listItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L,java.awt.Event.ALT_MASK))
-    listItem.setActionCommand("LIST_BASIC")
-    listItem.addActionListener(this)
+    listItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_I,java.awt.Event.ALT_MASK))
+    listItem.addActionListener(_ => ucesoft.cbm.misc.BasicListExplorer.list(mmu,if (c64Mode) 0x801 else 0x1C01) )
     editMenu.add(listItem)
     
     //state
     val saveStateItem = new JMenuItem("Save state ...")
-    saveStateItem.setActionCommand("SAVE_STATE")
-    saveStateItem.addActionListener(this)    
+    saveStateItem.addActionListener(_ => saveState )
     stateMenu.add(saveStateItem)
     val loadStateItem = new JMenuItem("Load state ...")
-    loadStateItem.setActionCommand("LOAD_STATE")
-    loadStateItem.addActionListener(this)    
+    loadStateItem.addActionListener(_ => loadState )
     stateMenu.add(loadStateItem)
     
     // trace
     
     traceItem = new JCheckBoxMenuItem("Trace CPU")
     traceItem.setSelected(false)
-    traceItem.setActionCommand("TRACE")
-    traceItem.addActionListener(this)    
+    traceItem.addActionListener(e => trace(true,e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     traceMenu.add(traceItem)  
     
     traceDiskItem = new JCheckBoxMenuItem("Trace Disk CPU")
     traceDiskItem.setSelected(false)
-    traceDiskItem.setActionCommand("TRACE_DISK")
-    traceDiskItem.addActionListener(this)    
+    traceDiskItem.addActionListener(e => trace(false,e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     traceMenu.add(traceDiskItem)
     
     val inspectItem = new JCheckBoxMenuItem("Inspect components ...")
     inspectItem.setSelected(false)
-    inspectItem.setActionCommand("INSPECT")
-    inspectItem.addActionListener(this)    
+    inspectItem.addActionListener(e => inspectDialog.setVisible(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     traceMenu.add(inspectItem)
     
     // settings
+
+    val driveMenu = new JMenuItem("Drives ...")
+    driveMenu.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    optionMenu.add(driveMenu)
+    driveMenu.addActionListener(_ => DrivesConfigPanel.getDriveConfigDialog.setVisible(true) )
     
     val vdcMenu = new JMenu("VDC")
     optionMenu.add(vdcMenu)
     val _80enabledAtStartupItem = new JCheckBoxMenuItem("80 columns enabled at startup")
     _80enabledAtStartupItem.setSelected(false)
-    _80enabledAtStartupItem.setActionCommand("80COLATSTARTUP")
-    _80enabledAtStartupItem.addActionListener(this)    
+    _80enabledAtStartupItem.addActionListener(e => enableVDC80(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     vdcMenu.add(_80enabledAtStartupItem)
     // Setting ---------------------------
     settings.add("vdc-80-startup",
@@ -1956,8 +1713,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     val vdcEnabled = new JCheckBoxMenuItem("VDC enabled")
     vdcEnabled.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_E,java.awt.event.InputEvent.ALT_DOWN_MASK))
     vdcEnabled.setSelected(true)
-    vdcEnabled.setActionCommand("VDCENABLED")
-    vdcEnabled.addActionListener(this)    
+    vdcEnabled.addActionListener(e => enabledVDC(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     vdcMenu.add(vdcEnabled)
     // Setting ---------------------------
     settings.add("vdc-enabled",
@@ -1972,14 +1728,12 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     // -----------------------------------
     val vdcSeparateThreadItem = new JCheckBoxMenuItem("VDC on its own thread")
     vdcSeparateThreadItem.setSelected(false)
-    vdcSeparateThreadItem.setActionCommand("VDCTHREAD")
-    vdcSeparateThreadItem.addActionListener(this)    
+    vdcSeparateThreadItem.addActionListener(e => if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) vdc.setOwnThread else vdc.stopOwnThread )
     vdcMenu.add(vdcSeparateThreadItem)
     
     val statusPanelItem = new JCheckBoxMenuItem("MMU status panel enabled")
     statusPanelItem.setSelected(false)
-    statusPanelItem.setActionCommand("MMUSTATUS")
-    statusPanelItem.addActionListener(this)    
+    statusPanelItem.addActionListener(e => enableMMUPanel(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     optionMenu.add(statusPanelItem)
     // Setting ---------------------------
     settings.add("mmupanel-enabled",
@@ -2000,33 +1754,28 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     
     val enableKeypadItem = new JCheckBoxMenuItem("Keypad enabled")
     enableKeypadItem.setSelected(true)
-    enableKeypadItem.setActionCommand("KEYPAD")
-    enableKeypadItem.addActionListener(this)    
+    enableKeypadItem.addActionListener(e => keyb.enableKeypad(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     keybMenu.add(enableKeypadItem)
     
     val keybEditorItem = new JMenuItem("Keyboard editor ...")
-    keybEditorItem.setActionCommand("KEYB_EDITOR")
-    keybEditorItem.addActionListener(this)
+    keybEditorItem.addActionListener(_ => showKeyboardEditor )
     keybMenu.add(keybEditorItem)
     val loadKeybItem = new JMenuItem("Set keyboard layout ...")
-    loadKeybItem.setActionCommand("LOAD_KEYB")
-    loadKeybItem.addActionListener(this)
+    loadKeybItem.addActionListener(_ => loadKeyboard )
     keybMenu.add(loadKeybItem)
     
     optionMenu.addSeparator
     
     val volumeItem = new JMenuItem("Volume settings ...")
-    volumeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V,java.awt.Event.ALT_MASK))
-    volumeItem.setActionCommand("VOLUME")
-    volumeItem.addActionListener(this)
+    volumeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    volumeItem.addActionListener(_ => volumeDialog.setVisible(true) )
     optionMenu.add(volumeItem)
     
     optionMenu.addSeparator
         
     maxSpeedItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_W,java.awt.event.InputEvent.ALT_DOWN_MASK))
     maxSpeedItem.setSelected(clock.maximumSpeed)
-    maxSpeedItem.setActionCommand("MAXSPEED")
-    maxSpeedItem.addActionListener(this)    
+    maxSpeedItem.addActionListener(e => warpMode(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     optionMenu.add(maxSpeedItem)
     
     optionMenu.addSeparator
@@ -2035,107 +1784,88 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     optionMenu.add(adjustMenu)
     val adjustRatioItem = new JMenuItem("Adjust VIC display ratio")
     adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    adjustRatioItem.setActionCommand("ADJUSTRATIO")
-    adjustRatioItem.addActionListener(this)
+    adjustRatioItem.addActionListener(_ => adjustRatio(true) )
     adjustMenu.add(adjustRatioItem)
     
     val adjustVDCRatioItem = new JMenuItem("Adjust VDC display ratio")
     adjustVDCRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_D,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    adjustVDCRatioItem.setActionCommand("ADJUSTRATIO_VDC")
-    adjustVDCRatioItem.addActionListener(this)
+    adjustVDCRatioItem.addActionListener(_ => adjustRatio(false,true) )
     adjustMenu.add(adjustVDCRatioItem)
     
     val vdcResetSizeItem = new JMenuItem("VDC normal size")
     vdcResetSizeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    vdcResetSizeItem.setActionCommand("VDC_NORMAL_SIZE")
-    vdcResetSizeItem.addActionListener(this)
+    vdcResetSizeItem.addActionListener(_ => adjustRatio(false) )
     adjustMenu.add(vdcResetSizeItem)
     
     val zoomItem = new JMenu("VIC Zoom")
     val groupZ = new ButtonGroup
     adjustMenu.add(zoomItem)
-    val zoom1Item = new JRadioButtonMenuItem("Zoom x 1")
-    zoom1Item.setActionCommand("ZOOM1")
-    zoom1Item.addActionListener(this)
-    zoomItem.add(zoom1Item)
-    groupZ.add(zoom1Item)
-    val zoom2Item = new JRadioButtonMenuItem("Zoom x 2")
-    zoom2Item.setActionCommand("ZOOM2")
-    zoom2Item.addActionListener(this)
-    zoomItem.add(zoom2Item)
-    groupZ.add(zoom2Item)
-    val zoom4Item = new JRadioButtonMenuItem("Zoom x 4")
-    zoom4Item.setActionCommand("ZOOM4")
-    zoom4Item.addActionListener(this)
-    zoomItem.add(zoom4Item)
-    groupZ.add(zoom4Item)
-    
+    for(z <- Array(1,2,4)) {
+      val zoom1Item = new JRadioButtonMenuItem(s"Zoom x $z")
+      zoom1Item.addActionListener(_ => zoom(z) )
+      zoomItem.add(zoom1Item)
+      groupZ.add(zoom1Item)
+    }
+
     val fullScreenItem = new JMenuItem("VIC full screen")
     fullScreenItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    fullScreenItem.setActionCommand("VIC_FULL_SCREEN")
-    fullScreenItem.addActionListener(this)
+    fullScreenItem.addActionListener(_ => setVicFullScreen )
     adjustMenu.add(fullScreenItem)
     
     val vdcScanLinesItem = new JMenuItem("VDC scan lines ...")
-    vdcScanLinesItem.setActionCommand("VDC_SCAN_LINES")
-    vdcScanLinesItem.addActionListener(this)
+    vdcScanLinesItem.addActionListener(_ => chooseVicScanLines )
     adjustMenu.add(vdcScanLinesItem)
     
     val renderingItem = new JMenu("Rendering")
     val groupR = new ButtonGroup
     adjustMenu.add(renderingItem)
     val renderingDefault1Item = new JRadioButtonMenuItem("Default")
-    renderingDefault1Item.setActionCommand("RENDERING_DEFAULT")
-    renderingDefault1Item.addActionListener(this)
+    renderingDefault1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR) )
     renderingItem.add(renderingDefault1Item)
     groupR.add(renderingDefault1Item)
     val renderingBilinear1Item = new JRadioButtonMenuItem("Bilinear")
-    renderingBilinear1Item.setActionCommand("RENDERING_BILINEAR")
-    renderingBilinear1Item.addActionListener(this)
+    renderingBilinear1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR) )
     renderingItem.add(renderingBilinear1Item)
     groupR.add(renderingBilinear1Item)
     val renderingBicubic1Item = new JRadioButtonMenuItem("Bicubic")
-    renderingBicubic1Item.setActionCommand("RENDERING_BICUBIC")
-    renderingBicubic1Item.addActionListener(this)
+    renderingBicubic1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC) )
     renderingItem.add(renderingBicubic1Item)
     groupR.add(renderingBicubic1Item)
     // Setting ---------------------------
     settings.add("rendering-type",
                  "Set the rendering type (default,bilinear,bicubic)",
                  "RENDERING_TYPE",
-                 (dt:String) => {
-                   dt match {
-                     case "bilinear"|"" => 
-                       setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-                       renderingBilinear1Item.setSelected(true)
-                     case "bicubic" => 
-                       setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-                       renderingBicubic1Item.setSelected(true)
-                     case "default" =>
-                       setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
-                       renderingDefault1Item.setSelected(true)
-                     case _ =>
-                   }
-                 },
-                 if (renderingDefault1Item.isSelected) "default"
-                 else
-                 if (renderingBilinear1Item.isSelected) "bilinear"
-                 else
-                 if (renderingBicubic1Item.isSelected) "bicubic"
-                 else "default"
+     (dt:String) => {
+       dt match {
+         case "bilinear"|"" =>
+           setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+           renderingBilinear1Item.setSelected(true)
+         case "bicubic" =>
+           setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+           renderingBicubic1Item.setSelected(true)
+         case "default" =>
+           setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
+           renderingDefault1Item.setSelected(true)
+         case _ =>
+       }
+     },
+     if (renderingDefault1Item.isSelected) "default"
+     else
+     if (renderingBilinear1Item.isSelected) "bilinear"
+     else
+     if (renderingBicubic1Item.isSelected) "bicubic"
+     else "default"
     )
     // -----------------------------------
     
     optionMenu.addSeparator
         
     val joyAItem = new JMenuItem("Joystick...")
-    joyAItem.setActionCommand("JOY")
-    joyAItem.addActionListener(this)
+    joyAItem.addActionListener(_ => joySettings )
     optionMenu.add(joyAItem)
     
     val swapJoyAItem = new JMenuItem("Swap joysticks")
-    swapJoyAItem.setActionCommand("SWAP_JOY")
-    swapJoyAItem.addActionListener(this)
+    swapJoyAItem.addActionListener(_ => swapJoysticks )
     optionMenu.add(swapJoyAItem)
     
     val lightPenMenu = new JMenu("Light pen")
@@ -2143,26 +1873,22 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     val group3 = new ButtonGroup
     val noPenItem = new JRadioButtonMenuItem("No light pen")
     noPenItem.setSelected(true)
-    noPenItem.setActionCommand("NO_PEN")
-    noPenItem.addActionListener(this)
+    noPenItem.addActionListener(_ => setLightPen(LIGHT_PEN_NO_BUTTON) )
     group3.add(noPenItem)
     lightPenMenu.add(noPenItem)
     val penUp = new JRadioButtonMenuItem("Light pen with button up")
-    penUp.setActionCommand("PEN_UP")
-    penUp.addActionListener(this)
+    penUp.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_UP) )
     group3.add(penUp)
     lightPenMenu.add(penUp)
     val penLeft = new JRadioButtonMenuItem("Light pen with button left")
-    penLeft.setActionCommand("PEN_LEFT")
-    penLeft.addActionListener(this)
+    penLeft.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_LEFT) )
     group3.add(penLeft)
     lightPenMenu.add(penLeft)
     
     val mouseEnabledItem = new JCheckBoxMenuItem("Mouse 1351 enabled")
     mouseEnabledItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_M,java.awt.event.InputEvent.ALT_DOWN_MASK))
     mouseEnabledItem.setSelected(false)
-    mouseEnabledItem.setActionCommand("MOUSE_ENABLED")
-    mouseEnabledItem.addActionListener(this)    
+    mouseEnabledItem.addActionListener(e => enableMouse(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     optionMenu.add(mouseEnabledItem)
     
     optionMenu.addSeparator
@@ -2171,34 +1897,29 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     optionMenu.add(snapMenu)
     
     val vicSnapshotItem = new JMenuItem("VIC ...")
-    vicSnapshotItem.setActionCommand("SNAPSHOT_VIC")
     vicSnapshotItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    vicSnapshotItem.addActionListener(this)
+    vicSnapshotItem.addActionListener(_ => takeSnapshot(true) )
     snapMenu.add(vicSnapshotItem)
     val vdcSnapshotItem = new JMenuItem("VDC ...")
-    vdcSnapshotItem.setActionCommand("SNAPSHOT_VDC")
-    vdcSnapshotItem.addActionListener(this)
+    vdcSnapshotItem.addActionListener(_ => takeSnapshot(false) )
     snapMenu.add(vdcSnapshotItem)
     
     optionMenu.addSeparator
     
     val pauseItem = new JCheckBoxMenuItem("Pause")
     pauseItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_P,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    pauseItem.setActionCommand("PAUSE")
-    pauseItem.addActionListener(this)
+    pauseItem.addActionListener(e => if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) clock.pause else clock.play )
     optionMenu.add(pauseItem)
     
     optionMenu.addSeparator
     
     val printerPreviewItem = new JMenuItem("Printer preview ...")    
-    printerPreviewItem.setActionCommand("PRINTER_PREVIEW")
-    printerPreviewItem.addActionListener(this)
+    printerPreviewItem.addActionListener(_ => showPrinterPreview )
     optionMenu.add(printerPreviewItem)
     
     val printerEnabledItem = new JCheckBoxMenuItem("Printer enabled")
     printerEnabledItem.setSelected(false)
-    printerEnabledItem.setActionCommand("PRINTER_ENABLED")
-    printerEnabledItem.addActionListener(this)
+    printerEnabledItem.addActionListener(e => { printerEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected ; printer.setActive(printerEnabled) } )
     optionMenu.add(printerEnabledItem)
     // Setting ---------------------------
     settings.add("printer-enabled",
@@ -2221,14 +1942,12 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     sidItem.add(sidTypeItem)
     val sid6581Item = new JRadioButtonMenuItem("MOS 6581")
     sid6581Item.setSelected(true)
-    sid6581Item.setActionCommand("SID_6581")
-    sid6581Item.addActionListener(this)
+    sid6581Item.addActionListener(_ => sid.setModel(true) )
     sidTypeItem.add(sid6581Item)
     group7.add(sid6581Item)
     val sid8580Item = new JRadioButtonMenuItem("MOS 8580")
     sid8580Item.setSelected(false)
-    sid8580Item.setActionCommand("SID_8580")
-    sid8580Item.addActionListener(this)
+    sid8580Item.addActionListener(_ => sid.setModel(false) )
     sidTypeItem.add(sid8580Item)
     group7.add(sid8580Item)
     // Setting ---------------------------
@@ -2248,154 +1967,52 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     val nosid2Item = new JRadioButtonMenuItem("None")
     sid2Item.add(nosid2Item)
     nosid2Item.setSelected(true)
-    nosid2Item.setActionCommand("NO_DUAL_SID")
-    nosid2Item.addActionListener(this)
+    nosid2Item.addActionListener(_ => setDualSID(None) )
     group8.add(nosid2Item)
     val sid2DE00Item = new JRadioButtonMenuItem("$DE00")
     sid2Item.add(sid2DE00Item)
     sid2DE00Item.setSelected(false)
-    sid2DE00Item.setActionCommand("DUAL_SID_DE00")
-    sid2DE00Item.addActionListener(this)
+    sid2DE00Item.addActionListener(_ => setDualSID(Some(0xDE00)) )
     group8.add(sid2DE00Item)
     val sid2DF00Item = new JRadioButtonMenuItem("$DF00")
     sid2Item.add(sid2DF00Item)
     sid2DF00Item.setSelected(false)
-    sid2DF00Item.setActionCommand("DUAL_SID_DF00")
-    sid2DF00Item.addActionListener(this)
+    sid2DF00Item.addActionListener(_ => setDualSID(Some(0xDF00)) )
     group8.add(sid2DF00Item)
     
     optionMenu.addSeparator
-    
-    val diskItem = new JMenu("Drive")
-    optionMenu.add(diskItem)
-    
-    val driveTypeItem = new JMenu("Drive Type")
-    diskItem.add(driveTypeItem)
-    val group12 = new ButtonGroup
-    val _1571TypeItem = new JRadioButtonMenuItem("1571")
-    group12.add(_1571TypeItem)
-    _1571TypeItem.setSelected(true)
-    _1571TypeItem.setActionCommand("DRIVE_1571")
-    _1571TypeItem.addActionListener(this)  
-    driveTypeItem.add(_1571TypeItem)
-    val _1581TypeItem = new JRadioButtonMenuItem("1581")
-    group12.add(_1581TypeItem)
-    _1581TypeItem.setActionCommand("DRIVE_1581")
-    _1581TypeItem.addActionListener(this)  
-    driveTypeItem.add(_1581TypeItem)
-    val _1541TypeItem = new JRadioButtonMenuItem("1541")
-    group12.add(_1541TypeItem)
-    _1541TypeItem.setActionCommand("DRIVE_1541")
-    _1541TypeItem.addActionListener(this)  
-    driveTypeItem.add(_1541TypeItem)
-    // Setting ---------------------------
-    settings.add("driver-type",
-                 "Set the driver's type (1541,1571,1581)",
-                 "DRIVER_TYPE",
-                 (dt:String) => {
-                   dt match {
-                     case "1541" => 
-                       setDriveType(DriveType._1541,true)
-                       _1541TypeItem.setSelected(true)
-                     case "1571" => 
-                       setDriveType(DriveType._1571,true)
-                       _1571TypeItem.setSelected(true)
-                     case "1581" => 
-                       setDriveType(DriveType._1581,true)
-                       _1581TypeItem.setSelected(true)
-                     case _ =>
-                   }
-                 },
-                 if (_1541TypeItem.isSelected) "1541"
-                 else
-                 if (_1571TypeItem.isSelected) "1571"
-                 else
-                 if (_1581TypeItem.isSelected) "1581"
-                 else "1571"
-    )
-    // -----------------------------------
-    // Setting ---------------------------
-    settings.add("drive8-file",
-                 "Attach a file to drive 8",
-                 "DRIVE_8_FILE",
-                 (d8f:String) => {
-                   if (d8f != "") attachDiskFile(0,new File(d8f),false)
-                 },
-                 floppyComponents(0).drive.getFloppy.file
-    )
-    // -----------------------------------
-    // Setting ---------------------------
-    settings.add("drive9-file",
-                 "Attach a file to drive 9",
-                 "DRIVE_9_FILE",
-                 (d9f:String) => {
-                   if (d9f != "") attachDiskFile(1,new File(d9f),false)
-                 },
-                 floppyComponents(1).drive.getFloppy.file
-    )
-    // -----------------------------------
-    
-    val diskReadOnlyItem = new JCheckBoxMenuItem("Read only disk")
-    diskReadOnlyItem.setSelected(false)
-    diskReadOnlyItem.setActionCommand("DISK_RO")
-    diskReadOnlyItem.addActionListener(this)    
-    diskItem.add(diskReadOnlyItem)
-    
-    val diskCanSleepItem = new JCheckBoxMenuItem("Drive can go sleeping")
-    diskCanSleepItem.setSelected(true)
-    diskCanSleepItem.setActionCommand("DISK_CAN_GO_SLEEP")
-    diskCanSleepItem.addActionListener(this)    
-    diskItem.add(diskCanSleepItem)
-    
-    val parallelCableItem = new JCheckBoxMenuItem("Parallel cable enabled")
-    parallelCableItem.setSelected(false)
-    parallelCableItem.setActionCommand("PARALLEL_CABLE")
-    parallelCableItem.addActionListener(this)    
-    diskItem.add(parallelCableItem)
-    
-    val diskSpeedItem = new JMenu("Drive speed")
-    val group11 = new ButtonGroup 
-    val diskMinSpeedItem = new JRadioButtonMenuItem("Min speed")
-    diskMinSpeedItem.setSelected(true)
-    diskMinSpeedItem.setActionCommand("DISK_MIN_SPEED")
-    diskMinSpeedItem.addActionListener(this)  
-    diskSpeedItem.add(diskMinSpeedItem)
-    group11.add(diskMinSpeedItem)
-    val diskMaxSpeedItem = new JRadioButtonMenuItem("Max speed")
-    diskMaxSpeedItem.setActionCommand("DISK_MAX_SPEED")
-    diskMaxSpeedItem.addActionListener(this)  
-    diskSpeedItem.add(diskMaxSpeedItem)
-    group11.add(diskMaxSpeedItem)
-    diskItem.add(diskSpeedItem)
-    
-    val expRAMItem = new JMenu("RAM Expansion")
-    diskItem.add(expRAMItem)
-    
-    val ramExp2000Item = new JCheckBoxMenuItem("$2000-$3FFF enabled")
-    ramExp2000Item.setSelected(false)
-    ramExp2000Item.setActionCommand("DISK_EXP_RAM_2000")
-    ramExp2000Item.addActionListener(this)    
-    expRAMItem.add(ramExp2000Item)
-    val ramExp4000Item = new JCheckBoxMenuItem("$4000-$5FFF enabled")
-    ramExp4000Item.setSelected(false)
-    ramExp4000Item.setActionCommand("DISK_EXP_RAM_4000")
-    ramExp4000Item.addActionListener(this)    
-    expRAMItem.add(ramExp4000Item)
-    val ramExp6000Item = new JCheckBoxMenuItem("$6000-$7FFF enabled")
-    ramExp6000Item.setSelected(false)
-    ramExp6000Item.setActionCommand("DISK_EXP_RAM_6000")
-    ramExp6000Item.addActionListener(this)    
-    expRAMItem.add(ramExp6000Item)
-    val ramExp8000Item = new JCheckBoxMenuItem("$8000-$9FFF enabled")
-    ramExp8000Item.setSelected(false)
-    ramExp8000Item.setActionCommand("DISK_EXP_RAM_8000")
-    ramExp8000Item.addActionListener(this)    
-    expRAMItem.add(ramExp8000Item)
-    val ramExpA000Item = new JCheckBoxMenuItem("$A000-$BFFF enabled")
-    ramExpA000Item.setSelected(false)
-    ramExpA000Item.setActionCommand("DISK_EXP_RAM_A000")
-    ramExpA000Item.addActionListener(this)    
-    expRAMItem.add(ramExpA000Item)
+
+    for(drive <- 0 to 1) {
+      // Setting ---------------------------
+      settings.add(s"drive${drive + 8}-type",
+        "Set the driver's type (1541,1571,1581)",
+        s"DRIVER${drive + 8}_TYPE",
+        (dt: String) => {
+          dt match {
+            case "1541" =>
+              setDriveType(drive,DriveType._1541, true)
+            case "1571" =>
+              setDriveType(drive,DriveType._1571, true)
+            case "1581" =>
+              setDriveType(drive,DriveType._1581, true)
+            case _ =>
+          }
+        },
+        if (drives(drive).driveType == DriveType._1541) "1541"
+        else if (drives(drive).driveType == DriveType._1571) "1571"
+        else if (drives(drive).driveType == DriveType._1581) "1581"
+        else "1571"
+      )
+
+      settings.add(s"drive${drive + 8}-file",
+        s"Attach a file to drive ${drive + 8}",
+        s"DRIVE_${drive + 8}_FILE",
+        (df: String) => {
+          if (df != "") attachDiskFile(drive, new File(df), false, None)
+        },
+        floppyComponents(drive).drive.getFloppy.file
+      )
+    }
     
     optionMenu.addSeparator
     
@@ -2405,84 +2022,13 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     val group10 = new ButtonGroup
     val remoteDisabledItem = new JRadioButtonMenuItem("Off")
     remoteDisabledItem.setSelected(true)
-    remoteDisabledItem.setActionCommand("REMOTE_OFF")
-    remoteDisabledItem.addActionListener(this)
+    remoteDisabledItem.addActionListener(_ => setRemote(None) )
     group10.add(remoteDisabledItem)
     remoteItem.add(remoteDisabledItem)
     val remoteEnabledItem = new JRadioButtonMenuItem("On ...")
-    remoteEnabledItem.setActionCommand("REMOTE_ON")
-    remoteEnabledItem.addActionListener(this)
+    remoteEnabledItem.addActionListener(e => setRemote(Some(e.getSource.asInstanceOf[JRadioButtonMenuItem])) )
     group10.add(remoteEnabledItem)
     remoteItem.add(remoteEnabledItem)
-    
-    optionMenu.addSeparator
-    
-    val frMenu = new JMenu("Function roms")
-    optionMenu.add(frMenu)
-    val frIntGroup = new ButtonGroup
-    val frNoInternalItem = new JRadioButtonMenuItem("Internal function ROM empty")
-    frNoInternalItem.setSelected(true)
-    frNoInternalItem.setActionCommand("NO_FR_INTERNAL")
-    frNoInternalItem.addActionListener(this)
-    frIntGroup.add(frNoInternalItem)
-    frMenu.add(frNoInternalItem)
-    val frLoadInternalItem = new JRadioButtonMenuItem("Load Internal function ROM ...")
-    frLoadInternalItem.setActionCommand("LOAD_FR_INTERNAL")
-    frLoadInternalItem.addActionListener(this)
-    frIntGroup.add(frLoadInternalItem)
-    frMenu.add(frLoadInternalItem)
-    val frLoadInternalMegabitItem = new JRadioButtonMenuItem("Load Megabit function ROM ...")
-    frLoadInternalMegabitItem.setActionCommand("LOAD_FR_MEGABIT_INTERNAL")
-    frLoadInternalMegabitItem.addActionListener(this)
-    frIntGroup.add(frLoadInternalMegabitItem)
-    frMenu.add(frLoadInternalMegabitItem)
-    // Setting ---------------------------
-    settings.add("internal-fun-rom",
-                 "Set the internal function rom: <type=NORMAL|MEGABIT>,<path to rom>",
-                 "INTERNAL_FUNCTION_ROM",
-                 (ifr:String) => {
-                   val ifrPars = ifr.split(",")
-                   if (ifrPars.length == 2) {
-                     val frType = FunctionROMType.withName(ifrPars(0))
-                     loadFunctionROM(true,Some(ifrPars(1)),frType)
-                     frType match {
-                       case FunctionROMType.NORMAL => frLoadInternalItem.setSelected(true)
-                       case FunctionROMType.MEGABIT => frLoadInternalMegabitItem.setSelected(true)
-                     }
-                   }
-                 },
-                 if (frLoadInternalItem.isSelected) FunctionROMType.NORMAL.toString + "," + internalFunctionROMFileName
-                 else
-                 if (frLoadInternalMegabitItem.isSelected) FunctionROMType.MEGABIT.toString + "," + internalFunctionROMFileName
-                 else "none"
-    )
-    // -----------------------------------
-    val frExtGroup = new ButtonGroup
-    val frNoExternalItem = new JRadioButtonMenuItem("External function ROM empty")
-    frNoExternalItem.setSelected(true)
-    frNoExternalItem.setActionCommand("NO_FR_EXTERNAL")
-    frNoExternalItem.addActionListener(this)
-    frExtGroup.add(frNoExternalItem)
-    frMenu.add(frNoExternalItem)
-    val frLoadExternalItem = new JRadioButtonMenuItem("Load External function ROM ...")
-    frLoadExternalItem.setActionCommand("LOAD_FR_EXTERNAL")
-    frLoadExternalItem.addActionListener(this)
-    frExtGroup.add(frLoadExternalItem)
-    frMenu.add(frLoadExternalItem)
-    // Setting ---------------------------
-    settings.add("external-fun-rom",
-                 "Set the external function rom: <path to rom>",
-                 "EXTERNAL_FUNCTION_ROM",
-                 (ifr:String) => {
-                   if (ifr != "none" && ifr != "") {
-                     loadFunctionROM(false,Some(ifr),FunctionROMType.NORMAL)
-                     frLoadExternalItem.setSelected(true)
-                   }                   
-                 },
-                 if (frLoadExternalItem.isSelected) externalFunctionROMFileName
-                 else "none"
-    )
-    // -----------------------------------
     
     optionMenu.addSeparator
     
@@ -2490,10 +2036,9 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     optionMenu.add(IOItem)
     
     optionMenu.addSeparator
-    
+
     val rs232Item = new JMenuItem("RS-232 ...")
-    rs232Item.setActionCommand("RS232")
-    rs232Item.addActionListener(this)    
+    rs232Item.addActionListener(_ => manageRS232 )
     IOItem.add(rs232Item)
     
     IOItem.addSeparator
@@ -2504,39 +2049,32 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     val fylerEnabledItem = new JCheckBoxMenuItem("Flyer enabled on 7")
     fylerEnabledItem.setSelected(false)
     flyerItem.add(fylerEnabledItem)
-    fylerEnabledItem.setActionCommand("FLYER ENABLED")
-    fylerEnabledItem.addActionListener(this)
+    fylerEnabledItem.addActionListener(e => enableFlyer(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     val flyerDirectoryItem = new JMenuItem("Set disks repository ...")
     flyerItem.add(flyerDirectoryItem)
-    flyerDirectoryItem.setActionCommand("FLYER DIR")
-    flyerDirectoryItem.addActionListener(this)
+    flyerDirectoryItem.addActionListener(_ => chooseFlyerDir )
     
     val reuItem = new JMenu("REU")
     val group5 = new ButtonGroup
     val noReuItem = new JRadioButtonMenuItem("None")
     noReuItem.setSelected(true)
-    noReuItem.setActionCommand("NO_REU")
-    noReuItem.addActionListener(this)
+    noReuItem.addActionListener(_ => setREU(None,None) )
     group5.add(noReuItem)
     reuItem.add(noReuItem)
     val reu128Item = new JRadioButtonMenuItem("128K")
-    reu128Item.setActionCommand("REU_128")
-    reu128Item.addActionListener(this)
+    reu128Item.addActionListener(_ => setREU(Some(REU.REU_1700),None) )
     group5.add(reu128Item)
     reuItem.add(reu128Item)
     val reu256Item = new JRadioButtonMenuItem("256K")
-    reu256Item.setActionCommand("REU_256")
-    reu256Item.addActionListener(this)
+    reu256Item.addActionListener(_ => setREU(Some(REU.REU_1764),None) )
     group5.add(reu256Item)
     reuItem.add(reu256Item)
     val reu512Item = new JRadioButtonMenuItem("512K")
-    reu512Item.setActionCommand("REU_512")
-    reu512Item.addActionListener(this)
+    reu512Item.addActionListener(_ => setREU(Some(REU.REU_1750),None) )
     group5.add(reu512Item)
     reuItem.add(reu512Item)
     val reu16MItem = new JRadioButtonMenuItem("16M ...")
-    reu16MItem.setActionCommand("REU_16M")
-    reu16MItem.addActionListener(this)
+    reu16MItem.addActionListener(_ => choose16MREU )
     group5.add(reu16MItem)
     reuItem.add(reu16MItem)    
     IOItem.add(reuItem)
@@ -2544,35 +2082,35 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     settings.add("reu-type",
                  "Set the reu type (none,128,256,512,16384). In case of 16384: 16384,<filename>",
                  "REU_TYPE",
-                 (reu:String) => {
-                   val reuPars = reu.split(",")
-                   if (reuPars(0) == "" || reuPars(0) == "none") setREU(None,None)
-                   else
-                   reuPars(0).toInt match {
-                     case REU.REU_1700 => 
-                       setREU(Some(REU.REU_1700),None)
-                       reu128Item.setSelected(true)
-                     case REU.REU_1750 => 
-                       setREU(Some(REU.REU_1750),None)
-                       reu512Item.setSelected(true)
-                     case REU.REU_1764 => 
-                       setREU(Some(REU.REU_1764),None)
-                       reu256Item.setSelected(true)                       
-                     case REU.REU_16M => 
-                       setREU(Some(REU.REU_16M),if (reuPars.length == 2 && reuPars(1) != "null") Some(reuPars(1)) else None)
-                       reu16MItem.setSelected(true)
-                   }
-                 },
-                 if (noReuItem.isSelected) "none"
-                 else
-                 if (reu128Item.isSelected) "128"
-                 else
-                 if (reu256Item.isSelected) "256"
-                 else
-                 if (reu512Item.isSelected) "512"
-                 else
-                 if (reu16MItem.isSelected) "16384," + REU.attached16MFileName
-                 else "none"
+     (reu:String) => {
+       val reuPars = reu.split(",")
+       if (reuPars(0) == "" || reuPars(0) == "none") setREU(None,None)
+       else
+       reuPars(0).toInt match {
+         case REU.REU_1700 =>
+           setREU(Some(REU.REU_1700),None)
+           reu128Item.setSelected(true)
+         case REU.REU_1750 =>
+           setREU(Some(REU.REU_1750),None)
+           reu512Item.setSelected(true)
+         case REU.REU_1764 =>
+           setREU(Some(REU.REU_1764),None)
+           reu256Item.setSelected(true)
+         case REU.REU_16M =>
+           setREU(Some(REU.REU_16M),if (reuPars.length == 2 && reuPars(1) != "null") Some(reuPars(1)) else None)
+           reu16MItem.setSelected(true)
+       }
+     },
+     if (noReuItem.isSelected) "none"
+     else
+     if (reu128Item.isSelected) "128"
+     else
+     if (reu256Item.isSelected) "256"
+     else
+     if (reu512Item.isSelected) "512"
+     else
+     if (reu16MItem.isSelected) "16384," + REU.attached16MFileName
+     else "none"
     )
     // -----------------------------------
     
@@ -2581,44 +2119,37 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     val digimaxItem = new JMenu("DigiMAX")
     IOItem.add(digimaxItem)
     val digiMaxSampleRateItem  = new JMenuItem("DigiMax sample rate ...")
-    digiMaxSampleRateItem.setActionCommand("DIGIMAX_SAMPLERATE")
-    digiMaxSampleRateItem.addActionListener(this)
+    digiMaxSampleRateItem.addActionListener(_ => chooseDigiMaxSampleRate )
     digimaxItem.add(digiMaxSampleRateItem)
     val group6 = new ButtonGroup
     val digimaxDisabledItem = new JRadioButtonMenuItem("Disabled")
     digimaxDisabledItem.setSelected(true)
-    digimaxDisabledItem.setActionCommand("DIGIMAX_DISABLED")
-    digimaxDisabledItem.addActionListener(this)
+    digimaxDisabledItem.addActionListener(_ => setDigiMax(false,None) )
     digimaxItem.add(digimaxDisabledItem)
     group6.add(digimaxDisabledItem)
     val digimaxOnUserPortItem = new JRadioButtonMenuItem("On UserPort")
-    digimaxOnUserPortItem.setActionCommand("DIGIMAX_USERPORT")
-    digimaxOnUserPortItem.addActionListener(this)
+    digimaxOnUserPortItem.addActionListener(_ => setDigiMax(true,None) )
     group6.add(digimaxOnUserPortItem)
     digimaxItem.add(digimaxOnUserPortItem)
     val digimaxDE00Item = new JRadioButtonMenuItem("On DE00")
-    digimaxDE00Item.setActionCommand("DIGIMAX_DE00")
-    digimaxDE00Item.addActionListener(this)
+    digimaxDE00Item.addActionListener(_ => setDigiMax(true,Some(0xDE00)) )
     group6.add(digimaxDE00Item)
     digimaxItem.add(digimaxDE00Item)
     val digimaxDF00Item = new JRadioButtonMenuItem("On DF00")
-    digimaxDF00Item.setActionCommand("DIGIMAX_DF00")
-    digimaxDF00Item.addActionListener(this)
+    digimaxDF00Item.addActionListener(_ => setDigiMax(true,Some(0xDF00)) )
     group6.add(digimaxDF00Item)
     digimaxItem.add(digimaxDF00Item)
     
     IOItem.addSeparator
     
     val gmod2Item = new JMenuItem("GMOD2 eeprom file...")
-    gmod2Item.setActionCommand("GMOD2")
-    gmod2Item.addActionListener(this)
+    gmod2Item.addActionListener(_ => chooseGMod2 )
     IOItem.add(gmod2Item)
     
     IOItem.addSeparator
     
-    val cpmItem = new JRadioButtonMenuItem("CP/M Cartdrige")
-    cpmItem.setActionCommand("CP/M")
-    cpmItem.addActionListener(this)
+    val cpmItem = new JCheckBoxMenuItem("CP/M Cartdrige")
+    cpmItem.addActionListener(e => enableCPMCart(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     IOItem.add(cpmItem)
     
     val ramItem = new JMenu("RAM")
@@ -2626,17 +2157,36 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     val _256RamEnabledItem = new JCheckBoxMenuItem("256K")
     _256RamEnabledItem.setSelected(false)
     ramItem.add(_256RamEnabledItem)
-    _256RamEnabledItem.setActionCommand("RAM_256K")
-    _256RamEnabledItem.addActionListener(this)
-    
+    _256RamEnabledItem.addActionListener(e => mmu.RAM.setExpansionBanks(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+
+    val romItem = new JMenuItem("ROMs ...")
+    optionMenu.add(romItem)
+    romItem.addActionListener( _ => ROMPanel.showROMPanel(vicDisplayFrame,configuration,false,() => {
+      saveSettings(false)
+      checkFunctionROMS
+    }) )
+
     // cartridge
     val cartButtonItem = new JMenuItem("Press cartridge button...")
     cartButtonItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Z,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    cartButtonItem.setActionCommand("CRT_PRESS")
-    cartButtonItem.addActionListener(this)
+    cartButtonItem.addActionListener(_ => cartButtonRequested = true )
     cartMenu.add(cartButtonItem)
-    
+
     // non-saveable settings
+    settings.add("ext-rom",
+      "External function ROM path",
+      (extRom:String) => {
+        configuration.setProperty(ROM.C128_EXTERNAL_ROM_PROP,extRom)
+        checkFunctionROMS
+      }
+    )
+    settings.add("int-rom",
+      "Internal function ROM (<rom path>,NORMAL|MEGABIT)",
+      (intRom:String) => {
+        configuration.setProperty(ROM.C128_INTERNAL_ROM_PROP,intRom)
+        checkFunctionROMS
+      }
+    )
     settings.add("go64",
                  "Run in 64 mode",
                  (go64:Boolean) => if (go64) mmu.go64
@@ -2695,8 +2245,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     
     // help    
     val aboutItem = new JMenuItem("About")
-    aboutItem.setActionCommand("ABOUT")
-    aboutItem.addActionListener(this)
+    aboutItem.addActionListener(_ => showAbout )
     helpMenu.add(aboutItem)
     
     vicDisplayFrame.setJMenuBar(menuBar)
@@ -2778,8 +2327,8 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     out.writeChars("KERNAL128")
     out.writeObject(ucesoft.cbm.Version.VERSION)
     out.writeLong(System.currentTimeMillis)
-    out.writeBoolean(isDiskActive)
-    out.writeBoolean(isDiskActive9)
+    out.writeBoolean(drivesEnabled(0))
+    out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
     out.writeBoolean(z80Active)
     out.writeInt(clockSpeed)
@@ -2792,8 +2341,8 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
     for(i <- 0 until header.length) if (in.readChar != header(i)) throw new IOException("Bad header")
     val ver = in.readObject.asInstanceOf[String]
     val ts = in.readLong
-    isDiskActive = in.readBoolean
-    isDiskActive9 = in.readBoolean
+    drivesEnabled(0) = in.readBoolean
+    drivesEnabled(1) = in.readBoolean
     printerEnabled = in.readBoolean
     z80Active = in.readBoolean
     clockSpeed = in.readInt
@@ -2822,6 +2371,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       sys.exit(0)
     }
     swing{ initComponent }
+    checkFunctionROMS
     // VDC
     swing { vdcDisplayFrame.pack }    
     if (configuration.getProperty(CONFIGURATION_VDC_FRAME_DIM) != null) {
@@ -2833,7 +2383,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       swing { vdcDisplayFrame.setLocation(xy(0),xy(1)) }
     } 
     // VIC
-    vicDisplayFrame.pack
+    swing { vicDisplayFrame.pack }
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
       swing { vicDisplayFrame.setSize(dim(0),dim(1)) }
@@ -2843,13 +2393,7 @@ class C128 extends CBMComponent with ActionListener with GamePlayer with MMUChan
       swing { vicDisplayFrame.setLocation(xy(0),xy(1)) }
     }     
     // SETTINGS
-    settings.load(configuration)       
-    // AUTOPLAY
-    settings.parseAndLoad(args) match {
-      case None =>
-      case Some(f) =>
-        handleDND(new File(f),false,true)
-    }
+    loadSettings(args)
     // VIEW
     if (headless) vdcDisplayFrame.setVisible(false)
     swing { vicDisplayFrame.setVisible(!headless) }
