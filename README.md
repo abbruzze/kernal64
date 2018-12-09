@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.4.8
+Kernal64 ver 1.4.9
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -18,6 +18,15 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.4.9 (Dec 9th 2018)
+- VICII 2Mhz mode partial support added. Now Risen From Oblivion for VIC has been improved and the moving image is shown. Cannot show the first image yet.
+- New ROMs panel. Removed rom environment variable. Now the roms configuration can be saved as other settings.
+- New drives settings panel. Now it's possible to change drives settings and load floppy from a floating window. Removed all drive settings from menu'
+-  The keyboard layout can be changed and the user can take effects immediately without restart.
+- New warp mode on loading
+- New RS-232 handling. New GUI panel to configure rs-232 and to monitor signals. RS-232 general improvements. New Hayes Modem class to handle AT commands.
+- Z80 cycle counting more accurate
 
 ### What's new in 1.4.8 (Oct 20th 2018)
 **VDC improvements**
