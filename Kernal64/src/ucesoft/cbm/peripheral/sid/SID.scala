@@ -8,8 +8,9 @@ import ucesoft.cbm.Clock
 import ucesoft.cbm.ClockEvent
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
+
 import javax.swing.JFrame
-import ucesoft.cbm.util.MouseCage
+import ucesoft.cbm.misc.MouseCage
 
 class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Option[AudioDriverDevice] = None) extends Chip with SIDDevice {
   override lazy val componentID = "SID_" + sidID
