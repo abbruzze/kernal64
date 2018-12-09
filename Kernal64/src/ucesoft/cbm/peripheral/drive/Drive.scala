@@ -16,15 +16,17 @@ trait Drive extends CBMComponent {
   val componentType = CBMComponentType.DISK
   val driveType : DriveType.Value
   val formatExtList : List[String]
-  protected var isRunningListener : (Boolean) => Unit = x => {}
+  var runningListener : (Boolean) => Unit = _
   
   def disconnect {}
   def setActive(active:Boolean) {}
+  def isRunning : Boolean = false
   def setCanSleep(canSleep:Boolean) {}
-  def setIsRunningListener(listener: (Boolean) => Unit) = isRunningListener = listener
+  def canGoSleeping : Boolean = false
   def setDriveReader(driveReader:Floppy,emulateInserting:Boolean)
   def clock(cycles:Long)
   def setReadOnly(readOnly:Boolean) {}
+  def isReadOnly : Boolean = false
   def getFloppy : Floppy
   def getMem : Memory = Memory.empty
   

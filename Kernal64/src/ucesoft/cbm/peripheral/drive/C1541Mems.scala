@@ -6,24 +6,25 @@ import ucesoft.cbm.Log
 import ucesoft.cbm.cpu.BridgeMemory
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.cpu.RAMComponent
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
+import java.io.{FileNotFoundException, ObjectInputStream, ObjectOutputStream}
+
 import javax.swing.JFrame
 
 object C1541Mems {
+  import ROM._
   val KERNEL_M = 0xC000
-  
-  private[this] val KERNAL_ROM = System.getProperty("1541kernal")
-  
-  private class DISK_KERNEL extends ROM(null,"C1541_KERNEL",KERNEL_M,16384,if (KERNAL_ROM != null) KERNAL_ROM else "roms/c1541II.rom") {
+
+  private class DISK_KERNEL extends ROM(null,"C1541_KERNEL",KERNEL_M,16384,D1541_DOS_ROM_PROP) {
     private[this] val startAndLen = {
-       Option(ClassLoader.getSystemClassLoader.getResourceAsStream(resourceName)) match {
-        case None => (0,0) // the error will be thrown by the super class 
-        case Some(in) =>          
-          val al = (0x10000 - in.available,in.available)
-          in.close
-          al
-       }
+      try {
+        val in = ROM.getROMInputStream(resourceName)
+        val al = (0x10000 - in.available,in.available)
+        in.close
+        al
+      }
+      catch {
+        case _: FileNotFoundException => (0,0)
+      }
     }
     override val startAddress = startAndLen._1
     override val length = startAndLen._2

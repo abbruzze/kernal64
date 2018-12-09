@@ -248,18 +248,21 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     viaDisk.setDriveReader(driveReader,emulateInserting)
     RW_HEAD.setWriteProtected(floppy.isReadOnly)
   }
+  override def isRunning : Boolean = running
+
   override def setActive(active: Boolean) = {
     viaBus.setEnabled(active)
     running = active
-    isRunningListener(active)
+    runningListener(active)
   }
+  override def canGoSleeping = canSleep
   override def setCanSleep(canSleep: Boolean) {
     this.canSleep = canSleep
     awake
   }
   private def awake {
     running = true
-    isRunningListener(true)
+    runningListener(true)
     viaBus.setActive(true)
     viaDisk.setActive(true)
     awakeCycles = clk.currentCycles
@@ -269,7 +272,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   override def disconnect {
     bus.unregisterListener(viaBus)
   }
-  
+
+  override def isReadOnly: Boolean = RW_HEAD.isWriteProtected
   override def setReadOnly(readOnly:Boolean) = RW_HEAD.setWriteProtected(readOnly)
   
   override def setSpeedHz(speed:Int) {
@@ -304,7 +308,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
 
   def reset {
     running = true
-    isRunningListener(true)
+    runningListener(true)
     awakeCycles = 0
     goSleepingCycles = 0
     cycleFrac = 0.0
@@ -366,7 +370,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     if (pc == LOAD_ROUTINE) setFilename
     else 
     if (pc == WAIT_LOOP_ROUTINE && canSleep && !mem.isChannelActive && !RW_HEAD.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
-      running = false      
+      running = false
+      runningListener(false)
       viaBus.setActive(false)
       viaDisk.setActive(false)
       goSleepingCycles = cycles
@@ -376,7 +381,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
 
   def clock(cycles: Long) {
     if (running) {
-      checkPC(cycles)      
+      checkPC(cycles)
       if (CYCLE_ADJ > 0) {
         cycleFrac += CYCLE_ADJ
         if (cycleFrac >= 1) {
@@ -396,7 +401,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     } else if (cycles - goSleepingCycles > GO_SLEEPING_MESSAGE_CYCLES) {
       ledListener.endLoading
       goSleepingCycles = Long.MaxValue
-      isRunningListener(false)
     }
   }
 
@@ -442,6 +446,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     currentSpeedHz = in.readInt
     cycleFrac = in.readDouble
     running = in.readBoolean
+    runningListener(running)
     awakeCycles = in.readLong
     goSleepingCycles = in.readLong
     canSleep = in.readBoolean

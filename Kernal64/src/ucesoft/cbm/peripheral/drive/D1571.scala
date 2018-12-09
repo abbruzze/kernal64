@@ -353,8 +353,7 @@ class D1571(val driveID: Int,
    * 
    ***********************************************************************************************************/
   private[this] val ram = Array.fill(length)(0)
-  private[this] val KERNAL_ROM = System.getProperty("1571kernal")
-  private[this] val DISK_KERNEL = new ROM(null,"C1571_KERNEL",0x8000,0x8000,if (KERNAL_ROM != null) KERNAL_ROM else "roms/c1571.rom") {
+  private[this] val DISK_KERNEL = new ROM(null,"C1571_KERNEL",0x8000,0x8000,ROM.D1571_DOS_ROM_PROP) {
     final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
   }
   
@@ -425,15 +424,19 @@ class D1571(val driveID: Int,
     VIA2.setDriveReader(driveReader,emulateInserting)    
     RW_HEAD.setWriteProtected(floppy.isReadOnly)
   }
+  override def isRunning = running
   override def setActive(active: Boolean) {
     VIA1.setEnabled(active)
     running = active
-    isRunningListener(active)
+    runningListener(active)
   }
+  override def canGoSleeping = this.canSleep
   override def setCanSleep(canSleep: Boolean) {
     this.canSleep = canSleep
     awake
   }
+
+  override def isReadOnly: Boolean = RW_HEAD.isWriteProtected
   override def setReadOnly(readOnly:Boolean) = RW_HEAD.setWriteProtected(readOnly)
   
   def init {
@@ -457,7 +460,7 @@ class D1571(val driveID: Int,
     activeHead = 0
     canSleep = true
     running = true
-    isRunningListener(true)
+    runningListener(true)
     awakeCycles = 0
     goSleepingCycles = 0
     cycleFrac = 0.0
@@ -488,7 +491,8 @@ class D1571(val driveID: Int,
     if (pc == _1541_LOAD_ROUTINE || pc == _1571_LOAD_ROUTINE) setFilename
     else 
     if (pc == _1541_WAIT_LOOP_ROUTINE && canSleep && channelActive == 0 && !RW_HEAD.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
-      running = false      
+      running = false
+      runningListener(false)
       VIA1.setActive(false)
       VIA2.setActive(false)
       goSleepingCycles = cycles
@@ -522,13 +526,12 @@ class D1571(val driveID: Int,
     if (cycles - goSleepingCycles > GO_SLEEPING_MESSAGE_CYCLES) {
       ledListener.endLoading
       goSleepingCycles = Long.MaxValue
-      isRunningListener(false)
     }
   }
   
   private def awake {
     running = true
-    isRunningListener(true)
+    runningListener(true)
     VIA1.setActive(true)
     VIA2.setActive(true)
     awakeCycles = clk.currentCycles    

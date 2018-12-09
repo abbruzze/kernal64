@@ -206,8 +206,7 @@ class D1581(val driveID: Int,
    * 
    ***********************************************************************************************************/
   private[this] val ram = Array.fill(length)(0)
-  private[this] val KERNAL_ROM = System.getProperty("1581kernal")
-  private[this] val DISK_KERNEL = new ROM(null,"C1581_KERNEL",0x8000,0x8000,if (KERNAL_ROM != null) KERNAL_ROM else "roms/1581.rom") {
+  private[this] val DISK_KERNEL = new ROM(null,"C1581_KERNEL",0x8000,0x8000,ROM.D1581_DOS_ROM_PROP) {
     final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
   }
   
@@ -265,15 +264,19 @@ class D1581(val driveID: Int,
     
     awake   
   }
+  override def isRunning = running
   override def setActive(active: Boolean) {
     driveEnabled = active
     running = active
-    isRunningListener(active)
+    runningListener(active)
   }
+  override def canGoSleeping = this.canSleep
   override def setCanSleep(canSleep: Boolean) {
     this.canSleep = canSleep
     awake
   }
+
+  override def isReadOnly: Boolean = RW_HEAD.isWriteProtected
   override def setReadOnly(readOnly:Boolean) = RW_HEAD.setWriteProtected(readOnly)
   
   def init {
@@ -293,7 +296,7 @@ class D1581(val driveID: Int,
     busDataDirection = 0
     activeHead = 0
     running = true
-    isRunningListener(true)
+    runningListener(true)
     awakeCycles = 0
     goSleepingCycles = 0
     cycleFrac = 0.0
@@ -328,7 +331,8 @@ class D1581(val driveID: Int,
   @inline private def checkPC(cycles: Long) {
     val pc = cpu.getPC
     if (pc == _1581_WAIT_LOOP_ROUTINE && canSleep && !RW_HEAD.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
-      running = false      
+      running = false
+      runningListener(false)
       goSleepingCycles = cycles
     }
   }
@@ -358,14 +362,13 @@ class D1581(val driveID: Int,
     if (cycles - goSleepingCycles > GO_SLEEPING_MESSAGE_CYCLES) {
       ledListener.endLoading
       goSleepingCycles = Long.MaxValue
-      isRunningListener(false)
     }
   }
   
   private def awake {
     running = true
-    isRunningListener(true)
-    awakeCycles = clk.currentCycles    
+    runningListener(true)
+    awakeCycles = clk.currentCycles
   }
     
   // ================== Tracing ====================================
