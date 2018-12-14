@@ -128,6 +128,9 @@ class VDC extends RAMComponent {
   private[this] var useCacheForNextFrame,writeOnPrevFrame = false
   private[this] var updateGeometryOnNextFrame = false
   private[this] var blankMode = false // TO BE IMPLEMENTED PROPERLY
+  // -----------------------------------------------------
+  private[this] var deinterlaceMode = true
+  private[this] var frameBit = 0
   // COLOR PALETTE =======================================
   private[this] val PALETTE = Array(
       0xFF000000,  // 00 Black
@@ -175,6 +178,11 @@ class VDC extends RAMComponent {
   }
   
   // =====================================================
+  def setDeinterlaceMode(on:Boolean) : Unit = {
+    deinterlaceMode = on
+    writeOnPrevFrame = true
+  }
+
   def setGeometryUpdateListener(geometryUpdateListener:(String) => Unit) {
     this.geometryUpdateListener = geometryUpdateListener  
   }
@@ -445,11 +453,13 @@ class VDC extends RAMComponent {
     if (rasterLine == 0) nextFrame       
     
     vblank = rasterLine < borderHeight || rasterLine >= borderHeight + visibleScreenHeightPix || rasterLine >= screenHeight - 1
+    val interlacing = !deinterlaceMode && interlaceMode
+    val skipLineForInterlace = interlacing && ((rasterLine & 1) != frameBit)
     
-    if (!useCacheForNextFrame)
-    try {      
+    if (!useCacheForNextFrame || interlacing)
+    try {
       oneLineDrawn = true
-      if (vblank || currentCharScanLine > ychars_visible) {
+      if (vblank || skipLineForInterlace || currentCharScanLine > ychars_visible) {
         val vm = videoMode
         videoMode = VideoMode.IDLE
         drawTextLine
@@ -539,6 +549,7 @@ class VDC extends RAMComponent {
   }
   
   @inline private def nextFrame {
+    frameBit = (frameBit + 1) & 1
     if (oneLineDrawn) display.showFrame(0,0,screenWidth,screenHeight)
     else display.showFrame(-1,-1,-1,-1)     
     
