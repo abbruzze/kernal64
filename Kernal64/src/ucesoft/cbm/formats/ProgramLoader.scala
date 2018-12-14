@@ -10,6 +10,7 @@ object ProgramLoader {
   var cpu : CPU6510 = _
   private[this] var loadingWithWarp = false
   var loadingWithWarpEnabled = true
+  var warpModeListener : (Boolean) => Unit = _
   private[this] lazy val clk = Clock.systemClock
 
   def checkLoadingInWarpMode(c64Mode:Boolean): Unit = {
@@ -18,11 +19,11 @@ object ProgramLoader {
         val pc = cpu.getCurrentInstructionPC
         if (pc == 0xF4E8 && !loadingWithWarp) {
           loadingWithWarp = true
-          clk.maximumSpeed = true
+          if (warpModeListener != null) warpModeListener(true)
         }
         else if (loadingWithWarp && (pc == 0xF52B || pc == 0xF633)) {
           loadingWithWarp = false
-          clk.maximumSpeed = false
+          if (warpModeListener != null) warpModeListener(false)
         }
       }
     }
@@ -31,11 +32,11 @@ object ProgramLoader {
         val pc = cpu.getCurrentInstructionPC
         if ((pc == 0xF421 || pc == 0xF2CF) && !loadingWithWarp) {
           loadingWithWarp = true
-          clk.maximumSpeed = true
+          if (warpModeListener != null) warpModeListener(true)
         }
         else if (loadingWithWarp && (pc == 0xF4A6 || pc == 0xF498 || pc == 0xF48C || pc == 0xF39B || pc == 0xF323)) {
           loadingWithWarp = false
-          clk.maximumSpeed = false
+          if (warpModeListener != null) warpModeListener(false)
         }
       }
     }

@@ -308,6 +308,7 @@ class C64 extends CBMComponent with GamePlayer {
     drivesEnabled(1) = false
     // -----------------------
     ProgramLoader.cpu = cpu
+    ProgramLoader.warpModeListener = warpMode _
     add(clock)
     add(mem)
     add(cpu)
@@ -418,7 +419,7 @@ class C64 extends CBMComponent with GamePlayer {
       case Some(f) =>
         handleDND(new File(f),false,true)
     }
-    DrivesConfigPanel.registerDrives(displayFrame,drives.toList,setDriveType(_,_,false),enableDrive _,attachDisk _,drivesEnabled)
+    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive _,attachDisk _,attachDiskFile(_,_,_,None),drivesEnabled)
   }
   
   override def afterInitHook {    
@@ -554,6 +555,7 @@ class C64 extends CBMComponent with GamePlayer {
   }
 
   private def warpMode(warpOn:Boolean): Unit = {
+    maxSpeedItem.setSelected(warpOn)
     clock.maximumSpeed = warpOn
     clock.pause
     sid.setFullSpeed(warpOn)

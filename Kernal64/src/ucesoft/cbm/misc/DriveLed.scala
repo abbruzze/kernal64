@@ -23,7 +23,10 @@ class DriveLed extends JComponent with CBMComponent {
     private[this] final val POWER_ACCESS_LED_ON = Color.GREEN
     private[this] var powerLedMode = false
     
-    def setPowerLedMode(on:Boolean) = powerLedMode = on
+    def setPowerLedMode(on:Boolean) = {
+      powerLedMode = on
+      repaint()
+    }
     
     setPreferredSize(new Dimension(15,15))
     override def paint(g:Graphics) {

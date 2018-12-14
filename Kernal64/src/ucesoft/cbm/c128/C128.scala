@@ -301,6 +301,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     drivesEnabled(1) = false
     // -----------------------
     ProgramLoader.cpu = cpu
+    ProgramLoader.warpModeListener = warpMode _
     //clock.setClockHz(1000000)
     mmu.setKeyboard(keyb)
     add(clock)
@@ -415,6 +416,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
           case java.awt.event.KeyEvent.VK_W if e.isAltDown =>
             clock.maximumSpeed = !clock.maximumSpeed
             sid.setFullSpeed(clock.maximumSpeed)
+            maxSpeedItem.setSelected(clock.maximumSpeed)
           // adjust ratio
           case java.awt.event.KeyEvent.VK_D if e.isAltDown =>
             adjustRatio(false,true)
@@ -488,7 +490,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
       case Some(f) =>
         handleDND(new File(f),false,true)
     }
-    DrivesConfigPanel.registerDrives(vicDisplayFrame,drives.toList,setDriveType(_,_,false),enableDrive _,attachDisk _,drivesEnabled)
+    DrivesConfigPanel.registerDrives(vicDisplayFrame,drives,setDriveType(_,_,false),enableDrive _,attachDisk _,attachDiskFile(_,_,_,None),drivesEnabled)
   }
   
   override def afterInitHook {    
@@ -674,6 +676,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   }
 
   private def warpMode(warpOn:Boolean): Unit = {
+    maxSpeedItem.setSelected(warpOn)
     clock.maximumSpeed = warpOn
     clock.pause
     sid.setFullSpeed(warpOn)
@@ -1856,6 +1859,11 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
      if (renderingBicubic1Item.isSelected) "bicubic"
      else "default"
     )
+
+    val deinterlaceModeItem = new JCheckBox("VDC deinterlace mode enabled")
+    adjustMenu.add(deinterlaceModeItem)
+    deinterlaceModeItem.setSelected(true)
+    deinterlaceModeItem.addActionListener(_ => vdc.setDeinterlaceMode(deinterlaceModeItem.isSelected) )
     // -----------------------------------
     
     optionMenu.addSeparator
