@@ -1,9 +1,9 @@
 package ucesoft.cbm.misc
 
-import java.awt.{BorderLayout, Component, GridLayout }
+import java.awt.{BorderLayout, Component, GridLayout}
+import java.io.File
 
 import javax.swing._
-import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.drive.{C1541Mems, Drive, DriveType, ParallelCable}
 
 object DrivesConfigPanel {
@@ -11,19 +11,22 @@ object DrivesConfigPanel {
   private var configPanel : JDialog = _
   private var changeDrive : (Int,DriveType.Value) => Unit = _
   private var enableDrive : (Int,Boolean) => Unit = _
-  private var attachDisk : (Int,Boolean) => Unit = _
+  private var selectDisk : (Int,Boolean) => Unit = _
+  private var attachDisk : (Int,File,Boolean) => Unit = _
 
   def registerDrives(parent:JFrame,
-                     drives:List[Drive],
+                     drives:Array[_ <: Drive],
                      changeDrive: (Int,DriveType.Value) => Unit,
                      enableDrive: (Int,Boolean) => Unit,
-                     attachDisk: (Int,Boolean) => Unit,
+                     selectDisk: (Int,Boolean) => Unit,
+                     attachDisk: (Int,File,Boolean) => Unit,
                      initialDrivesEnabled : Array[Boolean]) : Unit = {
     this.drives = drives.toArray
     configPanel = initConfigPanel(parent,initialDrivesEnabled)
     this.changeDrive = changeDrive
     this.enableDrive = enableDrive
     this.attachDisk = attachDisk
+    this.selectDisk = selectDisk
   }
 
   def getDriveConfigDialog : JDialog = configPanel
@@ -137,14 +140,15 @@ object DrivesConfigPanel {
       panel.add(generalPanel)
 
       val loadPanel = new JPanel
-      loadPanel.setBorder(BorderFactory.createTitledBorder("Attach"))
+      loadPanel.setBorder(BorderFactory.createTitledBorder("Attach or Drag & Drop"))
       val autorunCB = new JCheckBox("autorun")
       toBeDisabled = autorunCB :: toBeDisabled
       loadPanel.add(autorunCB)
       val attachButton = new JButton("Attach disk ...")
       toBeDisabled = attachButton :: toBeDisabled
       loadPanel.add(attachButton)
-      attachButton.addActionListener( _ => attachDisk(id,autorunCB.isSelected) )
+      attachButton.addActionListener( _ => selectDisk(id,autorunCB.isSelected) )
+      loadPanel.setTransferHandler(new DNDHandler(handleDND(id,autorunCB.isSelected,_),Some(() => drives(id).driveType)))
       drivePanel.add("South",loadPanel)
 
       for(c <- toBeDisabled) c.setEnabled(initialDrivesEnabled(id))
@@ -154,5 +158,9 @@ object DrivesConfigPanel {
     dialog.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE)
 
     dialog
+  }
+
+  private def handleDND(id:Int,autorun: => Boolean,file:File): Unit = {
+    attachDisk(id,file,autorun)
   }
 }
