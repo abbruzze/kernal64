@@ -27,6 +27,7 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 - New warp mode on loading
 - New RS-232 handling. New GUI panel to configure rs-232 and to monitor signals. RS-232 general improvements. New Hayes Modem class to handle AT commands.
 - Z80 cycle counting more accurate
+- Added VDC interlace mode user option. Now the user can choose between normal interlace mode (with flickering) and automatic de-interlace mode (default).
 
 ### What's new in 1.4.8 (Oct 20th 2018)
 **VDC improvements**
