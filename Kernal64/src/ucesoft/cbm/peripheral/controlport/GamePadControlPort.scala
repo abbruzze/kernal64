@@ -13,6 +13,7 @@ class GamePadControlPort(configuration:Properties) extends ControlPort {
   private[this] var xAxisComponent : Option[Component] = None
   private[this] var yAxisComponent : Option[Component] = None
   private[this] var fireComponent : Option[Component] = None
+  private[this] val dirThreshold = 0.5f
   
   findController
   
@@ -42,13 +43,13 @@ class GamePadControlPort(configuration:Properties) extends ControlPort {
         	f <- fireComponent) {
           if (f.getPollData != 0.0f) mask |= 16
           val xData = x.getPollData
-          if (xData ==  -1.0f) mask |= 4 // left
+          if (xData < -dirThreshold) mask |= 4 // left
           else
-          if (xData ==  1.0f) mask |= 8 // right
+          if (xData > dirThreshold) mask |= 8 // right
           val yData = y.getPollData
-          if (yData ==  -1.0f) mask |= 1 // up
+          if (yData < -dirThreshold) mask |= 1 // up
           else
-          if (yData ==  1.0f) mask |= 2 // down
+          if (yData > dirThreshold) mask |= 2 // down
         }
         
       case _ => 

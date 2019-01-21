@@ -1,11 +1,7 @@
 package ucesoft.cbm.misc
 
-import javax.swing.JFrame
-import javax.swing.JDialog
-import javax.swing.JProgressBar
-import javax.swing.JLabel
+import javax.swing._
 import ucesoft.cbm.Clock
-import javax.swing.JPanel
 import java.awt.Point
 
 trait FloppyFlushListener {
@@ -34,7 +30,14 @@ class FloppyFlushUI(parentWindow:JFrame) extends FloppyFlushListener {
     val t = new Thread {
       override def run {        
         Clock.systemClock.pause        
-        f
+        try {
+          f
+        }
+        catch {
+          case _:IllegalArgumentException =>
+            JOptionPane.showMessageDialog(dialog,"Can't write back on disk due to format error","Disk write error",JOptionPane.ERROR_MESSAGE)
+        }
+        while (!dialog.isVisible) Thread.sleep(10)
         dialog.setVisible(false)
         dialog.dispose
         Clock.systemClock.play
