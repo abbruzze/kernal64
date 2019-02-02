@@ -1017,6 +1017,8 @@ final class VIC(mem: VICMemory,
     
     if (badLine) isInDisplayState = true
 
+    if (rasterLine == 0x30) denOn30 |= den
+
     (rasterCycle: @switch) match {       
       case 1 =>                
         // check raster line with raster latch if irq enabled     
@@ -1024,7 +1026,7 @@ final class VIC(mem: VICMemory,
           checkRasterIRQ
         }        
         // check den on $30
-        if (rasterLine == 0x30) denOn30 = den
+        //if (rasterLine == 0x30) denOn30 = den
         badLine = isBadLine        
         sprites(3).readMemoryData(true)
         setBaLow((spriteDMAon & 0x18) > 0) // 3,4
@@ -1176,6 +1178,7 @@ final class VIC(mem: VICMemory,
     // update the 8th bit of raster in control register 1
     if (rasterLine > 0xFF) controlRegister1 |= 0x80 else controlRegister1 &= 0x7F
     if (rasterLine == 0) {
+      denOn30 = false
       canUpdateLightPenCoords = true
       display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
       firstModPixelX = -1
