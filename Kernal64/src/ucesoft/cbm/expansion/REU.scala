@@ -300,7 +300,7 @@ object REU {
         incrementAddresses
         if (transferRegister == 0x01) {
           statusRegister |= STATUS_END_OF_BLOCK
-          clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 2,cycles => endOperation))
+          clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation))
           //endOperation
         }
         else {
