@@ -413,7 +413,12 @@ final class VIC(mem: VICMemory,
         mc = (mc + 1) & 0x3F
       }
       else 
-      if (!first) mem.read(0x3FFF,ChipID.VIC) // idle access
+      if (!first) {
+        //mem.read(0x3FFF,ChipID.VIC)
+        gdata |= internalDataBus << 8
+        counter = 0
+        hasPixels = false
+      } // idle access
     }
     
     final def check16 {
@@ -1167,6 +1172,7 @@ final class VIC(mem: VICMemory,
           case _ =>
         }               
     }
+    internalDataBus = 0xFF
   }
   
   private[this] var showDebug = false
