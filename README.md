@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.4.9
+Kernal64 ver 1.5.0
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -18,6 +18,13 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.5.0 (Feb 3rd 2019)
+- VIC: fixed den bit handling: now on $30 it's checked on every cycles
+- VIC: fixed sprite idle cycle, now display internal bus
+- REU: fixed transfer timings.
+- Now, demo Bottom (REU) works fine (https://csdb.dk/release/?id=174066). Fixed also Treu Love, now works fine for 80% (https://csdb.dk/release/?id=144105)
+- Game pad controller: changed thresholds, now PS4 gamepad works properly
 
 ### What's new in 1.4.9 (Dec 9th 2018)
 - VICII 2Mhz mode partial support added. Now Risen From Oblivion for VIC has been improved and the moving image is shown. Cannot show the first image yet.
