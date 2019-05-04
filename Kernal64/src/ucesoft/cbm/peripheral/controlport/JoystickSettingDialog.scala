@@ -23,7 +23,7 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
       case CONFIGURATION_KEYPAD_VALUE => c.setSelectedIndex(0)
       case CONFIGURATION_JOYSTICK_VALUE => c.setSelectedIndex(1)
       case CONFIGURATION_KEYBOARD_VALUE => c.setSelectedIndex(2)
-      case _ => c.setSelectedIndex(2) 
+      case _ => c.setSelectedIndex(3)
     }
   }
   
