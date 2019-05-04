@@ -38,7 +38,6 @@ import ucesoft.cbm.peripheral.rs232._
 import ucesoft.cbm.peripheral.drive.LocalDrive
 import ucesoft.cbm.expansion.SwiftLink
 import ucesoft.cbm.peripheral.drive.ParallelCable
-import ucesoft.cbm.peripheral.drive.C1541Mems
 import ucesoft.cbm.expansion.DualSID
 import ucesoft.cbm.peripheral.drive.FlyerIEC
 import ucesoft.cbm.remote.RemoteC64
@@ -569,16 +568,7 @@ class C64 extends CBMComponent with GamePlayer {
   }
 
   private def setDualSID(address:Option[Int]): Unit = {
-    address match {
-      case Some(a) =>
-        expansionPort.eject
-        sid.setStereo(true)
-        ExpansionPort.setExpansionPort(new DualSID(sid,a))
-      case None =>
-        expansionPort.eject
-        sid.setStereo(false)
-        ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
-    }
+    DualSID.setDualSID(address,sid)
   }
 
   private def setRemote(source:Option[JRadioButtonMenuItem]): Unit = {
@@ -1667,8 +1657,8 @@ class C64 extends CBMComponent with GamePlayer {
     group7.add(sid6581Item)
     val sid8580Item = new JRadioButtonMenuItem("MOS 8580")
     sid8580Item.setSelected(false)
-    sid8580Item.setActionCommand("SID_8580")
     sid8580Item.addActionListener(_ => sid.setModel(false) )
+    sidTypeItem.add(sid8580Item)
     group7.add(sid8580Item)
     // Setting ---------------------------
     settings.add("sid-8580",
@@ -1689,17 +1679,14 @@ class C64 extends CBMComponent with GamePlayer {
     nosid2Item.setSelected(true)
     nosid2Item.addActionListener(_ => setDualSID(None) )
     group8.add(nosid2Item)
-    val sid2DE00Item = new JRadioButtonMenuItem("$DE00")
-    sid2Item.add(sid2DE00Item)
-    sid2DE00Item.setSelected(false)
-    sid2DE00Item.addActionListener(_ => setDualSID(Some(0xDE00)) )
-    group8.add(sid2DE00Item)
-    val sid2DF00Item = new JRadioButtonMenuItem("$DF00")
-    sid2Item.add(sid2DF00Item)
-    sid2DF00Item.setSelected(false)
-    sid2DF00Item.addActionListener(_ => setDualSID(Some(0xDF00)) )
-    group8.add(sid2DF00Item)
-    
+    for(adr <- DualSID.validAddresses(true)) {
+      val sid2AdrItem = new JRadioButtonMenuItem(adr)
+      sid2Item.add(sid2AdrItem)
+      sid2AdrItem.setSelected(false)
+      sid2AdrItem.addActionListener(_ => setDualSID(Some(Integer.parseInt(adr,16))) )
+      group8.add(sid2AdrItem)
+    }
+
     optionMenu.addSeparator
     
     for(drive <- 0 to 1) {

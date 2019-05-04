@@ -21,7 +21,7 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
   }
   private[this] val volume : FloatControl = if (dataLine != null) dataLine.getControl(FloatControl.Type.MASTER_GAIN).asInstanceOf[FloatControl] else null
   private[this] var vol = 0
-  private[this] val buffer = Array.ofDim[Byte](256)
+  private[this] val buffer = Array.ofDim[Byte](40)
   private[this] var pos = 0
   
   setMasterVolume(100)

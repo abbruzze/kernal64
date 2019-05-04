@@ -717,16 +717,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   }
 
   private def setDualSID(address:Option[Int]): Unit = {
-    address match {
-      case Some(a) =>
-        expansionPort.eject
-        sid.setStereo(true)
-        ExpansionPort.setExpansionPort(new DualSID(sid,a))
-      case None =>
-        expansionPort.eject
-        sid.setStereo(false)
-        ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
-    }
+    DualSID.setDualSID(address,sid)
   }
 
   private def enableFlyer(enabled:Boolean): Unit = {
@@ -1977,16 +1968,13 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     nosid2Item.setSelected(true)
     nosid2Item.addActionListener(_ => setDualSID(None) )
     group8.add(nosid2Item)
-    val sid2DE00Item = new JRadioButtonMenuItem("$DE00")
-    sid2Item.add(sid2DE00Item)
-    sid2DE00Item.setSelected(false)
-    sid2DE00Item.addActionListener(_ => setDualSID(Some(0xDE00)) )
-    group8.add(sid2DE00Item)
-    val sid2DF00Item = new JRadioButtonMenuItem("$DF00")
-    sid2Item.add(sid2DF00Item)
-    sid2DF00Item.setSelected(false)
-    sid2DF00Item.addActionListener(_ => setDualSID(Some(0xDF00)) )
-    group8.add(sid2DF00Item)
+    for(adr <- DualSID.validAddresses(false)) {
+      val sid2AdrItem = new JRadioButtonMenuItem(adr)
+      sid2Item.add(sid2AdrItem)
+      sid2AdrItem.setSelected(false)
+      sid2AdrItem.addActionListener(_ => setDualSID(Some(Integer.parseInt(adr,16))) )
+      group8.add(sid2AdrItem)
+    }
     
     optionMenu.addSeparator
 

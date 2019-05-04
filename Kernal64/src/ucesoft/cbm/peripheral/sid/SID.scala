@@ -14,6 +14,7 @@ import ucesoft.cbm.misc.MouseCage
 
 class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Option[AudioDriverDevice] = None) extends Chip with SIDDevice {
   override lazy val componentID = "SID_" + sidID
+  private[this] final val endAddress = startAddress + 0x20
   private[this] final val SAMPLE_RATE = 44100
   private[this] final val CPU_FREQ = 985248
   private[this] final val CLOCKS_PER_SAMPLE = CPU_FREQ / SAMPLE_RATE
@@ -21,7 +22,6 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   
   val id = ChipID.SID
   val name = "SID"
-  //val startAddress = 0xd400
   val length = 1024
   val isRom = false
   
@@ -37,6 +37,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   private[this] val POTX_OFS = 0x19
   private[this] val POTY_OFS = 0x1A
   private[this] var mouseEnabled = false
+  private[this] var sid2 : SID = null
   
   private[this] var lastCycles = Clock.systemClock.currentCycles
   private[this] var nextRest = 0
@@ -50,42 +51,79 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     def reset = driver.reset
     def discard = driver.discard
   }
-  
-  def setStereo(isStereo:Boolean) {
+
+  def setStereo(isStereo:Boolean,sid2:Option[SID] = None) {
+    if (this.sid2 != null) this.sid2.stop
+
+    this.sid2 = sid2.getOrElse(null)
     externalDriver match {
       case None =>
         driver.discard
         driver = new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE * 2,isStereo)
       case Some(_) =>
     }
+
+    Clock.systemClock.cancel(componentID)
+    start
   }
   
   def getDriver = driverProxy
   def init = start
   def reset = {
-    driver.reset
+    if (sid2 != null) sid2.reset
+
+    externalDriver match {
+      case None =>
+        driver.reset
+      case _ =>
+    }
     sid.reset
     Clock.systemClock.cancel(componentID)
     start
   }
   
   def setModel(is6581:Boolean) {
-    if (is6581) sid.set_chip_model(ISIDDefs.chip_model.MOS6581)
-    else sid.set_chip_model(ISIDDefs.chip_model.MOS8580)
+    if (is6581) {
+      sid.set_chip_model(ISIDDefs.chip_model.MOS6581)
+      if (sid2 != null) sid2.setModel(true)
+    }
+    else {
+      sid.set_chip_model(ISIDDefs.chip_model.MOS8580)
+      if (sid2 != null) sid2.setModel(false)
+    }
   }
-  
-  @inline private def decode(address:Int) = address & 0x1F
+
+  /**
+    * Decode address.
+    *
+    * @param address
+    * @return -1 if address refers to 2nd sid
+    */
+  @inline private def decode(address:Int) = {
+    if (sid2 == null) address & 0x1F
+    else
+    if (address >= startAddress && address < endAddress) address & 0x1F
+    else -1
+  }
   
   def setMouseEnabled(enabled:Boolean) = mouseEnabled = enabled
   
-  final def read(address: Int, chipID: ChipID.ID) = decode(address) match {
+  final def read(address: Int, chipID: ChipID.ID) : Int = decode(address) match {
+    case -1 => sid2.read(address)
     case POTX_OFS =>
       if (mouseEnabled) (MouseCage.x & 0x7F) << 1 else 0
     case POTY_OFS =>
       if (mouseEnabled) (0x7F - (MouseCage.y & 0x7F)) << 1 else 0
     case ofs => sid.read(ofs)
   }
-  final def write(address: Int, value: Int, chipID: ChipID.ID) = sid.write(decode(address),value)
+  final def write(address: Int, value: Int, chipID: ChipID.ID) = {
+    decode(address) match {
+      case -1 =>
+        sid2.write(address,value)
+      case ofs =>
+        sid.write(ofs,value)
+    }
+  }
   
   private[this] val sidEventCallBack = sidEvent _
   
@@ -108,7 +146,11 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   
   def stop = {
     removeSample = true
-    driver.setSoundOn(false)
+    externalDriver match {
+      case None =>
+        driver.setSoundOn(false)
+      case _ =>
+    }
   }
   def start {
     driver.setSoundOn(true)
