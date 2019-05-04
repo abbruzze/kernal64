@@ -51,7 +51,7 @@ private[c128] class C128RAM extends RAMComponent {
   
   def getBank0 : Memory = Bank0
   
-   override def getProperties = {
+  override def getProperties = {
     super.getProperties
     properties.setProperty("Processor memory bank",processorBank.toString)
     properties.setProperty("VIC memory bank",VICbank.toString)
@@ -134,7 +134,7 @@ private[c128] class C128RAM extends RAMComponent {
       page_1 = divertedPage & 0xFF
       page_1_bank = divertedPageBank & 0x1
     }
-    //println(s"Page $page diverted to ${Integer.toHexString(divertedPage << 8 | (divertedPageBank & 1) << 16)}")
+    Log.debug(s"Page $page diverted to ${Integer.toHexString(divertedPage << 8 | (divertedPageBank & 1) << 16)}")
   }
   
   final def setExpansionBanks(expanded:Boolean) {
@@ -165,16 +165,15 @@ private[c128] class C128RAM extends RAMComponent {
   
   @inline private def page_0_1(_address:Int) : Int = {
     var address = _address
-    if ((address & 0xFF00) == 0) {
-        address |= page_0 << 8
-    } else if ((address & 0xFF00) == 256) {
-        address = page_1 << 8 | address & 0xFF
-    } else if ((address & 0xFF00) == page_0 << 8 && processorBank == page_0_bank) {
-        address &= 255
-    } else if ((address & 0xFF00) == page_1 << 8 && processorBank == page_1_bank) {
-        address = address & 255 | 256
-    }
-    return address
+    if ((address & 0xFF00) == 0) address |= page_0 << 8
+    else
+    if ((address & 0xFF00) == 0x100) address = page_1 << 8 | address & 0xFF
+    else
+    if ((address & 0xFF00) == (page_0 << 8) && processorBank == page_0_bank) address &= 0xFF
+    else
+    if ((address & 0xFF00) == (page_1 << 8) && processorBank == page_1_bank) address = address & 0xFF | 0x100
+
+    address
   }
   
   final def read(address:Int,bank:Int) : Int = mem(bank)(address)
@@ -183,9 +182,9 @@ private[c128] class C128RAM extends RAMComponent {
   final def read(_address: Int, chipID: ChipID.ID = ChipID.CPU) : Int = {
     if (chipID == ChipID.VIC) return mem(VICbank)(_address)
     
-    val address = this.page_0_1(_address) & 0xFFFF
-    if (_address < 0x100) return mem(page_0_bank)(address)    
-    if (_address < 0x200) return mem(page_1_bank)(address)
+    val address = page_0_1(_address) & 0xFFFF
+    if (_address < 0x100) return mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_0_bank)(address)
+    if (_address < 0x200) return mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_1_bank)(address)
     
     commonArea match {
       case BOTTOM_COMMON_RAM => 
@@ -203,9 +202,9 @@ private[c128] class C128RAM extends RAMComponent {
   }
   
   final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
-    val address = this.page_0_1(_address) & 0xFFFF
-    if (_address < 0x100) mem(page_0_bank)(address) = value    
-    else if (_address < 0x200) mem(page_1_bank)(address) = value
+    val address = page_0_1(_address) & 0xFFFF
+    if (_address < 0x100) mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_0_bank)(address) = value
+    else if (_address < 0x200) mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_1_bank)(address) = value
     else {
       commonArea match {
         case BOTTOM_COMMON_RAM => 
