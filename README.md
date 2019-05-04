@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.5.0
+Kernal64 ver 1.5.1
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -8,7 +8,7 @@ Kernal64 ver 1.5.0
 ### Installation
 Go to https://github.com/abbruzze/kernal64/releases/latest and download and unzip on your computer the latest version.
 Be sure to have a jre (1.8 or above) in the path and launch the **k64.bat** or **k64.sh** or **k128** equivalent for 128 emulator batch file, depending on your operating system.
-I experienced a boost in performance using the new JRE 1.9.
+I experienced a boost in performance using Java 9+.
 
 Windows users that want shell support (for --help command line, for example) could use the **k64s.bat** or **k128s.bat** scripts.
 
@@ -18,6 +18,13 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.5.1 (May 4th 2019)
+- VIC: Improved invalid video modes.
+- Fixed Cart type 5 (Ocean) for Vice test
+- Dual SID: more addresses to choose from for second SID.
+- C128 MMU: fixed page diverting issue when common RAM is enabled on bottom position.
+- General minor bugs fixed
 
 ### What's new in 1.5.0 (Feb 3rd 2019)
 - VIC: fixed den bit handling: now on $30 it's checked on every cycles
