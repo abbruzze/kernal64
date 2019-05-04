@@ -562,7 +562,6 @@ final class VIC(mem: VICMemory,
     private[this] var mcm, ecm, isBlank = false
     private[this] var vml_p, vml_c: Array[Int] = _
     private[this] var vmli = 0
-    private[this] var isInvalidMode = false
     private[this] var isInDisplayState = false
 
     final def getPixels = pixels
@@ -576,7 +575,7 @@ final class VIC(mem: VICMemory,
     final def reset = firstPixel = true
     
     @inline private def shift = {
-      var pixel = if (isInvalidMode || isBlank || gdata < 0) PIXEL_BLACK
+      var pixel = if (isBlank || gdata < 0) PIXEL_BLACK
       else if (!bmm) { // text mode        
         val mc = (vml_c(vmli) & 8) == 8
         val multicolor = mcm && mc
@@ -584,28 +583,41 @@ final class VIC(mem: VICMemory,
           gdata <<= 1
           val cbit = (gdata & 0x100) == 0x100
           if (cbit) { // foreground
+            if (mcm & ecm) PIXEL_BLACK | PIXEL_FOREGROUND // invalid text mode (foreground)
+            else
             if (isInDisplayState) (if (mcm) vml_c(vmli) & 7 else vml_c(vmli)) | PIXEL_FOREGROUND
             else PIXEL_FOREGROUND
           }
           else { // background
+            if (mcm & ecm) PIXEL_BLACK // invalid text mode (background)
+            else
             if (isInDisplayState) { 
               val backIndex = if (ecm) (vml_p(vmli) >> 6) & 3 else 0
               backgroundColor(backIndex)
             }
             else backgroundColor(0)
           }
-        } else { // multi color mode          
+        }
+        else { // multi color mode
           if ((counter & 1) == 0) gdata <<= 2
           val cbit = (gdata & 0x300) >> 8
           (cbit : @switch) match {
-            case 0 => if (isInDisplayState) backgroundColor(cbit) // background
-            		  else backgroundColor(0)
-            case 1 => if (isInDisplayState) backgroundColor(cbit) // background
-            		  else 0
-            case 2 => if (isInDisplayState) backgroundColor(cbit) | PIXEL_FOREGROUND // foreground
-            		  else PIXEL_FOREGROUND
-            case 3 => if (isInDisplayState) (vml_c(vmli) & 7) | PIXEL_FOREGROUND // foreground
-            		  else PIXEL_FOREGROUND
+            case 0 => if (ecm) PIXEL_BLACK // invalid text mode (background)
+                      else
+                      if (isInDisplayState) backgroundColor(cbit) // background
+            		      else backgroundColor(0)
+            case 1 => if (ecm) PIXEL_BLACK // invalid text mode (background)
+                      else
+                      if (isInDisplayState) backgroundColor(cbit) // background
+            		      else PIXEL_BLACK
+            case 2 => if (ecm) PIXEL_BLACK | PIXEL_FOREGROUND // invalid text mode (foreground)
+                      else
+                      if (isInDisplayState) backgroundColor(cbit) | PIXEL_FOREGROUND // foreground
+            		      else PIXEL_FOREGROUND
+            case 3 => if (ecm) PIXEL_BLACK | PIXEL_FOREGROUND // invalid text mode (foreground)
+                      else
+                      if (isInDisplayState) (vml_c(vmli) & 7) | PIXEL_FOREGROUND // foreground
+            		      else PIXEL_FOREGROUND
           }
         }
       } else { // bitmap mode
@@ -615,25 +627,37 @@ final class VIC(mem: VICMemory,
           val col0 = vml_p(vmli) & 0x0F
           val col1 = (vml_p(vmli) >> 4) & 0x0F
           if (cbit) {
+            if (ecm) PIXEL_BLACK | PIXEL_FOREGROUND // invalid bitmap mode (foreground)
+            else
             if (isInDisplayState) col1 | PIXEL_FOREGROUND // foreground
             else PIXEL_FOREGROUND 
           }
           else {
+            if (ecm) PIXEL_BLACK // invalid bitmap mode (background)
+            else
             if (isInDisplayState) col0 // background
-            else 0
+            else PIXEL_BLACK
           }
         } else { // multi color mode          
           if ((counter & 1) == 0) gdata <<= 2
           val cbit = gdata & 0x300
           (cbit : @switch) match {
-            case 0x00 => if (isInDisplayState) backgroundColor(0) // background
-            			 else backgroundColor(0)
-            case 0x100 => if (isInDisplayState) (vml_p(vmli) >> 4) & 0x0F // background
-            			  else 0
-            case 0x200 => if (isInDisplayState) (vml_p(vmli) & 0x0F) | PIXEL_FOREGROUND// foreground
-            			  else PIXEL_FOREGROUND
-            case 0x300 => if (isInDisplayState) vml_c(vmli) | PIXEL_FOREGROUND// foreground
-            		 	  else PIXEL_FOREGROUND
+            case 0x00 => if (ecm) PIXEL_BLACK // invalid bitmap mode (blackground)
+                         else
+                         if (isInDisplayState) backgroundColor(0) // background
+                         else backgroundColor(0)
+            case 0x100 => if (ecm) PIXEL_BLACK // invalid bitmap mode (blackground)
+                          else
+                          if (isInDisplayState) (vml_p(vmli) >> 4) & 0x0F // background
+            			        else PIXEL_BLACK
+            case 0x200 => if (ecm) PIXEL_BLACK | PIXEL_FOREGROUND // invalid bitmap mode (foreground)
+                          else
+                          if (isInDisplayState) (vml_p(vmli) & 0x0F) | PIXEL_FOREGROUND// foreground
+            			        else PIXEL_FOREGROUND
+            case 0x300 => if (ecm) PIXEL_BLACK | PIXEL_FOREGROUND // invalid bitmap mode (foreground)
+                          else
+                          if (isInDisplayState) vml_c(vmli) | PIXEL_FOREGROUND// foreground
+            		 	        else PIXEL_FOREGROUND
           }
         }
       }
@@ -671,7 +695,6 @@ final class VIC(mem: VICMemory,
       vml_p = VIC.this.vml_p
       vml_c = VIC.this.vml_c
       vmli = VIC.this.vmliToDraw
-      isInvalidMode = mcm && ecm || bmm && ecm
       isInDisplayState = VIC.this.isInDisplayState
       
       // light pen checking
