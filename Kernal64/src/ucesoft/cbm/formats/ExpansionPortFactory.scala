@@ -229,18 +229,32 @@ object ExpansionPortFactory {
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = reg    
   }
   private class Type5CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
+    object ROMLMirrored extends Memory {
+      val name = "ROMH"
+      val startAddress = 0xA000
+      val length = 8192
+      val isRom = true
+      def isActive = true
+      def init {}
+      def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = romlBanks(romlBankIndex).read(0x8000 + address - startAddress)
+      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
+    }
+    private[this] val VALID_CRT = crt.kbSize == 128 || crt.kbSize == 256 || crt.kbSize == 512
+    private[this] val CRT_16K = crt.kbSize == 128 || crt.kbSize == 256
+
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
-      val target = address - startAddress
-      if (target == 0) {
+      if (address == 0xDE00) {
         val bank = value & 0x3F        
-        crt.kbSize match {          
-          case 256 =>
-            if (bank < 16) romlBankIndex = bank else romhBankIndex = bank - 16
-          case _ =>
+        if (CRT_16K) {
+          if (bank < 16) romlBankIndex = bank else romhBankIndex = bank - 16
+        }
+        else { // 8K
             romlBankIndex = bank
         }
       }
     }
+
+    override def ROMH = if (VALID_CRT) super.ROMH else ROMLMirrored
   }
   private class Type16CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     
@@ -266,7 +280,7 @@ object ExpansionPortFactory {
       notifyMemoryConfigurationChange
     }
   }
-  
+
   private class Type17CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       val bank = address - startAddress

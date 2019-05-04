@@ -44,7 +44,7 @@ abstract class ExpansionPort extends RAMComponent {
 
   final def notifyMemoryConfigurationChange = ExpansionPort.updateListeners(GAME,EXROM)
 
-  def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = 0
+  def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = ExpansionPort.emptyExpansionPort.read(address)
   def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
   
   def freezeButton {}
