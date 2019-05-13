@@ -111,11 +111,12 @@ class CIATimerA2(ciaName: String,
     countSystemClock = (value & 0x20) == 0 
     // bit 1,2 and 5 ignored
     val currentCountExternal = countExternal
-    handleCR567    
+    handleCR567
+    enableTimer(startTimer,reload,currentCountExternal)
     if (reload) {
       counter = latch // reload immediately
     }
-    enableTimer(startTimer,reload,currentCountExternal)
+
     Log.debug(s"${ciaName}-${id} control register set to ${cr} latch=${latch}")
   }
 
@@ -134,14 +135,14 @@ class CIATimerA2(ciaName: String,
 
   private def enableTimer(enabled: Boolean,reload:Boolean,oldCountExternal:Boolean) {
     if (!started && enabled) { // start from stopped
-      if (!countExternal && autoClock) reschedule(START_DELAY,counter)
+      if (!countExternal && autoClock) reschedule(START_DELAY,if (reload) latch else counter)
       startDelayCount = START_DELAY
     } 
     else 
     if (started && enabled) { // start from started
       if (reload && autoClock) {
         systemClock.cancel(EVENT_ID)
-        if (!countExternal) reschedule(START_DELAY,counter)        
+        if (!countExternal) reschedule(START_DELAY,latch)
       }
     }
     else
