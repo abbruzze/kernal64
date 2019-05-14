@@ -25,6 +25,7 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 - Dual SID: more addresses to choose from for second SID.
 - C128 MMU: fixed page diverting issue when common RAM is enabled on bottom position.
 - General minor bugs fixed
+- CIA major bug fixed (introduced on the 1st 128 release) that prevented ComaLand to work properly
 
 ### What's new in 1.5.0 (Feb 3rd 2019)
 - VIC: fixed den bit handling: now on $30 it's checked on every cycles
