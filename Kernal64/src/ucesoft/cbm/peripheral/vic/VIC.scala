@@ -414,7 +414,7 @@ final class VIC(mem: VICMemory,
       }
       else 
       if (!first) {
-        //mem.read(0x3FFF,ChipID.VIC)
+        mem.read(0x3FFF,ChipID.VIC)
         gdata |= internalDataBus << 8
         counter = 0
         hasPixels = false
