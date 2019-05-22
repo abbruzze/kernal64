@@ -62,6 +62,8 @@ import ucesoft.cbm.expansion.DigiMAX
 import ucesoft.cbm.expansion.DigiMaxCart
 import ucesoft.cbm.peripheral.drive.EmptyFloppy
 import ucesoft.cbm.peripheral.keyboard.Keyboard
+import ucesoft.cbm.peripheral.vic.Palette
+import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -1525,10 +1527,12 @@ class C64 extends CBMComponent with GamePlayer {
       zoomItem.add(zoom1Item)
       groupZ.add(zoom1Item)
     }
-    
+
+    val vicItem = new JMenu("VIC")
     val renderingItem = new JMenu("Rendering")
+    vicItem.add(renderingItem)
     val groupR = new ButtonGroup
-    optionMenu.add(renderingItem)
+    optionMenu.add(vicItem)
     val renderingDefault1Item = new JRadioButtonMenuItem("Default")
     renderingDefault1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR) )
     renderingItem.add(renderingDefault1Item)
@@ -1541,7 +1545,47 @@ class C64 extends CBMComponent with GamePlayer {
     renderingBicubic1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC) )
     renderingItem.add(renderingBicubic1Item)
     groupR.add(renderingBicubic1Item)
+
+    val paletteItem = new JMenu("Palette")
+    vicItem.add(paletteItem)
+    val groupP = new ButtonGroup
+    val vicePalItem = new JRadioButtonMenuItem("VICE")
+    vicePalItem.addActionListener(_ => Palette.setPalette(PaletteType.VICE) )
+    paletteItem.add(vicePalItem)
+    groupP.add(vicePalItem)
+    val brightPalItem = new JRadioButtonMenuItem("Bright")
+    brightPalItem.addActionListener(_ => Palette.setPalette(PaletteType.BRIGHT) )
+    paletteItem.add(brightPalItem)
+    groupP.add(brightPalItem)
+    val peptoPalItem = new JRadioButtonMenuItem("Pepto")
+    peptoPalItem.addActionListener(_ => Palette.setPalette(PaletteType.PEPTO) )
+    paletteItem.add(peptoPalItem)
+    groupP.add(peptoPalItem)
     // Setting ---------------------------
+    settings.add("vic-palette",
+      "Set the palette type (bright,vice,pepto)",
+      "PALETTE",
+      (dt:String) => {
+        dt match {
+          case "bright"|"" =>
+            Palette.setPalette(PaletteType.BRIGHT)
+            brightPalItem.setSelected(true)
+          case "vice" =>
+            Palette.setPalette(PaletteType.VICE)
+            vicePalItem.setSelected(true)
+          case "pepto" =>
+            Palette.setPalette(PaletteType.PEPTO)
+            peptoPalItem.setSelected(true)
+          case _ =>
+        }
+      },
+      if (brightPalItem.isSelected) "bright"
+      else
+      if (vicePalItem.isSelected) "vice"
+      else
+      if (peptoPalItem.isSelected) "pepto"
+      else "bright"
+    )
     settings.add("rendering-type",
                  "Set the rendering type (default,bilinear,bicubic)",
                  "RENDERING_TYPE",

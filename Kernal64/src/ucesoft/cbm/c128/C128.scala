@@ -31,6 +31,8 @@ import ucesoft.cbm.remote.RemoteC64
 import ucesoft.cbm.peripheral.bus.IECBusListener
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.vdc.VDC
+import ucesoft.cbm.peripheral.vic.Palette
+import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 
 object C128 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
@@ -1849,6 +1851,47 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
      else
      if (renderingBicubic1Item.isSelected) "bicubic"
      else "default"
+    )
+
+    val paletteItem = new JMenu("Palette")
+    adjustMenu.add(paletteItem)
+    val groupP = new ButtonGroup
+    val vicePalItem = new JRadioButtonMenuItem("VICE")
+    vicePalItem.addActionListener(_ => Palette.setPalette(PaletteType.VICE) )
+    paletteItem.add(vicePalItem)
+    groupP.add(vicePalItem)
+    val brightPalItem = new JRadioButtonMenuItem("Bright")
+    brightPalItem.addActionListener(_ => Palette.setPalette(PaletteType.BRIGHT) )
+    paletteItem.add(brightPalItem)
+    groupP.add(brightPalItem)
+    val peptoPalItem = new JRadioButtonMenuItem("Pepto")
+    peptoPalItem.addActionListener(_ => Palette.setPalette(PaletteType.PEPTO) )
+    paletteItem.add(peptoPalItem)
+    groupP.add(peptoPalItem)
+    // Setting ---------------------------
+    settings.add("vic-palette",
+      "Set the palette type (bright,vice,pepto)",
+      "PALETTE",
+      (dt:String) => {
+        dt match {
+          case "bright"|"" =>
+            Palette.setPalette(PaletteType.BRIGHT)
+            brightPalItem.setSelected(true)
+          case "vice" =>
+            Palette.setPalette(PaletteType.VICE)
+            vicePalItem.setSelected(true)
+          case "pepto" =>
+            Palette.setPalette(PaletteType.PEPTO)
+            peptoPalItem.setSelected(true)
+          case _ =>
+        }
+      },
+      if (brightPalItem.isSelected) "bright"
+      else
+      if (vicePalItem.isSelected) "vice"
+      else
+      if (peptoPalItem.isSelected) "pepto"
+      else "bright"
     )
 
     val deinterlaceModeItem = new JCheckBox("VDC deinterlace mode enabled")

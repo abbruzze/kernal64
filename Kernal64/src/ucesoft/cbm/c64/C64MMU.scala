@@ -102,12 +102,17 @@ object C64MMU {
 
     private[this] val mem = Array.fill(length)(0)
     final val isActive = true
+    private[this] var lastByteReadMemory : LastByteReadMemory = _
+
     def init {}
     def reset {
       for(i <- 0 until mem.length) mem(i) = 0xFF
     }
+    def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory): Unit = {
+      this.lastByteReadMemory = lastByteReadMemory
+    }
     
-    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address & 0x3FF)
+    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = (lastByteReadMemory.lastByteRead & 0xF0) | (mem(address & 0x3FF) & 0x0F)
     final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address & 0x3FF) = value & 0xff
     // state
     protected def saveState(out:ObjectOutputStream) {
@@ -191,6 +196,7 @@ object C64MMU {
     def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory) = {
       this.lastByteReadMemory = lastByteReadMemory
       ram.lastByteReadMemory = lastByteReadMemory
+      COLOR_RAM.setLastByteReadMemory(lastByteReadMemory)
     }
     
     override def getProperties = {

@@ -565,7 +565,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // Unused I/O --------------------------------------------------------
     if (address < 0xD800) return 0
     // Color RAM ---------------------------------------------------------
-    if (address < 0xDC00) return COLOR_RAM.read(address) | lastByteRead & 0xF0
+    if (address < 0xDC00) return COLOR_RAM.read(address) & 0x0F | lastByteRead & 0xF0
     // CIA 1 -------------------------------------------------------------
     if (address < 0xDD00) return cia_dc00.read(address)
     // CIA 2 -------------------------------------------------------------
@@ -696,7 +696,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
         }
         if (address >= 0xD600 && address < 0xD700) return vdc.read(address)
         if (address < 0xD800) return sid.read(address)
-        if (address < 0xDC00) return COLOR_RAM.read(address)
+        if (address < 0xDC00) return COLOR_RAM.read(address) & 0x0F | lastByteRead & 0xF0
         if (address < 0xDD00) return cia_dc00.read(address)
         if (address < 0xDE00) return cia_dd00.read(address)
         
