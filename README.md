@@ -26,6 +26,9 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 - C128 MMU: fixed page diverting issue when common RAM is enabled on bottom position.
 - General minor bugs fixed
 - CIA major bug fixed (introduced on the 1st 128 release) that prevented ComaLand to work properly
+- Color memory now handles the most significant nibble as the last nibble written by VIC: dadb (openio) test now works properly.
+- Fixed sprite idle cycle read.
+- Now it's possible to choose among 3 differente VIC palette
 
 ### What's new in 1.5.0 (Feb 3rd 2019)
 - VIC: fixed den bit handling: now on $30 it's checked on every cycles
