@@ -346,7 +346,7 @@ final class VIC(mem: VICMemory,
       }
       if (!display) spritesDisplayedMask &= ~DMA_INDEX
     }
-    
+
     @inline final def producePixels {
       val xcoord = xCoord(rasterCycle)
       var i = 0
@@ -412,10 +412,11 @@ final class VIC(mem: VICMemory,
         } 
         mc = (mc + 1) & 0x3F
       }
-      else 
-      if (!first) {
+      else
+      if (first) gdata |= internalDataBus << 16
+      else {
         mem.read(0x3FFF,ChipID.VIC)
-        gdata |= internalDataBus << 8
+        gdata |= mem.lastByteRead << 8 | internalDataBus
         counter = 0
         hasPixels = false
       } // idle access
@@ -517,7 +518,7 @@ final class VIC(mem: VICMemory,
     final def getPixels = if (drawBorder) pixels else ALL_TRANSPARENT
 
     final def producePixels {
-      // optimization           
+      // optimization
       drawBorder = !den ||
         rasterLine <= TOP_BOTTOM_FF_COMP(rsel)(0) ||
         rasterLine >= TOP_BOTTOM_FF_COMP(rsel)(1) ||
@@ -1228,8 +1229,8 @@ final class VIC(mem: VICMemory,
     val isForeground = (pixel & PIXEL_FOREGROUND) > 0
     traceRasterLineBuffer(x) = "%c%2d%c%s%s".format(source,color, if (isForeground) 'F' else 'B', if (mcm) "M" else "", if (ecm) "E" else "")
   }
-  @inline private[this] def drawPixel(x: Int, y: Int, pixel: Int) = {
-    val index = y * SCREEN_WIDTH + x
+  @inline private[this] def drawPixel(index: Int, y: Int, pixel: Int) = {
+    //val index = y * SCREEN_WIDTH + x
     val color = VIC_RGB(pixel & 0x0F)
     if (displayMem(index) != color) {
       displayMem(index) = color
@@ -1240,7 +1241,7 @@ final class VIC(mem: VICMemory,
 
       lastModPixelY = y
     }
-    if (traceRasterLineInfo && y == traceRasterLine) tracePixel(pixel, x)
+    //if (traceRasterLineInfo && y == traceRasterLine) tracePixel(pixel, x)
   }
 
   @inline private def drawCycle {
@@ -1254,6 +1255,7 @@ final class VIC(mem: VICMemory,
     
     val y = rasterLine
     val x = (rasterCycle - 1) << 3
+    var index = y * SCREEN_WIDTH + x
     var s, i = 0
 
     // --------------------- GFX -------------------------
@@ -1294,10 +1296,11 @@ final class VIC(mem: VICMemory,
       val gfxPixel = if (verticalBorderFF) backgroundColor(0) else if (dataToDraw < 0) backgroundColor(0) else gfxPixels(i)
       if (!verticalBorderFF && (gfxPixel & 0x10) > 0 && (pixel & PIXEL_TRANSPARENT) == 0) spriteDataCollision((pixel >> 6) & 7) // sprite-data collision detected
       if ((pixel & PIXEL_TRANSPARENT) > 0 || ((gfxPixel & 0x10) > 0 && (pixel & PIXEL_SPRITE_PRIORITY) > 0)) pixel = gfxPixel
-      if ((borderPixels(i) & PIXEL_TRANSPARENT) == 0) drawPixel(x + i, y, borderPixels(i))
-      else drawPixel(x + i, y, pixel)
+      if ((borderPixels(i) & PIXEL_TRANSPARENT) == 0) drawPixel(index, y, borderPixels(i))
+      else drawPixel(index, y, pixel)
       
       i += 1
+      index += 1
     }
     // ************************** RESET SPRITES ********************************
     s = 0
