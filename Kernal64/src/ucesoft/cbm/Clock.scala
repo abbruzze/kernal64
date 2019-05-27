@@ -67,6 +67,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   private[this] var nextPerformanceMeasurementTime = 0L
   private[this] var lastPerformance = 0
   private[this] var throttleStartedAt = 0L
+  private[this] var skipThrottle = false
   // -------------------------------------------
   private[this] var limitCycles = -1L
   
@@ -92,7 +93,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   def maximumSpeed = _maximumSpeed
   def maximumSpeed_=(maximumSpeed:Boolean) {
     _maximumSpeed = maximumSpeed
-    lastCorrectionTime = 0
+    if (!maximumSpeed) skipThrottle = true
   }
   
   override def getProperties = {
@@ -148,7 +149,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   }
   
   @inline private def throttle {
-    if (!_maximumSpeed) {
+    if (!_maximumSpeed && !skipThrottle) {
       val timeDiff = System.currentTimeMillis - lastCorrectionTime
       val cyclesDiff = cycles - lastCorrectionCycles
       val expectedCycles = timeDiff * C64_CLOCK_HZ_DIV_1000
@@ -157,7 +158,8 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
         Thread.sleep(waitTime)
       }
     }
-    if (System.currentTimeMillis > nextPerformanceMeasurementTime) {
+    if (skipThrottle || System.currentTimeMillis > nextPerformanceMeasurementTime) {
+      skipThrottle = false
       val executed = cycles - throttleStartedAt
       lastPerformance = math.round(100.0 * executed / C64_CLOCK_HZ / (PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS / 1000)).toInt
       setupNextMeasurement
