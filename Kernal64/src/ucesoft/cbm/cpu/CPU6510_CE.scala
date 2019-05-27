@@ -32,11 +32,6 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   final private[this] val Z_FLAG = "00000010".b
   final private[this] val C_FLAG = "00000001".b
   
-  final private[this] val A_REG = 0
-  final private[this] val X_REG = 1
-  final private[this] val Y_REG = 2
-  final private[this] val SP_REG = 3
-  final private[this] val SR_REG = 4
   final private[this] val FLAGS = "CZIDB#VN"
 
   private[this] var PC = 0
@@ -67,9 +62,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   final def irqRequest(low: Boolean) {
     if (tracing) Log.debug(s"IRQ request low=${low}")
     if (tracingOnFile && low) tracingFile.println("IRQ low")
+    if (low && !irqLow/* && irqFirstCycle == 0*/) irqFirstCycle = clk.currentCycles
     irqLow = low
-    //if (!irqLow) irqFirstCycle = 0
-    if (irqLow && irqFirstCycle == 0) irqFirstCycle = clk.currentCycles
   }
   final def nmiRequest(low: Boolean) {
     if (!nmiLow && low) {
@@ -78,7 +72,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       if (tracing) Log.debug("NMI request on negative edge")
       if (tracingOnFile && low) tracingFile.println("NMI low")
     }
-    else nmiFirstCycle = 0
+    //else nmiFirstCycle = 0
     nmiLow = low
   }
 
@@ -157,7 +151,6 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     PC = pc
   }
 
-  //import CPU6510._
   // -------------------------------- STATES -------------------------------------------------------------
   private[this] var op = 0
   private[this] var state = 0
@@ -572,7 +565,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	  case A_ZEROY1 => () => {
 		if (ready) {
 		mem.read(ar)
-		ar = (ar + Y) & 0xff;
+		ar = (ar + Y) & 0xff
 		Execute
 		}
 	  }
@@ -1092,7 +1085,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	    if (ready) {
 	    mem.read(PC)
 	    X = (X + 1) & 0xFF
-		set_nz(X);
+		set_nz(X)
 		Last
 	    }
 	  }
@@ -1930,8 +1923,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     }
     
     // check interrupts
-    if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - nmiFirstCycle >= 1) {
-      nmiFirstCycle = 0
+    if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - nmiFirstCycle >= 2) {
       nmiOnNegativeEdge = false
       state = NMI_STATE
       if (breakType != null && breakType.isBreak(PC,false,true)) {
@@ -1942,8 +1934,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       }
     } 
     else 
-    if (irqLow && !isInterrupt && state == 0 && clk.currentCycles - irqFirstCycle >= 1) {    
-      irqFirstCycle = 0
+    if (irqLow && !isInterrupt && state == 0 && clk.currentCycles - irqFirstCycle >= 2) {
       state = IRQ_STATE
       if (breakType != null && breakType.isBreak(PC,true,false)) {
         breakType = null
@@ -1952,18 +1943,16 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
         Log.debug("IRQ Break")
       }
     }
-    else {
-      val tracingNow = tracing && state == 0
-      if (tracingNow) Log.debug(formatDebug)
-      if (tracingOnFile && state == 0) tracingFile.println(formatDebug)
-      
-      CURRENT_OP_PC = PC
-      if (tracingNow) {
-        stepCallBack(toString)
-        syncObject.synchronized { syncObject.wait }        
-      }
-      states(state)()
+    val tracingNow = tracing && state == 0
+    if (tracingNow) Log.debug(formatDebug)
+    if (tracingOnFile && state == 0) tracingFile.println(formatDebug)
+
+    CURRENT_OP_PC = PC
+    if (tracingNow) {
+      stepCallBack(toString)
+      syncObject.synchronized { syncObject.wait }
     }
+    states(state)()
   }
   def isFetchingInstruction : Boolean = state == 0
   
