@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.5.1
+Kernal64 ver 1.5.2
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -19,16 +19,20 @@ If you want to load a 16M REU modify the memory settings inside the start script
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
+### What's new in 1.5.2 (May 30th 2019)
+- CIA major bug fixed that prevented ComaLand to work properly
+- Color memory now handles the most significant nibble as the last nibble written by VIC: dadb (openio) test now works properly.
+- Fixed sprite idle cycle read.
+- Now it's possible to choose among 3 differente VIC palette
+- Fixed a veeery old bug about irq/nmi timings. The bug caused some irq stable interrupt handling to malfunctioning cause of an additional random cycle. In some demo the bug is visible when an unexpected flickering appears.
+- Normal Mode -> Warp Mode -> Normal Mode fixed. Fixed warp mode handling causing a delay to SID output. When resetting emulator or using warp mode and then normal mode SID emits output with a short initial delay.
+
 ### What's new in 1.5.1 (May 4th 2019)
 - VIC: Improved invalid video modes.
 - Fixed Cart type 5 (Ocean) for Vice test
 - Dual SID: more addresses to choose from for second SID.
 - C128 MMU: fixed page diverting issue when common RAM is enabled on bottom position.
 - General minor bugs fixed
-- CIA major bug fixed (introduced on the 1st 128 release) that prevented ComaLand to work properly
-- Color memory now handles the most significant nibble as the last nibble written by VIC: dadb (openio) test now works properly.
-- Fixed sprite idle cycle read.
-- Now it's possible to choose among 3 differente VIC palette
 
 ### What's new in 1.5.0 (Feb 3rd 2019)
 - VIC: fixed den bit handling: now on $30 it's checked on every cycles
