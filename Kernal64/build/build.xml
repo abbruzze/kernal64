@@ -7,7 +7,7 @@
 	<property name="c64.install" value="${dist.dir}/kernal64_install.zip"/>
 	
 	<!-- VERSION -->
-	<property name="VERSION" value="1.5.2"/>
+	<property name="VERSION" value="1.5.3"/>
 	
 	<!-- label is set only if ant is executed by CI -->
  	<condition property="BUILD_NUMBER" value="?">
@@ -18,44 +18,63 @@
 	
 	<property name="version" value="${VERSION} b${BUILD_NUMBER}"/>
 
-	<target name="scala-init">
-		<property name="scala-library.jar" value="${lib.dir}/scala-library.jar" />
-		<path id="build.classpath">
-			<pathelement location="${scala-library.jar}" />
+	<target name="scala-compile">
+		<!-- source scala files -->
+		<path id="scala.path">
+			<fileset dir="${sources.dir}">
+				<include name="**/*.scala"/>
+			</fileset>
+		</path>
+		<!-- library files -->
+		<path id="kernal.lib">
 			<fileset dir="${lib.dir}">
-				<include name="**/*.jar" />
+				<include name="**/*.jar"/>
 			</fileset>
 			<pathelement location="${build.dir}" />
 		</path>
-		<taskdef resource="scala/tools/ant/antlib.xml">
-			<classpath>
-				<pathelement location="${lib.dir}/scala-compiler.jar" />
-				<pathelement location="${scala-library.jar}" />
-				<pathelement location="${lib.dir}/scala-reflect.jar" />
-				<pathelement location="${lib.dir}/scala-parser-combinators_2.12-1.0.5.jar" />
-			</classpath>
-		</taskdef>
-	</target>
 
-	<target name="compile" depends="scala-init">
+		<pathconvert pathsep="${path.separator}"
+					 property="project.lib"
+					 refid="kernal.lib">
+		</pathconvert>
+		<pathconvert pathsep=" "
+					 property="scala.path.compile"
+					 refid="scala.path">
+		</pathconvert>
+
 		<tstamp/>
 		<echo message="Building version ${version}"/>
-		<mkdir dir="${build.dir}"/>		
+		<mkdir dir="${build.dir}"/>
 		<echo file="${sources.dir}/ucesoft/cbm/Version.scala" message='package ucesoft.cbm ; object Version { val VERSION = "${version}" ; val BUILD_DATE="${TODAY}"}'/>
-		<javac srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/cbm/peripheral/sid/resid/*.java">
-			<classpath refid="build.classpath"/>
+		<javac source="1.8" target="1.8" srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/cbm/peripheral/sid/resid/*.java">
+			<classpath refid="kernal.lib"/>
 		</javac>
-		<scalac srcdir="${sources.dir}" excludes="ucesoft/cbm/peripheral/sid/resid/**" 
-				destdir="${build.dir}" 
-				classpathref="build.classpath" 
-				deprecation="yes" 
-				encoding="ISO-8859-1"
-				addparams="-opt:_"				
-				target="jvm-1.8" />		
-	</target>
-		
-	<target name="deploy" depends="compile">
 		<mkdir dir="${dist.dir}"/>
+		<echo file="${dist.dir}/files" message="${scala.path.compile}"/>
+		<java classname="scala.tools.nsc.Main"
+			  fork="true"
+			  failonerror="true"
+			  maxmemory="256m">
+			<arg value="-classpath"/>
+			<arg value="${project.lib}"/>
+			<arg value="-d"/>
+			<arg value="${build.dir}"/>
+			<arg value="-deprecation"/>
+			<arg value="-encoding"/>
+			<arg value="ISO-8859-1"/>
+			<arg value="-opt:_"/>
+			<arg value="-language:postfixOps"/>
+			<arg value="@${dist.dir}/files"/>
+			<classpath>
+				<pathelement location="${lib.dir}/scala-compiler.jar"/>
+				<pathelement location="${lib.dir}/scala-library.jar"/>
+				<pathelement location="${lib.dir}/scala-reflect.jar"/>
+			</classpath>
+		</java>
+		<delete file="${dist.dir}/files"/>
+	</target>
+
+	<target name="deploy" depends="scala-compile">
 		<!-- copy images and roms -->
 		<mkdir dir="${build.dir}/resources"/>
 		<copy todir="${build.dir}/resources">

@@ -17,7 +17,7 @@ class DNDHandler(handleDND:(File) => Unit,extOnly:Option[() => DriveType.Value] 
     val t = support.getTransferable
 
     try {
-      import scala.collection.JavaConverters._
+      import scala.jdk.CollectionConverters._
       t.getTransferData(DataFlavor.javaFileListFlavor).asInstanceOf[java.util.List[File]].asScala.headOption match {
         case None =>
           false

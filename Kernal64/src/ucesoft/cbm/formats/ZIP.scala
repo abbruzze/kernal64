@@ -22,7 +22,7 @@ object ZIP {
   def zipEntries(file:File) : Try[List[ArchiveEntry]] = {
     Try {
         val zip = new ZipFile(file)
-        import collection.JavaConverters._
+      import scala.jdk.CollectionConverters._
         val entries = zip.entries.asScala
         val validEntries = entries filter { e =>
           val name = e.getName

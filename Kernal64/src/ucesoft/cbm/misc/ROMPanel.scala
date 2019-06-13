@@ -122,8 +122,8 @@ class ROMPanel(prop:Properties,c64Only:Boolean) extends JPanel {
     p.add(comp,c)
   }
 
-  import collection.JavaConverters._
-  for(kv <- propertiesAsScalaMap(prop)) {
+  import scala.jdk.CollectionConverters._
+  for(kv <- prop.asScala) {
     romMap get kv._1 match {
       case Some(rom) if !kv._2.isEmpty =>
         if (rom.romType == C128_I_F_ROM) {

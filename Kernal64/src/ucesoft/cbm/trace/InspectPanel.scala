@@ -152,7 +152,7 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
   private def createTree(node: CBMComponent): DefaultMutableTreeNode = {
     val treeNode = new DefaultMutableTreeNode(new ComponentNode(node))
     treeNode.add(new DefaultMutableTreeNode(node.componentType))
-    import collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     val properties = node.getProperties
     properties.asScala foreach { p => treeNode.add(new DefaultMutableTreeNode(new PropNode(properties, p._1))) }
     node match {
@@ -165,7 +165,7 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
   }
 
   private def updateTree(node: DefaultMutableTreeNode) {
-    import collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     val props = node.getUserObject.asInstanceOf[ComponentNode].node.getProperties
     node.children.asScala foreach { c =>
       val child = c.asInstanceOf[DefaultMutableTreeNode]
