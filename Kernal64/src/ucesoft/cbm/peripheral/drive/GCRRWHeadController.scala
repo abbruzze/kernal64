@@ -16,10 +16,12 @@ class GCRRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
   }
   
   final def changeSide(side:Int) {
-    floppy.side = side
-    track = floppy.currentTrack
-    val oldTrackSteps = trackSteps
-    trackSteps = (track << 1) | (oldTrackSteps & 1)
+    if (!floppy.singleSide) {
+      floppy.side = side
+      track = floppy.currentTrack
+      val oldTrackSteps = trackSteps
+      trackSteps = (track << 1) | (oldTrackSteps & 1)
+    }
   }
   
   final override def setFloppy(newFloppy:Floppy) {
