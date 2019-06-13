@@ -27,36 +27,36 @@ object ExpansionPortFactory {
       override def toString = s"ROM(${name})[startAddress=${Integer.toHexString(startAddress)} length=${length}]"
     }
     val name = crt.name
-    protected val romlBanks = crt.chips filter { c => c.startingLoadAddress >= 0x8000 && c.startingLoadAddress < 0xA000 } sortBy { c => convertBankNumber(c.bankNumber) } map { c =>
+    protected val romlBanks = crt.chips filter { c => c.startingLoadAddress >= 0x8000 && c.startingLoadAddress < 0xA000 } map { c =>
       val data = Array.ofDim[Int](8192)
       val size = if (c.romSize > 8192) 8192 else c.romSize
       Array.copy(c.romData, 0, data, 0, size)
-      new ROM(s"${crt.name}-roml-${convertBankNumber(c.bankNumber)}", c.startingLoadAddress, size, data): Memory
-    }
+      convertBankNumber(c.bankNumber) -> (new ROM(s"${crt.name}-roml-${convertBankNumber(c.bankNumber)}", c.startingLoadAddress, size, data): Memory)
+    } toMap
     protected val romhBanks = crt.chips filter { c =>
       (c.startingLoadAddress >= 0xA000 && c.startingLoadAddress < 0xC000) ||
         c.startingLoadAddress >= 0xE000 ||
         c.romSize > 8192
-    } sortBy { c => convertBankNumber(c.bankNumber) } map { c =>
+    } map { c =>
       val data = Array.ofDim[Int](8192)
       val size = if (c.romSize > 8192) 8192 else c.romSize
       if (c.romSize > 8192) Array.copy(c.romData, 8192, data, 0, size) else Array.copy(c.romData, 0, data, 0, size)
       val startAddress = if (c.romSize > 8192) {
         if (!crt.GAME && crt.EXROM) 0xE000 else 0xA000
       } else c.startingLoadAddress
-      new ROM(s"${crt.name}-romh-${convertBankNumber(c.bankNumber)}", startAddress, size, data): Memory
-    }
+      convertBankNumber(c.bankNumber) -> (new ROM(s"${crt.name}-romh-${convertBankNumber(c.bankNumber)}", startAddress, size, data): Memory)
+    } toMap
     protected var romlBankIndex = 0
     protected var romhBankIndex = 0
-    protected var game = /*if (crt.GAME && crt.EXROM) false else*/ crt.GAME
-    protected var exrom = /*if (crt.GAME && crt.EXROM) false else*/ crt.EXROM
+    protected var game = crt.GAME
+    protected var exrom = crt.EXROM
 
     protected def convertBankNumber(bank: Int): Int = bank
 
     def GAME = game
     def EXROM = exrom
-    def ROML = if (romlBanks.length > 0) romlBanks(romlBankIndex) else null
-    def ROMH = if (romhBanks.length > 0) romhBanks(romhBankIndex) else null
+    def ROML = if (romlBanks.size > 0) romlBanks(romlBankIndex) else null
+    def ROMH = if (romhBanks.size > 0) romhBanks(romhBankIndex) else null
 
     override def toString = s"ExpansionPort{crt=${crt} game=${game} exrom=${exrom} romlBanks=${romlBanks.mkString("<", ",", ">")} romhBanks=${romhBanks.mkString("<", ",", ">")}}"
   }
