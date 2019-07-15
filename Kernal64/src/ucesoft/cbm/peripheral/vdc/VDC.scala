@@ -134,20 +134,20 @@ class VDC extends RAMComponent {
   // COLOR PALETTE =======================================
   private[this] val PALETTE = Array(
       0xFF000000,  // 00 Black
-      0xFF202020,  // 01 Medium Gray
-      0xFF000080,  // 02 Blue
-      0xFF0000FF,  // 03 Light blue
-      0xFF008000,  // 04 Green
-      0xFF00FF00,  // 05 Light green
-      0xFF008080,  // 06 Dark cyan
-      0xFF00FFFF,  // 07 Light cyan
-      0xFF800000,  // 08 Dark red
-      0xFFFF0000,  // 09 Light red
-      0xFF800080,  // 10 Dark purple
-      0xFFFF00FF,  // 11 Light purple
-      0xFF805000,  // 12 Brown
-      0xFFFFFF00,  // 13 Yellow
-      0xFFC0C0C0,  // 14 Light Gray
+      0xFF555555,  // 01 Medium Gray
+      0xFF000078,  // 02 Blue (78)
+      0xFF5555FF,  // 03 Light blue
+      0xFF007800,  // 04 Green (78)
+      0xFF55FF55,  // 05 Light green
+      0xFF007878,  // 06 Dark cyan (78)
+      0xFF55FFFF,  // 07 Light cyan
+      0xFF780000,  // 08 Dark red (78)
+      0xFFFF5555,  // 09 Light red
+      0xFF780078,  // 10 Dark purple (78)
+      0xFFFF55FF,  // 11 Light purple
+      0xFF785500,  // 12 Brown (78)
+      0xFFFFFF55,  // 13 Yellow
+      0xFF787878,  // 14 Light Gray (78)
       0xFFFFFFFF   // 15 White
   )
   // Clock management ====================================
@@ -299,15 +299,19 @@ class VDC extends RAMComponent {
         updateGeometryOnNextFrame = true
       case 4 => // REG 4 Vertical Total
         if (debug) println(s"VDC: REG 4 Vertical Total :$value")
-        updateGeometryOnNextFrame = true
+        //updateGeometryOnNextFrame = true
+        updateGeometry
       case 5 => // REG 5 Vertical Total Fine Adjust
         if (debug) println(s"VDC: REG 5 Vertical Total Fine Adjust :$value")
         updateGeometryOnNextFrame = true
       case 6 => // REG 6 Vertical Displayed
         if (debug) println(s"VDC: REG 6 Vertical Displayed: $value")
-        updateGeometryOnNextFrame = true
+        //updateGeometryOnNextFrame = true
+        updateGeometry
+        //updateVertical
       case 7 => // REG 7 Vertical Sync Position
         if (debug) println(s"VDC: REG 7 Vertical Sync Position: $value")
+        //updateVertical
       case 8 => // REG 8 Interlace
         if (debug) println(s"VDC: REG 8 Interlace: $value")
         val newInterlaceMode = (value & 3) == 3
@@ -338,6 +342,7 @@ class VDC extends RAMComponent {
         }
         if (debug) println(s"VDC: REG 9 Character Total Vertical: $value ychars_total=$ychars_total ychars_visible=$ychars_visible bytes_per_char=$bytes_per_char attr_offset=$attr_offset rasterLine=$rasterLine vblank=$vblank")
         //updateGeometryOnNextFrame = true
+        //updateVertical
       case 10 => // R10  Cursor Mode, Start Scan
         if (debug) println(s"VDC: R10  Cursor Mode, Start Scan: ${value & 0x1F} mode: ${(value & 0xE0) >> 5}")
       case 11 => // R11 Cursor End Scan
@@ -450,7 +455,7 @@ class VDC extends RAMComponent {
     clkStartLine = cycles
     reschedule    
 
-    if (rasterLine == 0) nextFrame       
+    //if (rasterLine == 0) nextFrame
     
     vblank = rasterLine < borderHeight || rasterLine >= borderHeight + visibleScreenHeightPix || rasterLine >= screenHeight - 1
     val interlacing = !deinterlaceMode && interlaceMode
@@ -480,7 +485,12 @@ class VDC extends RAMComponent {
     }
     // NEXT RASTER LINE =====================================================
     rasterLine = rasterLine + 1
-    if (rasterLine > screenHeight) rasterLine = 0
+
+    if (rasterLine > screenHeight) {
+      rasterLine = 0
+      nextFrame // we are on last line
+    }
+
     val virtualScreenWidth = (regs(1) + regs(27))
     if (videoMode != VideoMode.IDLE) {     
       if (videoMode == VideoMode.BITMAP) {
@@ -494,10 +504,10 @@ class VDC extends RAMComponent {
     
     if (currentCharScanLine > ychars_total) {
       currentCharScanLine = 0
-      ypos += 1            
+      ypos += 1
       attr_base_ptr += virtualScreenWidth
       if (videoMode == VideoMode.TEXT) ram_base_ptr += virtualScreenWidth
-    }    
+    }
   }
   
   @inline private def updateGeometry {
@@ -527,7 +537,8 @@ class VDC extends RAMComponent {
     if (lborder < 0) lborder = 0
     
     val newScreenHeight = (regs(4) + 1) * (ychars_total + 1) + regs(5)
-    
+    //screenHeight = newScreenHeight
+
     val newScreenWidth = (hdisplayed + lborder + rborder) * charWidth
     if (newScreenWidth != screenWidth) {
       screenWidth = newScreenWidth
@@ -537,7 +548,7 @@ class VDC extends RAMComponent {
     
     borderWidth = lborder * charWidth
     //borderWidth = (xchars_total - regs(2) - ((regs(3) & 0x0F))) * charWidth
-    if (debug) println(s"New screen res. height=$screenHeight width=$screenWidth htotal=$htotal hdisplayed=$hdisplayed hsync=$hsync hsync_width=$hsync_width rborder=$rborder lborder=$lborder")
+    if (debug) println(s"New screen res. height=$newScreenHeight width=$screenWidth htotal=$htotal hdisplayed=$hdisplayed hsync=$hsync hsync_width=$hsync_width rborder=$rborder lborder=$lborder rester=$rasterLine")
     if (borderWidth < 0) borderWidth = 0
     val textMode = (regs(25) & 0x80) == 0
     if (geometryUpdateListener != null) {
@@ -547,7 +558,15 @@ class VDC extends RAMComponent {
     }
     if (debug) println(s"VDC: updated geometry. Text mode=$textMode interlaced=$interlaceMode ${regs(1) * charVisibleWidth}x${visibleScreenHeightPix} new borderWidth=$borderWidth")
   }
-  
+/*
+  @inline private def updateVertical : Unit = {
+    borderHeight = (regs(7) - regs(6)) * (ychars_total + 1)
+    if (borderHeight < 0 || borderHeight > screenHeight) borderHeight = 0
+
+    visibleTextRows = regs(6)
+    visibleScreenHeightPix = visibleTextRows * (ychars_total + 1)// + regs(5)
+  }
+*/
   @inline private def nextFrame {
     frameBit = (frameBit + 1) & 1
     if (oneLineDrawn) display.showFrame(0,0,screenWidth,screenHeight)
@@ -558,7 +577,7 @@ class VDC extends RAMComponent {
     ypos = 0
     borderHeight = (regs(7) - regs(6)) * (ychars_total + 1)
     if (borderHeight < 0 || borderHeight > screenHeight) borderHeight = 0
-    
+
     visibleTextRows = regs(6)
     visibleScreenHeightPix = visibleTextRows * (ychars_total + 1)// + regs(5)
     //println(s"New borderHeight=$borderHeight visibleScreenHeightPix=$visibleScreenHeightPix")
