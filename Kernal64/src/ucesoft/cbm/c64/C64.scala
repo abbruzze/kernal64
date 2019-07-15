@@ -60,6 +60,7 @@ import ucesoft.cbm.peripheral.drive.D1581
 import ucesoft.cbm.trace.InspectPanelDialog
 import ucesoft.cbm.expansion.DigiMAX
 import ucesoft.cbm.expansion.DigiMaxCart
+import ucesoft.cbm.expansion.cpm.CPMCartridge
 import ucesoft.cbm.peripheral.drive.EmptyFloppy
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.vic.Palette
@@ -684,7 +685,10 @@ class C64 extends CBMComponent with GamePlayer {
 
   private def enableCPMCart(enabled:Boolean): Unit = {
     ExpansionPort.getExpansionPort.eject
-    if (enabled) ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mem,setDMA _,setTraceListener _))
+    if (enabled) {
+      ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mem,setDMA _,setTraceListener _))
+      detachCtrItem.setEnabled(true)
+    }
     else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
   }
 
@@ -1907,6 +1911,14 @@ class C64 extends CBMComponent with GamePlayer {
     val cpmItem = new JCheckBoxMenuItem("CP/M Cartdrige")
     cpmItem.addActionListener(e => enableCPMCart(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     IOItem.add(cpmItem)
+    settings.add("cpm64-enabled",
+      s"Attach the CP/M cart",
+      "CPM64",
+      (cpm: Boolean) => {
+        if (cpm) enableCPMCart(true)
+      },
+      ExpansionPort.getExpansionPort.isInstanceOf[CPMCartridge]
+    )
 
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)

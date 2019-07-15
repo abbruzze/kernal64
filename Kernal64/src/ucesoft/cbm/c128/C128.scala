@@ -714,7 +714,10 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
 
   private def enableCPMCart(enabled:Boolean): Unit = {
     ExpansionPort.getExpansionPort.eject
-    if (enabled) ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,setDMA _,setTraceListener _))
+    if (enabled) {
+      ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,setDMA _,setTraceListener _))
+      detachCtrItem.setEnabled(true)
+    }
     else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
   }
 
@@ -2190,6 +2193,14 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     val cpmItem = new JCheckBoxMenuItem("CP/M Cartdrige")
     cpmItem.addActionListener(e => enableCPMCart(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     IOItem.add(cpmItem)
+    settings.add("cpm64-enabled",
+      s"Attach the CP/M cart",
+      "CPM64",
+      (cpm: Boolean) => {
+        if (cpm) enableCPMCart(true)
+      },
+      ExpansionPort.getExpansionPort.isInstanceOf[ucesoft.cbm.expansion.cpm.CPMCartridge]
+    )
     
     val ramItem = new JMenu("RAM")
     optionMenu.add(ramItem)
