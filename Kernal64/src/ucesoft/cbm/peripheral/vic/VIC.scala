@@ -348,14 +348,18 @@ final class VIC(mem: VICMemory,
     }
 
     @inline final def producePixels {
-      val xcoord = xCoord(rasterCycle)
+      var xcoord = xCoord(rasterCycle)
       var i = 0
       var finished = false
       while (i < 8 && !finished) {
-        if (!painting && x == xcoord + i) painting = true
+        if (!painting && x == xcoord) painting = true else xcoord += 1
+
         if (painting) {
           finished = counter == (if (xexp) 48 else 24)
-          if (finished) painting = false
+          if (finished) {
+            painting = false
+            counter = 0
+          }
           else pixels(i) = shift
         }
         i += 1
