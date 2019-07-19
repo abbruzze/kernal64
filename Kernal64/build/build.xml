@@ -19,6 +19,8 @@
 	<property name="version" value="${VERSION} b${BUILD_NUMBER}"/>
 
 	<target name="scala-compile">
+		<tstamp/>
+		<echo file="${sources.dir}/ucesoft/cbm/Version.scala" message='package ucesoft.cbm ; object Version { val VERSION = "${version}" ; val BUILD_DATE="${TODAY}"}'/>
 		<!-- source scala files -->
 		<path id="scala.path">
 			<fileset dir="${sources.dir}">
@@ -43,10 +45,8 @@
 					 refid="scala.path">
 		</pathconvert>
 
-		<tstamp/>
 		<echo message="Building version ${version}"/>
 		<mkdir dir="${build.dir}"/>
-		<echo file="${sources.dir}/ucesoft/cbm/Version.scala" message='package ucesoft.cbm ; object Version { val VERSION = "${version}" ; val BUILD_DATE="${TODAY}"}'/>
 		<javac source="1.8" target="1.8" srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/cbm/peripheral/sid/resid/*.java">
 			<classpath refid="kernal.lib"/>
 		</javac>
