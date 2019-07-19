@@ -23,6 +23,7 @@
 		<path id="scala.path">
 			<fileset dir="${sources.dir}">
 				<include name="**/*.scala"/>
+				<include name="ucesoft/cbm/Version.scala"/>
 			</fileset>
 		</path>
 		<!-- library files -->
