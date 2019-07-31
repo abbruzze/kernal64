@@ -260,15 +260,15 @@ final class VIC(mem: VICMemory,
     var x: Int = 0,
     var y: Int = 0,
     var xexp: Boolean = false,
+    var isMulticolor : Boolean = false,
     var color: Int = 0,
-    var isMulticolor: Boolean = false,
     var dataPriority: Boolean = false) extends CBMComponent {
     val componentID = "Sprite " + index
     val componentType = CBMComponentType.INTERNAL
     
     private[this] val DMA_INDEX = 1 << index
     private[this] var _enabled = false
-    private[this] var counter = 0
+    private[this] var mcCounter = 0
     private[this] var gdata = 0
     private[this] var _yexp = false
     private[this] var memoryPointer = 0
@@ -277,17 +277,19 @@ final class VIC(mem: VICMemory,
     private[this] var expansionFF = true
     private[this] var xexpCounter = 0
     private[this] var display = false
+    private[this] var latchedMc = false
+    private[this] val clk = Clock.systemClock
     var painting = false
     var hasPixels = false
     private[this] val pixels = Array.fill[Int](8)(PIXEL_TRANSPARENT)
     private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
-    
+
     def enabled = _enabled
     def enabled_=(enabled:Boolean) = {
       _enabled = enabled
     }
-    
-    override def toString = s"Sprite #${index} cnt=${counter} data=${Integer.toBinaryString(gdata & 0xFFFFFF)} en=${_enabled} hasPixels=${hasPixels} x=${x} y=${y} xexp=${xexp} yexp=${_yexp} color=${color} mcm=${isMulticolor} pr=${dataPriority} memP=${memoryPointer} mcbase=${mcbase} mc=${mc} dma=${dma} display=${display} ff=${expansionFF}"
+
+    override def toString = s"Sprite #${index} mcCounter=${mcCounter} data=${Integer.toBinaryString(gdata & 0xFFFFFF)} en=${_enabled} hasPixels=${hasPixels} x=${x} y=${y} xexp=${xexp} yexp=${_yexp} color=${color} mcm=${isMulticolor} pr=${dataPriority} memP=${memoryPointer} mcbase=${mcbase} mc=${mc} dma=${dma} display=${display} ff=${expansionFF}"
 
     override def getProperties = {
       properties.setProperty("Enabled",_enabled.toString)
@@ -333,7 +335,7 @@ final class VIC(mem: VICMemory,
       display = false
       painting = false
       hasPixels = false
-      counter = 0
+      mcCounter = 0
       Array.copy(ALL_TRANSPARENT,0,pixels,0,8)
     }
     
@@ -347,41 +349,49 @@ final class VIC(mem: VICMemory,
       if (!display) spritesDisplayedMask &= ~DMA_INDEX
     }
 
-    @inline final def producePixels {
+    final def producePixels {
       var xcoord = xCoord(rasterCycle)
       var i = 0
       var finished = false
+
       while (i < 8 && !finished) {
-        if (!painting && x == xcoord) painting = true else xcoord += 1
+        if (!painting && x == xcoord) {
+          painting = true
+          latchedMc = isMulticolor
+          mcCounter = 0
+          xexpCounter = 0
+        } else xcoord += 1
 
         if (painting) {
-          finished = counter == (if (xexp) 48 else 24)
-          if (finished) {
-            painting = false
-            counter = 0
+          finished = gdata == 0//counter == (if (xexp) 48 else 24)
+          if (finished) painting = false
+          else {
+            if (i == 3) {
+              if (latchedMc ^ isMulticolor) latchedMc = isMulticolor
+            }
+            pixels(i) = shift(latchedMc)
           }
-          else pixels(i) = shift
         }
         i += 1
       }
-      //if (finished) counter = 0
     }
     
-    final private def shift = {
-      var pixel = if (!isMulticolor) { // no multicolor        
+    @inline final private def shift(mc:Boolean) = {
+      var pixel = if (!mc) { // no multicolor
         if (xexp) {
           if (xexpCounter == 0) gdata <<= 1
-          xexpCounter = (xexpCounter + 1) & 1//% 2
+          xexpCounter ^= 1
         } else gdata <<= 1
         val cbit = (gdata & 0x1000000) == 0x1000000
         if (cbit) color else PIXEL_TRANSPARENT
       } else { // multicolor
-        if ((counter & 1) == 0) {
+        if (mcCounter == 0) {
           if (xexp) {
             if (xexpCounter == 0) gdata <<= 2
-            xexpCounter = (xexpCounter + 1) & 1
+            xexpCounter ^= 1
           } else gdata <<= 2
         }
+        mcCounter ^= 1
         val cbit = (gdata & 0x3000000)
         (cbit : @switch) match {
           case 0x0000000 => PIXEL_TRANSPARENT
@@ -390,7 +400,7 @@ final class VIC(mem: VICMemory,
           case 0x3000000 => spriteMulticolor01(1)
         }
       }
-      counter += 1
+
       if ((pixel & PIXEL_TRANSPARENT) == 0) hasPixels = true
       if (dataPriority) pixel |= PIXEL_SPRITE_PRIORITY
       pixel |= index << 6
@@ -404,15 +414,17 @@ final class VIC(mem: VICMemory,
       if (dma) {    
         if (first) {          
           // s-access phi2
-          gdata = (mem.read(memoryPointer + mc,ChipID.VIC) & 0xFF) << 16
+          gdata <<= 8
+          gdata |= (mem.read(memoryPointer + mc,ChipID.VIC) & 0xFF)
         }
         else {
           // s-accesses phi2
-          gdata |= (mem.readPhi2(memoryPointer + mc) & 0xFF) << 8
-          mc = (mc + 1) & 0x3F
+          gdata <<= 8
           gdata |= (mem.readPhi2(memoryPointer + mc) & 0xFF)
-          counter = 0
-          hasPixels = false
+          mc = (mc + 1) & 0x3F
+          gdata <<= 8
+          gdata |= (mem.readPhi2(memoryPointer + mc) & 0xFF)
+          //hasPixels = false
         } 
         mc = (mc + 1) & 0x3F
       }
@@ -421,8 +433,7 @@ final class VIC(mem: VICMemory,
       else {
         mem.read(0x3FFF,ChipID.VIC)
         gdata |= mem.lastByteRead << 8 | internalDataBus
-        counter = 0
-        hasPixels = false
+        //hasPixels = false
       } // idle access
     }
     
@@ -476,7 +487,7 @@ final class VIC(mem: VICMemory,
       out.writeBoolean(display)
       out.writeBoolean(painting)
       out.writeBoolean(hasPixels)
-      out.writeInt(counter)
+      out.writeInt(mcCounter)
       out.writeObject(pixels)
     }
     protected def loadState(in:ObjectInputStream) {
@@ -498,7 +509,7 @@ final class VIC(mem: VICMemory,
       display = in.readBoolean
       painting = in.readBoolean
       hasPixels = in.readBoolean
-      counter = in.readInt
+      mcCounter = in.readInt
       loadMemory[Int](pixels,in)
     }
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
@@ -1288,7 +1299,7 @@ final class VIC(mem: VICMemory,
       var pixel = PIXEL_TRANSPARENT
       if (almostOneSprite) 
       while (s >= 0) {
-        if (sprites(s).hasPixels) { // scan each sprite      
+        if (sprites(s).hasPixels) { // scan each sprite
           val spritePixels = sprites(s).getPixels
           if ((spritePixels(i) & PIXEL_TRANSPARENT) == 0) {
             if ((pixel & PIXEL_TRANSPARENT) == 0) spriteSpriteCollision((pixel >> 6) & 7, (spritePixels(i) >> 6) & 7) // sprite-sprite collision detected
