@@ -1,6 +1,6 @@
 language: java
 
 jdk:
-  - oraclejdk8
+  - openjdk8
 
 script: ant -DBUILD_NUMBER=$TRAVIS_BUILD_NUMBER -f Kernal64/build/build.xml
