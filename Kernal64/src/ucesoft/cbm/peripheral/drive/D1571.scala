@@ -239,11 +239,11 @@ class D1571(val driveID: Int,
     private[this] val SYNC_DETECTION_LINE = 0x80
     private[this] var isDiskChanged = true
     private[this] var isDiskChanging = false
-      
+
     def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
       floppy = driveReader
-      RW_HEAD.setFloppy(floppy)
       if (emulateInserting) {
+        RW_HEAD.setFloppy(EmptyFloppy)
         isDiskChanged = true
         isDiskChanging = true
         VIA1.irq_set(IRQ_CA2)
@@ -255,11 +255,14 @@ class D1571(val driveID: Int,
             clk.schedule(new ClockEvent("DiskWaitingClearing",cycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
               isDiskChanged = false
               isDiskChanging = false
+              RW_HEAD.setFloppy(floppy)
             }))
           }))
         }))
       }
-      //else floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
+      else {
+        RW_HEAD.setFloppy(floppy)
+      }
       awake
     }
     

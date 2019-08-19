@@ -143,8 +143,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       
     def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
       floppy = driveReader
-      RW_HEAD.setFloppy(floppy)
       if (emulateInserting) {
+        RW_HEAD.setFloppy(EmptyFloppy)
         isDiskChanged = true
         isDiskChanging = true
         viaBus.irq_set(IRQ_CA2)
@@ -156,9 +156,13 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
             clk.schedule(new ClockEvent("DiskWaitingClearing",cycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
               isDiskChanged = false
               isDiskChanging = false
+              RW_HEAD.setFloppy(floppy)
             }))
           }))
         }))
+      }
+      else {
+        RW_HEAD.setFloppy(floppy)
       }
       awake
     }
