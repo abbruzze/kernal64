@@ -435,13 +435,14 @@ class C64 extends CBMComponent with GamePlayer {
     t match {
       case j:CPUJammedException =>
         JOptionPane.showConfirmDialog(displayFrame,
-            s"CPU[${j.cpuID}] jammed at " + Integer.toHexString(j.pcError) + ". Do you want to open debugger or reset ?",
+            s"CPU[${j.cpuID}] jammed at " + Integer.toHexString(j.pcError) + ". Do you want to open debugger (yes), reset (no) or continue (cancel) ?",
             "CPU jammed",
-            JOptionPane.YES_NO_OPTION,
+            JOptionPane.YES_NO_CANCEL_OPTION,
             JOptionPane.ERROR_MESSAGE) match {
           case JOptionPane.YES_OPTION =>
             traceDialog.forceTracing(true)
             trace(true,true)
+          case JOptionPane.CANCEL_OPTION => // continue
           case _ => 
             reset(true)
         }

@@ -361,7 +361,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   final private[this] val O_SHY = 0xCD
   final private[this] val O_SHX = 0xCE
   final private[this] val O_SHA = 0xCF
-  final private[this] val O_EXT = 0xD0
+  final private[this] val O_JAM = 0xD0
+  final private[this] val O_EXT = 0xD1
 
 
   private[this] val MODE_TAB = Array(
@@ -1817,7 +1818,14 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 	    mem.write(ar,A & X & (ar2 + 1))
 		Last
 	  }
-	  case 1 => () => { Last ; throw new CPU6510.CPUJammedException(id,CURRENT_OP_PC) }
+    case O_JAM => () => {
+      // HALT CPU
+    }
+	  case 1 => () => {
+      state = O_JAM
+      PC -= 1
+      throw new CPU6510.CPUJammedException(id,CURRENT_OP_PC)
+    }
 	  case RESET => () => { 
 	    if (ready) {
 	      PC = readWordFrom(0xfffc, mem)
@@ -1886,7 +1894,6 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   }
 
   def reset {
-    //PC = readWordFrom(0xfffc, mem)
     irqLow = false
     nmiLow = false
     nmiOnNegativeEdge = false
@@ -1943,9 +1950,9 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
         Log.debug("IRQ Break")
       }
     }
-    val tracingNow = tracing && state == 0
+    val tracingNow = tracing && (state == 0 || state == O_JAM)
     if (tracingNow) Log.debug(formatDebug)
-    if (tracingOnFile && state == 0) tracingFile.println(formatDebug)
+    if (tracingOnFile && (state == 0 || state == O_JAM)) tracingFile.println(formatDebug)
 
     CURRENT_OP_PC = PC
     if (tracingNow) {

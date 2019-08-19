@@ -509,14 +509,15 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     t match {
       case j:CPUJammedException =>
         JOptionPane.showConfirmDialog(vicDisplayFrame,
-            s"CPU[${j.cpuID}] jammed at " + Integer.toHexString(j.pcError) + ". Do you want to open debugger or reset ?",
-            "CPU jammed",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.ERROR_MESSAGE) match {
+          s"CPU[${j.cpuID}] jammed at " + Integer.toHexString(j.pcError) + ". Do you want to open debugger (yes), reset (no) or continue (cancel) ?",
+          "CPU jammed",
+          JOptionPane.YES_NO_CANCEL_OPTION,
+          JOptionPane.ERROR_MESSAGE) match {
           case JOptionPane.YES_OPTION =>
             traceDialog.forceTracing(true)
             trace(true,true)
-          case _ => 
+          case JOptionPane.CANCEL_OPTION => // continue
+          case _ =>
             reset(true)
         }
       case _ =>
