@@ -219,6 +219,8 @@ final class VIC(mem: VICMemory,
    * Set Background Color 0 - 3 to one of the 16 Colors ($00-$0F)
    */
   final private[this] val backgroundColor = Array(0, 0, 0, 0)
+  // Last background drawn
+  private[this] var lastBackground = 0
   /*
    * $D025 - $D026
    * Set Color 1 - 2 shared by Multicolor Sprites
@@ -363,7 +365,7 @@ final class VIC(mem: VICMemory,
         } else xcoord += 1
 
         if (painting) {
-          finished = gdata == 0//counter == (if (xexp) 48 else 24)
+          finished = gdata == 0 //counter == (if (xexp) 48 else 24)
           if (finished) painting = false
           else {
             if (i == 3) {
@@ -569,29 +571,42 @@ final class VIC(mem: VICMemory,
   private class GFXShifter extends CBMComponent {
     val componentID = "GFXShifter"
     val componentType = CBMComponentType.INTERNAL
-    private[this] var counter = 0
-    private[this] var gdata = 0
-    private[this] var xscrollBuffer = Array.fill(8)(PIXEL_BLACK)
-    private[this] var firstPixel = true
+    private[this] var gdata,gdataLatch = 0
+    //private[this] val xscrollBuffer = Array.fill(8)(PIXEL_BLACK)
     private[this] val pixels = Array.fill(8)(PIXEL_TRANSPARENT)
 
     private[this] var mcm, ecm, isBlank = false
     private[this] var vml_p, vml_c: Array[Int] = _
     private[this] var vmli = 0
     private[this] var isInDisplayState = false
+    private[this] var mcFlop = 0
 
     final def getPixels = pixels
 
     final def setData(gdata: Int) {
-      this.gdata = gdata      
-      counter = 0
+      this.gdataLatch = gdata
+      //this.gdata = gdata
+      //mcFlop = 0
     }
     
     final def init {}
-    final def reset = firstPixel = true
+    final def reset = {
+      gdata = 0
+      gdataLatch = 0
+    }
     
-    @inline private def shift = {
-      var pixel = if (isBlank || gdata < 0) PIXEL_BLACK
+    @inline private def shift(counter:Int) = {
+      val vmli = if (counter < xscroll) {
+        if (this.vmli > 0) this.vmli - 1 else 0
+      }
+      else this.vmli
+
+      if (counter == xscroll) {
+        gdata = gdataLatch
+        mcFlop = 0
+      }
+
+      val pixel = if (isBlank || gdata < 0) PIXEL_BLACK
       else if (!bmm) { // text mode        
         val mc = (vml_c(vmli) & 8) == 8
         val multicolor = mcm && mc
@@ -615,7 +630,7 @@ final class VIC(mem: VICMemory,
           }
         }
         else { // multi color mode
-          if ((counter & 1) == 0) gdata <<= 2
+          if (mcFlop == 0) gdata <<= 2
           val cbit = (gdata & 0x300) >> 8
           (cbit : @switch) match {
             case 0 => if (ecm) PIXEL_BLACK // invalid text mode (background)
@@ -655,7 +670,7 @@ final class VIC(mem: VICMemory,
             else PIXEL_BLACK
           }
         } else { // multi color mode          
-          if ((counter & 1) == 0) gdata <<= 2
+          if (mcFlop == 0) gdata <<= 2
           val cbit = gdata & 0x300
           (cbit : @switch) match {
             case 0x00 => if (ecm) PIXEL_BLACK // invalid bitmap mode (blackground)
@@ -677,31 +692,29 @@ final class VIC(mem: VICMemory,
           }
         }
       }
-      counter += 1
-      if (xscroll == 0) {
-        if (traceRasterLineInfo && pixel != PIXEL_BLACK) pixel |= PIXEL_DOX_G
-        pixel
-      } else {
-        if (firstPixel) {
-          firstPixel = false
-          var i = 0
-          // insert xscroll black pixels
-          while (i < xscroll) {
-            xscrollBuffer(i) = backgroundColor(0) //BLACK_PIXEL
-            i += 1
-          }
-        }
-        xscrollBuffer(xscroll) = pixel
-        // shift xscrollBuffer
-        var headPixel = xscrollBuffer(0)
+      mcFlop ^= 1
+/*
+      if (firstPixel) {
+        firstPixel = false
         var i = 0
+        // insert xscroll black pixels
         while (i < xscroll) {
-          xscrollBuffer(i) = xscrollBuffer(i + 1)
+          xscrollBuffer(i) = backgroundColor(0)
           i += 1
         }
-        if (traceRasterLineInfo && pixel != PIXEL_BLACK) headPixel |= PIXEL_DOX_G
-        headPixel
       }
+      xscrollBuffer(xscroll) = pixel
+      // shift xscrollBuffer
+      pixel = xscrollBuffer(0)
+      var i = 0
+      while (i < xscroll) {
+        xscrollBuffer(i) = xscrollBuffer(i + 1)
+        i += 1
+      }
+*/
+      if (isInDisplayState && (pixel & PIXEL_FOREGROUND) == 0) lastBackground = pixel
+
+      pixel
     }
 
     final def producePixels {
@@ -723,24 +736,25 @@ final class VIC(mem: VICMemory,
         lpx = display.getLightPenX
         baseX = rasterCycle << 3
       }
-      counter = 0
+      var counter = 0
       while (counter < 8) {
-        pixels(counter) = shift
+        pixels(counter) = shift(counter)
         if (checkLP && baseX + counter == lpx) triggerLightPen
+        counter += 1
       }
     }
     // state
     protected def saveState(out:ObjectOutputStream) {
-      out.writeInt(counter)
       out.writeInt(gdata)
-      out.writeBoolean(firstPixel)
-      out.writeObject(xscrollBuffer)
+      //out.writeObject(xscrollBuffer)
+      out.writeInt(gdataLatch)
+      out.writeInt(mcFlop)
     }
     protected def loadState(in:ObjectInputStream) {
-      counter = in.readInt
       gdata = in.readInt
-      firstPixel = in.readBoolean
-      loadMemory[Int](xscrollBuffer,in)
+      //loadMemory[Int](xscrollBuffer,in)
+      gdataLatch = in.readInt
+      mcFlop = in.readInt
       
     }
     protected def allowsStateRestoring(parent:JFrame) : Boolean = true
@@ -822,6 +836,7 @@ final class VIC(mem: VICMemory,
     firstModPixelY = 0
     java.util.Arrays.fill(displayMem,0)
     display.showFrame(-1,0, lastModPixelX, RASTER_LINES)
+    lastBackground = 0
   }
 
   def setDisplay(display: Display) = {
@@ -1297,6 +1312,7 @@ final class VIC(mem: VICMemory,
     while (i < 8) { // scan each bit      
       s = 7
       var pixel = PIXEL_TRANSPARENT
+      // ---------------------------- Sprite pixel --------------------------
       if (almostOneSprite) 
       while (s >= 0) {
         if (sprites(s).hasPixels) { // scan each sprite
@@ -1308,12 +1324,14 @@ final class VIC(mem: VICMemory,
         }
         s -= 1
       }
-      val gfxPixel = if (verticalBorderFF) backgroundColor(0) else if (dataToDraw < 0) backgroundColor(0) else gfxPixels(i)
-      if (!verticalBorderFF && (gfxPixel & 0x10) > 0 && (pixel & PIXEL_TRANSPARENT) == 0) spriteDataCollision((pixel >> 6) & 7) // sprite-data collision detected
-      if ((pixel & PIXEL_TRANSPARENT) > 0 || ((gfxPixel & 0x10) > 0 && (pixel & PIXEL_SPRITE_PRIORITY) > 0)) pixel = gfxPixel
-      if ((borderPixels(i) & PIXEL_TRANSPARENT) == 0) drawPixel(index, y, borderPixels(i))
-      else drawPixel(index, y, pixel)
-      
+      // --------------------------------------------------------------------
+      val gfxPixel = if (verticalBorderFF) lastBackground else if (dataToDraw < 0) backgroundColor(0) else gfxPixels(i)
+      if (!verticalBorderFF && (gfxPixel & PIXEL_FOREGROUND) > 0 && (pixel & PIXEL_TRANSPARENT) == 0) spriteDataCollision((pixel >> 6) & 7) // sprite-data collision detected
+      if ((borderPixels(i) & PIXEL_TRANSPARENT) == 0) pixel = borderPixels(i) // border is on
+      else
+      if ((pixel & PIXEL_TRANSPARENT) > 0 || ((gfxPixel & PIXEL_FOREGROUND) > 0 && (pixel & PIXEL_SPRITE_PRIORITY) > 0)) pixel = gfxPixel
+
+      drawPixel(index, y, pixel)
       i += 1
       index += 1
     }
@@ -1509,6 +1527,7 @@ final class VIC(mem: VICMemory,
     out.writeObject(spriteMulticolor01)
     out.writeObject(vml_p)
     out.writeObject(vml_c)
+    out.writeInt(lastBackground)
   }
   protected def loadState(in:ObjectInputStream) {
     videoMatrixAddress = in.readInt
@@ -1563,6 +1582,7 @@ final class VIC(mem: VICMemory,
     loadMemory[Int](spriteMulticolor01,in)
     loadMemory[Int](vml_p,in)
     loadMemory[Int](vml_c,in)
+    lastBackground = in.readInt
   }
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
