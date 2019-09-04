@@ -489,6 +489,13 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     // AUTOPLAY
     settings.parseAndLoad(args) match {
       case None =>
+        // run the given file name
+        settings.get[String]("RUNFILE") match {
+          case None =>
+          case Some(fn) =>
+            val cmd = s"""RUN"$fn"""" + 13.toChar
+            clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,false) ))
+        }
       case Some(f) =>
         handleDND(new File(f),false,true)
     }
@@ -2260,6 +2267,12 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     settings.add("limitcycles",
                  "Run at most the number of cycles specified",
                  (cycles:Int) => if (cycles > 0) clock.limitCyclesTo(cycles)                 
+    )
+    settings.add("run-file",
+      "Run the given file taken from the attached disk",
+      "RUNFILE",
+      (runFile:String) => {},
+      ""
     )
     // games
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])

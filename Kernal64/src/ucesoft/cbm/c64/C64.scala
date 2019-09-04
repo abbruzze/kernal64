@@ -418,6 +418,13 @@ class C64 extends CBMComponent with GamePlayer {
     // AUTOPLAY
     settings.parseAndLoad(args) match {
       case None =>
+        // run the given file name
+        settings.get[String]("RUNFILE") match {
+          case None =>
+          case Some(fn) =>
+            val cmd = s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar
+            clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => Keyboard.insertTextIntoKeyboardBuffer(cmd,mem,true) ))
+        }
       case Some(f) =>
         handleDND(new File(f),false,true)
     }
@@ -879,12 +886,12 @@ class C64 extends CBMComponent with GamePlayer {
     }
   }
   
-  private def attachDevice(file:File,autorun:Boolean) {
+  private def attachDevice(file:File,autorun:Boolean,fileToLoad:Option[String] = None) {
     val name = file.getName.toUpperCase
     
     if (name.endsWith(".PRG")) loadPRGFile(file,autorun)
     else    
-    if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun,None)
+    if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun,fileToLoad)
     else
     if (name.endsWith(".TAP")) attachTapeFile(file,autorun)
     else
@@ -1950,6 +1957,12 @@ class C64 extends CBMComponent with GamePlayer {
     settings.add("limitcycles",
                  "Run at most the number of cycles specified",
                  (cycles:Int) => if (cycles > 0) clock.limitCyclesTo(cycles)                 
+    )
+    settings.add("run-file",
+      "Run the given file taken from the attached disk",
+      "RUNFILE",
+      (runFile:String) => {},
+      ""
     )
     // games
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])
