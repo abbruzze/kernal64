@@ -17,7 +17,20 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   private[this] final  val D71_DISK_SIZE_70_TRACKS_WITH_ERRORS = 351062
     
   /*
-   *     Track       Sec/trk   # Sectors
+    Track allocation tables.
+
+    .D64 ======================================================
+
+        Track   Sectors/track   # Sectors   Storage in Bytes
+        -----   -------------   ---------   ----------------
+         1-17        21            357           7820
+        18-24        19            133           7170
+        25-30        18            108           6300
+        31-40(*)     17             85           6020
+                                   ---
+                                   683 (for a 35 track image)
+    .D71 ======================================================
+         Track       Sec/trk   # Sectors
         --------------  -------   ---------
          1-17 (side 0)    21         357
         18-24 (side 0)    19         133
@@ -31,6 +44,14 @@ private[formats] class D64_D71(val file: String) extends Diskette {
                               total 1366
    */
   private[this] final val TRACK_ALLOCATION = // Key = #track => Value = #sectors per track
+    if (file.toUpperCase.endsWith(".D64"))
+      (for (t <- 0 to 40) yield {
+        if (t <= 17) (t, 21)
+        else if (t <= 24) (t, 19)
+        else if (t <= 30) (t, 18)
+        else (t,17)
+      }).toMap
+    else
     (for (t <- 0 to 70) yield {
       if (t <= 17) (t, 21)
       else if (t <= 24) (t, 19)
