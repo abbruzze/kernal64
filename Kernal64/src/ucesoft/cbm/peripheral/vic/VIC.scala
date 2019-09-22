@@ -280,7 +280,6 @@ final class VIC(mem: VICMemory,
     private[this] var xexpCounter = 0
     private[this] var display = false
     private[this] var latchedMc = false
-    private[this] val clk = Clock.systemClock
     var painting = false
     var hasPixels = false
     private[this] val pixels = Array.fill[Int](8)(PIXEL_TRANSPARENT)
@@ -365,11 +364,14 @@ final class VIC(mem: VICMemory,
         } else xcoord += 1
 
         if (painting) {
-          finished = gdata == 0 //counter == (if (xexp) 48 else 24)
+          finished = (gdata & 0x03FFFFFF) == 0
           if (finished) painting = false
           else {
             if (i == 3) {
-              if (latchedMc ^ isMulticolor) latchedMc = isMulticolor
+              if (latchedMc ^ isMulticolor) {
+                latchedMc = isMulticolor
+                //mcCounter = 0
+              }
             }
             pixels(i) = shift(latchedMc)
           }
@@ -377,7 +379,7 @@ final class VIC(mem: VICMemory,
         i += 1
       }
     }
-    
+
     @inline final private def shift(mc:Boolean) = {
       var pixel = if (!mc) { // no multicolor
         if (xexp) {
@@ -393,8 +395,9 @@ final class VIC(mem: VICMemory,
             xexpCounter ^= 1
           } else gdata <<= 2
         }
+
         mcCounter ^= 1
-        val cbit = (gdata & 0x3000000)
+        val cbit = gdata & 0x3000000
         (cbit : @switch) match {
           case 0x0000000 => PIXEL_TRANSPARENT
           case 0x1000000 => spriteMulticolor01(0)
@@ -431,7 +434,7 @@ final class VIC(mem: VICMemory,
         mc = (mc + 1) & 0x3F
       }
       else
-      if (first) gdata |= internalDataBus << 16
+      if (first) gdata = internalDataBus << 16
       else {
         mem.read(0x3FFF,ChipID.VIC)
         gdata |= mem.lastByteRead << 8 | internalDataBus
