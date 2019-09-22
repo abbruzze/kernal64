@@ -4,7 +4,10 @@ import ucesoft.cbm.peripheral.drive.Floppy
 import java.io.RandomAccessFile
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
+
 import ucesoft.cbm.formats.Diskette._
+
+import scala.collection.mutable.ListBuffer
 
 private[formats] class G64(val file:String) extends Diskette {
   val isReadOnly = !new java.io.File(file).canWrite
@@ -26,8 +29,82 @@ private[formats] class G64(val file:String) extends Diskette {
   lazy val totalTracks = tracks.length
   
   private[this] var trackChangeListener : Floppy#TrackListener = null
-  def bam : BamInfo = throw new UnsupportedOperationException
-  override def directories : List[DirEntry] = throw new UnsupportedOperationException
+
+  def bam : BamInfo = {
+    var bamSector : Array[Int] = null
+    GCR.GCR2track(tracks((DIR_TRACK - 1) * 2),-1,(tr,se,data) => if (se == BAM_SECTOR) bamSector = data)
+
+    var offset = 0x90
+    val diskName = new StringBuilder
+    var i = 0
+    while (i < 16) {
+      val c = bamSector(offset) & 0xFF
+      if (c != 0xA0) diskName.append(c.toChar)
+      i += 1
+      offset += 1
+    }
+    offset += 2
+    val diskID = "" + bamSector(offset).toChar + bamSector(offset + 1).toChar
+    offset += 3
+    val dosType = "" + bamSector(offset).toChar + bamSector(offset + 1).toChar
+
+    offset = 4
+    var free = 0
+    for(t <- 1 to 35) {
+      val f = bamSector(offset) & 0xFF
+      free += (if (t == 18) 0 else f)
+      offset += 4
+    }
+    BamInfo(diskName.toString, diskID, dosType,true,free)
+  }
+
+  override def directories : List[DirEntry] = {
+    var t = DIR_TRACK
+    var s = DIR_SECTOR
+    var dirs = new ListBuffer[DirEntry]
+    var readNextSector = true
+    val buffer = Array.ofDim[Int](0x20)
+    val sectors = new collection.mutable.HashMap[(Int,Int),Array[Int]]
+
+    while (readNextSector) {
+      val sector : Array[Int] = sectors get (t,s) match {
+        case None =>
+          GCR.GCR2track(tracks((t - 1) * 2),-1,(tr,se,data) => { sectors += (tr,se) -> data })
+          sectors(t,s)
+        case Some(s) => s
+      }
+
+      var firstEntryOfSector = true
+      var entryIndex = 0
+      var readNextEntry = true
+      var sectorPos = 0
+      while (readNextEntry) {
+        System.arraycopy(sector,sectorPos,buffer,0,0x20)
+        sectorPos += 0x20
+        if (firstEntryOfSector) {
+          firstEntryOfSector = false
+          val nextT = buffer(0)
+          val nextS = buffer(1)
+          if (nextT != 0) {
+            t = nextT
+            s = nextS
+          }
+          else readNextSector = false
+        }
+        entryIndex += 1
+        if (sectorPos + 0x20 > sector.length) {
+          readNextEntry = false
+          readNextSector = false
+        }
+
+        if (entryIndex == 9 || buffer.forall(_ == 0)) {
+          readNextEntry = false // last+1 entry of this sector
+        }
+        else dirs += makeDirEntryFromBuffer(buffer map { _.toByte })
+      }
+    }
+    dirs.toList
+  }
   
   private def loadTracks {    
     val header = Array.ofDim[Byte](0x0C)
@@ -64,7 +141,14 @@ private[formats] class G64(val file:String) extends Diskette {
         val trackLen = disk.read | disk.read << 8
         //println(s"Track $i len=${Integer.toHexString(trackLen)}")
         tracks(i) = Array.ofDim[Int](trackLen)
-        for(d <- 0 until trackLen) tracks(i)(d) = disk.read
+        //for(d <- 0 until trackLen) tracks(i)(d) = disk.read
+        val buf = Array.ofDim[Byte](trackLen)
+        disk.readFully(buf)
+        var b = 0
+        while (b < trackLen) {
+          tracks(i)(b) = buf(b).toInt & 0xFF
+          b += 1
+        }
       }
     }   
   }

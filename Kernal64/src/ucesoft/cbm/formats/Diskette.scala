@@ -105,6 +105,23 @@ abstract class Diskette extends Floppy {
   protected val disk : RandomAccessFile
   
   protected def absoluteSector(t:Int,s:Int) : Int = 0
+
+  protected def makeDirEntryFromBuffer(buffer:Array[Byte]) : DirEntry = {
+    val fileType = FileType(buffer(2) & 7)
+    val track = buffer(3)
+    val sector = buffer(4)
+    val fileName = new StringBuilder
+    var a0Found = false
+    var i = 5
+    val a0 = 0xA0.toByte
+    while (i < 0x15 && !a0Found) {
+      if (buffer(i) == a0) a0Found = true
+      else fileName.append((buffer(i) & 0xFF).toChar)
+      i += 1
+    }
+    val size = buffer(0x1E).toInt & 0xFF + (buffer(0x1F).toInt & 0xFF) * 256
+    DirEntry(fileType, fileName.toString, track, sector, size)
+  }
   
   def directories : List[DirEntry] = {
     var t = DIR_TRACK
@@ -133,23 +150,7 @@ abstract class Diskette extends Floppy {
         if (entryIndex == 9 || buffer.forall(_ == 0)) {
           readNextEntry = false // last+1 entry of this sector
         }
-        else {                              
-          val fileType = FileType(buffer(2) & 7)
-          val track = buffer(3)
-          val sector = buffer(4)
-          val fileName = new StringBuilder
-          var a0Found = false
-          var i = 5
-          val a0 = 0xA0.toByte
-          while (i < 0x15 && !a0Found) {
-            if (buffer(i) == a0) a0Found = true
-            else fileName.append((buffer(i) & 0xFF).toChar)            
-            i += 1
-          }
-          val size = buffer(0x1E).toInt & 0xFF + (buffer(0x1F).toInt & 0xFF) * 256
-          val entry = DirEntry(fileType, fileName.toString, track, sector, size)
-          dirs += entry
-        }
+        else dirs += makeDirEntryFromBuffer(buffer)
       }
     }
     dirs.toList

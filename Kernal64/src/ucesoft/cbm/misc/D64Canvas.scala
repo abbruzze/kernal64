@@ -39,7 +39,10 @@ class D64Canvas(fc:JFileChooser,charRom:Memory,c64Mode:Boolean) extends CBMCanva
 
 	def selectedFile : Option[String] = validSelectableIndexes get selectedRow
 
-  protected def isFileExtOK(fileName:String) : Boolean = fileName.toUpperCase.endsWith(".D64") || fileName.toUpperCase.endsWith(".D71") || fileName.toUpperCase.endsWith(".D81")
+  protected def isFileExtOK(fileName:String) : Boolean = fileName.toUpperCase.endsWith(".D64") ||
+																												 fileName.toUpperCase.endsWith(".D71") ||
+																												 fileName.toUpperCase.endsWith(".D81") ||
+																												 fileName.toUpperCase.endsWith(".G64")
 
   def propertyChange(e:PropertyChangeEvent) {
     val prop = e.getPropertyName
