@@ -128,7 +128,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   
   private def loadGCRImage {
     for(t <- 1 to TOTAL_TRACKS;
-    	s <- 0 until TRACK_ALLOCATION(t)) GCRImage(t - 1)(s) = GCR.sector2GCR(s,t,readBlock(t,s),bam.diskID,getSectorError(t,s))
+    	s <- 0 until TRACK_ALLOCATION(t)) GCRImage(t - 1)(s) = GCR.sector2GCR(s,t,readBlock(t,s),bam.diskID,getSectorError(t,s),s == TRACK_ALLOCATION(t) - 1)
   }
   
   override def flush {
@@ -147,9 +147,13 @@ private[formats] class D64_D71(val file: String) extends Diskette {
             GCR.GCR2track(gcrTrack.toArray,ss,(track,sector,data) => {
               //println(s"Writing back track $track sector $sector") 
               disk.seek(absoluteSector(track,sector) * BYTES_PER_SECTOR)
-              for(b <- 0 until data.length) {
-                disk.write(data(b))
+              val buf = Array.ofDim[Byte](data.length)
+              var b = 0
+              while (b < buf.length) {
+                buf(b) = data(b).toByte
+                b += 1
               }
+              disk.write(buf)
             })
           }
           flushListener.update((t * 100.0 / tracks).toInt)
@@ -165,7 +169,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   }
   
   private def bamInfo = {    
-    disk.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 3)
+    //disk.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 3)
     val singleSide = file.toUpperCase.endsWith(".D64")// || disk.read != 0x80
     disk.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)
     val diskName = new StringBuilder
