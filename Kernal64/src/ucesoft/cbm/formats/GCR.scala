@@ -1,15 +1,15 @@
 package ucesoft.cbm.formats
 
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 private[formats] object GCR {
   final private[this] val SYNC = 0xFF
   final private[this] val SYNC_SIZE = 5
-  final private[this] val HEADER_SIZE = 10
   final private[this] val GAP = 0x55
   final private[this] val HEADER_DATA_GAP_SIZE = 9  
-  final private[this] val DATA_SIZE = 325  
-  final private[this] val INTER_SECTOR_GAPS_PER_ZONE = Array(8,18,12,9) // Array(9, 12, 17, 8)
+  final private[this] val LAST_SECTOR_GAP = 180
+  final private[this] val INTER_SECTOR_GAPS_PER_ZONE = Array(9, 12, 17, 8)
   
   final private[this] val DOS_20_HEADER_DESC_BYTE_NOT_FOUND = 2
   final private[this] val DOS_21_NO_SYNC_SEQ_FOUND = 3
@@ -30,7 +30,7 @@ private[formats] object GCR {
   /**
    * Convert a gcr track back to a disk format sectors.
    */
-  def GCR2track(gcrTrack:Array[Int],sectorSize:Int,writeSector : (Int,Int,Array[Int]) => Unit) = {
+  def GCR2track(gcrTrack:Array[Int],_sectorSize:Int,writeSector : (Int,Int,Array[Int]) => Unit) = {
     val ungcr = new UNGCR
     var i = 0
     var readData = 0
@@ -43,9 +43,11 @@ private[formats] object GCR {
     var bits = 0
     var track,sector = 0
     var round = 0
+    val sectorSize = if (_sectorSize == -1) Int.MaxValue else _sectorSize
+    val sectorsSet = new mutable.HashSet[Int]()
+    var finished = false
     
-    while (sectorsFound < sectorSize) {
-      
+    while (sectorsFound < sectorSize && !finished) {
       var data = gcrTrack(i)
       var b = 0
       while (b < 8) {
@@ -63,6 +65,10 @@ private[formats] object GCR {
               headerFound = false
               sector = dataBuffer(1)
               track = dataBuffer(2)
+              if (_sectorSize == -1) {
+                if (!sectorsSet.add(sector))
+                  finished = true
+              }
               //println(s"Found header sector=${sector} track=${track}")              
             }
           }
@@ -123,7 +129,7 @@ private[formats] object GCR {
   /**
    * Convert a whole sector to a GCR sector.
    */
-  def sector2GCR(sector:Int,track:Int,sectorData:Array[Byte],diskID:String,sectorError:Option[Int]) = {
+  def sector2GCR(sector:Int,track:Int,sectorData:Array[Byte],diskID:String,sectorError:Option[Int],isLastSector:Boolean) = {
     val sectorErrorCode = sectorError.getOrElse(0)
     val gcr = new GCR
     // SYNC
@@ -154,8 +160,9 @@ private[formats] object GCR {
     if (sectorErrorCode == DOS_23_CHECKSUM_ERROR_IN_DATA_BLOCK) dataChecksum ^= 0xFF
     gcr.addAndConvertToGCR(dataChecksum)
     gcr.addAndConvertToGCR(0x00,0x00)
-    // SECTOR-HEADER GAP
-    for(_ <- 1 to INTER_SECTOR_GAPS_PER_ZONE(getZoneFrom(track))) gcr.add(GAP)
+    // INTER-SECTOR GAP
+    if (isLastSector) for(_ <- 1 to LAST_SECTOR_GAP) gcr.add(GAP)
+    else for(_ <- 1 to INTER_SECTOR_GAPS_PER_ZONE(getZoneFrom(track))) gcr.add(GAP)
     gcr.getGCRBytes
   }  
 }
