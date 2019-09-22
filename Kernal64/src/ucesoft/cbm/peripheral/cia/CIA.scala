@@ -157,7 +157,7 @@ class CIA(val name:String,
       }
       
       @inline private def bcd2dec(value:Int) = "" + (((value & 0xF0) >> 4) + '0').toChar + ((value & 0x0F)  + '0').toChar
-      override def toString = s"${bcd2dec(h)}:${bcd2dec(m)}:${bcd2dec(s)}:${bcd2dec(ts)} [$freezed]"
+      override def toString = s"${bcd2dec(h)}:${bcd2dec(m)}:${bcd2dec(s)}:${bcd2dec(ts)} ${if (am) "am" else "pm"} [$freezed]"
     }
     
     private val actualTime = Time(0,0,0,0,true)
@@ -243,7 +243,8 @@ class CIA(val name:String,
     }
     def writeTenthSec(tsec:Int) {
       if ((timerB.readCR & 0x80) > 0) { // set alarm
-        alarmTime.ts = tsec & 0x0F        
+        alarmTime.ts = tsec & 0x0F
+        if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
       }
       else {
         actualTime.ts = tsec  & 0x0F
@@ -313,12 +314,19 @@ class CIA(val name:String,
       case IRQ_FLAG => 16
       case _ => 0
     }
-    icr |= bit //0x80 | bit
-    if ((icrMask & bit) > 0) {
-      icr |= 0x80
-      Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
-      irqAction(true)
-    }
+    icr |= bit
+    setIRQOnNextClock(src,1)
+  }
+
+  @inline private def setIRQOnNextClock(src:String,delay:Int): Unit = {
+    val clk = Clock.systemClock
+    clk.schedule(new ClockEvent(componentID + "_IRQ",clk.currentCycles + delay, cycles => {
+      if ((icrMask & icr) > 0) {
+        icr |= 0x80
+        Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
+        irqAction(true)
+      }
+    }))
   }
   
   override def getProperties = {
@@ -371,7 +379,7 @@ class CIA(val name:String,
       val lastIcr = icr
       icr = 0
       irqAction(false)
-      lastIcr & 0x9F	// bit 5 & 6 always 0      
+      lastIcr & 0x9F	// bit 5 & 6 always 0
     case CRA => timerA.readCR
     case CRB => timerB.readCR
   }
@@ -413,10 +421,7 @@ class CIA(val name:String,
       val mustSet = (value & 0x80) == 0x80 
       if (mustSet) icrMask |= value & 0x7f else icrMask &= ~value
       
-      if ((icrMask & icr & 0x1f) != 0) {
-        icr |= 0x80
-        irqAction(true)
-      }
+      if ((icrMask & icr & 0x1f) != 0) setIRQOnNextClock("Write to ICR",2)
       Log.debug(s"${name} ICR's value is ${Integer.toBinaryString(value)} => ICR = ${Integer.toBinaryString(icrMask)}")
     case CRA =>
       val oldSerialOut = timerA.readCR & 0x40
