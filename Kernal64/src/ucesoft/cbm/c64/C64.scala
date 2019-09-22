@@ -877,7 +877,7 @@ class C64 extends CBMComponent with GamePlayer {
     else {
       if (_reset) reset(false)
       if (autorun) {
-        clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => { attachDevice(file,true) }))
+        clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => { attachDevice(file,true,None,false) }))
         clock.play
       }
       else {
@@ -886,12 +886,12 @@ class C64 extends CBMComponent with GamePlayer {
     }
   }
   
-  private def attachDevice(file:File,autorun:Boolean,fileToLoad:Option[String] = None) {
+  private def attachDevice(file:File,autorun:Boolean,fileToLoad:Option[String] = None,emulateInserting:Boolean = true) {
     val name = file.getName.toUpperCase
     
     if (name.endsWith(".PRG")) loadPRGFile(file,autorun)
     else    
-    if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun,fileToLoad)
+    if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun,fileToLoad,emulateInserting)
     else
     if (name.endsWith(".TAP")) attachTapeFile(file,autorun)
     else
@@ -958,7 +958,7 @@ class C64 extends CBMComponent with GamePlayer {
     clock.play
   }
   
-  private def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String]) {
+  private def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String],emulateInserting:Boolean = true) {
     try {   
       if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
       val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
@@ -973,7 +973,7 @@ class C64 extends CBMComponent with GamePlayer {
       disk.flushListener = diskFlusher
       drives(driveID).getFloppy.close
       if (!traceDialog.isTracing) clock.pause
-      drives(driveID).setDriveReader(disk,true)
+      drives(driveID).setDriveReader(disk,emulateInserting)
       clock.play
             
       loadFileItems(driveID).setEnabled(isD64)
