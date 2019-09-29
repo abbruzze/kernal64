@@ -111,7 +111,13 @@ object ExpansionPort {
     listeners = l :: listeners
   }
 
-  private def updateListeners(game:Boolean,exrom:Boolean) = for (l <- listeners) l.expansionPortConfigurationChanged(game,exrom)
+  private def updateListeners(game:Boolean,exrom:Boolean) = {
+    var ptr = listeners
+    while (!ptr.isEmpty) {
+      ptr.head.expansionPortConfigurationChanged(game,exrom)
+      ptr = ptr.tail
+    }
+  }
 
   def getExpansionPort = proxyExpansionPort
   def setMemoryForEmptyExpansionPort(mem:LastByteReadMemory) = memoryForEmptyExpansionPort = mem
