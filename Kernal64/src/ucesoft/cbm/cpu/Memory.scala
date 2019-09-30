@@ -83,7 +83,7 @@ abstract class BridgeMemory extends RAMComponent {
       if (address >= bridgesStart(i) && address <= bridgesEnd(i)) found = bridgesMem(i)
       else i += 1
     }
-    if (found == null) throw new IllegalArgumentException("Bad configuration of ram " + name + " while selecting address " + address + " " + bridges)
+    if (found == null) throw new IllegalArgumentException //("Bad configuration of ram " + name + " while selecting address " + address + " " + bridges)
     found
   }
   final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = try {
