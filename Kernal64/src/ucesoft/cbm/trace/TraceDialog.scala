@@ -2,16 +2,21 @@ package ucesoft.cbm.trace
 
 import javax.swing._
 import java.awt.event._
+
 import ucesoft.cbm.cpu.Memory
-import java.awt.BorderLayout
+import java.awt.{BorderLayout, Color}
+
 import ucesoft.cbm.Log
 import ucesoft.cbm.cpu.Assembler
 import java.io.FileOutputStream
+
 import javax.swing.event.ChangeListener
 import javax.swing.event.ChangeEvent
 import ucesoft.cbm.peripheral.vic.Display
 import ucesoft.cbm.peripheral.vic.VIC
 import java.io._
+
+import javax.swing.JSpinner.DefaultEditor
 
 object TraceDialog {
   def getTraceDialog(displayFrame: JFrame, mem: Memory,traceListener: TraceListener, display: Display, vic: VIC): TraceDialog = {
@@ -34,7 +39,23 @@ class TraceDialog private (displayFrame: JFrame,
   display: Option[Display],
   vic: Option[VIC]) extends JDialog(displayFrame, "Trace dialog") with ActionListener {
   private val notrace = new JButton("Tracing on")
-  private val rasterLineSpinner = new JSpinner
+  private val rasterLineSpinner = new JSpinner(new AbstractSpinnerModel {
+    private var value = 0
+    override def getValue = value
+
+    override def setValue(value: Any) : Unit = {
+      value match {
+        case v:Integer if v >= 0 && v <= 312 =>
+          this.value = v
+          fireStateChanged()
+        case _ =>
+      }
+    }
+
+    override def getNextValue = if (value < 312) value + 1 else value
+
+    override def getPreviousValue = if (value > 0) value - 1 else 0
+  })
   private val traceSR = new JLabel
   val logPanel = Log.getLogPanel
   private[this] var tracing = false
@@ -47,6 +68,16 @@ class TraceDialog private (displayFrame: JFrame,
   }
   
   def isTracing = tracing
+
+  private def updateRegs(_regs:String) : Unit = {
+    val regs = vic match {
+      case Some(vic) =>
+        s"${_regs} rasterLine=${vic.getRasterLine} rasterCycle=${vic.getRasterCycle}"
+      case None =>
+        _regs
+    }
+    traceSR.setText(regs)
+  }
   
   def forceTracing(on:Boolean) {
     tracing = on
@@ -54,10 +85,10 @@ class TraceDialog private (displayFrame: JFrame,
       case Some(v) => v.setShowDebug(tracing)
       case None =>
     }
-    traceListener.step(regs => traceSR.setText(regs))
+    traceListener.step(updateRegs _)
     traceListener.setTrace(tracing)
     if (!tracing) {
-      traceListener.step(regs => traceSR.setText(regs))
+      traceListener.step(updateRegs _)
       Log.setInfo 
     }
     else Log.setDebug
@@ -85,14 +116,14 @@ class TraceDialog private (displayFrame: JFrame,
       case "STEP" =>
         if (tracing) Log.setDebug
         Log.setOutput(logPanel.writer)
-        traceListener.step(regs => traceSR.setText(regs))
+        traceListener.step(updateRegs _)
       case "GOTO" =>
         Log.setOutput(logPanel.writer)
         Option(JOptionPane.showInputDialog(this, "Break type:")) match {
           case Some(breakType) =>
-            traceListener.setBreakAt(BreakType.makeBreak(breakType), (regs) => { traceSR.setText(regs) ; forceTracing(true) })
+            traceListener.setBreakAt(BreakType.makeBreak(breakType), (regs) => { updateRegs(regs) ; forceTracing(true) })
             Log.setInfo
-            traceListener.step(regs => traceSR.setText(regs))
+            traceListener.step(updateRegs _)
           case _ =>
         }
       case "READ" =>
@@ -168,8 +199,6 @@ class TraceDialog private (displayFrame: JFrame,
         vic.get.setTraceRasterLineAt(rasterLineSpinner.getValue.asInstanceOf[Int])
         display.get.setDrawRasterLine(e.getSource.asInstanceOf[JCheckBox].isSelected)
         vic.get.enableTraceRasterLine(e.getSource.asInstanceOf[JCheckBox].isSelected)
-      case "PRINTRASTERINFO" =>
-        Log.info(vic.get.getTraceRasterLineInfo)
       case "CHARVIEWER" =>
         FontPanel.getFontDialog(displayFrame, vic.get.getMemory).setVisible(true)
       case "CLEAR" =>
@@ -257,17 +286,15 @@ class TraceDialog private (displayFrame: JFrame,
         vic.get.setTraceRasterLineAt(r)
       }
     })
-    val showRasterLineInfoButton = new JButton("Print raster info")
-    showRasterLineInfoButton.setActionCommand("PRINTRASTERINFO")
-    showRasterLineInfoButton.addActionListener(this)
+    rasterLineSpinner.getEditor.asInstanceOf[DefaultEditor].getTextField.setEditable(true)
     buttonPanel.add(showRasterCB)
     buttonPanel.add(rasterLineSpinner)
-    buttonPanel.add(showRasterLineInfoButton)
   }
 
   tracePanel.add("North", buttonPanel)
   val pcsrPanel = new JPanel
   pcsrPanel.add(traceSR)
+  traceSR.setForeground(Color.BLUE)
   tracePanel.add("South", pcsrPanel)
   getContentPane.add("North", tracePanel)
   getContentPane.add("Center",logPanel)
