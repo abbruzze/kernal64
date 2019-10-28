@@ -1,13 +1,13 @@
 package ucesoft.cbm
 
 import java.io.PrintWriter
+
 import javax.swing.JPanel
 import java.io.Writer
-import java.awt.BorderLayout
+import java.awt.{BorderLayout, Color, Font}
+
 import javax.swing.JTextArea
 import javax.swing.JScrollPane
-import java.awt.Font
-import ucesoft.cbm.peripheral.vic.Palette
 
 object Log {
   private val FINE = 1
@@ -37,8 +37,8 @@ object Log {
     logPanel.setEditable(false)
     add("Center",new JScrollPane(logPanel))
     logPanel.setFont(new Font(Font.MONOSPACED,Font.BOLD,12))
-    logPanel.setForeground(Palette.VIC_COLORS(7))
-    logPanel.setBackground(Palette.VIC_COLORS(0))
+    logPanel.setForeground(Color.WHITE)
+    logPanel.setBackground(Color.BLACK)
     val writer = new PrintWriter(new Writer {
       def write(chars:Array[Char],off:Int,len:Int) {
         val str = new String(chars,off,len)        
