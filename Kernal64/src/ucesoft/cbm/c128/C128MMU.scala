@@ -1,12 +1,12 @@
 package ucesoft.cbm.c128
 
-import ucesoft.cbm.cpu.RAMComponent
+import ucesoft.cbm.cpu.{CPU6510, Memory, RAMComponent, ROM, Z80}
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.ChipID
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
+
 import javax.swing.JFrame
-import ucesoft.cbm.cpu.ROM
 import ucesoft.cbm.expansion.ExpansionPortConfigurationListener
 import ucesoft.cbm.c64.ExtendedROM
 import ucesoft.cbm.Log
@@ -19,8 +19,6 @@ import ucesoft.cbm.expansion.ExpansionPort
 import ucesoft.cbm.peripheral.vdc.VDC
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.vic.VICMemory
-import ucesoft.cbm.cpu.Z80
-import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.misc.TestCart
 
 trait MMUChangeListener {
@@ -114,6 +112,10 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   private[this] var internalFunctionROM,internalFunctionROM_mid,internalFunctionROM_high,externalFunctionROM_mid,externalFunctionROM_high : Array[Int] = _
   private[this] var internalROMType : FunctionROMType.Value = FunctionROMType.NORMAL
   // ==========================================================================================
+  private[this] var cpu : CPU6510 = _
+
+  def setCPU(cpu:CPU6510) : Unit = this.cpu = cpu
+
   def getBank0RAM : Memory = ram.getBank0
   def colorRAM = COLOR_RAM
   def RAM = ram
@@ -782,6 +784,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     vicBaseAddress = videoBank << 14
   }
   final def lastByteRead = memLastByteRead
+
+  override def readPCOpcode = ram.read(cpu.getPC)
   
   @inline private def vicReadPhi1(address: Int) : Int = {
     val realAddress = vicBaseAddress | address

@@ -4,12 +4,13 @@ import ucesoft.cbm.peripheral.vic.VICMemory
 import ucesoft.cbm.Log
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.ChipID
-import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.cpu.{CPU6510, Memory}
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
+
 import javax.swing.JFrame
 
-class C64VICMemory(mem: Memory,charROM:Memory) extends VICMemory {
+class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU6510) extends VICMemory {
   val componentID = "VIC Banked Memory"
   val componentType = CBMComponentType.MEMORY
   val name = "VIC-Memory"
@@ -61,6 +62,8 @@ class C64VICMemory(mem: Memory,charROM:Memory) extends VICMemory {
   }
   
   final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = { /* ignored for VIC */}
+
+  override def readPCOpcode = mem.read(cpu.getPC)
   // state
   protected def saveState(out:ObjectOutputStream) {
     out.writeInt(bank)
