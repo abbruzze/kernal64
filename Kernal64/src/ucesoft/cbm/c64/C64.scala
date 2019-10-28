@@ -325,7 +325,7 @@ class C64 extends CBMComponent with GamePlayer {
     floppyComponents(1) = new FloppyComponent(9,drives(1),driveLeds(1))
     add(floppyComponents(1))
     // -----------------------
-    val vicMemory = new C64VICMemory(mem,mem.CHAR_ROM) 
+    val vicMemory = new C64VICMemory(mem,mem.CHAR_ROM,cpu)
     add(vicMemory)
     ExpansionPort.setMemoryForEmptyExpansionPort(vicMemory)
     ExpansionPort.addConfigurationListener(vicMemory)    
@@ -1476,6 +1476,7 @@ class C64 extends CBMComponent with GamePlayer {
     // trace
 
     traceItem = new JCheckBoxMenuItem("Trace CPU")
+    traceItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_T,java.awt.event.InputEvent.ALT_DOWN_MASK))
     traceItem.setSelected(false)
     traceItem.addActionListener(e => trace(true,e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     traceMenu.add(traceItem)
@@ -1533,9 +1534,14 @@ class C64 extends CBMComponent with GamePlayer {
     val zoomItem = new JMenu("Zoom")
     val groupZ = new ButtonGroup
     optionMenu.add(zoomItem)
-    for(z <- Array(1,2,4)) {
+    for(z <- 1 to 2) {
       val zoom1Item = new JRadioButtonMenuItem(s"Zoom x $z")
       zoom1Item.addActionListener(_ => zoom(z) )
+      val kea = z match {
+        case 1 => java.awt.event.KeyEvent.VK_1
+        case 2 => java.awt.event.KeyEvent.VK_2
+      }
+      zoom1Item.setAccelerator(KeyStroke.getKeyStroke(kea,java.awt.event.InputEvent.ALT_DOWN_MASK))
       zoomItem.add(zoom1Item)
       groupZ.add(zoom1Item)
     }
