@@ -18,6 +18,7 @@ import java.io._
 
 import ucesoft.cbm.formats._
 import java.awt.datatransfer.DataFlavor
+import java.util
 
 import scala.util.Success
 import scala.util.Failure
@@ -306,6 +307,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     ProgramLoader.warpModeListener = warpMode _
     //clock.setClockHz(1000000)
     mmu.setKeyboard(keyb)
+    mmu.setCPU(cpu)
     add(clock)
     add(mmu)
     add(cpu)
@@ -384,17 +386,37 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     vdcDisplay.setPreferredSize(ucesoft.cbm.peripheral.vdc.VDC.PREFERRED_FRAME_SIZE)
     vdc.setDisplay(vdcDisplay)
     
-//    val dummy = new JPanel(new FlowLayout(FlowLayout.LEFT,0,0))
-//    dummy.add(vdcDisplay)
     vdcDisplayFrame.getContentPane.add("Center",vdcDisplay)
     vdcDisplayFrame.addKeyListener(keyb)
     vdcDisplayFrame.addKeyListener(keypadControlPort)
     vdcDisplayFrame.addKeyListener(keyboardControlPort)
     vdcDisplay.addMouseListener(keypadControlPort)
+    val resRootPanel = new JPanel(new BorderLayout())
     val resPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
     val resLabel = new JLabel("Initializing ...")
     resPanel.add(resLabel)
-    vdcDisplayFrame.getContentPane.add("South",resPanel)
+    resRootPanel.add("West",resPanel)
+    val slider = new JSlider(SwingConstants.HORIZONTAL,200,500,312)
+    slider.setFocusable(false)
+    slider.setToolTipText(slider.getValue.toString)
+    slider.addChangeListener(e => {
+      vdc.setScanLines(slider.getValue)
+      slider.setToolTipText(slider.getValue.toString)
+    })
+    val labels = new util.Hashtable[Integer,JLabel]()
+    labels.put(200,new JLabel("200"))
+    labels.put(262,new JLabel("ntsc"))
+    labels.put(312,new JLabel("pal"))
+    labels.put(500,new JLabel("500"))
+    slider.setLabelTable(labels)
+    slider.setMajorTickSpacing(10)
+    slider.setPaintTicks(true)
+    slider.setPaintLabels(true)
+    val sliderPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
+    sliderPanel.add(new JLabel("Scan lines:"))
+    sliderPanel.add(slider)
+    resRootPanel.add("East",sliderPanel)
+    vdcDisplayFrame.getContentPane.add("South",resRootPanel)
     vdc.setGeometryUpdateListener { msg =>
       resLabel.setText(msg)
     }
@@ -423,8 +445,10 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
           case java.awt.event.KeyEvent.VK_D if e.isAltDown =>
             adjustRatio(false,true)
           // adjust ratio: normal size
-          case java.awt.event.KeyEvent.VK_N if e.isAltDown =>
+          case java.awt.event.KeyEvent.VK_1 if e.isAltDown && e.isShiftDown =>
             adjustRatio(false,false)
+          case java.awt.event.KeyEvent.VK_2 if e.isAltDown && e.isShiftDown =>
+            adjustRatio(false,false,true)
           case java.awt.event.KeyEvent.VK_ENTER if e.isAltDown =>
             ucesoft.cbm.misc.FullScreenMode.goFullScreen(vdcDisplayFrame,
                                                          vdcDisplay,
@@ -842,13 +866,6 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
                                                 keyboardControlPort)
   }
 
-  private def chooseVicScanLines: Unit = {
-    val lines = JOptionPane.showInputDialog(vdcDisplayFrame,"Insert VDC scan lines", "VDC Scan Lines",JOptionPane.QUESTION_MESSAGE,null,null,"312")
-    if (lines != null) {
-      vdc.setScanLines(lines.toString.toInt)
-    }
-  }
-
   private def checkFunctionROMS: Unit = {
     val extFunRom = configuration.getProperty(ROM.C128_EXTERNAL_ROM_PROP)
     if (extFunRom != null && extFunRom != "") loadFunctionROM(false,Some(extFunRom))
@@ -1009,7 +1026,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     }
   }
   
-  private def adjustRatio(vic:Boolean=true,vdcResize:Boolean=false) {
+  private def adjustRatio(vic:Boolean=true,vdcResize:Boolean=false,vdcHalfSize:Boolean = false) {
     if (vic) {
       val dim = vicDisplay.asInstanceOf[java.awt.Component].getSize
       dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).round.toInt
@@ -1018,7 +1035,8 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     }
     else {
       if (!vdcResize) {
-        vdcDisplay.setPreferredSize(VDC.PREFERRED_FRAME_SIZE) 
+        val dim = if (vdcHalfSize) new Dimension((VDC.PREFERRED_FRAME_SIZE.width / 1.5).toInt,(VDC.PREFERRED_FRAME_SIZE.height / 1.5).toInt) else VDC.PREFERRED_FRAME_SIZE
+        vdcDisplay.setPreferredSize(dim)
         vdcDisplayFrame.pack
       }
       else {
@@ -1679,6 +1697,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     // trace
     
     traceItem = new JCheckBoxMenuItem("Trace CPU")
+    traceItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_T,java.awt.event.InputEvent.ALT_DOWN_MASK))
     traceItem.setSelected(false)
     traceItem.addActionListener(e => trace(true,e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     traceMenu.add(traceItem)  
@@ -1800,16 +1819,26 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     adjustMenu.add(adjustVDCRatioItem)
     
     val vdcResetSizeItem = new JMenuItem("VDC normal size")
-    vdcResetSizeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    vdcResetSizeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_1,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK))
     vdcResetSizeItem.addActionListener(_ => adjustRatio(false) )
     adjustMenu.add(vdcResetSizeItem)
+
+    val vdcHalfSizeItem = new JMenuItem("VDC smaller size")
+    vdcHalfSizeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_2,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK))
+    vdcHalfSizeItem.addActionListener(_ => adjustRatio(false,false,true) )
+    adjustMenu.add(vdcHalfSizeItem)
     
     val zoomItem = new JMenu("VIC Zoom")
     val groupZ = new ButtonGroup
     adjustMenu.add(zoomItem)
-    for(z <- Array(1,2,4)) {
+    for(z <- 1 to 2) {
       val zoom1Item = new JRadioButtonMenuItem(s"Zoom x $z")
       zoom1Item.addActionListener(_ => zoom(z) )
+      val kea = z match {
+        case 1 => java.awt.event.KeyEvent.VK_1
+        case 2 => java.awt.event.KeyEvent.VK_2
+      }
+      zoom1Item.setAccelerator(KeyStroke.getKeyStroke(kea,java.awt.event.InputEvent.ALT_DOWN_MASK))
       zoomItem.add(zoom1Item)
       groupZ.add(zoom1Item)
     }
@@ -1818,10 +1847,6 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     fullScreenItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER,java.awt.event.InputEvent.ALT_DOWN_MASK))
     fullScreenItem.addActionListener(_ => setVicFullScreen )
     adjustMenu.add(fullScreenItem)
-    
-    val vdcScanLinesItem = new JMenuItem("VDC scan lines ...")
-    vdcScanLinesItem.addActionListener(_ => chooseVicScanLines )
-    adjustMenu.add(vdcScanLinesItem)
     
     val renderingItem = new JMenu("Rendering")
     val groupR = new ButtonGroup
