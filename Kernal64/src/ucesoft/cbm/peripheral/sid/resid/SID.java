@@ -455,13 +455,13 @@ public class SID {
 	public int /* reg8 */read(int /* reg8 */offset) {
 		switch (offset) {
 		case 0x19:
-			return potx.readPOT();
+			return bus_value = potx.readPOT();
 		case 0x1a:
-			return poty.readPOT();
+			return bus_value = poty.readPOT();
 		case 0x1b:
-			return voice[2].wave.readOSC();
+			return bus_value = voice[2].wave.readOSC();
 		case 0x1c:
-			return voice[2].envelope.readENV();
+			return bus_value = voice[2].envelope.readENV();
 		default:
 			return bus_value;
 		}
