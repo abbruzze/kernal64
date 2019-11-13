@@ -15,9 +15,9 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   private[this] var dma = false
   private[this] var ready = true
   // ------------- Tracing --------------------
-  private[this] var tracing,tracingOnFile = false
-  private[this] var tracingFile : PrintWriter = _
-  private[this] var breakType : BreakType = null
+  private[this] var tracing, tracingOnFile = false
+  private[this] var tracingFile: PrintWriter = _
+  private[this] var breakType: BreakType = null
   private[this] var breakCallBack: (String) => Unit = _
   private[this] var stepCallBack: (String) => Unit = _
   private[this] val syncObject = new Object
@@ -31,7 +31,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   final private[this] val I_FLAG = "00000100".b
   final private[this] val Z_FLAG = "00000010".b
   final private[this] val C_FLAG = "00000001".b
-  
+
   final private[this] val FLAGS = "CZIDB#VN"
 
   private[this] var PC = 0
@@ -45,26 +45,36 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   private[this] var nmiOnNegativeEdge = false
   private[this] var irqLow = false
   private[this] var nmiLow = false
-  private[this] var irqFirstCycle,nmiFirstCycle = 0L
+  private[this] var irqFirstCycle, nmiFirstCycle = 0L
   private[this] val clk = Clock.systemClock
+  private[this] var delay1CycleIRQCheck = false
+  private[this] var forceIRQNow = false
+  private[this] var prevIClearedFlag = false
+
   // -----------------------------------------
-  final override def setBaLow(baLow: Boolean) { 
+  final override def setBaLow(baLow: Boolean) {
     this.baLow = baLow
     ready = !this.baLow && !dma
   }
-  final override def setDMA(dma:Boolean) { 
+
+  final override def setDMA(dma: Boolean) {
     this.dma = dma
     ready = !this.baLow && !dma
   }
+
   final def getPC = PC
+
   final def getCurrentInstructionPC = CURRENT_OP_PC
+
   final def getMem(address: Int) = mem.read(address)
+
   final def irqRequest(low: Boolean) {
     if (tracing) Log.debug(s"IRQ request low=${low}")
     if (tracingOnFile && low) tracingFile.println("IRQ low")
-    if (low && !irqLow/* && irqFirstCycle == 0*/) irqFirstCycle = clk.currentCycles
+    if (low && !irqLow /* && irqFirstCycle == 0*/ ) irqFirstCycle = clk.currentCycles
     irqLow = low
   }
+
   final def nmiRequest(low: Boolean) {
     if (!nmiLow && low) {
       nmiOnNegativeEdge = true
@@ -77,29 +87,77 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   }
 
   @inline private[this] def SR = SREG | FLAG_#
+
   @inline private[this] def SR_=(sr: Int) = SREG = (sr | FLAG_#) & NOT_B_FLAG
 
-  @inline private[this] def sen { SREG |= N_FLAG }
-  @inline private[this] def cln { SREG &= (~N_FLAG & 0xFF) }
-  @inline private[this] def sev { SREG |= V_FLAG }
-  @inline private[this] def clv { SREG &= (~V_FLAG & 0xFF) }
-  @inline private[this] def seb { SREG |= B_FLAG }
-  @inline private[this] def clb { SREG &= (~B_FLAG & 0xFF) }
-  @inline private[this] def sed { SREG |= D_FLAG }
-  @inline private[this] def cld { SREG &= (~D_FLAG & 0xFF) }
-  @inline private[this] def sei { SREG |= I_FLAG }
-  @inline private[this] def cli { SREG &= (~I_FLAG & 0xFF) }
-  @inline private[this] def sez { SREG |= Z_FLAG }
-  @inline private[this] def clz { SREG &= (~Z_FLAG & 0xFF) }
-  @inline private[this] def sec { SREG |= C_FLAG }
-  @inline private[this] def clc { SREG &= (~C_FLAG & 0xFF) }
+  @inline private[this] def sen {
+    SREG |= N_FLAG
+  }
+
+  @inline private[this] def cln {
+    SREG &= (~N_FLAG & 0xFF)
+  }
+
+  @inline private[this] def sev {
+    SREG |= V_FLAG
+  }
+
+  @inline private[this] def clv {
+    SREG &= (~V_FLAG & 0xFF)
+  }
+
+  @inline private[this] def seb {
+    SREG |= B_FLAG
+  }
+
+  @inline private[this] def clb {
+    SREG &= (~B_FLAG & 0xFF)
+  }
+
+  @inline private[this] def sed {
+    SREG |= D_FLAG
+  }
+
+  @inline private[this] def cld {
+    SREG &= (~D_FLAG & 0xFF)
+  }
+
+  @inline private[this] def sei {
+    SREG |= I_FLAG
+  }
+
+  @inline private[this] def cli {
+    SREG &= (~I_FLAG & 0xFF)
+  }
+
+  @inline private[this] def sez {
+    SREG |= Z_FLAG
+  }
+
+  @inline private[this] def clz {
+    SREG &= (~Z_FLAG & 0xFF)
+  }
+
+  @inline private[this] def sec {
+    SREG |= C_FLAG
+  }
+
+  @inline private[this] def clc {
+    SREG &= (~C_FLAG & 0xFF)
+  }
 
   @inline private[this] def isNegative = (SREG & N_FLAG) > 0
+
   @inline private[this] def isOverflow = (SREG & V_FLAG) > 0
+
   @inline private[this] def isBreak = (SREG & B_FLAG) > 0
+
   @inline private[this] def isDecimal = (SREG & D_FLAG) > 0
+
   @inline private[this] def isInterrupt = (SREG & I_FLAG) > 0
+
   @inline private[this] def isZero = (SREG & Z_FLAG) > 0
+
   @inline private[this] def isCarry = (SREG & C_FLAG) > 0
 
   /**
@@ -114,11 +172,12 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     properties.setProperty("Y", hex2(Y))
     properties.setProperty("S", hex2(SP))
     properties.setProperty("NV#BDIZC", sr2String)
-    properties.setProperty("irqFirstCycle",irqFirstCycle.toString)
+    properties.setProperty("irqFirstCycle", irqFirstCycle.toString)
     properties
   }
 
   override def toString = s"PC=${hex4(PC)} AC=${hex2(A)} XR=${hex2(X)} YR=${hex2(Y)} SP=${hex2(SP)} NV#BDIZC=${sr2String}"
+
   private[this] def sr2String = (for (b <- 7 to 0 by -1) yield {
     if (b == 5) '#'
     else {
@@ -128,11 +187,11 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   }).mkString
 
   // TRACING ---------------------------------------------
-  def setTraceOnFile(out:PrintWriter,enabled:Boolean) {
+  def setTraceOnFile(out: PrintWriter, enabled: Boolean) {
     tracingOnFile = enabled
     tracingFile = if (enabled) out else null
   }
-  
+
   def setTrace(traceOn: Boolean) = tracing = traceOn
 
   def step(updateRegisters: (String) => Unit) {
@@ -141,11 +200,13 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       syncObject.notify
     }
   }
-  def setBreakAt(breakType:BreakType, callback: (String) => Unit) {
+
+  def setBreakAt(breakType: BreakType, callback: (String) => Unit) {
     tracing = false
     breakCallBack = callback
     this.breakType = breakType
   }
+
   def jmpTo(pc: Int) {
     state = 0
     PC = pc
@@ -154,7 +215,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   // -------------------------------- STATES -------------------------------------------------------------
   private[this] var op = 0
   private[this] var state = 0
-  private[this] var ar,ar2,data,rdbuf = 0
+  private[this] var ar, ar2, data, rdbuf = 0
 
   // RESET
   final private[this] val RESET = 0x02
@@ -431,7 +492,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     1, 1, 1, 1, O_CPX, O_SBC, O_INC, O_ISB,
     1, O_SBC, 1, O_ISB, O_NOP_A, O_SBC, O_INC, O_ISB, // f0
     1, O_SBC, 1, O_ISB, O_NOP_A, O_SBC, O_INC, O_ISB)
-    
+
   final private[this] val states = Array.ofDim[() => Unit](O_EXT)
 
   // -----------------------------------------------------------------------------------------------------  
@@ -447,1432 +508,1513 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     if (value == 0) sez else clz
   }
 
-  @inline private[this] def DoRMW { state = RMW_DO_IT }
-  @inline private[this] def Execute { state = OP_TAB(op) }
-  @inline private[this] def Last { state = 0 }
-  
+  @inline private[this] def DoRMW {
+    state = RMW_DO_IT
+  }
+
+  @inline private[this] def Execute {
+    state = OP_TAB(op)
+  }
+
+  @inline private[this] def Last {
+    state = 0
+  }
+
   private def initStates {
-    for(s <- 0 until states.length) states(s) = 
-    s match {
-      // Opcode fetch (cycle 0)
-      case 0 => () => {
-        if (ready) {
-        op = mem.read(PC); PC += 1
-        state = MODE_TAB(op)
+    for (s <- 0 until states.length) states(s) =
+      s match {
+        // Opcode fetch (cycle 0)
+        case 0 => () => {
+          if (ready) {
+            op = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = MODE_TAB(op)
+          }
         }
-      }
-      // IRQ
-      case IRQ_STATE => () => {
-        if (ready) {
-        mem.read(PC)
-        state = IRQ_STATE_2
+        // IRQ
+        case IRQ_STATE => () => {
+          if (ready) {
+            mem.read(PC)
+            state = IRQ_STATE_2
+          }
         }
-      }
-      case IRQ_STATE_2 => () => {
-        if (ready) {
-        mem.read(PC)
-        state = IRQ_STATE_3
+        case IRQ_STATE_2 => () => {
+          if (ready) {
+            mem.read(PC)
+            state = IRQ_STATE_3
+          }
         }
-      }
-      case IRQ_STATE_3 => () => {
-        push((PC >> 8) & 0xFF)
-        state = IRQ_STATE_4
-      }
-      case IRQ_STATE_4 => () => {
-        push(PC & 0xFF)
-        state = IRQ_STATE_5
-      }
-      case IRQ_STATE_5 => () => {
-        push(SR & ~B_FLAG)
-        sei
-        state = IRQ_STATE_6
-      }
-      case IRQ_STATE_6 => () => {
-        if (ready) {
-        PC = mem.read(0xfffe)
-        state = IRQ_STATE_7
+        case IRQ_STATE_3 => () => {
+          push((PC >> 8) & 0xFF)
+          state = IRQ_STATE_4
         }
-      }
-      case IRQ_STATE_7 => () => {
-        if (ready) {
-        PC |= mem.read(0xffff) << 8
-        Last
+        case IRQ_STATE_4 => () => {
+          push(PC & 0xFF)
+          state = IRQ_STATE_5
         }
-      }
-      // NMI
-      case NMI_STATE => () => {
-        if (ready) {
-        mem.read(PC)
-        state = NMI_STATE_2
+        case IRQ_STATE_5 => () => {
+          push(SR & ~B_FLAG)
+          sei
+          state = IRQ_STATE_6
         }
-      }
-      case NMI_STATE_2 => () => {
-        if (ready) {
-        mem.read(PC)
-        state = NMI_STATE_3
+        case IRQ_STATE_6 => () => {
+          if (ready) {
+            PC = mem.read(0xfffe)
+            state = IRQ_STATE_7
+          }
         }
-      }
-      case NMI_STATE_3 => () => {
-        push((PC >> 8) & 0xFF)
-        state = NMI_STATE_4
-      }
-      case NMI_STATE_4 => () => {
-        push(PC & 0xFF)
-        state = NMI_STATE_5
-      }
-      case NMI_STATE_5 => () => {
-        push(SR & ~B_FLAG)
-        sei
-        state = NMI_STATE_6
-      }
-      case NMI_STATE_6 => () => {
-        if (ready) {
-        PC = mem.read(0xfffa)
-        state = NMI_STATE_7
+        case IRQ_STATE_7 => () => {
+          if (ready) {
+            PC |= mem.read(0xffff) << 8
+            Last
+          }
         }
-      }
-      case NMI_STATE_7 => () => {
-        if (ready) {
-        PC |= mem.read(0xfffb) << 8
-        Last
+        // NMI
+        case NMI_STATE => () => {
+          if (ready) {
+            mem.read(PC)
+            state = NMI_STATE_2
+          }
         }
-      }
-      // Addressing modes: Fetch effective address, no extra cycles (-> ar)
-      case A_ZERO => () => {
-        if (ready) {
-          ar = mem.read(PC) ; PC += 1
-		  Execute
+        case NMI_STATE_2 => () => {
+          if (ready) {
+            mem.read(PC)
+            state = NMI_STATE_3
+          }
         }
-      }
-	  case A_ZEROX => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = A_ZEROX1
-	    }
-	  }
-	  case A_ZEROX1 => () => {
-	    if (ready) {
-		mem.read(ar)
-		ar = (ar + X) & 0xff
-		Execute
-	    }
-	  }
-	  case A_ZEROY => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = A_ZEROY1
-	    }
-	  }
-	  case A_ZEROY1 => () => {
-		if (ready) {
-		mem.read(ar)
-		ar = (ar + Y) & 0xff
-		Execute
-		}
-	  }
-	  case A_ABS => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = A_ABS1
-	    }
-	  }
-	  case A_ABS1 => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-		ar = ar | (data << 8)
-		Execute
-	    }
-	  }
-	  case A_ABSX => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = A_ABSX1
-	    }
-	  }
-	  case A_ABSX1 => () => {
-		if (ready) {
-		ar2 = mem.read(PC) ; PC += 1 // Note: Some undocumented opcodes rely on the value of ar2
-		if (ar + X < 0x100) state = A_ABSX2 else state = A_ABSX3
-		ar = (ar + X) & 0xff | (ar2 << 8)
-		}
-	  }
-	  case A_ABSX2 => () => {	// No page crossed
-	    if (ready) {
-		mem.read(ar)
-		Execute
-	    }
-	  }
-	  case A_ABSX3 => () => {	// Page crossed
-	    if (ready) {
-		mem.read(ar)
-		ar += 0x100
-		Execute
-	    }
-	  }
-	  case A_ABSY => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = A_ABSY1
-	    }
-	  }
-	  case A_ABSY1 => () => {
-		if (ready) {
-	    ar2 = mem.read(PC) ; PC += 1 // Note: Some undocumented opcodes rely on the value of ar2
-		if (ar + Y < 0x100) state = A_ABSY2 else state = A_ABSY3
-		ar = (ar + Y) & 0xff | (ar2 << 8)
-		}
-	  }
-	  case A_ABSY2 => () => { // No page crossed
-	    if (ready) {
-		mem.read(ar)
-		Execute
-	    }
-	  }
-	  case A_ABSY3 => () => {	// Page crossed
-		if (ready) {
-		mem.read(ar)
-		ar += 0x100
-		Execute
-		}
-	  }
-	  case A_INDX => () => {
-	    if (ready) {
-	    ar2 = mem.read(PC) ; PC += 1 // Note: Some undocumented opcodes rely on the value of ar2
-		state = A_INDX1
-	    }
-	  }
-	  case A_INDX1 => () => {
-	    if (ready) {
-		mem.read(ar2)
-		ar2 = (ar2 + X) & 0xff
-		state = A_INDX2
-	    }
-	  }
-	  case A_INDX2 => () => {
-	    if (ready) {
-	    ar = mem.read(ar2)
-		state = A_INDX3
-	    }
-	  }
-	  case A_INDX3 => () => {
-	    if (ready) {
-	    data = mem.read((ar2 + 1) & 0xff)
-		ar = ar | (data << 8)
-		Execute
-	    }
-	  }
-	  case A_INDY => () => {
-	    if (ready) {
-	    ar2 = mem.read(PC) ; PC += 1
-		state = A_INDY1
-	    }
-	  }
-	  case A_INDY1 => () => {
-	    if (ready) {
-	    ar = mem.read(ar2)
-		state = A_INDY2
-	    }
-	  }
-	  case A_INDY2 => () => {
-	    if (ready) {
-	    ar2 = mem.read((ar2 + 1) & 0xff) // Note: Some undocumented opcodes rely on the value of ar2
-		if (ar + Y < 0x100) state = A_INDY3 else state = A_INDY4
-		ar = (ar + Y) & 0xff | (ar2 << 8)
-	    }
-	  }
-	  case A_INDY3 => () => {	// No page crossed
-	    if (ready) {
-	    mem.read(ar)
-		Execute
-	    }
-	  }
-	  case A_INDY4 => () => {	// Page crossed
-	    if (ready) {
-	    mem.read(ar)
-		ar += 0x100
-		Execute
-	    }
-	  }
-	  // Addressing modes: Fetch effective address, extra cycle on page crossing (-> ar)
-	  case AE_ABSX => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = AE_ABSX1
-	    }
-	  }
-	  case AE_ABSX1 => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-		if (ar + X < 0x100) {
-			ar = (ar + X) & 0xff | (data << 8)
-			Execute
-		} else {
-			ar = (ar + X) & 0xff | (data << 8)
-			state = AE_ABSX2
-		}
-	    }
-	  }
-	  case AE_ABSX2 => () => {	// Page crossed
-	    if (ready) {
-	    mem.read(ar)
-		ar += 0x100
-		Execute
-	    }
-	  }
-	  case AE_ABSY => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = AE_ABSY1
-	    }
-	  }
-	  case AE_ABSY1 => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-		if (ar + Y < 0x100) {
-			ar = (ar + Y) & 0xff | (data << 8)
-			Execute
-		} else {
-			ar = (ar + Y) & 0xff | (data << 8)
-			state = AE_ABSY2
-		}
-	    }
-	  }
-	  case AE_ABSY2 => () => {// Page crossed
-	    if (ready) {
-	    mem.read(ar)
-		ar += 0x100
-		Execute
-	    }
-	  }
-	  case AE_INDY => () => {
-	    if (ready) {
-	    ar2 = mem.read(PC) ; PC += 1
-		state = AE_INDY1
-	    }
-	  }
-	  case AE_INDY1 => () => {
-	    if (ready) {
-	    ar = mem.read(ar2)
-		state = AE_INDY2
-	    }
-	  }
-	  case AE_INDY2 => () => {
-	    if (ready) {
-	    data = mem.read((ar2 + 1) & 0xff)
-		if (ar + Y < 0x100) {
-			ar = (ar + Y) & 0xff | (data << 8)
-			Execute
-		} else {
-			ar = (ar + Y) & 0xff | (data << 8)
-			state = AE_INDY3
-		}
-	    }
-	  }
-	  case AE_INDY3 => () => {	// Page crossed
-	    if (ready) {
-	    mem.read(ar)
-		ar += 0x100
-		Execute
-	    }
-	  }
-	  // Addressing modes: Read operand, write it back, no extra cycles (-> ar, rdbuf)
-	  case M_ZERO => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		DoRMW
-	    }
-	  }
-	  case M_ZEROX => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = M_ZEROX1
-	    }
-	  }
-	  case M_ZEROX1 => () => {
-	    if (ready) {
-	    mem.read(ar)
-		ar = (ar + X) & 0xff
-		DoRMW
-	    }
-	  }
-	  case M_ZEROY => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = M_ZEROY1
-	    }
-	  }
-	  case M_ZEROY1 => () => {
-	    if (ready) {
-	    mem.read(ar)
-		ar = (ar + Y) & 0xff
-		DoRMW
-	    }
-	  }
-	  case M_ABS => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = M_ABS1
-	    }
-	  }
-	  case M_ABS1 => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-		ar = ar | (data << 8)
-		DoRMW
-	    }
-	  }
-	  case M_ABSX => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = M_ABSX1
-	    }
-	  }
-	  case M_ABSX1 => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-		if (ar + X < 0x100) state = M_ABSX2 else state = M_ABSX3
-		ar = (ar + X) & 0xff | (data << 8)
-	    }
-	  }
-	  case M_ABSX2 => () => {	// No page crossed
-	    if (ready) {
-	    mem.read(ar)
-		DoRMW
-	    }
-	  }
-	  case M_ABSX3 => () => {	// Page crossed
-	    if (ready) {
-	    mem.read(ar)
-		ar += 0x100
-		DoRMW
-	    }
-	  }
-	  case M_ABSY => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = M_ABSY1
-	    }
-	  }
-	  case M_ABSY1 => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-		if (ar + Y < 0x100) state = M_ABSY2	else state = M_ABSY3
-		ar = (ar + Y) & 0xff | (data << 8)
-	    }
-	  }
-	  case M_ABSY2 => () => {	// No page crossed
-	    if (ready) {
-	    mem.read(ar)
-		DoRMW
-	    }
-	  }
-	  case M_ABSY3 => () => {	// Page crossed
-	    if (ready) {
-	    mem.read(ar)
-		ar += 0x100
-		DoRMW
-	    }
-	  }
-	  case M_INDX => () => {
-	    if (ready) {
-	    ar2 = mem.read(PC) ; PC += 1
-		state = M_INDX1
-	    }
-	  }
-	  case M_INDX1 => () => {
-	    if (ready) {
-	    mem.read(ar2)
-		ar2 = (ar2 + X) & 0xff
-		state = M_INDX2
-	    }
-	  }
-	  case M_INDX2 => () => {
-	    if (ready) {
-	    ar = mem.read(ar2)
-		state = M_INDX3
-	    }
-	  }
-	  case M_INDX3 => () => {
-	    if (ready) {
-	    data = mem.read((ar2 + 1) & 0xff)
-		ar = ar | (data << 8)
-		DoRMW
-	    }
-	  }
-	  case M_INDY => () => {
-	    if (ready) {
-	    ar2 = mem.read(PC) ; PC += 1
-		state = M_INDY1
-	    }
-	  }
-	  case M_INDY1 => () => {
-	    if (ready) {
-	    ar = mem.read(ar2)
-		state = M_INDY2
-	    }
-	  }
-	  case M_INDY2 => () => {
-	    if (ready) {
-	    data = mem.read((ar2 + 1) & 0xff)
-		if (ar + Y < 0x100) state = M_INDY3 else state = M_INDY4
-		ar = (ar + Y) & 0xff | (data << 8)
-	    }
-	  }
-	  case M_INDY3 => () => {	// No page crossed
-	    if (ready) {
-	    mem.read(ar)
-		DoRMW
-	    }
-	  }
-	  case M_INDY4 => () => {	// Page crossed
-	    if (ready) {
-	    mem.read(ar)
-		ar += 0x100
-		DoRMW
-	    }
-	  }
-	  case RMW_DO_IT => () => {
-	    if (ready) {
-	    rdbuf = mem.read(ar)
-		state = RMW_DO_IT1
-	    }
-	  }
-	  case RMW_DO_IT1 => () => {
-	    mem.write(ar,rdbuf)
-		Execute
-	  }
-	  // ------------------ OPERATIONS -------------------------------
-	  // Load group
-	  case O_LDA => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    A = data
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_LDA_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    A = data
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_LDX => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    X = data
-		set_nz(X)
-		Last
-	    }
-	  }
-	  case O_LDX_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    X = data
-		set_nz(X)
-		Last
-	    }
-	  }
-	  case O_LDY => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    Y = data
-		set_nz(Y)
-		Last
-	    }
-	  }
-	  case O_LDY_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    Y = data
-		set_nz(Y)
-		Last
-	    }
-	  }
-	  // Store group
-	  case O_STA => () => {
-	    mem.write(ar,A)
-		Last
-	  }
-	  case O_STX => () => {
-	    mem.write(ar,X)
-	    Last
-	  }
-	  case O_STY => () => {
-	    mem.write(ar,Y)
-		Last
-	  }
-	  // Transfer group
-	  case O_TAX => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    X = A
-		set_nz(X)
-		Last
-	    }
-	  }
-	  case O_TXA => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    A = X
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_TAY => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    Y = A
-		set_nz(Y)
-		Last
-	    }
-	  }
-	  case O_TYA => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    A = Y
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_TSX => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    X = SP
-		set_nz(X)
-		Last
-	    }
-	  }
-	  case O_TXS => () => {
-	    if (ready) {
-	    mem.read(PC)
-		SP = X
-		Last
-	    }
-	  }
-	  // Arithmetic group
-	  case O_ADC => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-		do_adc(data)
-		Last
-	    }
-	  }
-	  case O_ADC_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-		do_adc(data)
-		Last
-	    }
-	  }
-	  case O_SBC => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-		do_sbc(data)
-		Last
-	    }
-	  }
-	  case O_SBC_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-		do_sbc(data)
-		Last
-	    }
-	  }
-	  // Increment/decrement group
-	  case O_INX => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    X = (X + 1) & 0xFF
-		set_nz(X)
-		Last
-	    }
-	  }
-	  case O_DEX => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    X = (X - 1) & 0xFF
-		set_nz(X)
-		Last
-	    }
-	  }
-	  case O_INY => () => {
-	    if (ready) {
-	    mem.read(PC)
-		Y = (Y + 1) & 0xFF
-		set_nz(Y)
-		Last
-	    }
-	  }
-	  case O_DEY => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    Y = (Y - 1) & 0xFF
-		set_nz(Y)
-		Last
-	    }
-	  }
-	  case O_INC => () => {
-	    rdbuf = (rdbuf + 1) & 0xFF
-	    set_nz(rdbuf)
-	    mem.write(ar,rdbuf)
-		Last
-	  }
-	  case O_DEC => () => {
-	    rdbuf = (rdbuf - 1) & 0xFF
-	    set_nz(rdbuf)
-	    mem.write(ar,rdbuf)
-		Last
-	  }
-	  // Logic group
-	  case O_AND => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    A &= data
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_AND_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    A &= data	    
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_ORA => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    A |= data
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_ORA_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    A |= data
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_EOR =>() => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    A ^= data
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_EOR_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    A ^= data
-		set_nz(A)
-		Last
-	    }
-	  }
-	  // Compare group
-	  case O_CMP => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    ar = A - data
-		set_nz(ar)
-	    if (ar >= 0) sec else clc
-		Last
-	    }
-	  }
-	  case O_CMP_I => () => {
-		if (ready) {
-		data = mem.read(PC) ; PC += 1
-		ar = A - data
-		set_nz(ar)
-		if (ar >= 0) sec else clc
-		Last
-		}
-	  }
-	  case O_CPX => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    ar = X - data
-		set_nz(ar)
-	    if (ar >= 0) sec else clc
-		Last
-	    }
-	  }
-	  case O_CPX_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    ar = X - data
-		set_nz(ar)
-		if (ar >= 0) sec else clc
-		Last
-	    }
-	  }
-	  case O_CPY => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    ar = Y - data
-		set_nz(ar)
-		if (ar >= 0) sec else clc
-		Last
-	    }
-	  }
-	  case O_CPY_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    ar = Y - data
-		set_nz(ar)
-		if (ar >= 0) sec else clc
-		Last
-	    }
-	  }
-	  // Bit-test group
-	  case O_BIT => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    if (data >= 0x80) sen else cln
-	    if ((data & V_FLAG) == V_FLAG) sev else clv
-	    if ((A & data) == 0) sez else clz
-		Last
-	    }
-	  }
-	  // Shift/rotate group
-	  case O_ASL => () => {
-	    if ((rdbuf & N_FLAG) == N_FLAG) sec else clc
-	    rdbuf = (rdbuf << 1) & 0xFF
-	    mem.write(ar,rdbuf)
-	    set_nz(rdbuf)
-		Last
-	  }
-	  case O_ASL_A => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    if ((A & N_FLAG) == N_FLAG) sec else clc
-	    A = (A << 1) & 0xFF
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_LSR => () => {
-	    if ((rdbuf & 0x01) == 0x01) sec else clc
-	    rdbuf = (rdbuf >> 1) & 0xFF
-	    mem.write(ar,rdbuf)
-	    set_nz(rdbuf)
-		Last
-	  }
-	  case O_LSR_A => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    if ((A & 0x01) == 0x01) sec else clc
-	    A = (A >> 1) & 0xFF
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_ROL => () => {
-	    val oldC = if (isCarry) 1 else 0
-	    if ((rdbuf & N_FLAG) == N_FLAG) sec else clc
-        rdbuf = ((rdbuf << 1) & 0xff) | oldC
-	    set_nz(rdbuf)
-	    mem.write(ar,rdbuf)
-		Last
-	  }
-	  case O_ROL_A => () => {
-	    if (ready) {
-	    mem.read(PC)		
-	    val oldC = if (isCarry) 1 else 0
-	    if ((A & N_FLAG) == N_FLAG) sec else clc
-        A = ((A << 1) & 0xff) | oldC
-	    set_nz(A)
-		Last
-	    }
-	  }
-	  case O_ROR => () => {
-	    val oldC = if (isCarry) 0x80 else 0
-	    if ((rdbuf & 1) == 1) sec else clc
-        rdbuf = ((rdbuf >> 1) & 0xff) | oldC
-        set_nz(rdbuf)
-        mem.write(ar,rdbuf)
-		Last
-	  }
-	  case O_ROR_A => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    val oldC = if (isCarry) 0x80 else 0
-	    if ((A & 1) == 1) sec else clc
-        A = ((A >> 1) & 0xff) | oldC
-        set_nz(A)
-		Last
-	    }
-	  }
-	  // Stack group
-	  case O_PHA => () => {
-	    if (ready) {
-	    mem.read(PC)
-		state = O_PHA1
-	    }
-	  }
-	  case O_PHA1 => () => {
-	    //push(A)
-	    mem.write(SP | 0x100,A)
-	    SP = (SP - 1) & 0xFF
-		Last
-	  }
-	  case O_PLA => () => {
-	    if (ready) {
-	    mem.read(PC)
-		state = O_PLA1
-	    }
-	  }
-	  case O_PLA1 => () => {
-	    if (ready) {
-	    mem.read(SP | 0x100)
-	    SP = (SP + 1) & 0xFF
-		state = O_PLA2
-	    }
-	  }
-	  case O_PLA2 => () => {
-	    if (ready) {
-	    A = mem.read(SP | 0x100)	    
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_PHP => () => {
-	    if (ready) {
-	    mem.read(PC)
-		state = O_PHP1
-	    }
-	  }
-	  case O_PHP1 => () => {
-	    val sr = SR | B_FLAG
-	    push(sr)
-		Last
-	  }
-	  case O_PLP => () => {
-	    if (ready) {
-	    mem.read(PC)
-		state = O_PLP1
-	    }
-	  }
-	  case O_PLP1 => () => {
-	    if (ready) {
-	    mem.read(SP | 0x100)
-	    SP = (SP + 1) & 0xFF
-		state = O_PLP2
-	    }
-	  }
-	  case O_PLP2 => () => {
-	    if (ready) {
-	    data = mem.read(SP | 0x100)
-	    SR = (data & ~B_FLAG) | (SR & B_FLAG)
-		Last	
-	    }
-	  }
-	  // Jump/branch group
-	  case O_JMP => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = O_JMP1
-	    }
-	  }
-	  case O_JMP1 => () => {
-	    if (ready) {
-	    data = mem.read(PC)
-		PC = (data << 8) | ar
-		Last
-	    }
-	  }
-	  case O_JMP_I => () => {
-	    if (ready) {
-	    PC = mem.read(ar)
-		state = O_JMP_I1
-	    }
-	  }
-	  case O_JMP_I1 => () => {
-	    if (ready) {
-	    data = mem.read((ar + 1) & 0xff | ar & 0xff00)
-		PC |= data << 8
-		Last
-	    }
-	  }
-	  case O_JSR => () => {
-	    if (ready) {
-	    ar = mem.read(PC) ; PC += 1
-		state = O_JSR1
-	    }
-	  }
-	  case O_JSR1 => () => {
-	    if (ready) {
-	    mem.read(SP | 0x100)
-		state = O_JSR2
-	    }
-	  }
-	  case O_JSR2 => () => {
-	    mem.write(SP | 0x100,(PC >> 8) & 0xFF)
-	    SP = (SP - 1) & 0xFF
-		state = O_JSR3
-	  }
-	  case O_JSR3 => () => {
-	    mem.write(SP | 0x100,PC & 0xFF)
-	    SP = (SP - 1) & 0xFF
-		state = O_JSR4
-	  }
-	  case O_JSR4 => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-		PC = ar | (data << 8)
-		Last
-	    }
-	  }
-	  case O_RTS => () => {
-	    if (ready) {
-	    mem.read(PC)
-		state = O_RTS1
-	    }
-	  }
-	  case O_RTS1 => () => {
-	    if (ready) {
-	    mem.read(SP | 0x100)
-	    SP = (SP + 1) & 0xFF
-		state = O_RTS2
-	    }
-	  }
-	  case O_RTS2 => () => {
-	    if (ready) {
-	    PC = mem.read(SP | 0x100)
-	    SP = (SP + 1) & 0xFF
-		state = O_RTS3
-	    }
-	  }
-	  case O_RTS3 => () => {
-	    if (ready) {
-	    data = mem.read(SP | 0x100)
-		PC |= data << 8
-		state = O_RTS4
-	    }
-	  }
-	  case O_RTS4 => () => {
-	    if (ready) {
-	    mem.read(PC) ; PC += 1
-		Last
-	    }
-	  }
-	  case O_RTI => () => {
-	    if (ready) {
-	    mem.read(PC)
-		state = O_RTI1
-	    }
-	  }
-	  case O_RTI1 => () => {
-	    if (ready) {
-	    mem.read(SP | 0x100)
-	    SP = (SP + 1) & 0xFF
-		state = O_RTI2
-	    }
-	  }
-	  case O_RTI2 => () => {
-	    if (ready) {
-	    data = mem.read(SP | 0x100)
-	    SR = (data & ~B_FLAG) | (SR & B_FLAG)
-		SP = (SP + 1) & 0xFF
-		state = O_RTI3
-	    }
-	  }
-	  case O_RTI3 => () => {
-	    if (ready) {
-	    PC = mem.read(SP | 0x100)
-	    SP = (SP + 1) & 0xFF
-		state = O_RTI4
-	    }
-	  }
-	  case O_RTI4 => () => {
-	    if (ready) {
-	    data = mem.read(SP | 0x100)
-		PC |= data << 8
-		Last
-	    }
-	  }
-	  case O_BRK => () => {
-	    if (ready) {
-	    mem.read(PC) ; PC += 1
-		state = O_BRK1
-	    }
-	  }
-	  case O_BRK1 => () => {
-	    mem.write(SP | 0x100,PC >> 8)
-	    SP = (SP - 1) & 0xFF
-		state = O_BRK2		
-	  }
-	  case O_BRK2 => () => {
-	    mem.write(SP | 0x100,PC & 0xFF)
-	    SP = (SP - 1) & 0xFF
-		state = O_BRK3
-	  }
-	  case O_BRK3 => () => {
-	    push(SR | B_FLAG)
-		sei
-		// CHECK NMI
-    if (nmiOnNegativeEdge) {
-      nmiOnNegativeEdge = false
-      state = NMI_STATE_6      
-    }
-    else state = O_BRK4
-	  }
-	  case O_BRK4 => () => {
-	    irqFirstCycle += 1
-	    if (ready) {	
-	    PC = mem.read(0xfffe)
-		state = O_BRK5
-	    }
-	  }
-	  case O_BRK5 => () => {
-	    if (ready) {
-	    data = mem.read(0xffff)
-		PC |= data << 8
-		Last
-	    }
-	  }
-	  case O_BCS => () => { branch(isCarry) }
-	  case O_BCC => () => { branch(!isCarry) }
-	  case O_BEQ => () => { branch(isZero) }
-	  case O_BNE => () => { branch(!isZero) }
-	  case O_BVS => () => { branch(isOverflow) }
-	  case O_BVC => () => { branch(!isOverflow) }
-	  case O_BMI => () => { branch(isNegative) }
-	  case O_BPL => () => { branch(!isNegative) }
-	  case O_BRANCH_NP => () => {	// No page crossed
-	    irqFirstCycle += 1
-	    nmiFirstCycle += 1
-	    if (ready) {
-	    mem.read(PC)
-		PC = ar
-		Last
-	    }
-	  }
-	  case O_BRANCH_BP => () => {	// Page crossed, branch backwards	    
-	    if (ready) {
-	    mem.read(PC)
-		PC = ar
-		state = O_BRANCH_BP1
-	    }
-	  }
-	  case O_BRANCH_BP1 => () => {
-	    if (ready) {
-	    mem.read(PC | 0x100)
-		Last
-	    }
-	  }
-	  case O_BRANCH_FP => () => {	// Page crossed, branch forwards
-	    if (ready) {
-	    mem.read(PC)
-		PC = ar
-		state = O_BRANCH_FP1
-	    }
-	  }
-	  case O_BRANCH_FP1 => () => {
-	    if (ready) {
-	    mem.read((PC - 0x100) & 0xFFFF)
-		Last
-	    }
-	  }
-	  // Flag group
-	  case O_SEC => () => {
-	    if (ready) {
-	    mem.read(PC)
-		sec
-		Last
-	    }
-	  }
-	  case O_CLC => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    clc
-		Last
-	    }
-	  }
-	  case O_SED => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    sed
-		Last
-	    }
-	  }
-	  case O_CLD => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    cld
-		Last
-	    }
-	  }
-	  case O_SEI => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    sei
-		Last
-	    }
-	  }
-	  case O_CLI => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    cli
-		Last
-	    }
-	  }
-	  case O_CLV => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    clv
-		Last
-	    }
-	  }
-	  // NOP group
-	  case O_NOP => () => {
-	    if (ready) {
-	    mem.read(PC)
-		Last
-	    }
-	  }
-	  // Undocumented
-		// NOP group
-	  case O_NOP_I => () => {
-	    if (ready) {
-	    mem.read(PC)
-	    PC += 1
-		Last
-	    }
-	  }
-	  case O_NOP_A => () => {
-	    if (ready) {
-	    mem.read(ar)
-		Last
-	    }
-	  }
-	  // Load A/X group
-	  case O_LAX => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    A = data
-	    X = data
-	    set_nz(A)
-		Last
-	    }
-	  }
-	  // Store A/X group
-	  case O_SAX => () => {
-	    mem.write(ar,A & X)
-		Last
-	  }
-	  // ASL/ORA group
-	  case O_SLO => () => {
-	    if ((rdbuf & 0x80) > 0) sec else clc
-		rdbuf <<= 1
-		mem.write(ar,rdbuf)
-		A |= rdbuf
-		set_nz(A)
-		Last
-	  }
-	  // ROL/AND group
-	  case O_RLA => () => {
-		val tmp = (rdbuf & 0x80) > 0
-		rdbuf = if (isCarry) (rdbuf << 1) | 0x01 else rdbuf << 1
-		if (tmp) sec else clc
-		mem.write(ar,rdbuf)
-		A &= rdbuf
-		set_nz(A)
-		Last
-	  }
-	  // LSR/EOR group
-	  case O_SRE => () => {
-	    if ((rdbuf & 0x01) > 0) sec else clc
-		rdbuf >>= 1
-		mem.write(ar,rdbuf)
-		A ^= rdbuf
-		set_nz(A)
-		Last
-	  }
-	  // ROR/ADC group
-	  case O_RRA => () => {
-		val tmp = (rdbuf & 0x01) > 0
-		rdbuf = if (isCarry) (rdbuf >> 1) | 0x80 else rdbuf >> 1
-		if (tmp) sec else clc
-		mem.write(ar,rdbuf)
-		do_adc(rdbuf)
-		Last
-	  }
-	  // DEC/CMP group
-	  case O_DCP => () => {
-	    rdbuf = (rdbuf - 1) & 0xFF
-	    mem.write(ar,rdbuf)
-	    ar = A - rdbuf
-	    set_nz(ar)
-	    if (ar >= 0) sec else clc
-		Last
-	  }
-	  // INC/SBC group
-	  case O_ISB => () => {
-	    rdbuf = (rdbuf + 1) & 0xFF
-	    mem.write(ar,rdbuf)
-		do_sbc(rdbuf)
-		Last
-	  }
-	  // Complex functions
-	  case O_ANC_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    A &= data
-		set_nz(A)
-	    if (isNegative) sec else clc
-		Last
-	    }
-	  }
-	  case O_ASR_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    A &= data
-	    if ((A & 0x01) > 0) sec else clc
-	    A >>= 1
-	    set_nz(A)
-		Last
-	    }
-	  }
-	  case O_ARR_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    data &= A
-	    A = if (isCarry) (data >> 1) | 0x80 else data >> 1
-	    if (!isDecimal) {
-          set_nz(A)
-          if ((A & 0x40) > 0) sec else clc
-          if (((A & 0x40) ^ ((A & 0x20) << 1)) > 0) sev else clv
+        case NMI_STATE_3 => () => {
+          push((PC >> 8) & 0xFF)
+          state = NMI_STATE_4
         }
-        else {
-          if (isCarry) sen else cln
-          if (A == 0) sez else clz
-          if (((data ^ A) & 0x40) != 0) sev else clv
-          if ((data & 0x0F) + (data & 0x01) > 5) A = A & 0xF0 | (A + 6) & 0x0F
-          if (((data + (data & 0x10)) & 0x1F0) > 0x50) {
+        case NMI_STATE_4 => () => {
+          push(PC & 0xFF)
+          state = NMI_STATE_5
+        }
+        case NMI_STATE_5 => () => {
+          push(SR & ~B_FLAG)
+          sei
+          state = NMI_STATE_6
+        }
+        case NMI_STATE_6 => () => {
+          if (ready) {
+            PC = mem.read(0xfffa)
+            state = NMI_STATE_7
+          }
+        }
+        case NMI_STATE_7 => () => {
+          if (ready) {
+            PC |= mem.read(0xfffb) << 8
+            Last
+          }
+        }
+        // Addressing modes: Fetch effective address, no extra cycles (-> ar)
+        case A_ZERO => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            Execute
+          }
+        }
+        case A_ZEROX => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = A_ZEROX1
+          }
+        }
+        case A_ZEROX1 => () => {
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + X) & 0xff
+            Execute
+          }
+        }
+        case A_ZEROY => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = A_ZEROY1
+          }
+        }
+        case A_ZEROY1 => () => {
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + Y) & 0xff
+            Execute
+          }
+        }
+        case A_ABS => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = A_ABS1
+          }
+        }
+        case A_ABS1 => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            ar = ar | (data << 8)
+            Execute
+          }
+        }
+        case A_ABSX => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = A_ABSX1
+          }
+        }
+        case A_ABSX1 => () => {
+          if (ready) {
+            ar2 = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF // Note: Some undocumented opcodes rely on the value of ar2
+            if (ar + X < 0x100) state = A_ABSX2 else state = A_ABSX3
+            ar = (ar + X) & 0xff | (ar2 << 8)
+          }
+        }
+        case A_ABSX2 => () => { // No page crossed
+          if (ready) {
+            mem.read(ar)
+            Execute
+          }
+        }
+        case A_ABSX3 => () => { // Page crossed
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + 0x100) & 0xFFFF
+            Execute
+          }
+        }
+        case A_ABSY => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = A_ABSY1
+          }
+        }
+        case A_ABSY1 => () => {
+          if (ready) {
+            ar2 = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF // Note: Some undocumented opcodes rely on the value of ar2
+            if (ar + Y < 0x100) state = A_ABSY2 else state = A_ABSY3
+            ar = (ar + Y) & 0xff | (ar2 << 8)
+          }
+        }
+        case A_ABSY2 => () => { // No page crossed
+          if (ready) {
+            mem.read(ar)
+            Execute
+          }
+        }
+        case A_ABSY3 => () => { // Page crossed
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + 0x100) & 0xFFFF
+            Execute
+          }
+        }
+        case A_INDX => () => {
+          if (ready) {
+            ar2 = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF // Note: Some undocumented opcodes rely on the value of ar2
+            state = A_INDX1
+          }
+        }
+        case A_INDX1 => () => {
+          if (ready) {
+            mem.read(ar2)
+            ar2 = (ar2 + X) & 0xff
+            state = A_INDX2
+          }
+        }
+        case A_INDX2 => () => {
+          if (ready) {
+            ar = mem.read(ar2)
+            state = A_INDX3
+          }
+        }
+        case A_INDX3 => () => {
+          if (ready) {
+            data = mem.read((ar2 + 1) & 0xff)
+            ar = ar | (data << 8)
+            Execute
+          }
+        }
+        case A_INDY => () => {
+          if (ready) {
+            ar2 = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = A_INDY1
+          }
+        }
+        case A_INDY1 => () => {
+          if (ready) {
+            ar = mem.read(ar2)
+            state = A_INDY2
+          }
+        }
+        case A_INDY2 => () => {
+          if (ready) {
+            ar2 = mem.read((ar2 + 1) & 0xff) // Note: Some undocumented opcodes rely on the value of ar2
+            if (ar + Y < 0x100) state = A_INDY3 else state = A_INDY4
+            ar = (ar + Y) & 0xff | (ar2 << 8)
+          }
+        }
+        case A_INDY3 => () => { // No page crossed
+          if (ready) {
+            mem.read(ar)
+            Execute
+          }
+        }
+        case A_INDY4 => () => { // Page crossed
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + 0x100) & 0xFFFF
+            Execute
+          }
+        }
+        // Addressing modes: Fetch effective address, extra cycle on page crossing (-> ar)
+        case AE_ABSX => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = AE_ABSX1
+          }
+        }
+        case AE_ABSX1 => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            if (ar + X < 0x100) {
+              ar = (ar + X) & 0xff | (data << 8)
+              Execute
+            } else {
+              ar = (ar + X) & 0xff | (data << 8)
+              state = AE_ABSX2
+            }
+          }
+        }
+        case AE_ABSX2 => () => { // Page crossed
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + 0x100) & 0xFFFF
+            Execute
+          }
+        }
+        case AE_ABSY => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = AE_ABSY1
+          }
+        }
+        case AE_ABSY1 => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            if (ar + Y < 0x100) {
+              ar = (ar + Y) & 0xff | (data << 8)
+              Execute
+            } else {
+              ar = (ar + Y) & 0xff | (data << 8)
+              state = AE_ABSY2
+            }
+          }
+        }
+        case AE_ABSY2 => () => { // Page crossed
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + 0x100) & 0xFFFF
+            Execute
+          }
+        }
+        case AE_INDY => () => {
+          if (ready) {
+            ar2 = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = AE_INDY1
+          }
+        }
+        case AE_INDY1 => () => {
+          if (ready) {
+            ar = mem.read(ar2)
+            state = AE_INDY2
+          }
+        }
+        case AE_INDY2 => () => {
+          if (ready) {
+            data = mem.read((ar2 + 1) & 0xff)
+            if (ar + Y < 0x100) {
+              ar = (ar + Y) & 0xff | (data << 8)
+              Execute
+            } else {
+              ar = (ar + Y) & 0xff | (data << 8)
+              state = AE_INDY3
+            }
+          }
+        }
+        case AE_INDY3 => () => { // Page crossed
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + 0x100) & 0xFFFF
+            Execute
+          }
+        }
+        // Addressing modes: Read operand, write it back, no extra cycles (-> ar, rdbuf)
+        case M_ZERO => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            DoRMW
+          }
+        }
+        case M_ZEROX => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = M_ZEROX1
+          }
+        }
+        case M_ZEROX1 => () => {
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + X) & 0xff
+            DoRMW
+          }
+        }
+        case M_ZEROY => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = M_ZEROY1
+          }
+        }
+        case M_ZEROY1 => () => {
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + Y) & 0xff
+            DoRMW
+          }
+        }
+        case M_ABS => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = M_ABS1
+          }
+        }
+        case M_ABS1 => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            ar = ar | (data << 8)
+            DoRMW
+          }
+        }
+        case M_ABSX => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = M_ABSX1
+          }
+        }
+        case M_ABSX1 => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            if (ar + X < 0x100) state = M_ABSX2 else state = M_ABSX3
+            ar = (ar + X) & 0xff | (data << 8)
+          }
+        }
+        case M_ABSX2 => () => { // No page crossed
+          if (ready) {
+            mem.read(ar)
+            DoRMW
+          }
+        }
+        case M_ABSX3 => () => { // Page crossed
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + 0x100) & 0xFFFF
+            DoRMW
+          }
+        }
+        case M_ABSY => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = M_ABSY1
+          }
+        }
+        case M_ABSY1 => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            if (ar + Y < 0x100) state = M_ABSY2 else state = M_ABSY3
+            ar = (ar + Y) & 0xff | (data << 8)
+          }
+        }
+        case M_ABSY2 => () => { // No page crossed
+          if (ready) {
+            mem.read(ar)
+            DoRMW
+          }
+        }
+        case M_ABSY3 => () => { // Page crossed
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + 0x100) & 0xFFFF
+            DoRMW
+          }
+        }
+        case M_INDX => () => {
+          if (ready) {
+            ar2 = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = M_INDX1
+          }
+        }
+        case M_INDX1 => () => {
+          if (ready) {
+            mem.read(ar2)
+            ar2 = (ar2 + X) & 0xff
+            state = M_INDX2
+          }
+        }
+        case M_INDX2 => () => {
+          if (ready) {
+            ar = mem.read(ar2)
+            state = M_INDX3
+          }
+        }
+        case M_INDX3 => () => {
+          if (ready) {
+            data = mem.read((ar2 + 1) & 0xff)
+            ar = ar | (data << 8)
+            DoRMW
+          }
+        }
+        case M_INDY => () => {
+          if (ready) {
+            ar2 = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = M_INDY1
+          }
+        }
+        case M_INDY1 => () => {
+          if (ready) {
+            ar = mem.read(ar2)
+            state = M_INDY2
+          }
+        }
+        case M_INDY2 => () => {
+          if (ready) {
+            data = mem.read((ar2 + 1) & 0xff)
+            if (ar + Y < 0x100) state = M_INDY3 else state = M_INDY4
+            ar = (ar + Y) & 0xff | (data << 8)
+          }
+        }
+        case M_INDY3 => () => { // No page crossed
+          if (ready) {
+            mem.read(ar)
+            DoRMW
+          }
+        }
+        case M_INDY4 => () => { // Page crossed
+          if (ready) {
+            mem.read(ar)
+            ar = (ar + 0x100) & 0xFFFF
+            DoRMW
+          }
+        }
+        case RMW_DO_IT => () => {
+          if (ready) {
+            rdbuf = mem.read(ar)
+            state = RMW_DO_IT1
+          }
+        }
+        case RMW_DO_IT1 => () => {
+          mem.write(ar, rdbuf)
+          Execute
+        }
+        // ------------------ OPERATIONS -------------------------------
+        // Load group
+        case O_LDA => () => {
+          if (ready) {
+            data = mem.read(ar)
+            A = data
+            set_nz(A)
+            Last
+          }
+        }
+        case O_LDA_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            A = data
+            set_nz(A)
+            Last
+          }
+        }
+        case O_LDX => () => {
+          if (ready) {
+            data = mem.read(ar)
+            X = data
+            set_nz(X)
+            Last
+          }
+        }
+        case O_LDX_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            X = data
+            set_nz(X)
+            Last
+          }
+        }
+        case O_LDY => () => {
+          if (ready) {
+            data = mem.read(ar)
+            Y = data
+            set_nz(Y)
+            Last
+          }
+        }
+        case O_LDY_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            Y = data
+            set_nz(Y)
+            Last
+          }
+        }
+        // Store group
+        case O_STA => () => {
+          mem.write(ar, A)
+          Last
+        }
+        case O_STX => () => {
+          mem.write(ar, X)
+          Last
+        }
+        case O_STY => () => {
+          mem.write(ar, Y)
+          Last
+        }
+        // Transfer group
+        case O_TAX => () => {
+          if (ready) {
+            mem.read(PC)
+            X = A
+            set_nz(X)
+            Last
+          }
+        }
+        case O_TXA => () => {
+          if (ready) {
+            mem.read(PC)
+            A = X
+            set_nz(A)
+            Last
+          }
+        }
+        case O_TAY => () => {
+          if (ready) {
+            mem.read(PC)
+            Y = A
+            set_nz(Y)
+            Last
+          }
+        }
+        case O_TYA => () => {
+          if (ready) {
+            mem.read(PC)
+            A = Y
+            set_nz(A)
+            Last
+          }
+        }
+        case O_TSX => () => {
+          if (ready) {
+            mem.read(PC)
+            X = SP
+            set_nz(X)
+            Last
+          }
+        }
+        case O_TXS => () => {
+          if (ready) {
+            mem.read(PC)
+            SP = X
+            Last
+          }
+        }
+        // Arithmetic group
+        case O_ADC => () => {
+          if (ready) {
+            data = mem.read(ar)
+            do_adc(data)
+            Last
+          }
+        }
+        case O_ADC_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            do_adc(data)
+            Last
+          }
+        }
+        case O_SBC => () => {
+          if (ready) {
+            data = mem.read(ar)
+            do_sbc(data)
+            Last
+          }
+        }
+        case O_SBC_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            do_sbc(data)
+            Last
+          }
+        }
+        // Increment/decrement group
+        case O_INX => () => {
+          if (ready) {
+            mem.read(PC)
+            X = (X + 1) & 0xFF
+            set_nz(X)
+            Last
+          }
+        }
+        case O_DEX => () => {
+          if (ready) {
+            mem.read(PC)
+            X = (X - 1) & 0xFF
+            set_nz(X)
+            Last
+          }
+        }
+        case O_INY => () => {
+          if (ready) {
+            mem.read(PC)
+            Y = (Y + 1) & 0xFF
+            set_nz(Y)
+            Last
+          }
+        }
+        case O_DEY => () => {
+          if (ready) {
+            mem.read(PC)
+            Y = (Y - 1) & 0xFF
+            set_nz(Y)
+            Last
+          }
+        }
+        case O_INC => () => {
+          rdbuf = (rdbuf + 1) & 0xFF
+          set_nz(rdbuf)
+          mem.write(ar, rdbuf)
+          Last
+        }
+        case O_DEC => () => {
+          rdbuf = (rdbuf - 1) & 0xFF
+          set_nz(rdbuf)
+          mem.write(ar, rdbuf)
+          Last
+        }
+        // Logic group
+        case O_AND => () => {
+          if (ready) {
+            data = mem.read(ar)
+            A &= data
+            set_nz(A)
+            Last
+          }
+        }
+        case O_AND_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            A &= data
+            set_nz(A)
+            Last
+          }
+        }
+        case O_ORA => () => {
+          if (ready) {
+            data = mem.read(ar)
+            A |= data
+            set_nz(A)
+            Last
+          }
+        }
+        case O_ORA_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            A |= data
+            set_nz(A)
+            Last
+          }
+        }
+        case O_EOR => () => {
+          if (ready) {
+            data = mem.read(ar)
+            A ^= data
+            set_nz(A)
+            Last
+          }
+        }
+        case O_EOR_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            A ^= data
+            set_nz(A)
+            Last
+          }
+        }
+        // Compare group
+        case O_CMP => () => {
+          if (ready) {
+            data = mem.read(ar)
+            ar = A - data
+            set_nz(ar)
+            if (ar >= 0) sec else clc
+            Last
+          }
+        }
+        case O_CMP_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            ar = A - data
+            set_nz(ar)
+            if (ar >= 0) sec else clc
+            Last
+          }
+        }
+        case O_CPX => () => {
+          if (ready) {
+            data = mem.read(ar)
+            ar = X - data
+            set_nz(ar)
+            if (ar >= 0) sec else clc
+            Last
+          }
+        }
+        case O_CPX_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            ar = X - data
+            set_nz(ar)
+            if (ar >= 0) sec else clc
+            Last
+          }
+        }
+        case O_CPY => () => {
+          if (ready) {
+            data = mem.read(ar)
+            ar = Y - data
+            set_nz(ar)
+            if (ar >= 0) sec else clc
+            Last
+          }
+        }
+        case O_CPY_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            ar = Y - data
+            set_nz(ar)
+            if (ar >= 0) sec else clc
+            Last
+          }
+        }
+        // Bit-test group
+        case O_BIT => () => {
+          if (ready) {
+            data = mem.read(ar)
+            if (data >= 0x80) sen else cln
+            if ((data & V_FLAG) == V_FLAG) sev else clv
+            if ((A & data) == 0) sez else clz
+            Last
+          }
+        }
+        // Shift/rotate group
+        case O_ASL => () => {
+          if ((rdbuf & N_FLAG) == N_FLAG) sec else clc
+          rdbuf = (rdbuf << 1) & 0xFF
+          mem.write(ar, rdbuf)
+          set_nz(rdbuf)
+          Last
+        }
+        case O_ASL_A => () => {
+          if (ready) {
+            mem.read(PC)
+            if ((A & N_FLAG) == N_FLAG) sec else clc
+            A = (A << 1) & 0xFF
+            set_nz(A)
+            Last
+          }
+        }
+        case O_LSR => () => {
+          if ((rdbuf & 0x01) == 0x01) sec else clc
+          rdbuf = (rdbuf >> 1) & 0xFF
+          mem.write(ar, rdbuf)
+          set_nz(rdbuf)
+          Last
+        }
+        case O_LSR_A => () => {
+          if (ready) {
+            mem.read(PC)
+            if ((A & 0x01) == 0x01) sec else clc
+            A = (A >> 1) & 0xFF
+            set_nz(A)
+            Last
+          }
+        }
+        case O_ROL => () => {
+          val oldC = if (isCarry) 1 else 0
+          if ((rdbuf & N_FLAG) == N_FLAG) sec else clc
+          rdbuf = ((rdbuf << 1) & 0xff) | oldC
+          set_nz(rdbuf)
+          mem.write(ar, rdbuf)
+          Last
+        }
+        case O_ROL_A => () => {
+          if (ready) {
+            mem.read(PC)
+            val oldC = if (isCarry) 1 else 0
+            if ((A & N_FLAG) == N_FLAG) sec else clc
+            A = ((A << 1) & 0xff) | oldC
+            set_nz(A)
+            Last
+          }
+        }
+        case O_ROR => () => {
+          val oldC = if (isCarry) 0x80 else 0
+          if ((rdbuf & 1) == 1) sec else clc
+          rdbuf = ((rdbuf >> 1) & 0xff) | oldC
+          set_nz(rdbuf)
+          mem.write(ar, rdbuf)
+          Last
+        }
+        case O_ROR_A => () => {
+          if (ready) {
+            mem.read(PC)
+            val oldC = if (isCarry) 0x80 else 0
+            if ((A & 1) == 1) sec else clc
+            A = ((A >> 1) & 0xff) | oldC
+            set_nz(A)
+            Last
+          }
+        }
+        // Stack group
+        case O_PHA => () => {
+          if (ready) {
+            mem.read(PC)
+            state = O_PHA1
+          }
+        }
+        case O_PHA1 => () => {
+          //push(A)
+          mem.write(SP | 0x100, A)
+          SP = (SP - 1) & 0xFF
+          Last
+        }
+        case O_PLA => () => {
+          if (ready) {
+            mem.read(PC)
+            state = O_PLA1
+          }
+        }
+        case O_PLA1 => () => {
+          if (ready) {
+            mem.read(SP | 0x100)
+            SP = (SP + 1) & 0xFF
+            state = O_PLA2
+          }
+        }
+        case O_PLA2 => () => {
+          if (ready) {
+            A = mem.read(SP | 0x100)
+            set_nz(A)
+            Last
+          }
+        }
+        case O_PHP => () => {
+          if (ready) {
+            mem.read(PC)
+            state = O_PHP1
+          }
+        }
+        case O_PHP1 => () => {
+          val sr = SR | B_FLAG
+          push(sr)
+          Last
+        }
+        case O_PLP => () => {
+          if (ready) {
+            mem.read(PC)
+            state = O_PLP1
+          }
+        }
+        case O_PLP1 => () => {
+          if (ready) {
+            mem.read(SP | 0x100)
+            SP = (SP + 1) & 0xFF
+            state = O_PLP2
+          }
+        }
+        case O_PLP2 => () => {
+          if (ready) {
+            data = mem.read(SP | 0x100)
+            SR = (data & ~B_FLAG) | (SR & B_FLAG)
+            delay1CycleIRQCheck = true
+            Last
+          }
+        }
+        // Jump/branch group
+        case O_JMP => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = O_JMP1
+          }
+        }
+        case O_JMP1 => () => {
+          if (ready) {
+            data = mem.read(PC)
+            PC = (data << 8) | ar
+            Last
+          }
+        }
+        case O_JMP_I => () => {
+          if (ready) {
+            PC = mem.read(ar)
+            state = O_JMP_I1
+          }
+        }
+        case O_JMP_I1 => () => {
+          if (ready) {
+            data = mem.read((ar + 1) & 0xff | ar & 0xff00)
+            PC |= data << 8
+            Last
+          }
+        }
+        case O_JSR => () => {
+          if (ready) {
+            ar = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = O_JSR1
+          }
+        }
+        case O_JSR1 => () => {
+          if (ready) {
+            mem.read(SP | 0x100)
+            state = O_JSR2
+          }
+        }
+        case O_JSR2 => () => {
+          mem.write(SP | 0x100, (PC >> 8) & 0xFF)
+          SP = (SP - 1) & 0xFF
+          state = O_JSR3
+        }
+        case O_JSR3 => () => {
+          mem.write(SP | 0x100, PC & 0xFF)
+          SP = (SP - 1) & 0xFF
+          state = O_JSR4
+        }
+        case O_JSR4 => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            PC = ar | (data << 8)
+            Last
+          }
+        }
+        case O_RTS => () => {
+          if (ready) {
+            mem.read(PC)
+            state = O_RTS1
+          }
+        }
+        case O_RTS1 => () => {
+          if (ready) {
+            mem.read(SP | 0x100)
+            SP = (SP + 1) & 0xFF
+            state = O_RTS2
+          }
+        }
+        case O_RTS2 => () => {
+          if (ready) {
+            PC = mem.read(SP | 0x100)
+            SP = (SP + 1) & 0xFF
+            state = O_RTS3
+          }
+        }
+        case O_RTS3 => () => {
+          if (ready) {
+            data = mem.read(SP | 0x100)
+            PC |= data << 8
+            state = O_RTS4
+          }
+        }
+        case O_RTS4 => () => {
+          if (ready) {
+            mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            Last
+          }
+        }
+        case O_RTI => () => {
+          if (ready) {
+            mem.read(PC)
+            state = O_RTI1
+          }
+        }
+        case O_RTI1 => () => {
+          if (ready) {
+            mem.read(SP | 0x100)
+            SP = (SP + 1) & 0xFF
+            state = O_RTI2
+          }
+        }
+        case O_RTI2 => () => {
+          if (ready) {
+            data = mem.read(SP | 0x100)
+            SR = (data & ~B_FLAG) | (SR & B_FLAG)
+            if (irqLow && !isInterrupt) forceIRQNow = true
+            SP = (SP + 1) & 0xFF
+            state = O_RTI3
+          }
+        }
+        case O_RTI3 => () => {
+          if (ready) {
+            PC = mem.read(SP | 0x100)
+            SP = (SP + 1) & 0xFF
+            state = O_RTI4
+          }
+        }
+        case O_RTI4 => () => {
+          if (ready) {
+            data = mem.read(SP | 0x100)
+            PC |= data << 8
+            Last
+          }
+        }
+        case O_BRK => () => {
+          if (ready) {
+            mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            state = O_BRK1
+          }
+        }
+        case O_BRK1 => () => {
+          mem.write(SP | 0x100, PC >> 8)
+          SP = (SP - 1) & 0xFF
+          state = O_BRK2
+        }
+        case O_BRK2 => () => {
+          mem.write(SP | 0x100, PC & 0xFF)
+          SP = (SP - 1) & 0xFF
+          state = O_BRK3
+        }
+        case O_BRK3 => () => {
+          push(SR | B_FLAG)
+          sei
+          // CHECK NMI
+          if (nmiOnNegativeEdge) {
+            nmiOnNegativeEdge = false
+            state = NMI_STATE_6
+          }
+          else state = O_BRK4
+        }
+        case O_BRK4 => () => {
+          if (ready) {
+            irqFirstCycle += 1
+            PC = mem.read(0xfffe)
+            state = O_BRK5
+          }
+        }
+        case O_BRK5 => () => {
+          if (ready) {
+            data = mem.read(0xffff)
+            PC |= data << 8
+            Last
+          }
+        }
+        case O_BCS => () => {
+          branch(isCarry)
+        }
+        case O_BCC => () => {
+          branch(!isCarry)
+        }
+        case O_BEQ => () => {
+          branch(isZero)
+        }
+        case O_BNE => () => {
+          branch(!isZero)
+        }
+        case O_BVS => () => {
+          branch(isOverflow)
+        }
+        case O_BVC => () => {
+          branch(!isOverflow)
+        }
+        case O_BMI => () => {
+          branch(isNegative)
+        }
+        case O_BPL => () => {
+          branch(!isNegative)
+        }
+        case O_BRANCH_NP => () => { // No page crossed
+          if (ready) {
+            irqFirstCycle += 1
+            nmiFirstCycle += 1
+            mem.read(PC)
+            PC = ar
+            Last
+          }
+        }
+        case O_BRANCH_BP => () => { // Page crossed, branch backwards
+          if (ready) {
+            mem.read(PC)
+            PC = ar
+            state = O_BRANCH_BP1
+          }
+        }
+        case O_BRANCH_BP1 => () => {
+          if (ready) {
+            mem.read((PC + 0x100) & 0xFFFF)
+            Last
+          }
+        }
+        case O_BRANCH_FP => () => { // Page crossed, branch forwards
+          if (ready) {
+            mem.read(PC)
+            PC = ar
+            state = O_BRANCH_FP1
+          }
+        }
+        case O_BRANCH_FP1 => () => {
+          if (ready) {
+            mem.read((PC - 0x100) & 0xFFFF)
+            Last
+          }
+        }
+        // Flag group
+        case O_SEC => () => {
+          if (ready) {
+            mem.read(PC)
             sec
-            A += 0x60
-          } 
-          else clc
+            Last
+          }
         }
-	    Last
-	    }	    
-	  }
-	  case O_ANE_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    A = (A | 0xee) & X & data
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_LXA_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    A = (A | 0xee) & data
-	    X = A
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_SBX_I => () => {
-	    if (ready) {
-	    data = mem.read(PC) ; PC += 1
-	    ar = (X & A) - data
-	    X = ar & 0xFF
-	    set_nz(X)
-	    if (ar >= 0) sec else clc
-		Last
-	    }
-	  }
-	  case O_LAS => () => {
-	    if (ready) {
-	    data = mem.read(ar)
-	    X = data & SP
-	    SP = X
-	    A = X
-		set_nz(A)
-		Last
-	    }
-	  }
-	  case O_SHS => () => {		// ar2 contains the high byte of the operand address
-	    SP = A & X
-	    mem.write(ar,(ar2 + 1) & SP)
-		Last
-	  }
-	  case O_SHY => () => {		// ar2 contains the high byte of the operand address
-	    mem.write(ar,Y & (ar2 + 1))
-		Last
-	  }
-	  case O_SHX => () => {		// ar2 contains the high byte of the operand address
-	    mem.write(ar,X & (ar2 + 1))
-		Last
-	  }
-	  case O_SHA => () => {		// ar2 contains the high byte of the operand address
-	    mem.write(ar,A & X & (ar2 + 1))
-		Last
-	  }
-    case O_JAM => () => {
-      // HALT CPU
-    }
-	  case 1 => () => {
-      state = O_JAM
-      PC -= 1
-      throw new CPU6510.CPUJammedException(id,CURRENT_OP_PC)
-    }
-	  case RESET => () => { 
-	    if (ready) {
-	      PC = readWordFrom(0xfffc, mem)
-	      state = 0
-	      Log.info(s"$componentID/$id RESET to ${hex4(PC)}")
-	    }
-	  }
-	  case s => () => { println("Check CPU6510_CE states: " + s) }
-	  //case _ => throw new IllegalArgumentException("Bad state " + state + " at PC=" + Integer.toHexString(PC))
-    }
+        case O_CLC => () => {
+          if (ready) {
+            mem.read(PC)
+            clc
+            Last
+          }
+        }
+        case O_SED => () => {
+          if (ready) {
+            mem.read(PC)
+            sed
+            Last
+          }
+        }
+        case O_CLD => () => {
+          if (ready) {
+            mem.read(PC)
+            cld
+            Last
+          }
+        }
+        case O_SEI => () => {
+          if (ready) {
+            mem.read(PC)
+            prevIClearedFlag = !isInterrupt
+            sei
+            Last
+          }
+        }
+        case O_CLI => () => {
+          if (ready) {
+            mem.read(PC)
+            cli
+            delay1CycleIRQCheck = true
+            Last
+          }
+        }
+        case O_CLV => () => {
+          if (ready) {
+            mem.read(PC)
+            clv
+            Last
+          }
+        }
+        // NOP group
+        case O_NOP => () => {
+          if (ready) {
+            mem.read(PC)
+            Last
+          }
+        }
+        // Undocumented
+        // NOP group
+        case O_NOP_I => () => {
+          if (ready) {
+            mem.read(PC)
+            PC = (PC + 1) & 0xFFFF
+            Last
+          }
+        }
+        case O_NOP_A => () => {
+          if (ready) {
+            mem.read(ar)
+            Last
+          }
+        }
+        // Load A/X group
+        case O_LAX => () => {
+          if (ready) {
+            data = mem.read(ar)
+            A = data
+            X = data
+            set_nz(A)
+            Last
+          }
+        }
+        // Store A/X group
+        case O_SAX => () => {
+          mem.write(ar, A & X)
+          Last
+        }
+        // ASL/ORA group
+        case O_SLO => () => {
+          if ((rdbuf & 0x80) > 0) sec else clc
+          rdbuf <<= 1
+          mem.write(ar, rdbuf)
+          A |= rdbuf
+          set_nz(A)
+          Last
+        }
+        // ROL/AND group
+        case O_RLA => () => {
+          val tmp = (rdbuf & 0x80) > 0
+          rdbuf = if (isCarry) (rdbuf << 1) | 0x01 else rdbuf << 1
+          if (tmp) sec else clc
+          mem.write(ar, rdbuf)
+          A &= rdbuf
+          set_nz(A)
+          Last
+        }
+        // LSR/EOR group
+        case O_SRE => () => {
+          if ((rdbuf & 0x01) > 0) sec else clc
+          rdbuf >>= 1
+          mem.write(ar, rdbuf)
+          A ^= rdbuf
+          set_nz(A)
+          Last
+        }
+        // ROR/ADC group
+        case O_RRA => () => {
+          val tmp = (rdbuf & 0x01) > 0
+          rdbuf = if (isCarry) (rdbuf >> 1) | 0x80 else rdbuf >> 1
+          if (tmp) sec else clc
+          mem.write(ar, rdbuf)
+          do_adc(rdbuf)
+          Last
+        }
+        // DEC/CMP group
+        case O_DCP => () => {
+          rdbuf = (rdbuf - 1) & 0xFF
+          mem.write(ar, rdbuf)
+          ar = A - rdbuf
+          set_nz(ar)
+          if (ar >= 0) sec else clc
+          Last
+        }
+        // INC/SBC group
+        case O_ISB => () => {
+          rdbuf = (rdbuf + 1) & 0xFF
+          mem.write(ar, rdbuf)
+          do_sbc(rdbuf)
+          Last
+        }
+        // Complex functions
+        case O_ANC_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            A &= data
+            set_nz(A)
+            if (isNegative) sec else clc
+            Last
+          }
+        }
+        case O_ASR_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            A &= data
+            if ((A & 0x01) > 0) sec else clc
+            A >>= 1
+            set_nz(A)
+            Last
+          }
+        }
+        case O_ARR_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            data &= A
+            A = if (isCarry) (data >> 1) | 0x80 else data >> 1
+            if (!isDecimal) {
+              set_nz(A)
+              if ((A & 0x40) > 0) sec else clc
+              if (((A & 0x40) ^ ((A & 0x20) << 1)) > 0) sev else clv
+            }
+            else {
+              if (isCarry) sen else cln
+              if (A == 0) sez else clz
+              if (((data ^ A) & 0x40) != 0) sev else clv
+              if ((data & 0x0F) + (data & 0x01) > 5) A = A & 0xF0 | (A + 6) & 0x0F
+              if (((data + (data & 0x10)) & 0x1F0) > 0x50) {
+                sec
+                A += 0x60
+              }
+              else clc
+            }
+            Last
+          }
+        }
+        case O_ANE_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            A = (A | 0xee) & X & data
+            set_nz(A)
+            Last
+          }
+        }
+        case O_LXA_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            A = (A | 0xee) & data
+            X = A
+            set_nz(A)
+            Last
+          }
+        }
+        case O_SBX_I => () => {
+          if (ready) {
+            data = mem.read(PC);
+            PC = (PC + 1) & 0xFFFF
+            ar = (X & A) - data
+            X = ar & 0xFF
+            set_nz(X)
+            if (ar >= 0) sec else clc
+            Last
+          }
+        }
+        case O_LAS => () => {
+          if (ready) {
+            data = mem.read(ar)
+            X = data & SP
+            SP = X
+            A = X
+            set_nz(A)
+            Last
+          }
+        }
+        case O_SHS => () => { // ar2 contains the high byte of the operand address
+          SP = A & X
+          mem.write(ar, (ar2 + 1) & SP)
+          Last
+        }
+        case O_SHY => () => { // ar2 contains the high byte of the operand address
+          mem.write(ar, Y & (ar2 + 1))
+          Last
+        }
+        case O_SHX => () => { // ar2 contains the high byte of the operand address
+          mem.write(ar, X & (ar2 + 1))
+          Last
+        }
+        case O_SHA => () => { // ar2 contains the high byte of the operand address
+          mem.write(ar, A & X & (ar2 + 1))
+          Last
+        }
+        case O_JAM => () => {
+          // HALT CPU
+        }
+        case 1 => () => {
+          state = O_JAM
+          PC -= 1
+          throw new CPU6510.CPUJammedException(id, CURRENT_OP_PC)
+        }
+        case RESET => () => {
+          if (ready) {
+            PC = readWordFrom(0xfffc, mem)
+            state = 0
+            Log.info(s"$componentID/$id RESET to ${hex4(PC)}")
+          }
+        }
+        case s => () => {
+          println("Check CPU6510_CE states: " + s)
+        }
+        //case _ => throw new IllegalArgumentException("Bad state " + state + " at PC=" + Integer.toHexString(PC))
+      }
   }
-  
-  @inline private[this] def branch(flag:Boolean) {
+
+  @inline private[this] def branch(flag: Boolean) {
     if (ready) {
-      data = mem.read(PC) ; PC += 1
-	  if (flag) {
-	    ar = PC + data.asInstanceOf[Byte]
-	    if ((ar >> 8) != (PC >> 8)) {
-		  if ((data & 0x80) > 0) state = O_BRANCH_BP else state = O_BRANCH_FP
-	    } else state = O_BRANCH_NP
-	  } else state = 0
+      data = mem.read(PC);
+      PC = (PC + 1) & 0xFFFF
+      if (flag) {
+        ar = PC + data.asInstanceOf[Byte]
+        if ((ar >> 8) != (PC >> 8)) {
+          if ((data & 0x80) > 0) state = O_BRANCH_BP else state = O_BRANCH_FP
+        } else state = O_BRANCH_NP
+      } else state = 0
     }
   }
-  
-  @inline private[this] def do_adc(data:Int) {
+
+  @inline private[this] def do_adc(data: Int) {
     var tmp = A + data + (if (isCarry) 1 else 0)
-	if ((tmp & 0xFF) == 0) sez else clz
-	  
-	if (isDecimal) {
-	  tmp = (A & 0xf) + (data & 0xf) + (if (isCarry) 1 else 0)
-	  if (tmp > 0x9) tmp += 0x6
-	  if (tmp <= 0x0f) tmp = (tmp & 0xf) + (A & 0xf0) + (data & 0xf0)
-	  else tmp = (tmp & 0xf) + (A & 0xf0) + (data & 0xf0) + 0x10
-	  if ((((A ^ data) & 0x80) == 0) && (((A ^ tmp) & 0x80) != 0)) sev else clv
-	  if ((tmp & 0x80) > 0) sen else cln
-	  if ((tmp & 0x1f0) > 0x90) tmp += 0x60
-	  if (tmp > 0x99) sec else clc
-	  A = tmp & 0xff
-	} else {
-	  if ((((A ^ data) & 0x80) == 0) && (((A ^ tmp) & 0x80) != 0)) sev else clv
-	  if (tmp > 0xff) sec else clc
-	  A = tmp & 0xff
-	  set_nz(A)
-	}
+    if ((tmp & 0xFF) == 0) sez else clz
+
+    if (isDecimal) {
+      tmp = (A & 0xf) + (data & 0xf) + (if (isCarry) 1 else 0)
+      if (tmp > 0x9) tmp += 0x6
+      if (tmp <= 0x0f) tmp = (tmp & 0xf) + (A & 0xf0) + (data & 0xf0)
+      else tmp = (tmp & 0xf) + (A & 0xf0) + (data & 0xf0) + 0x10
+      if ((((A ^ data) & 0x80) == 0) && (((A ^ tmp) & 0x80) != 0)) sev else clv
+      if ((tmp & 0x80) > 0) sen else cln
+      if ((tmp & 0x1f0) > 0x90) tmp += 0x60
+      if (tmp > 0x99) sec else clc
+      A = tmp & 0xff
+    } else {
+      if ((((A ^ data) & 0x80) == 0) && (((A ^ tmp) & 0x80) != 0)) sev else clv
+      if (tmp > 0xff) sec else clc
+      A = tmp & 0xff
+      set_nz(A)
+    }
   }
-  
-  @inline private[this] def do_sbc(data:Int) {
+
+  @inline private[this] def do_sbc(data: Int) {
     var tmp = A - data - (if (isCarry) 0 else 1)
     val nextCarry = tmp >= 0
     tmp = tmp & 0x1ff
@@ -1901,6 +2043,9 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     dma = false
     ready = true
     baLow = false
+    delay1CycleIRQCheck = false
+    forceIRQNow = false
+    prevIClearedFlag = false
     A = 0
     X = 0
     Y = 0
@@ -1908,13 +2053,13 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     SP = 0
     Log.info(s"CPU reset! PC = ${hex4(PC)}")
   }
-  
-  def disassemble(mem:Memory,address:Int) = {
+
+  def disassemble(mem: Memory, address: Int) = {
     val dinfo = CPU6510.disassemble(mem, address)
-    (dinfo.toString,dinfo.len)
+    (dinfo.toString, dinfo.len)
   }
-  
-  final def fetchAndExecute(cycles:Int) {
+
+  final def fetchAndExecute(cycles: Int) {
     var c = cycles
     while (c > 0) {
       fetchAndExecute
@@ -1923,32 +2068,10 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   }
 
   @inline private def fetchAndExecute {
-    if (breakType != null && state == 0 && breakType.isBreak(PC,false,false)) {
+    if (breakType != null && state == 0 && breakType.isBreak(PC, false, false)) {
       breakType = null
       tracing = true
       breakCallBack(toString)
-    }
-    
-    // check interrupts
-    if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - nmiFirstCycle >= 2) {
-      nmiOnNegativeEdge = false
-      state = NMI_STATE
-      if (breakType != null && breakType.isBreak(PC,false,true)) {
-        breakType = null
-        tracing = true
-        breakCallBack(toString)
-        Log.debug("NMI Break")
-      }
-    } 
-    else 
-    if (irqLow && !isInterrupt && state == 0 && clk.currentCycles - irqFirstCycle >= 2) {
-      state = IRQ_STATE
-      if (breakType != null && breakType.isBreak(PC,true,false)) {
-        breakType = null
-        tracing = true
-        breakCallBack(toString)
-        Log.debug("IRQ Break")
-      }
     }
     val tracingNow = tracing && (state == 0 || state == O_JAM)
     if (tracingNow) Log.debug(formatDebug)
@@ -1957,15 +2080,46 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     CURRENT_OP_PC = PC
     if (tracingNow) {
       stepCallBack(toString)
-      syncObject.synchronized { syncObject.wait }
+      syncObject.synchronized {
+        syncObject.wait
+      }
     }
+
+    // check interrupts
+    if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - nmiFirstCycle >= 2) {
+      nmiOnNegativeEdge = false
+      state = NMI_STATE
+      if (breakType != null && breakType.isBreak(PC, false, true)) {
+        breakType = null
+        tracing = true
+        breakCallBack(toString)
+        Log.debug("NMI Break")
+      }
+    }
+    else if (state == 0 && ((irqLow && (!isInterrupt || prevIClearedFlag)  && clk.currentCycles - irqFirstCycle >= 2) || forceIRQNow)) {
+      if (!delay1CycleIRQCheck) {
+        forceIRQNow = false
+        state = IRQ_STATE
+      }
+      if (breakType != null && breakType.isBreak(PC, true, false)) {
+        breakType = null
+        tracing = true
+        breakCallBack(toString)
+        Log.debug("IRQ Break")
+      }
+    }
+    delay1CycleIRQCheck = false
+    prevIClearedFlag = false
+
     states(state)()
   }
-  def isFetchingInstruction : Boolean = state == 0
-  
-  protected def formatDebug = s"[${id.toString}] ${CPU6510.disassemble(mem,PC).toString} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
+
+  def isFetchingInstruction: Boolean = state == 0
+
+  protected def formatDebug = s"[${id.toString}] ${CPU6510.disassemble(mem, PC).toString} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
+
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out: ObjectOutputStream) {
     out.writeBoolean(baLow)
     out.writeBoolean(dma)
     out.writeBoolean(ready)
@@ -1986,8 +2140,12 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     out.writeInt(ar2)
     out.writeInt(data)
     out.writeInt(rdbuf)
+    out.writeBoolean(forceIRQNow)
+    out.writeBoolean(delay1CycleIRQCheck)
+    out.writeBoolean(prevIClearedFlag)
   }
-  protected def loadState(in:ObjectInputStream) {
+
+  protected def loadState(in: ObjectInputStream) {
     baLow = in.readBoolean
     dma = in.readBoolean
     ready = in.readBoolean
@@ -2008,6 +2166,10 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     ar2 = in.readInt
     data = in.readInt
     rdbuf = in.readInt
+    forceIRQNow = in.readBoolean
+    delay1CycleIRQCheck = in.readBoolean
+    prevIClearedFlag = in.readBoolean
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+
+  protected def allowsStateRestoring(parent: JFrame): Boolean = true
 }
