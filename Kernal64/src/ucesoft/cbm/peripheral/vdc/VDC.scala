@@ -329,7 +329,7 @@ class VDC extends RAMComponent {
         if (ychars_total == 0) {
           if (ypos == 0) {
             ram_base_offset = 34 * regs(1)
-            attr_offset = regs(1)
+            attr_offset = -regs(1)
           }
           else attr_offset = 3
           
@@ -757,7 +757,7 @@ class VDC extends RAMComponent {
     var ram_ptr = ram_base_ptr + interlaceRamOffset + ram_base_offset
     var attr_ptr = attr_base_ptr + interlaceAttrOffset + attr_offset
     
-    if (interlaceMode) ram_ptr += ((ychars_total + 1) >> 1) * virtualScreenWidth
+    if (interlaceMode) ram_ptr += (((regs(5) & 0x1F) + 1) >> 1) * virtualScreenWidth
     
     var col = 0
     val rightBorderPix = borderWidth + regs(1) * charWidth - (charWidth - 1 - xsmooth)
