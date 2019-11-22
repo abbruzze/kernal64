@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.5.2
+Kernal64 ver 1.5.3
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -18,6 +18,26 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.5.3 (Nov 22th 2019)
+- Fixed bug that prevents G64 floppy to run properly on 1571 drive.
+- New 2.13 Scala libraries.
+- Cart rom handling fix for unordered rom's index sequence
+- New command line option: --cpm64-enabled
+- Fixed VDC color palette
+- Fixed sprite handling for "Krestage 3" 50 pixels wide sprites
+- When JAM opcodes are executed the user can choose if continue or open debugger
+- Improved disk change recognition: Now the R/W disk head will read an empty disk for a while while user is changing disk
+- New command line option: --run-file. Can be used to run the specific file (on the attached disk) at startup
+- Fixed track allocation table for .D64 modified for .D71 support.
+- Removed disk insertion emulation when user is dragging a disk
+- D64: added last sector gap
+- Added directory/bam support for G64 format: now G64 can be previewed
+- Minor fixes to pass more CIA's tests
+- Added support for Zaxxon & Mach 5 carts
+- VDC: New screen size selection from VDC main screen. Useful to display images larger than PAL dimensions.
+- CPU: Fixed RTI, CLI, SEI and PLP; RTI: executes irq immediately if after restoring flags I = 0 and irq is pending; CLI,SEI,PLP: execute next instruction even if irq condition is satisfied
+- VIC: general improvements for sprites and gfx
 
 ### What's new in 1.5.2 (May 30th 2019)
 - CIA major bug fixed that prevented ComaLand to work properly
