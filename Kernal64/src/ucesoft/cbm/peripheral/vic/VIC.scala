@@ -1412,7 +1412,7 @@ final class VIC(mem: VICMemory,
       val busAvailable = clk.currentCycles - baLowFirstCycle > 2
       if (busAvailable) {
         val charCode = if (_2MhzMode) internalDataBus else mem.readPhi2(videoMatrixAddress | vc)
-        val color = if (_2MhzMode) mem.byteOnBUS & 0x0F else colorMem.read(COLOR_ADDRESS | vc) & 0x0F
+        val color = if (_2MhzMode) mem.byteOnBUS & 0x0F else colorMem.read(COLOR_ADDRESS | vc,ChipID.VIC) & 0x0F
         vml_p(vmli) = charCode
         vml_c(vmli) = color
       }
