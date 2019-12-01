@@ -468,7 +468,7 @@ class VDC extends RAMComponent {
         val vm = videoMode
         videoMode = VideoMode.IDLE
         drawTextLine
-        videoMode = vm
+        //videoMode = vm
       }
       else
       if ((regs(25) & 0x80) == 0) {
@@ -500,14 +500,15 @@ class VDC extends RAMComponent {
         else ram_base_ptr += virtualScreenWidth
       }
       currentCharScanLine += 1
+
+      if (currentCharScanLine > ychars_total) {
+        currentCharScanLine = 0
+        //ypos = (ypos + 1) % regs(6)
+        ypos += 1
+        attr_base_ptr += virtualScreenWidth
+        if (videoMode == VideoMode.TEXT) ram_base_ptr += virtualScreenWidth
+      }
     }    
-    
-    if (currentCharScanLine > ychars_total) {
-      currentCharScanLine = 0
-      ypos += 1
-      attr_base_ptr += virtualScreenWidth
-      if (videoMode == VideoMode.TEXT) ram_base_ptr += virtualScreenWidth
-    }
   }
   
   @inline private def updateGeometry {
@@ -526,12 +527,12 @@ class VDC extends RAMComponent {
     val hdisplayed = regs(1)
     val hsync = regs(2)
     val hsync_width = (regs(3) & 0x0F) - 1
-    var lborder = hsync - hdisplayed
-    var rborder = htotal - (hsync + hsync_width)
+    var rborder = hsync - hdisplayed
+    var lborder = htotal - (hsync + hsync_width)
 
     // adjustments in order to have 10 as border on both left and right at startup
-    rborder -= 8
-    lborder -= 12
+    lborder -= 8
+    rborder -= 12
 
     if (rborder < 0) rborder = 0
     if (lborder < 0) lborder = 0
@@ -560,7 +561,7 @@ class VDC extends RAMComponent {
   }
 /*
   @inline private def updateVertical : Unit = {
-    borderHeight = (regs(7) - regs(6)) * (ychars_total + 1)
+    borderHeight = (regs(4)  - regs(7)) * (ychars_total + 1)
     if (borderHeight < 0 || borderHeight > screenHeight) borderHeight = 0
 
     visibleTextRows = regs(6)
@@ -575,7 +576,7 @@ class VDC extends RAMComponent {
     oneLineDrawn = false
     currentCharScanLine = regs(24) & 0x1F // vertical smooth scrolling
     ypos = 0
-    borderHeight = (regs(7) - regs(6)) * (ychars_total + 1)
+    borderHeight = (regs(4)  - regs(7)) * (ychars_total + 1)
     if (borderHeight < 0 || borderHeight > screenHeight) borderHeight = 0
 
     visibleTextRows = regs(6)
@@ -619,7 +620,7 @@ class VDC extends RAMComponent {
   }
   
   @inline private def drawTextLine {
-    val backgroundColor = PALETTE(regs(26) & 0x0F)    
+    val backgroundColor = PALETTE(regs(26) & 0x0F)
     val bitmapOffset = rasterLine * screenWidth
     val blankColLeft = regs(35)
     val blankColRight = regs(34)
