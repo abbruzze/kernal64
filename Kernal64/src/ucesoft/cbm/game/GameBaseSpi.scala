@@ -24,7 +24,7 @@ class GameBaseSpi extends GameProvider {
   private val pages = (65 to 90).toList ++ List(48)
   private val constraints : List[SyncConstraint] = SyncAll :: (pages map { l => LetterConstraint(l.toChar) })
   
-  val version = {
+  lazy val version = {
     try getVersion.getOrElse("??")
     catch {
       case t:Throwable =>
