@@ -99,15 +99,15 @@ object ControlPort {
       import KeyEvent._
       if (e.getKeyLocation == KEY_LOCATION_NUMPAD) {
         e.getKeyCode match {
-          case VK_NUMPAD8 => 1 // up
-          case VK_NUMPAD2 => 2 // down
-          case VK_NUMPAD4 => 4 // left
-          case VK_NUMPAD6 => 8 // right
+          case VK_NUMPAD8|VK_UP => 1 // up
+          case VK_NUMPAD2|VK_DOWN => 2 // down
+          case VK_NUMPAD4|VK_LEFT => 4 // left
+          case VK_NUMPAD6|VK_RIGHT => 8 // right
           case VK_NUMPAD9 => 9 // up+right
           case VK_NUMPAD3 => 10// down+right
           case VK_NUMPAD7 => 5 // up+left
           case VK_NUMPAD1 => 6 // down+left
-          case VK_NUMPAD0 => 16	// fire
+          case VK_NUMPAD0|VK_INSERT => 16	// fire
           case _ => 0
         }
       }
