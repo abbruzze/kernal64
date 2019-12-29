@@ -66,7 +66,7 @@ object VDC {
 class VDC extends RAMComponent {
   import VDC._
 
-  val name = "C128 VDC"
+  val name = "VDC"
   val componentID = "C128_VDC"
   val isRom = false
   val startAddress = 0xD600
@@ -76,6 +76,8 @@ class VDC extends RAMComponent {
 
   final private[this] val X_LEFT_CLIP_COLS = 20 * 8
   final private[this] val X_RIGHT_CLIP_COLS = 8 * 8
+  final private[this] val Y_TOP_CLIP_ROWS = 1 * 8
+  final private[this] val Y_BOTTOM_CLIP_ROWS = 3 * 8
   final private[this] val CPU_CLOCK_HZ = 985248.0
   final private[this] val VDC_CLOCK_HZ = 16000000.0
 
@@ -103,7 +105,6 @@ class VDC extends RAMComponent {
   private[this] var videoMode = VideoMode.IDLE
   private[this] var screenHeight,currentScreenHeight = SCREEN_HEIGHT
   private[this] var screenWidth = SCREEN_WIDTH
-  private[this] var nextFrameScreenHeight = -1
   private[this] var oneLineDrawn = false
   // =====================================================
   private[this] var busyFlagClearCycle = 0L         // used to keep track of copy&fill operation cycles
@@ -232,7 +233,6 @@ class VDC extends RAMComponent {
     interlaceMode = false
     display.setInterlaceMode(false)
     bitmap = display.displayMem
-    nextFrameScreenHeight = SCREEN_HEIGHT
     currentScreenHeight = SCREEN_HEIGHT
     vsyncPos = 0
     setScanLines(SCREEN_HEIGHT)
@@ -332,14 +332,7 @@ class VDC extends RAMComponent {
       case 8 => // REG 8 Interlace
         if (debug) println(s"VDC: REG 8 Interlace: $value")
         val newInterlaceMode = (value & 3) == 3
-        if (newInterlaceMode != interlaceMode) {
-          interlaceMode = newInterlaceMode
-          display.setInterlaceMode(interlaceMode)
-          bitmap = display.displayMem
-          nextFrameScreenHeight = if (interlaceMode) currentScreenHeight << 1 else currentScreenHeight
-          if (debug) println(s"Interlace mode changed to $interlaceMode nextFrameScreenHeight=$nextFrameScreenHeight")
-          updateGeometryOnNextFrame = true
-        }
+        if (newInterlaceMode != interlaceMode) setInterlaceMode(newInterlaceMode)
       case 9 => // REG 9 Character Total Vertical
         ychars_total = value & 0x1F
         bytes_per_char = if (ychars_total < 16) 16 else 32
@@ -415,6 +408,17 @@ class VDC extends RAMComponent {
         if (debug) println(s"VDC: REG$address_reg Display Enable begin ${regs(34)} end ${regs(35)}")
       case _ =>
     }
+  }
+
+  private def setInterlaceMode(newInterlaceMode:Boolean) {
+    interlaceMode = newInterlaceMode
+    display.setInterlaceMode(interlaceMode)
+    bitmap = display.displayMem
+    if (debug) {
+      val nextFrameScreenHeight = if (interlaceMode) currentScreenHeight << 1 else currentScreenHeight
+      println(s"Interlace mode changed to $interlaceMode nextFrameScreenHeight=$nextFrameScreenHeight")
+    }
+    updateGeometryOnNextFrame = true
   }
 
   // ============================================================================
@@ -606,7 +610,8 @@ class VDC extends RAMComponent {
     val newScreenWidth = htotal * charWidth // (hdisplayed + lborder + rborder) * charWidth
     if (newScreenWidth != screenWidth) {
       screenWidth = newScreenWidth
-      display.setClipArea(X_LEFT_CLIP_COLS,0,screenWidth - X_RIGHT_CLIP_COLS,screenHeight)
+      //display.setClipArea(X_LEFT_CLIP_COLS,0,screenWidth - X_RIGHT_CLIP_COLS,screenHeight)
+      display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
       display.setNewResolution(currentScreenHeight,screenWidth)
       bitmap = display.displayMem
     }
@@ -645,10 +650,7 @@ class VDC extends RAMComponent {
     if (cursorMode == 0x60) (display.getFrameCounter % 0xF) == 0 // 1/32
     else false
     if (cursor_change) cursorOn = !cursorOn
-    if (nextFrameScreenHeight != -1) {
-      screenHeight = nextFrameScreenHeight
-      nextFrameScreenHeight = -1
-    }
+
     if (writeOnPrevFrame) {
       writeOnPrevFrame = false
       useCacheForNextFrame = false
@@ -669,8 +671,8 @@ class VDC extends RAMComponent {
     // don't know if the screen height must be checked on every frame
     if (newScreenHeight > MIN_HEIGHT && newScreenHeight < MAX_HEIGHT && newScreenHeight != currentHeight) {
       setScanLines(newScreenHeight)
-      display.setClipArea(X_LEFT_CLIP_COLS,0,screenWidth - X_RIGHT_CLIP_COLS,screenHeight)
-      //println(s"New screen height: $newScreenHeight")
+      display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
+      println(s"New screen height: $newScreenHeight")
     }
   }
 
@@ -730,7 +732,7 @@ class VDC extends RAMComponent {
         if (useAttributes) {
           val attr = ram(ram_adr(attr_ptr))
           attr_ptr += 1
-          if ((attr & 0x80) > 0) alternateCharSetOfs = 0x1000
+          if ((attr & 0x80) > 0) alternateCharSetOfs = if (ychars_total > 15) 0x2000 else 0x1000
           reverse ^= (attr & 0x40) > 0
           underline = (attr & 0x20) > 0 && currentCharScanLine == (regs(29) & 0x1F)
           blink = (attr & 0x10) > 0
@@ -746,7 +748,8 @@ class VDC extends RAMComponent {
           if (cursorMode != 0x00 && isCursorLine) reverse ^= cursorOn // cursor blinking
         }
 
-        val char_ptr = chargen_adr + alternateCharSetOfs + charCode * bytes_per_char + currentCharScanLine
+        val char_address = if (ychars_total > 15) (regs(28) & 0xC0) << 8 else chargen_adr
+        val char_ptr = char_address + alternateCharSetOfs + charCode * bytes_per_char + currentCharScanLine
         val charBitmap = ram(ram_adr(char_ptr))
         var showChar = true
 
@@ -910,7 +913,6 @@ class VDC extends RAMComponent {
     out.writeInt(screenHeight)
     out.writeInt(currentScreenHeight)
     out.writeInt(screenWidth)
-    out.writeInt(nextFrameScreenHeight)
     out.writeInt(cycles_per_line)
     out.writeInt(xchars_total)
     out.writeInt(ychars_total)
@@ -941,7 +943,6 @@ class VDC extends RAMComponent {
     screenHeight = in.readInt
     currentScreenHeight = in.readInt
     screenWidth = in.readInt
-    nextFrameScreenHeight = in.readInt
     cycles_per_line = in.readInt
     xchars_total = in.readInt
     ychars_total = in.readInt
@@ -964,6 +965,10 @@ class VDC extends RAMComponent {
     vsyncPos = in.readInt
     borderWidth = in.readInt
     interlaceMode = in.readBoolean
+    setInterlaceMode(interlaceMode)
+    display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
+    display.setNewResolution(currentScreenHeight,screenWidth)
+    bitmap = display.displayMem
     play
   }
   protected def allowsStateRestoring(parent:JFrame) = true
