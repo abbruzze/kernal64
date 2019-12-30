@@ -2356,6 +2356,8 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   
   private def close {
     saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
+    for(d <- drives)
+      d.getFloppy.close
     shutdownComponent
     sys.exit(0)
   }
@@ -2373,9 +2375,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
       val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
       val out = new FileWriter(propsFile)
       configuration.store(out, "C128 configuration file")
-      out.close      
-      for(d <- drives)
-        d.getFloppy.close
+      out.close
     }
     catch {
       case io:IOException =>

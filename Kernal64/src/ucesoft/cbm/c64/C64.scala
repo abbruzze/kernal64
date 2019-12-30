@@ -2045,6 +2045,8 @@ class C64 extends CBMComponent with GamePlayer {
   
   private def close {
     saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
+    for(d <- drives)
+      d.getFloppy.close
     shutdownComponent
     sys.exit(0)
   }
@@ -2060,9 +2062,7 @@ class C64 extends CBMComponent with GamePlayer {
       val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
       val out = new FileWriter(propsFile)
       configuration.store(out, "C64 configuration file")
-      out.close      
-      for(d <- drives)
-        d.getFloppy.close
+      out.close
     }
     catch {
       case io:IOException =>
