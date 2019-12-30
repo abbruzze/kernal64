@@ -215,6 +215,7 @@ class VDC extends RAMComponent {
   }
 
   final def reset {
+    busyFlagClearCycle = 0
     charVisibleWidth = 8
     regs(22) = 0x78
     regs(25) = 0x47
@@ -285,10 +286,16 @@ class VDC extends RAMComponent {
       case 28 => // to set the memory size 16K or 64K
         regs(28)
       case 31 =>
-        val addr = currentMemoryAddress
-        incCurrentMemoryAddress
-        busyFlagClearCycle = clk.currentCycles + 37
-        ram(ram_adr(addr))
+        if (busyFlagClearCycle < clk.currentCycles) {
+          val adr = currentMemoryAddress
+          incCurrentMemoryAddress
+          busyFlagClearCycle = clk.currentCycles + 37
+          ram(ram_adr(adr))
+        }
+        else {
+          //println(s"Reading too early $busyFlagClearCycle ${clk.currentCycles}")
+          0
+        }
       case _ =>
         regs(address_reg) | reg_mask(address_reg)
     }
@@ -362,8 +369,8 @@ class VDC extends RAMComponent {
       case 14|15 =>  // REG 14-5 Cursor location HI/LO
         cursor_pos = regs(14) << 8 | regs(15)
       //if (debug) println(s"VDC: new cursor pos($address_reg): ${Integer.toHexString(cursor_pos)}")
-      case 19 =>
-        busyFlagClearCycle = clk.currentCycles + 37
+      case 18|19 =>
+        if (busyFlagClearCycle < clk.currentCycles) busyFlagClearCycle = clk.currentCycles + 37
       case 20|21 => // REG 20-1 Attribute Start Address hi/lo
         //attr_adr = regs(20) << 8 | regs(21)
         if (debug) println(s"VDC: new Attribute Address($address_reg): ${Integer.toHexString(regs(20) << 8 | regs(21))}")
@@ -399,10 +406,12 @@ class VDC extends RAMComponent {
       case 30 =>
         copyorfill
       case 31 =>
-        val addr = currentMemoryAddress
-        incCurrentMemoryAddress
-        ram(ram_adr(addr)) = value
-        busyFlagClearCycle = clk.currentCycles + 15
+        if (busyFlagClearCycle < clk.currentCycles) {
+          val addr = currentMemoryAddress
+          incCurrentMemoryAddress
+          ram(ram_adr(addr)) = value
+          busyFlagClearCycle = clk.currentCycles + 15
+        }
       //if (debug) println(s"VDC write ${Integer.toHexString(addr)} = ${Integer.toHexString(value)}")
       case 34|35 => // REG 34-5 Display Enable begin/end
         if (debug) println(s"VDC: REG$address_reg Display Enable begin ${regs(34)} end ${regs(35)}")
@@ -672,7 +681,7 @@ class VDC extends RAMComponent {
     if (newScreenHeight > MIN_HEIGHT && newScreenHeight < MAX_HEIGHT && newScreenHeight != currentHeight) {
       setScanLines(newScreenHeight)
       display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
-      println(s"New screen height: $newScreenHeight")
+      //println(s"New screen height: $newScreenHeight")
     }
   }
 
