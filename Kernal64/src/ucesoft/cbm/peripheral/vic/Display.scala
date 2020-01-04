@@ -248,6 +248,10 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     }
   }
 
+  def setPaused : Unit = {
+    frame.setTitle(s"$title - paused")
+  }
+
   def lastFramePerSecondCounter = framePerSecond
 
   def saveSnapshot(file: File) {

@@ -1679,7 +1679,11 @@ class C64 extends CBMComponent with GamePlayer {
     
     val pauseItem = new JCheckBoxMenuItem("Pause")
     pauseItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_P,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    pauseItem.addActionListener(e => if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) clock.pause else clock.play )
+    pauseItem.addActionListener(e =>
+      if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) {
+        clock.pause
+        display.setPaused
+      } else clock.play )
     optionMenu.add(pauseItem)
     
     optionMenu.addSeparator

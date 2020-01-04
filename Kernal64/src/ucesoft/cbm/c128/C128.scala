@@ -408,7 +408,11 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
           // mouse
           case java.awt.event.KeyEvent.VK_P if e.isAltDown => 
             if (Clock.systemClock.isPaused) Clock.systemClock.play
-            else Clock.systemClock.pause
+            else {
+              Clock.systemClock.pause
+              vicDisplay.setPaused
+              vdcDisplay.setPaused
+            }
           case java.awt.event.KeyEvent.VK_M if e.isAltDown =>
             mouseEnabled = !mouseEnabled
             sid.setMouseEnabled(mouseEnabled)
@@ -1966,7 +1970,12 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     
     val pauseItem = new JCheckBoxMenuItem("Pause")
     pauseItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_P,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    pauseItem.addActionListener(e => if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) clock.pause else clock.play )
+    pauseItem.addActionListener(e =>
+      if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) {
+        clock.pause
+        vicDisplay.setPaused
+        vdcDisplay.setPaused
+      } else clock.play )
     optionMenu.add(pauseItem)
     
     optionMenu.addSeparator
