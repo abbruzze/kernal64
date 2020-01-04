@@ -25,7 +25,7 @@ object VDC {
 }
 
 /**
-0/$00 Total number of horizontal character positions
+  0/$00 Total number of horizontal character positions
   l/$01 Number of visible horizontal character positions
   2/$02 Horizontal sync position
   3/$03 Horizontal and vertical sync width
@@ -589,7 +589,7 @@ class VDC extends RAMComponent {
 
     if (currentCharScanLine > ychars_total) {
       currentCharScanLine = 0
-      ypos = (ypos + 1) % regs(6)
+      ypos = (ypos + 1) & 0x1F
       //ypos += 1
       if (videoMode != VideoMode.IDLE) attr_base_ptr += virtualScreenWidth
       if (videoMode == VideoMode.TEXT) ram_base_ptr += virtualScreenWidth
@@ -600,7 +600,7 @@ class VDC extends RAMComponent {
   @inline private def updateGeometry {
     visibleTextRows = regs(6)
     visibleScreenHeightPix = visibleTextRows * (ychars_total + 1)
-    val charWidth = if((regs(25) & 0x10) > 0) (regs(22) >> 4) << 1 /* double pixel a.k.a 40column mode */
+    val charWidth = if((regs(25) & 0x10) > 0) (regs(22) >> 4) << 1 /* 40column mode */
     else 1 + (regs(22) >> 4)
 
     val htotal = xchars_total
@@ -608,26 +608,24 @@ class VDC extends RAMComponent {
     val hsync = regs(2)
 
     val BORDER = 4
-    val hsync_width = (regs(3) & 0x0F) - 1
-    //var rborder = hsync - hdisplayed - BORDER
-    var lborder = htotal - hsync + BORDER //htotal - (hsync + hsync_width)
+    var lborder = htotal - hsync + BORDER
     var rborder = htotal - hdisplayed - lborder
 
     if (rborder < 0) rborder = 0
     if (lborder < 0) lborder = 0
 
-    val newScreenWidth = htotal * charWidth // (hdisplayed + lborder + rborder) * charWidth
+    borderWidth = lborder * charWidth
+
+    val newScreenWidth = htotal * charWidth
     if (newScreenWidth != screenWidth) {
       screenWidth = newScreenWidth
-      //display.setClipArea(X_LEFT_CLIP_COLS,0,screenWidth - X_RIGHT_CLIP_COLS,screenHeight)
-      display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
+      if (borderWidth < X_LEFT_CLIP_COLS) display.setClipArea(borderWidth,Y_TOP_CLIP_ROWS,screenWidth,screenHeight - Y_BOTTOM_CLIP_ROWS)
+      else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
       display.setNewResolution(currentScreenHeight,screenWidth)
       bitmap = display.displayMem
     }
 
-    borderWidth = lborder * charWidth
-    //borderWidth = (xchars_total - regs(2) - ((regs(3) & 0x0F))) * charWidth
-    if (debug) println(s"New screen res. width=$screenWidth htotal=$htotal hdisplayed=$hdisplayed hsync=$hsync hsync_width=$hsync_width rborder=$rborder lborder=$lborder rester=$rasterLine")
+    if (debug) println(s"New screen res. width=$screenWidth htotal=$htotal hdisplayed=$hdisplayed hsync=$hsync hsync_width=${(regs(3) & 0x0F) - 1} rborder=$rborder lborder=$lborder rester=$rasterLine")
     if (borderWidth < 0) borderWidth = 0
     val textMode = (regs(25) & 0x80) == 0
     if (geometryUpdateListener != null) {
@@ -641,6 +639,7 @@ class VDC extends RAMComponent {
   }
 
   @inline private def nextFrame {
+    blankMode = false
     frameBit = (frameBit + 1) & 1
     if (oneLineDrawn) display.showFrame(0,0,screenWidth,screenHeight)
     else display.showFrame(-1,-1,-1,-1)
@@ -680,7 +679,8 @@ class VDC extends RAMComponent {
     // don't know if the screen height must be checked on every frame
     if (newScreenHeight > MIN_HEIGHT && newScreenHeight < MAX_HEIGHT && newScreenHeight != currentHeight) {
       setScanLines(newScreenHeight)
-      display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
+      if (borderWidth < X_LEFT_CLIP_COLS) display.setClipArea(borderWidth,Y_TOP_CLIP_ROWS,screenWidth,screenHeight - Y_BOTTOM_CLIP_ROWS)
+      else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
       //println(s"New screen height: $newScreenHeight")
     }
   }
@@ -688,8 +688,9 @@ class VDC extends RAMComponent {
   @inline private def drawTextLine(vsync:Boolean) {
     val backgroundColor = PALETTE(regs(26) & 0x0F)
     val bitmapOffset = rasterLine * screenWidth
-    val blankColLeft = regs(35) % regs(0)
-    val blankColRight = regs(34) % regs(0)
+    val blankColOffset = xchars_total - regs(2) + 4 - 7
+    val blankColLeft = regs(35) + blankColOffset
+    val blankColRight = regs(34) + blankColOffset
 
     val foregroundColor = PALETTE((regs(26) >> 4) & 0x0F)
     val virtualScreenWidth = regs(1) + regs(27)
@@ -712,20 +713,19 @@ class VDC extends RAMComponent {
     val semigraphicMode = (regs(25) & 0x20) > 0
 
     while (col < xchars_total) {
-      // TODO
-      //      if (col == blankColLeft) blankMode = true
-      //      else
-      //      if (col == blankColRight) blankMode = false
+      if (blankColRight < xchars_total && colPix / charWidth == blankColLeft) blankMode = true
+      else
+      if (col == blankColRight) blankMode = false
 
       val outRow = colPix < borderWidth || colPix >= rightBorderPix
       if (vsync || videoMode == VideoMode.IDLE || videoMode == VideoMode.BLANK || outRow) {
         var x = 0
         val bkc = if (blankMode || videoMode == VideoMode.BLANK || (videoMode == VideoMode.IDLE && !outRow)) PALETTE(0) else backgroundColor
-        while (x < charWidth && colPix + x < screenWidth) {
-          bitmap(bitmapOffset + colPix + x) = bkc
+        while (x < charWidth && colPix < screenWidth) {
+          bitmap(bitmapOffset + colPix) = bkc
           x += 1
+          colPix += 1
         }
-        colPix += charWidth
       }
       else {
         // pick char code
@@ -798,7 +798,6 @@ class VDC extends RAMComponent {
       }
       col += 1
     }
-    //    if (blankColRight > xtotal) blankMode = false
   }
 
   @inline private def drawBitmapLine {
@@ -825,15 +824,22 @@ class VDC extends RAMComponent {
     val reverse = (regs(24) & 0x40) > 0
     val semigraphicMode = (regs(25) & 0x20) > 0
 
+    val blankColOffset = xchars_total - regs(2) + 4 - 7
+    val blankColLeft = regs(35) + blankColOffset
+    val blankColRight = regs(34) + blankColOffset
+
     while (col < xchars_total) {
-      if (colPix < borderWidth || // TODO Horizontal blanking pos.
-        colPix >= rightBorderPix) {
+      if (blankColRight < xchars_total && colPix / charWidth == blankColLeft) blankMode = true
+      else
+      if (col == blankColRight) blankMode = false
+
+      if (colPix < borderWidth || colPix >= rightBorderPix) {
         var x = 0
-        while (x < charWidth && colPix + x < screenWidth) {
-          bitmap(bitmapOffset + colPix + x) = backgroundColor
+        while (x < charWidth && colPix < screenWidth) {
+          bitmap(bitmapOffset + colPix) = if (blankMode) PALETTE(0) else backgroundColor
           x += 1
+          colPix += 1
         }
-        colPix += charWidth
       }
       else {
         // pick gfx
@@ -944,6 +950,7 @@ class VDC extends RAMComponent {
     out.writeInt(vsyncPos)
     out.writeInt(borderWidth)
     out.writeBoolean(interlaceMode)
+    out.writeBoolean(blankMode)
   }
   protected def loadState(in:ObjectInputStream) {
     loadMemory[Int](ram,in)
@@ -974,6 +981,7 @@ class VDC extends RAMComponent {
     vsyncPos = in.readInt
     borderWidth = in.readInt
     interlaceMode = in.readBoolean
+    blankMode = in.readBoolean
     setInterlaceMode(interlaceMode)
     display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
     display.setNewResolution(currentScreenHeight,screenWidth)
