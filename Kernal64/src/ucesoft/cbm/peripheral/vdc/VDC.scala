@@ -76,8 +76,8 @@ class VDC extends RAMComponent {
 
   final private[this] val X_LEFT_CLIP_COLS = 20 * 8
   final private[this] val X_RIGHT_CLIP_COLS = 8 * 8
-  final private[this] val Y_TOP_CLIP_ROWS = 1 * 8
-  final private[this] val Y_BOTTOM_CLIP_ROWS = 3 * 8
+  final private[this] val Y_TOP_CLIP_ROWS = 3 * 8//1 * 8
+  final private[this] val Y_BOTTOM_CLIP_ROWS = 0//3 * 8
   final private[this] val CPU_CLOCK_HZ = 985248.0
   final private[this] val VDC_CLOCK_HZ = 16000000.0
 
@@ -128,16 +128,18 @@ class VDC extends RAMComponent {
   private[this] var lpFlag = 0                      // 0 = no new values of lp coords, 0x40 new values
   private[this] var clkStartLine = 0L               // clock cycles when the last line begun
   // -----------------------------------------------------
-  private[this] var rasterLine,screenLine = 0
+  private[this] var rasterLine = 0
   private[this] var currentCharScanLine = 0
   private[this] var visibleScreenHeightPix = 0      // total Y pixels
   private[this] var visibleTextRows = 0             // total rows
-  private[this] var vsyncPos,borderWidth = 0    // top char position
+  private[this] var borderWidth = 0
   private[this] var interlaceMode = false
   private[this] var geometryUpdateListener : String => Unit = _
   private[this] var useCacheForNextFrame,writeOnPrevFrame = false
   private[this] var updateGeometryOnNextFrame = false
   private[this] var blankMode = false // TO BE IMPLEMENTED PROPERLY
+  private[this] var rowCounter,rowCounterY = 0
+  private[this] var verticalAdjFlag = 0
   // -----------------------------------------------------
   private[this] var deinterlaceMode = true
   private[this] var frameBit = 0
@@ -235,7 +237,6 @@ class VDC extends RAMComponent {
     display.setInterlaceMode(false)
     bitmap = display.displayMem
     currentScreenHeight = SCREEN_HEIGHT
-    vsyncPos = 0
     setScanLines(SCREEN_HEIGHT)
     play
   }
@@ -435,7 +436,7 @@ class VDC extends RAMComponent {
     val charWidth = if((regs(25) & 0x10) > 0) (regs(22) >> 4) << 1 /* double pixel a.k.a 40column mode */
     else 1 + (regs(22) >> 4)
 
-    val exact_cycles_per_line = xchars_total * charWidth * CPU_CLOCK_HZ / VDC_CLOCK_HZ - 0.2
+    val exact_cycles_per_line = xchars_total * charWidth * CPU_CLOCK_HZ / VDC_CLOCK_HZ
     val new_cycles_per_line = (exact_cycles_per_line * 65536).asInstanceOf[Int]
     if (new_cycles_per_line != cycles_per_line) {
       cycles_per_line = new_cycles_per_line
@@ -490,45 +491,41 @@ class VDC extends RAMComponent {
     t.printStackTrace
   }
 
-  @inline private def vsync: Unit = {
-    vblank = false
-    screenLine = 0
-    ypos = 0
-    currentCharScanLine = regs(24) & 0x1F // vertical smooth scrolling
-    if (currentCharScanLine > ychars_total) currentCharScanLine = 0 // ?? maybe
-  }
-
   @inline private def latch_addresses: Unit = {
     // update video & attributes address for the next frame
     ram_adr = regs(12) << 8 | regs(13)
     attr_adr = regs(20) << 8 | regs(21)
     ram_base_ptr = ram_adr
     attr_base_ptr = attr_adr
-
-    // vsync update
-    // from vdc101 tests seems this is the correct place to check vsync updates
-    var _vsyncPos = (regs(4) - regs(7)) * (ychars_total + 1) -          // vsync pulse
-         //(((regs(9) & 0x1f) - (regs(24) & 0x1f)) & 0x1f) -            // vscroll adjustment
-         ((regs(3) >> 4) & 0x0F)                                        // vsync pulse width
-    if (_vsyncPos > screenHeight) _vsyncPos = 0 // what to do when vsync > screenHeight ?
-    else
-    if (_vsyncPos < 0) _vsyncPos = screenHeight - regs(4) * (ychars_total + 1) // maybe ? seems correct for vdc101
-
-    if (_vsyncPos != vsyncPos) {
-      vsyncPos = _vsyncPos
-      //println(s"New vsync: regs(4)=${regs(4)} regs(7)=${regs(7)} ychars_total=${ychars_total} vsync=$vsyncPos")
-    }
   }
+
+  @inline private def vsync : Unit = {
+    rasterLine = 0
+    nextFrame
+  }
+
 
   final def drawLine(cycles:Long) {
     clkStartLine = cycles
     reschedule
 
-    if (rasterLine == vsyncPos) vsync
-    else
-    if (screenLine == visibleScreenHeightPix) vblank = true
-    else
-    if (screenLine == screenHeight || screenLine == visibleScreenHeightPix + 2) latch_addresses
+    if (rowCounter == visibleTextRows) vblank = true
+    if (rowCounter == visibleTextRows && currentCharScanLine == 0) latch_addresses
+
+    if (rowCounter > regs(4)) {
+      if (verticalAdjFlag == 2 || (regs(5) & 0x1F) == 0) {
+        rowCounter = 0
+        rowCounterY = 0
+        verticalAdjFlag = 0
+        currentCharScanLine = regs(24) & 0x1F
+        if (currentCharScanLine > ychars_total) currentCharScanLine = 0 // ?? maybe
+        vblank = false
+        ypos = 0
+        latch_addresses
+      }
+      else verticalAdjFlag = 1
+    }
+    if (rowCounter == regs(7) && rowCounterY == 0) vsync
 
     val interlacing = !deinterlaceMode && interlaceMode
     val skipLineForInterlace = interlacing && ((rasterLine & 1) != frameBit)
@@ -536,9 +533,9 @@ class VDC extends RAMComponent {
     if (!useCacheForNextFrame || interlacing)
       try {
         oneLineDrawn = true
-        val isIdle = currentCharScanLine > ychars_visible ||
+        val isIdle = false/*currentCharScanLine > ychars_visible ||
                      ((regs(25) & 0x10) == 0 && xsmooth > ((regs(22) >> 4) & 0x0F)) ||  // xscroll > char_width in single pixel mode
-                     ((regs(25) & 0x10) > 0 && xsmooth >= ((regs(22) >> 4) & 0x0F))     // xscroll >= char_width in double pixel mode
+                     ((regs(25) & 0x10) > 0 && xsmooth >= ((regs(22) >> 4) & 0x0F))     // xscroll >= char_width in double pixel mode*/
         val allBlank = ((regs(25) & 0x10) == 0 && regs(34) > regs(0)) || regs(34) == regs(35)
         if (allBlank) {
           videoMode = VideoMode.BLANK
@@ -568,13 +565,6 @@ class VDC extends RAMComponent {
       }
     // NEXT RASTER LINE =====================================================
     rasterLine += 1
-    screenLine += 1
-
-    if (rasterLine > screenHeight) {
-      rasterLine = 0
-      nextFrame // we are on last line
-      //latch_addresses
-    }
 
     val virtualScreenWidth = (regs(1) + regs(27))
     if (!vblank && videoMode != VideoMode.IDLE) {
@@ -589,12 +579,20 @@ class VDC extends RAMComponent {
 
     if (currentCharScanLine > ychars_total) {
       currentCharScanLine = 0
-      ypos = (ypos + 1) & 0x1F
-      //ypos += 1
+      ypos += 1
       if (videoMode != VideoMode.IDLE) attr_base_ptr += virtualScreenWidth
       if (videoMode == VideoMode.TEXT) ram_base_ptr += virtualScreenWidth
     }
 
+    rowCounterY += 1
+    if (verticalAdjFlag == 1) {
+      if (rowCounterY == (regs(5) & 0x1F)) verticalAdjFlag = 2
+    }
+    else
+    if (rowCounterY > ychars_total) {
+      rowCounterY = 0
+      rowCounter += 1
+    }
   }
 
   @inline private def updateGeometry {
@@ -673,7 +671,7 @@ class VDC extends RAMComponent {
       updateGeometry
     }
     // check new screen's height
-    var newScreenHeight = (regs(4) + 1) * (ychars_total + 1) + (regs(5) & 0x0F)
+    var newScreenHeight = regs(4) * (ychars_total + 1) + (regs(5) & 0x1F)
     if (interlaceMode) newScreenHeight >>= 1
     val currentHeight = if (interlaceMode) screenHeight >> 1 else screenHeight
     // don't know if the screen height must be checked on every frame
@@ -681,7 +679,7 @@ class VDC extends RAMComponent {
       setScanLines(newScreenHeight)
       if (borderWidth < X_LEFT_CLIP_COLS) display.setClipArea(borderWidth,Y_TOP_CLIP_ROWS,screenWidth,screenHeight - Y_BOTTOM_CLIP_ROWS)
       else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
-      //println(s"New screen height: $newScreenHeight")
+      println(s"New screen height: $newScreenHeight")
     }
   }
 
@@ -947,10 +945,12 @@ class VDC extends RAMComponent {
     out.writeInt(currentCharScanLine)
     out.writeInt(visibleScreenHeightPix)
     out.writeInt(visibleTextRows)
-    out.writeInt(vsyncPos)
     out.writeInt(borderWidth)
     out.writeBoolean(interlaceMode)
     out.writeBoolean(blankMode)
+    out.writeInt(rowCounter)
+    out.writeInt(rowCounterY)
+    out.writeInt(verticalAdjFlag)
   }
   protected def loadState(in:ObjectInputStream) {
     loadMemory[Int](ram,in)
@@ -978,10 +978,12 @@ class VDC extends RAMComponent {
     currentCharScanLine = in.readInt
     visibleScreenHeightPix = in.readInt
     visibleTextRows = in.readInt
-    vsyncPos = in.readInt
     borderWidth = in.readInt
     interlaceMode = in.readBoolean
     blankMode = in.readBoolean
+    rowCounter = in.readInt
+    rowCounterY = in.readInt
+    verticalAdjFlag = in.readInt
     setInterlaceMode(interlaceMode)
     display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
     display.setNewResolution(currentScreenHeight,screenWidth)
