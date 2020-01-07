@@ -533,9 +533,9 @@ class VDC extends RAMComponent {
     if (!useCacheForNextFrame || interlacing)
       try {
         oneLineDrawn = true
-        val isIdle = false/*currentCharScanLine > ychars_visible ||
+        val isIdle = currentCharScanLine > ychars_visible ||
                      ((regs(25) & 0x10) == 0 && xsmooth > ((regs(22) >> 4) & 0x0F)) ||  // xscroll > char_width in single pixel mode
-                     ((regs(25) & 0x10) > 0 && xsmooth >= ((regs(22) >> 4) & 0x0F))     // xscroll >= char_width in double pixel mode*/
+                     ((regs(25) & 0x10) > 0 && xsmooth >= ((regs(22) >> 4) & 0x0F))     // xscroll >= char_width in double pixel mode
         val allBlank = ((regs(25) & 0x10) == 0 && regs(34) > regs(0)) || regs(34) == regs(35)
         if (allBlank) {
           videoMode = VideoMode.BLANK
@@ -679,7 +679,7 @@ class VDC extends RAMComponent {
       setScanLines(newScreenHeight)
       if (borderWidth < X_LEFT_CLIP_COLS) display.setClipArea(borderWidth,Y_TOP_CLIP_ROWS,screenWidth,screenHeight - Y_BOTTOM_CLIP_ROWS)
       else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
-      println(s"New screen height: $newScreenHeight")
+      //println(s"New screen height: $newScreenHeight")
     }
   }
 
