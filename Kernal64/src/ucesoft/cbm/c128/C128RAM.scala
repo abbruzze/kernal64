@@ -119,6 +119,7 @@ private[c128] class C128RAM extends RAMComponent {
     if (expanded) VICbank = bank & 0x3 
     else VICbank = bank & 0x1 
     Log.debug(s"Set VIC bank to $VICbank")
+    //println(s"Set VIC bank to $VICbank")
   }  
   /**
    *  Set the redirecting page 0/1 page
@@ -128,13 +129,14 @@ private[c128] class C128RAM extends RAMComponent {
   final def setDivertedPage(page:Int,divertedPage:Int,divertedPageBank:Int) {
     if (page == 0) {
       page_0 = divertedPage & 0xFF
-      page_0_bank = divertedPageBank & 0x1
+      page_0_bank = divertedPageBank & (if (expanded) 0x3 else 0x1)
     }
     else {
       page_1 = divertedPage & 0xFF
-      page_1_bank = divertedPageBank & 0x1
+      page_1_bank = divertedPageBank & (if (expanded) 0x3 else 0x1)
     }
     Log.debug(s"Page $page diverted to ${Integer.toHexString(divertedPage << 8 | (divertedPageBank & 1) << 16)}")
+    //println(s"Set diverted page $page $divertedPage $divertedPageBank")
   }
   
   final def setExpansionBanks(expanded:Boolean) {
@@ -160,7 +162,7 @@ private[c128] class C128RAM extends RAMComponent {
     commonAreaBottomLimit = COMMON_RAM_SIZE_FROM_BOTTOM(commonAreaSize + 1)
     commonAreaTopLimit = COMMON_RAM_SIZE_FROM_TOP(commonAreaSize + 1)
     Log.debug(s"Common area set to $commonArea. Common area size set to $commonAreaSize. Common bottom limit ${Integer.toHexString(commonAreaBottomLimit)}. Common top limit ${Integer.toHexString(commonAreaTopLimit)}")
-    //println(s"Common area set to $commonArea. Common area size set to $commonAreaSize. Common bottom limit ${Integer.toHexString(commonAreaBottomLimit)}. Common top limit ${Integer.toHexString(commonAreaTopLimit)}")    
+    //println(s"Common area set to $commonArea. Common area size set to $commonAreaSize. Common bottom limit ${Integer.toHexString(commonAreaBottomLimit)}. Common top limit ${Integer.toHexString(commonAreaTopLimit)}")
   }
   
   @inline private def page_0_1(_address:Int) : Int = {
@@ -188,16 +190,16 @@ private[c128] class C128RAM extends RAMComponent {
     
     commonArea match {
       case BOTTOM_COMMON_RAM => 
-        if (address < commonAreaBottomLimit) return mem(0)(address)
-        else return mem(processorBank)(address)
+        if (address < commonAreaBottomLimit) mem(0)(address)
+        else mem(processorBank)(address)
       case TOP_COMMON_RAM =>
-        if (address > commonAreaTopLimit) return mem(0)(address)
-        else return mem(processorBank)(address)
+        if (address > commonAreaTopLimit) mem(0)(address)
+        else mem(processorBank)(address)
       case TOP_BOTTOM_COMMON_RAM =>
-        if (address < commonAreaBottomLimit || address > commonAreaTopLimit) return mem(0)(address)
-        else return mem(processorBank)(address)
+        if (address < commonAreaBottomLimit || address > commonAreaTopLimit) mem(0)(address)
+        else mem(processorBank)(address)
       case NO_COMMON_RAM =>
-        return mem(processorBank)(address)
+        mem(processorBank)(address)
     }
   }
   
