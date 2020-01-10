@@ -76,7 +76,7 @@ class VDC extends RAMComponent {
 
   final private[this] val X_LEFT_CLIP_COLS = 20 * 8
   final private[this] val X_RIGHT_CLIP_COLS = 8 * 8
-  final private[this] val Y_TOP_CLIP_ROWS = 3 * 8//1 * 8
+  final private[this] val Y_TOP_CLIP_ROWS = 0//3 * 8//1 * 8
   final private[this] val Y_BOTTOM_CLIP_ROWS = 0//3 * 8
   final private[this] val CPU_CLOCK_HZ = 985248.0
   final private[this] val VDC_CLOCK_HZ = 16000000.0
@@ -347,7 +347,7 @@ class VDC extends RAMComponent {
         if (ychars_total == 0) {
           if (ypos == 0) {
             ram_base_offset = 34 * regs(1)
-            attr_offset = -regs(1)
+            attr_offset = regs(1)
           }
           else attr_offset = 3
 
@@ -411,7 +411,7 @@ class VDC extends RAMComponent {
           val addr = currentMemoryAddress
           incCurrentMemoryAddress
           ram(ram_adr(addr)) = value
-          busyFlagClearCycle = clk.currentCycles + 15
+          busyFlagClearCycle = clk.currentCycles + 26 // 15
         }
       //if (debug) println(s"VDC write ${Integer.toHexString(addr)} = ${Integer.toHexString(value)}")
       case 34|35 => // REG 34-5 Display Enable begin/end
@@ -448,11 +448,18 @@ class VDC extends RAMComponent {
   @inline private[this] def copyorfill {
     val length = if (regs(30) == 0) 0x100 else regs(30)
     // ------------------------------
-    // To be confirmed: copyfill cycles = length / 20MHz * 8 bit
-    busyFlagClearCycle = clk.currentCycles + (length * 0.45).toInt
+    val copy = (regs(24) & 0x80) > 0
+    /*
+       To be confirmed: fill cycles = length * CPU_CLOCK_CYCLES * 8 bit / 16MHz
+       on copy operation the cycles must be doubled ?
+
+       From this value should be subtracted the number of cycles spent by VDC for ram refreshes/graphic fetches/attribute fetches per row
+     */
+    val clkFactor = 8 * CPU_CLOCK_HZ / VDC_CLOCK_HZ
+    busyFlagClearCycle = clk.currentCycles + (length * (if (copy) clkFactor * 2 else clkFactor)).toInt // 0.45
     // ------------------------------
     var address = currentMemoryAddress
-    if ((regs(24) & 0x80) > 0) { // copy
+    if (copy) { // copy
       var source_copy_address = regs(32) << 8 | regs(33)
       Log.debug(s"VDC copying from ${Integer.toHexString(source_copy_address)} to ${Integer.toHexString(address)} length=${Integer.toHexString(length)}")
       //if (debug) println(s"VDC copying from ${Integer.toHexString(source_copy_address)} to ${Integer.toHexString(address)} length=${Integer.toHexString(length)}")
@@ -565,6 +572,10 @@ class VDC extends RAMComponent {
       }
     // NEXT RASTER LINE =====================================================
     rasterLine += 1
+    if (regs(7) > regs(4) && rasterLine > screenHeight) {
+      // hack used to force vsync when no vsync has been reached at the end of raster path
+      if (!(regs(7) == regs(4) + 1 && regs(5) > 0)) vsync
+    }
 
     val virtualScreenWidth = (regs(1) + regs(27))
     if (!vblank && videoMode != VideoMode.IDLE) {
@@ -574,7 +585,7 @@ class VDC extends RAMComponent {
         }
         else ram_base_ptr += virtualScreenWidth
       }
-      currentCharScanLine += 1
+      currentCharScanLine = (currentCharScanLine + 1) & 0x1F
     }
 
     if (currentCharScanLine > ychars_total) {
@@ -584,7 +595,7 @@ class VDC extends RAMComponent {
       if (videoMode == VideoMode.TEXT) ram_base_ptr += virtualScreenWidth
     }
 
-    rowCounterY += 1
+    rowCounterY = (rowCounterY + 1) & 0x1F
     if (verticalAdjFlag == 1) {
       if (rowCounterY == (regs(5) & 0x1F)) verticalAdjFlag = 2
     }
