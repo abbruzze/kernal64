@@ -1326,9 +1326,11 @@ class C64 extends CBMComponent with GamePlayer {
     fileMenu.add(autorunDiskItem)
 
     val attachDisk0Item = new JMenuItem("Attach disk 8...")
+    attachDisk0Item.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_8,java.awt.event.InputEvent.ALT_DOWN_MASK))
     attachDisk0Item.addActionListener(_ => attachDisk(0,false) )
     fileMenu.add(attachDisk0Item)
     val attachDisk1Item = new JMenuItem("Attach disk 9...")
+    attachDisk1Item.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_9,java.awt.event.InputEvent.ALT_DOWN_MASK))
     attachDisk1Item.addActionListener(_ => attachDisk(1,false) )
     fileMenu.add(attachDisk1Item)
     // For settings see below, after drive type
