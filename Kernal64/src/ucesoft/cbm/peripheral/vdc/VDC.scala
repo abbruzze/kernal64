@@ -76,8 +76,8 @@ class VDC extends RAMComponent {
 
   final private[this] val X_LEFT_CLIP_COLS = 20 * 8
   final private[this] val X_RIGHT_CLIP_COLS = 8 * 8
-  final private[this] val Y_TOP_CLIP_ROWS = 0//3 * 8//1 * 8
-  final private[this] val Y_BOTTOM_CLIP_ROWS = 0//3 * 8
+  final private[this] val Y_TOP_CLIP_ROWS = 2 * 8//1 * 8
+  final private[this] val Y_BOTTOM_CLIP_ROWS = 0 * 8//3 * 8
   final private[this] val CPU_CLOCK_HZ = 985248.0
   final private[this] val VDC_CLOCK_HZ = 16000000.0
 
@@ -631,7 +631,7 @@ class VDC extends RAMComponent {
     if (newScreenWidth != screenWidth) {
       screenWidth = newScreenWidth
       if (borderWidth < X_LEFT_CLIP_COLS) display.setClipArea(borderWidth,Y_TOP_CLIP_ROWS,screenWidth,screenHeight - Y_BOTTOM_CLIP_ROWS)
-      else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
+      else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS * (if (interlaceMode) 2 else 1),screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS * (if (interlaceMode) 2 else 1))
       display.setNewResolution(currentScreenHeight,screenWidth)
       bitmap = display.displayMem
     }
@@ -691,8 +691,37 @@ class VDC extends RAMComponent {
     if (newScreenHeight > MIN_HEIGHT && newScreenHeight < MAX_HEIGHT && newScreenHeight != currentHeight) {
       setScanLines(newScreenHeight)
       if (borderWidth < X_LEFT_CLIP_COLS) display.setClipArea(borderWidth,Y_TOP_CLIP_ROWS,screenWidth,screenHeight - Y_BOTTOM_CLIP_ROWS)
-      else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
+      else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS * (if (interlaceMode) 2 else 1),screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS * (if (interlaceMode) 2 else 1))
       //println(s"New screen height: $newScreenHeight")
+    }
+  }
+
+  @inline private def fetchGFXAndAttrs : Unit = {
+    val cursorMode = regs(10) & 0x60
+    val cursorTopLine = regs(10) & 0x1F
+    val cursorBottomLine = regs(11) & 0x1F
+    val useAttributes = (regs(25) & 0x40) > 0
+
+    var c = 0
+    while (c < regs(1)) {
+      var reverse = (regs(24) & 0x40) > 0
+
+      gfxBuffer(c) = ram(ram_adr(ram_base_ptr + c))
+      if (c >= 82) gfxBuffer(c - 41) = gfxBuffer(c)
+
+      val showCursor = ram_base_ptr + c == cursor_pos && cursorMode != 0x20
+      if (showCursor) {
+        val isCursorLine = if (cursorTopLine < cursorBottomLine) currentCharScanLine >= cursorTopLine && currentCharScanLine <= cursorBottomLine
+        else currentCharScanLine < cursorBottomLine || currentCharScanLine > cursorTopLine
+        reverse ^= isCursorLine
+        if (cursorMode != 0x00 && isCursorLine) reverse ^= cursorOn // cursor blinking
+      }
+
+      if (useAttributes) {
+        attrBuffer(c) = ram(ram_adr(attr_base_ptr + c)) ^ (if (reverse) 0x40 else 0x00)
+        if (c >= 82) attrBuffer(c - 41) = attrBuffer(c)
+      }
+      c += 1
     }
   }
 
@@ -707,7 +736,6 @@ class VDC extends RAMComponent {
     val virtualScreenWidth = regs(1) + regs(27)
 
     var ram_ptr = ram_base_ptr
-    var attr_ptr = attr_base_ptr
     var col = 0
     val doublePixFeature = (regs(25) & 0x10) > 0
     val realCharWidth = if (doublePixFeature) regs(22) >> 4 else 1 + (regs(22) >> 4)
@@ -717,9 +745,6 @@ class VDC extends RAMComponent {
     var colPix = 0
     var char_col = 0
     val useAttributes = (regs(25) & 0x40) > 0
-    val cursorMode = regs(10) & 0x60
-    val cursorTopLine = regs(10) & 0x1F
-    val cursorBottomLine = regs(11) & 0x1F
     val semigraphicMode = (regs(25) & 0x20) > 0
 
     while (col < xchars_total) {
@@ -738,38 +763,20 @@ class VDC extends RAMComponent {
         }
       }
       else {
-        //val lastRowLine = currentCharScanLine == ychars_total
-        val showCursor = ram_ptr == cursor_pos && cursorMode != 0x20
-
-        // pick char code
-        if ((rowCounter == 0 && currentCharScanLine == (regs(24) & 0x1F)) || currentCharScanLine == 0) {
-          gfxBuffer(char_col) = ram(ram_adr(ram_ptr))
-          if (char_col >= 82) gfxBuffer(char_col - 41) = gfxBuffer(char_col)
-        }
-        val charCode = gfxBuffer(char_col)
-        ram_ptr += 1
-
-        var reverse = (regs(24) & 0x40) > 0
+        var reverse = false
         var alternateCharSetOfs = 0
         var blink = false
         var underline = false
         var fg = foregroundColor
 
-        if (showCursor) {
-          val isCursorLine = if (cursorTopLine < cursorBottomLine) currentCharScanLine >= cursorTopLine && currentCharScanLine <= cursorBottomLine
-          else currentCharScanLine < cursorBottomLine || currentCharScanLine > cursorTopLine
-          reverse ^= isCursorLine
-          if (cursorMode != 0x00 && isCursorLine) reverse ^= cursorOn // cursor blinking
-        }
+        // fetch gfx & attrs on first line and first col
+        if (char_col == 0 && (rowCounter == 0 && currentCharScanLine == (regs(24) & 0x1F)) || currentCharScanLine == 0) fetchGFXAndAttrs
+
+        val charCode = gfxBuffer(char_col)
+        ram_ptr += 1
 
         if (useAttributes) {
-          // pick attribute code
-          if ((rowCounter == 0 && currentCharScanLine == (regs(24) & 0x1F)) || currentCharScanLine == 0) {
-            attrBuffer(char_col) = ram(ram_adr(attr_ptr)) ^ (if (reverse) 0x40 else 0x00)
-            if (char_col >= 82) attrBuffer(char_col - 41) = attrBuffer(char_col)
-          }
           val attr = attrBuffer(char_col)
-          attr_ptr += 1
           if ((attr & 0x80) > 0) alternateCharSetOfs = if (ychars_total > 15) 0x2000 else 0x1000
           reverse = (attr & 0x40) > 0
           underline = (attr & 0x20) > 0 && currentCharScanLine == (regs(29) & 0x1F)
