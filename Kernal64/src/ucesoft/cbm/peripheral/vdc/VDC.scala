@@ -140,6 +140,9 @@ class VDC extends RAMComponent {
   private[this] var blankMode = false // TO BE IMPLEMENTED PROPERLY
   private[this] var rowCounter,rowCounterY = 0
   private[this] var verticalAdjFlag = 0
+  // caches
+  private[this] val gfxBuffer = Array.ofDim[Int](256)
+  private[this] val attrBuffer = Array.ofDim[Int](256)
   // -----------------------------------------------------
   private[this] var deinterlaceMode = true
   private[this] var frameBit = 0
@@ -511,7 +514,6 @@ class VDC extends RAMComponent {
     nextFrame
   }
 
-
   final def drawLine(cycles:Long) {
     clkStartLine = cycles
     reschedule
@@ -577,7 +579,7 @@ class VDC extends RAMComponent {
       if (!(regs(7) == regs(4) + 1 && regs(5) > 0)) vsync
     }
 
-    val virtualScreenWidth = (regs(1) + regs(27))
+    val virtualScreenWidth = regs(1) + regs(27)
     if (!vblank && videoMode != VideoMode.IDLE) {
       if (videoMode == VideoMode.BITMAP) {
         if (interlaceMode) {
@@ -703,7 +705,6 @@ class VDC extends RAMComponent {
 
     val foregroundColor = PALETTE((regs(26) >> 4) & 0x0F)
     val virtualScreenWidth = regs(1) + regs(27)
-    val yoffset = ram_adr + ypos * virtualScreenWidth
 
     var ram_ptr = ram_base_ptr
     var attr_ptr = attr_base_ptr
@@ -737,8 +738,15 @@ class VDC extends RAMComponent {
         }
       }
       else {
+        //val lastRowLine = currentCharScanLine == ychars_total
+        val showCursor = ram_ptr == cursor_pos && cursorMode != 0x20
+
         // pick char code
-        val charCode = ram(ram_adr(ram_ptr))
+        if ((rowCounter == 0 && currentCharScanLine == (regs(24) & 0x1F)) || currentCharScanLine == 0) {
+          gfxBuffer(char_col) = ram(ram_adr(ram_ptr))
+          if (char_col >= 82) gfxBuffer(char_col - 41) = gfxBuffer(char_col)
+        }
+        val charCode = gfxBuffer(char_col)
         ram_ptr += 1
 
         var reverse = (regs(24) & 0x40) > 0
@@ -747,23 +755,26 @@ class VDC extends RAMComponent {
         var underline = false
         var fg = foregroundColor
 
-        if (useAttributes) {
-          val attr = ram(ram_adr(attr_ptr))
-          attr_ptr += 1
-          if ((attr & 0x80) > 0) alternateCharSetOfs = if (ychars_total > 15) 0x2000 else 0x1000
-          reverse ^= (attr & 0x40) > 0
-          underline = (attr & 0x20) > 0 && currentCharScanLine == (regs(29) & 0x1F)
-          blink = (attr & 0x10) > 0
-          fg = PALETTE(attr & 0x0F)
-        }
-
-        val showCursor = yoffset + char_col == cursor_pos && cursorMode != 0x20
-
         if (showCursor) {
           val isCursorLine = if (cursorTopLine < cursorBottomLine) currentCharScanLine >= cursorTopLine && currentCharScanLine <= cursorBottomLine
           else currentCharScanLine < cursorBottomLine || currentCharScanLine > cursorTopLine
           reverse ^= isCursorLine
           if (cursorMode != 0x00 && isCursorLine) reverse ^= cursorOn // cursor blinking
+        }
+
+        if (useAttributes) {
+          // pick attribute code
+          if ((rowCounter == 0 && currentCharScanLine == (regs(24) & 0x1F)) || currentCharScanLine == 0) {
+            attrBuffer(char_col) = ram(ram_adr(attr_ptr)) ^ (if (reverse) 0x40 else 0x00)
+            if (char_col >= 82) attrBuffer(char_col - 41) = attrBuffer(char_col)
+          }
+          val attr = attrBuffer(char_col)
+          attr_ptr += 1
+          if ((attr & 0x80) > 0) alternateCharSetOfs = if (ychars_total > 15) 0x2000 else 0x1000
+          reverse = (attr & 0x40) > 0
+          underline = (attr & 0x20) > 0 && currentCharScanLine == (regs(29) & 0x1F)
+          blink = (attr & 0x10) > 0
+          fg = PALETTE(attr & 0x0F)
         }
 
         val char_address = if (ychars_total > 15) (regs(28) & 0xC0) << 8 else chargen_adr
@@ -773,7 +784,6 @@ class VDC extends RAMComponent {
 
         if (blink) showChar ^= charBlinkOn
 
-        val virtualScreenWidth = regs(1) + regs(27)
         val xscroll = realCharWidth - xsmooth
         val xscrollCount = if (char_col == 0) xscroll - 1 else 0
         var bitmapPtr = bitmapOffset + colPix
@@ -859,7 +869,11 @@ class VDC extends RAMComponent {
         var bg = backgroundColor
 
         if (useAttributes) {
-          val attr = ram(ram_adr(attr_ptr))
+          if (interlaceMode || currentCharScanLine == 0) {
+            attrBuffer(char_col) = ram(ram_adr(attr_ptr))
+            if (char_col >= 82) attrBuffer(char_col - 41) = attrBuffer(char_col)
+          }
+          val attr = attrBuffer(char_col)
           attr_ptr += 1
 
           fg = PALETTE(attr & 0x0F)
@@ -962,6 +976,8 @@ class VDC extends RAMComponent {
     out.writeInt(rowCounter)
     out.writeInt(rowCounterY)
     out.writeInt(verticalAdjFlag)
+    out.writeObject(gfxBuffer)
+    out.writeObject(attrBuffer)
   }
   protected def loadState(in:ObjectInputStream) {
     loadMemory[Int](ram,in)
@@ -995,6 +1011,8 @@ class VDC extends RAMComponent {
     rowCounter = in.readInt
     rowCounterY = in.readInt
     verticalAdjFlag = in.readInt
+    loadMemory[Int](gfxBuffer,in)
+    loadMemory[Int](attrBuffer,in)
     setInterlaceMode(interlaceMode)
     display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
     display.setNewResolution(currentScreenHeight,screenWidth)
