@@ -381,7 +381,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     vicDisplayFrame.addKeyListener(keyboardControlPort)
     vicDisplay.addMouseListener(keypadControlPort)
     // VDC vicDisplay
-    vdcDisplay = new vic.Display(ucesoft.cbm.peripheral.vdc.VDC.SCREEN_WIDTH,ucesoft.cbm.peripheral.vdc.VDC.SCREEN_HEIGHT,vdcDisplayFrame.getTitle,vdcDisplayFrame) 
+    vdcDisplay = new vic.Display(ucesoft.cbm.peripheral.vdc.VDC.SCREEN_WIDTH,ucesoft.cbm.peripheral.vdc.VDC.SCREEN_HEIGHT,vdcDisplayFrame.getTitle,vdcDisplayFrame)
     add(vdcDisplay)
     vdcDisplay.setPreferredSize(ucesoft.cbm.peripheral.vdc.VDC.PREFERRED_FRAME_SIZE)
     vdc.setDisplay(vdcDisplay)
@@ -1558,6 +1558,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     fileMenu.addSeparator
     
     val loadPrgItem = new JMenuItem("Load PRG file from local disk ...")
+    loadPrgItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G,java.awt.event.InputEvent.ALT_DOWN_MASK))
     loadPrgItem.addActionListener(_ => loadPrg )
     fileMenu.add(loadPrgItem)
     

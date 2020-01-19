@@ -1353,6 +1353,7 @@ class C64 extends CBMComponent with GamePlayer {
     fileMenu.addSeparator
 
     val loadPrgItem = new JMenuItem("Load PRG file from local disk ...")
+    loadPrgItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G,java.awt.event.InputEvent.ALT_DOWN_MASK))
     loadPrgItem.addActionListener(_ => loadPrg )
     fileMenu.add(loadPrgItem)
 
