@@ -15,15 +15,15 @@ object Clock extends App {
   private var clock : Clock = null
   def systemClock = clock
   def isAvailable = clock != null
-  
+
   def setSystemClock(errorHandler:Option[(Throwable) => Unit] = None)(mainLoop: (Long) => Unit) = {
     if (clock == null) {
       clock = new Clock(errorHandler)(mainLoop)
-      clock.start      
+      clock.start
     }
     clock
   }
-  
+
   def makeClock(clockName:String,errorHandler:Option[(Throwable) => Unit] = None)(mainLoop: (Long) => Unit) = {
     val clock = new Clock(errorHandler,clockName)(mainLoop)
     clock.start
@@ -33,8 +33,8 @@ object Clock extends App {
 
 class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clock")(mainLoop: (Long) => Unit) extends Thread(name) with CBMComponent {
   val componentID = "System Clock"
-  val componentType = CBMComponentType.CHIP 
-  
+  val componentType = CBMComponentType.CHIP
+
   private class EventList(val e:ClockEvent,var next:EventList = null) {
     override def toString = {
       val sb = new StringBuilder
@@ -47,9 +47,9 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       s"EventList[${sb}]"
     }
   }
-  
+
   Log.info(s"${name} clock started")
-  
+
   private[this] var events : EventList = null
   @volatile private[this] var running = false
   @volatile private[this] var suspended = true
@@ -62,7 +62,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   private[this] var C64_CLOCK_HZ_DIV_1000 = DEFAULT_CLOCK_HZ / 1000
   private[this] var C64_CLOCK_HZ_INV_BY_1000 = 1000 / DEFAULT_CLOCK_HZ
   final private[this] val PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS = 1 * 1000
-  
+
   private[this] var _maximumSpeed = false
   private[this] var lastCorrectionTime = 0L
   private[this] var lastCorrectionCycles = 0L
@@ -72,67 +72,67 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   private[this] var skipThrottle = false
   // -------------------------------------------
   private[this] var limitCycles = -1L
-  
+
   def limitCyclesTo(cycles:Long) = limitCycles = cycles
-  
+
   def setDefaultClockHz = setClockHz(DEFAULT_CLOCK_HZ)
-  
+
   def setClockHzSpeedFactor(f:Double) = setClockHz(DEFAULT_CLOCK_HZ * f)
-  
+
   def getClockHz = C64_CLOCK_HZ
-  
+
   def setClockHz(hz:Double) {
     C64_CLOCK_HZ = hz
     C64_CLOCK_HZ_DIV_1000 = hz / 1000
     C64_CLOCK_HZ_INV_BY_1000 = 1000 / hz
   }
-  
+
   private[this] var cycles = 0L
-  
+
   def currentCycles = cycles
   def nextCycles = cycles + 1
-  
+
   def maximumSpeed = _maximumSpeed
   def maximumSpeed_=(maximumSpeed:Boolean) {
     _maximumSpeed = maximumSpeed
     if (!maximumSpeed) skipThrottle = true
   }
-  
+
   override def getProperties = {
     properties.setProperty("cycles","%10d".format(cycles))
     properties
   }
-  
+
   def init {}
-  
+
   def reset {
     events = null
     lastCorrectionTime = System.currentTimeMillis
     lastCorrectionCycles = cycles
   }
-      
+
   final override def run {
-    running = true      
+    running = true
     while (running) {
       try {
-      	if (suspended) {
-      	  while (suspended) suspendedLock.synchronized {
-      	    suspendedConfim = true
-      	    suspendedLock.wait 
-      	  } 
-      	}
-      	
-      	mainLoop(cycles)
-      	while (events != null && cycles >= events.e.when) {
-      	  if (!events.e.canceled) events.e.execute(cycles)
-      	  val next = events.next
-      	  events.next = null 	// cut from list
-      	  events = next
-      	}
+        if (suspended) {
+          while (suspended) suspendedLock.synchronized {
+            suspendedConfim = true
+            suspendedLock.wait
+          }
+        }
 
-      	cycles += 1
-      	if (limitCycles > 0 && cycles > limitCycles) TestCart.exit(0x01)
-      	throttle
+        mainLoop(cycles)
+        while (events != null && cycles >= events.e.when) {
+          if (!events.e.canceled) events.e.execute(cycles)
+          val next = events.next
+          events.next = null 	// cut from list
+          events = next
+        }
+
+        cycles += 1
+        if (limitCycles > 0 && cycles > limitCycles) TestCart.exit(0x01)
+        throttle
       }
       catch {
         case t:Throwable => errorHandler match {
@@ -142,14 +142,14 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       }
     }
   }
-  
+
   @inline private def setupNextMeasurement {
     lastCorrectionTime = System.currentTimeMillis
     lastCorrectionCycles = cycles
     throttleStartedAt = cycles
     nextPerformanceMeasurementTime = System.currentTimeMillis + PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS
   }
-  
+
   @inline private def throttle {
     if (!_maximumSpeed && !skipThrottle) {
       val timeDiff = System.currentTimeMillis - lastCorrectionTime
@@ -167,9 +167,9 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       setupNextMeasurement
     }
   }
-  
+
   def getLastPerformancePerc = lastPerformance
-  
+
   final def cancel(id:String) {
     if (events != null) {
       var ptr = events
@@ -200,24 +200,24 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       ptr.next = new EventList(e,ptrNext)
     }
   }
-  
+
   def isPaused = suspendedConfim
-  
+
   def pause {
     if (Thread.currentThread == this) return
-    
+
     suspendedLock.synchronized { suspended = true }
     while (!suspendedConfim) { Thread.sleep(10) }
   }
-  
-  def play = suspendedLock.synchronized { 
+
+  def play = suspendedLock.synchronized {
     suspended = false
     suspendedConfim = false
-    suspendedLock.notify 
+    suspendedLock.notify
   }
   def halt = running = false
   def printEvents { println(if (events != null) events else "No events") }
-  
+
   // state
   protected def saveState(out:ObjectOutputStream) {
     out.writeLong(cycles)
@@ -227,7 +227,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     events = null
   }
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
-  
+
   def getSubIdListFor(id:String) : List[(Int,Long)] = {
     var ids : List[(Int,Long)] = Nil
     if (events != null) {
