@@ -1942,19 +1942,19 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
         }
         case O_SHS => () => { // ar2 contains the high byte of the operand address
           SP = A & X
-          if (ready) mem.write(ar, (ar2 + 1) & SP) else mem.write(ar,SP)
+          mem.write(ar, (ar2 + 1) & SP)
           Last
         }
         case O_SHY => () => { // ar2 contains the high byte of the operand address
-          if (ready) mem.write(ar, Y & (ar2 + 1)) else mem.write(ar, Y)
+          mem.write(ar, Y & (ar2 + 1))
           Last
         }
         case O_SHX => () => { // ar2 contains the high byte of the operand address
-          if (ready) mem.write(ar, X & (ar2 + 1)) else mem.write(ar, X)
+          mem.write(ar, X & (ar2 + 1))
           Last
         }
         case O_SHA => () => { // ar2 contains the high byte of the operand address
-          if (ready) mem.write(ar, A & X & (ar2 + 1)) else mem.write(ar, A & X)
+          mem.write(ar, A & X & (ar2 + 1))
           Last
         }
         case O_JAM => () => {
