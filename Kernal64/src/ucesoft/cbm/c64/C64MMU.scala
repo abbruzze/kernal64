@@ -288,7 +288,7 @@ object C64MMU {
     def reset {
       Log.info("Resetting main memory...")
       ddr = 0
-      pr = read0001
+      pr = 0//read0001
       memConfig = -1
       ULTIMAX = false
       ram.ULTIMAX = false
@@ -324,7 +324,7 @@ object C64MMU {
         else {
           val r = if (address == 0) ddr 
         		  else
-        		  if (address == 1) read0001 
+        		  if (address == 1) read0001
         		  else ram.read(address, chipID)
           //Log.debug("Reading from RAM %4X = %2X".format(address,r))
           r
