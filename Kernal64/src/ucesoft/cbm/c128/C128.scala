@@ -72,6 +72,8 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   }
   private[this] var cartButtonRequested = false
   private[this] var headless = false // used with --headless command line option
+  private[this] var cpujamContinue = false // used with --cpujam-continue
+  private[this] var zoomOverride = false // used with --screen-dim
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mmu = new C128MMU(this)
   private[this] val cpu = CPU6510.make(mmu)  
@@ -86,7 +88,6 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   private[this] val sid = new ucesoft.cbm.peripheral.sid.SID
   private[this] var vicDisplay : vic.Display = _
   private[this] var vdcDisplay : vic.Display = _
-  private[this] var vdcOnItsOwnThread = false
   private[this] var internalFunctionROMFileName,externalFunctionROMFileName : String = _
   private[this] val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
   private[this] val irqSwitcher = new IRQSwitcher(irqRequest _)
@@ -522,7 +523,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   private def errorHandler(t:Throwable) {
     import CPU6510.CPUJammedException
     t match {
-      case j:CPUJammedException =>
+      case j:CPUJammedException if !cpujamContinue =>
         JOptionPane.showConfirmDialog(vicDisplayFrame,
           s"CPU[${j.cpuID}] jammed at " + Integer.toHexString(j.pcError) + ". Do you want to open debugger (yes), reset (no) or continue (cancel) ?",
           "CPU jammed",
@@ -535,6 +536,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
           case _ =>
             reset(true)
         }
+      case j:CPUJammedException => // continue
       case _ =>
         Log.info("Fatal error occurred: " + cpu + "-" + t)
         Log.info(CPU6510.disassemble(mmu,cpu.getCurrentInstructionPC).toString)
@@ -1223,10 +1225,21 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   
   private def zoom(f:Int) {
     val dim = new Dimension(vicChip.VISIBLE_SCREEN_WIDTH * f,vicChip.VISIBLE_SCREEN_HEIGHT * f)
+    updateScreenDimension(dim)
+  }
+
+  private def updateScreenDimension(dim:Dimension): Unit = {
     vicDisplay.setPreferredSize(dim)
     vicDisplay.invalidate
     vicDisplay.repaint()
     vicDisplayFrame.pack
+  }
+
+  private def updateVDCScreenDimension(dim:Dimension): Unit = {
+    vdcDisplay.setPreferredSize(dim)
+    vdcDisplay.invalidate
+    vdcDisplay.repaint()
+    vdcDisplayFrame.pack
   }
   
   private def savePrg {
@@ -2283,13 +2296,38 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     )
     settings.add("limitcycles",
                  "Run at most the number of cycles specified",
-                 (cycles:Int) => if (cycles > 0) clock.limitCyclesTo(cycles)                 
+                 (cycles:String) => if (cycles != "" && cycles.toLong > 0) clock.limitCyclesTo(cycles.toLong)
     )
     settings.add("run-file",
       "Run the given file taken from the attached disk",
       "RUNFILE",
       (runFile:String) => {},
       ""
+    )
+    settings.add("screenshot",
+      "Take a screenshot of VIC screen and save it on the given file path. Used with --testcart only.",
+      (file:String) => if (file != "") {
+        TestCart.screenshotFile = Some(file)
+        TestCart.screeshotHandler = vicDisplay.saveSnapshot _
+      }
+    )
+    settings.add("vdcscreenshot",
+      "Take a screenshot of VDC screen and save it on the given file path. Used with --testcart only.",
+      (file:String) => if (file != "") {
+        TestCart.screenshotFile = Some(file)
+        TestCart.screeshotHandler = vdcDisplay.saveSnapshot _
+      }
+    )
+    settings.add("cpujam-continue",
+      "On cpu jam continue execution",
+      (jam:Boolean) => cpujamContinue = jam
+    )
+    settings.add("screen-dim",
+      "Zoom factor. Valued accepted are 1 and 2",
+      (f:Int) => if (f == 1 || f == 2) {
+        zoom(f)
+        zoomOverride = true
+      }
     )
     // games
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])
@@ -2376,9 +2414,14 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   
   private def saveSettings(save:Boolean) {
     configuration.setProperty(CONFIGURATION_FRAME_XY,vicDisplayFrame.getX + "," + vicDisplayFrame.getY)
-    configuration.setProperty(CONFIGURATION_FRAME_DIM,vicDisplayFrame.getSize.width + "," + vicDisplayFrame.getSize.height)
+    if (!zoomOverride) {
+      val dimension = vicDisplay.getSize()
+      configuration.setProperty(CONFIGURATION_FRAME_DIM,dimension.width + "," + dimension.height)
+    }
+
     configuration.setProperty(CONFIGURATION_VDC_FRAME_XY,vdcDisplayFrame.getX + "," + vdcDisplayFrame.getY)
-    configuration.setProperty(CONFIGURATION_VDC_FRAME_DIM,vdcDisplayFrame.getSize.width + "," + vdcDisplayFrame.getSize.height)
+    val vdcDimension = vdcDisplay.getSize()
+    configuration.setProperty(CONFIGURATION_VDC_FRAME_DIM,vdcDimension.width + "," + vdcDimension.height)
     if (save) {
       settings.save(configuration)
       println("Settings saved")
@@ -2457,7 +2500,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     swing { vdcDisplayFrame.pack }    
     if (configuration.getProperty(CONFIGURATION_VDC_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_VDC_FRAME_DIM) split "," map { _.toInt }
-      swing { vdcDisplayFrame.setSize(dim(0),dim(1)) }
+      swing { updateVDCScreenDimension(new Dimension(dim(0),dim(1))) }
     }
     if (configuration.getProperty(CONFIGURATION_VDC_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_VDC_FRAME_XY) split "," map { _.toInt }
@@ -2467,7 +2510,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     swing { vicDisplayFrame.pack }
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
-      swing { vicDisplayFrame.setSize(dim(0),dim(1)) }
+      swing { updateScreenDimension(new Dimension(dim(0),dim(1))) }
     }
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }
