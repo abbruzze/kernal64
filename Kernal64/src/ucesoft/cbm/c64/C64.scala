@@ -100,6 +100,8 @@ class C64 extends CBMComponent with GamePlayer {
   }
   private[this] var cartButtonRequested = false
   private[this] var headless = false // used with --testcart command options
+  private[this] var cpujamContinue = false // used with --cpujam-continue
+  private[this] var zoomOverride = false // used with --screen-dim
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mem = new C64MMU.MAIN_MEMORY
   private[this] val cpu = CPU6510.make(mem)  
@@ -440,7 +442,7 @@ class C64 extends CBMComponent with GamePlayer {
   
   private def errorHandler(t:Throwable) {
     t match {
-      case j:CPUJammedException =>
+      case j:CPUJammedException if !cpujamContinue =>
         JOptionPane.showConfirmDialog(displayFrame,
             s"CPU[${j.cpuID}] jammed at " + Integer.toHexString(j.pcError) + ". Do you want to open debugger (yes), reset (no) or continue (cancel) ?",
             "CPU jammed",
@@ -453,6 +455,7 @@ class C64 extends CBMComponent with GamePlayer {
           case _ => 
             reset(true)
         }
+      case j:CPUJammedException => // continue
       case _ =>
         Log.info("Fatal error occurred: " + cpu + "-" + t)
         Log.info(CPU6510.disassemble(mem,cpu.getCurrentInstructionPC).toString)
@@ -1028,12 +1031,16 @@ class C64 extends CBMComponent with GamePlayer {
   
  private def zoom(f:Int) {
     val dim = new Dimension(vicChip.VISIBLE_SCREEN_WIDTH * f,vicChip.VISIBLE_SCREEN_HEIGHT * f)
+   updateScreenDimension(dim)
+  }
+
+  private def updateScreenDimension(dim:Dimension): Unit = {
     display.setPreferredSize(dim)
     display.invalidate
     display.repaint()
     displayFrame.pack
   }
-  
+
   private def savePrg {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
@@ -1969,13 +1976,31 @@ class C64 extends CBMComponent with GamePlayer {
     )
     settings.add("limitcycles",
                  "Run at most the number of cycles specified",
-                 (cycles:Int) => if (cycles > 0) clock.limitCyclesTo(cycles)                 
+                  (cycles:String) => if (cycles != "" && cycles.toLong > 0) clock.limitCyclesTo(cycles.toLong)
     )
     settings.add("run-file",
       "Run the given file taken from the attached disk",
       "RUNFILE",
       (runFile:String) => {},
       ""
+    )
+    settings.add("screenshot",
+      "Take a screenshot of VIC screen and save it on the given file path. Used with --testcart only.",
+      (file:String) => if (file != "") {
+        TestCart.screenshotFile = Some(file)
+        TestCart.screeshotHandler = display.saveSnapshot _
+      }
+    )
+    settings.add("cpujam-continue",
+      "On cpu jam continue execution",
+      (jam:Boolean) => cpujamContinue = jam
+    )
+    settings.add("screen-dim",
+      "Zoom factor. Valued accepted are 1 and 2",
+      (f:Int) => if (f == 1 || f == 2) {
+        zoom(f)
+        zoomOverride = true
+      }
     )
     // games
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])
@@ -2059,8 +2084,11 @@ class C64 extends CBMComponent with GamePlayer {
   }
   
   private def saveSettings(save:Boolean) {
-    configuration.setProperty(CONFIGURATION_FRAME_XY,displayFrame.getX + "," + displayFrame.getY)
-    configuration.setProperty(CONFIGURATION_FRAME_DIM,displayFrame.getSize.width + "," + displayFrame.getSize.height)
+    if (!zoomOverride) {
+      val dimension = display.getSize()
+      configuration.setProperty(CONFIGURATION_FRAME_DIM, dimension.width + "," + dimension.height)
+    }
+    configuration.setProperty(CONFIGURATION_FRAME_XY, displayFrame.getX + "," + displayFrame.getY)
     if (save) {
       settings.save(configuration)
       println("Settings saved")
@@ -2128,7 +2156,7 @@ class C64 extends CBMComponent with GamePlayer {
     swing { displayFrame.pack }
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
-      swing { displayFrame.setSize(dim(0),dim(1)) }
+      swing { updateScreenDimension(new Dimension(dim(0),dim(1))) }
     }
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }
