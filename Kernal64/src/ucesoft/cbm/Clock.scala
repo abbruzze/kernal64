@@ -2,7 +2,9 @@ package ucesoft.cbm
 
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
+
 import javax.swing.JFrame
+import ucesoft.cbm.misc.TestCart
 
 class ClockEvent (val id : String,val when : Long,val execute: (Long) => Unit,val subid : Int = 0) {
   var canceled = false
@@ -129,7 +131,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       	}
 
       	cycles += 1
-      	if (limitCycles > 0 && cycles > limitCycles) sys.exit(0xFF)
+      	if (limitCycles > 0 && cycles > limitCycles) TestCart.exit(0x01)
       	throttle
       }
       catch {
