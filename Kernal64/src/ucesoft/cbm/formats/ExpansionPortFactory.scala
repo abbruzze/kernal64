@@ -200,17 +200,27 @@ object ExpansionPortFactory {
   }
 
   private class Type8CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
+    private[this] var latch = false
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
-      if (address == 0xDF00) {
+      if (!latch && address == 0xDF00) {
         val bank = value & 0x03
         romlBankIndex = bank
         romhBankIndex = bank
-        val invGame = (bank & 4) > 0
-        val invExrom = (bank & 8) > 0
+        val invGame = (value & 4) > 0
+        latch = (value & 8) > 0
         game = invGame
-        exrom = invExrom
+        exrom = invGame
         notifyMemoryConfigurationChange
       }
+    }
+
+    override def reset: Unit = {
+      latch = false
+      romlBankIndex = 0
+      romhBankIndex = 0
+      game = false
+      exrom = false
+      notifyMemoryConfigurationChange
     }
   }
 
@@ -572,6 +582,61 @@ object ExpansionPortFactory {
       game = true
     }
   }
+  private class Type53CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
+    private[this] val cart_ram = Array.ofDim[Int](32768)
+    private[this] var enabled = false
+    private[this] var bankSelect,chipselect = 0
+
+    private class ROMCart(override val startAddress:Int,isLow:Boolean) extends Memory {
+      val name = if (isLow) "ROML" else "ROMH"
+      val length = 8192
+      val isRom = true
+      def isActive = true
+      def init {}
+
+      def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+        if (chipselect == 2) cart_ram((address & 0x3FFF) + (bankSelect << 14))
+        else
+        if (isLow) romlBanks(romlBankIndex).read(address) else romhBanks(romhBankIndex).read(address)
+      }
+      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {
+        if (chipselect == 2) cart_ram((address & 0x3FFF) + (bankSelect << 14)) = value
+        ram.write(address,value,chipID)
+      }
+    }
+
+    private[this] val roml = new ROMCart(0x8000,true)
+    private[this] val romh = new ROMCart(0xA000,false)
+
+    override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = 0
+
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {
+      if (address >= 0xDE80 && address < 0xDFFF) {
+        bankSelect = (value >> 1) & 0x1
+        chipselect = (value >> 2) & 0x3
+        enabled = (value & 0x10) == 0x0
+        val bank = (chipselect << 1 | bankSelect) & 0x3
+        romlBankIndex = bank
+        romhBankIndex = bank
+        game = !enabled
+        exrom = !enabled
+        notifyMemoryConfigurationChange
+        //println(s"bankSelect=$bankSelect bank=$bank chipSelect=$chipselect enabled=$enabled")
+      }
+    }
+    override def reset: Unit = {
+      exrom = false
+      game = false
+      bankSelect = 0
+      chipselect = 0
+      romlBankIndex = 0
+      romhBankIndex = 0
+      notifyMemoryConfigurationChange
+    }
+
+    override def ROML: Memory = roml
+    override def ROMH: Memory = romh
+  }
   // ====================================================================================================
   def loadExpansionPort(crtName: String, irqAction: (Boolean) => Unit, nmiAction: (Boolean) => Unit, ram: Memory,config:Properties): ExpansionPort = {
     val crt = new Cartridge(crtName)
@@ -595,6 +660,7 @@ object ExpansionPortFactory {
       case 60 => new GMOD2CartridgeExpansionPort(crt,ram,config)
       case 18 => new Type18CartridgeExpansionPort(crt,ram)
       case 51 => new Type51CartridgeExpansionPort(crt,ram)
+      case 53 => new Type53CartridgeExpansionPort(crt,ram)
       case _ =>        
         throw new IllegalArgumentException(s"Unsupported cartridge type ${crt.ctrType} for ${crt.name}")
     }
