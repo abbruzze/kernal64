@@ -461,6 +461,7 @@ class C64 extends CBMComponent with GamePlayer {
         Log.info(CPU6510.disassemble(mem,cpu.getCurrentInstructionPC).toString)
         t.printStackTrace(Log.getOut)
         t.printStackTrace
+        if (headless) sys.exit(1) // exit if headless
         JOptionPane.showMessageDialog(displayFrame,t.toString + " [PC=" + Integer.toHexString(cpu.getCurrentInstructionPC) + "]", "Fatal error",JOptionPane.ERROR_MESSAGE)
         //trace(true,true)
         reset(true)
@@ -2076,7 +2077,7 @@ class C64 extends CBMComponent with GamePlayer {
   }
   
   private def close {
-    saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
+    if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
     for(d <- drives)
       d.getFloppy.close
     shutdownComponent

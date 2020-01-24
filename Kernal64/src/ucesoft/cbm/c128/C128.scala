@@ -542,6 +542,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
         Log.info(CPU6510.disassemble(mmu,cpu.getCurrentInstructionPC).toString)
         t.printStackTrace(Log.getOut)
         t.printStackTrace
+        if (headless) sys.exit(1) // exit if headless
         JOptionPane.showMessageDialog(vicDisplayFrame,t.toString + " [PC=" + Integer.toHexString(cpu.getCurrentInstructionPC) + "]", "Fatal error",JOptionPane.ERROR_MESSAGE)
         //trace(true,true)
         reset(true)
@@ -2405,7 +2406,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   }
   
   private def close {
-    saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
+    if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
     for(d <- drives)
       d.getFloppy.close
     shutdownComponent
