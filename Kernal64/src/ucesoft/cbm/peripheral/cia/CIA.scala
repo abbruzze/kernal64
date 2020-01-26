@@ -36,6 +36,9 @@ object CIA {
   val IRQ_SRC_ALARM = "ALARM"    
   val IRQ_SERIAL = "SERIAL"
   val IRQ_FLAG = "FLAG"
+
+  val CIA_MODEL_6526 = 0 // old
+  val CIA_MODEL_8521 = 1 // new
 }
 
 /**
@@ -66,6 +69,7 @@ class CIA(val name:String,
   private[this] var serialOUTTrigger : Boolean => Unit = _
   private[this] var sdrIndex = 0
   private[this] var icrMask = 0	// bits 0 - 4
+  private[this] var ciaModel = CIA_MODEL_6526
   
   // ========================== TOD ================================================
   
@@ -275,6 +279,8 @@ class CIA(val name:String,
   }
   
   // ===============================================================================
+
+  def setCIAModel(model:Int): Unit = ciaModel = model
   
   /**
    * Manual clock
@@ -319,14 +325,19 @@ class CIA(val name:String,
   }
 
   @inline private def setIRQOnNextClock(src:String,delay:Int): Unit = {
-    val clk = Clock.systemClock
-    clk.schedule(new ClockEvent(componentID + "_IRQ",clk.currentCycles + delay, cycles => {
+    def setIRQ = {
       if ((icrMask & icr) > 0) {
         icr |= 0x80
         Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
         irqAction(true)
       }
-    }))
+    }
+    val actualDelay = if (ciaModel == CIA_MODEL_8521) delay - 1 else delay
+    if (actualDelay == 0) setIRQ // set immediately
+    else {
+      val clk = Clock.systemClock
+      clk.schedule(new ClockEvent(componentID + "_IRQ", clk.currentCycles + delay, _ => setIRQ))
+    }
   }
   
   override def getProperties = {
@@ -335,6 +346,7 @@ class CIA(val name:String,
     properties.setProperty("Shift register",Integer.toHexString(shiftRegister))
     properties.setProperty("SDR index",Integer.toHexString(sdrIndex))
     properties.setProperty("SDR out",sdrOut.toString)
+    properties.setProperty("Model", if (ciaModel == CIA_MODEL_8521) "8521" else "6521")
     super.getProperties
   }
   
@@ -500,6 +512,7 @@ class CIA(val name:String,
     out.writeBoolean(sdrLoaded)
     out.writeBoolean(sdrOut)
     out.writeBoolean(SP)
+    out.writeInt(ciaModel)
   }
   protected def loadState(in:ObjectInputStream) {
     icr = in.readInt
@@ -510,6 +523,7 @@ class CIA(val name:String,
     sdrLoaded = in.readBoolean
     sdrOut = in.readBoolean
     SP = in.readBoolean
+    ciaModel = in.readInt
   }
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }

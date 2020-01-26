@@ -18,7 +18,7 @@ class CIATimerA2(ciaName: String,
   val componentType = CBMComponentType.CHIP 
   
   final private[this] val EVENT_ID = componentID
-  final private[this] val START_DELAY = 1
+  final private[this] val START_DELAY = 2
   final private[this] val START_CONT_DELAY = 1
   //state
   final private[this] val UNDERFLOW_SUBID = 1
@@ -139,8 +139,8 @@ class CIATimerA2(ciaName: String,
   private def enableTimer(enabled: Boolean,reload:Boolean,oldCountExternal:Boolean) {
     val startDelay = START_DELAY + (if (reload) 1 else 0)
     if (!started && enabled) { // start from stopped
-      if (!countExternal && autoClock) reschedule(startDelay,if (reload) latch else counter)
-      startDelayCount = startDelay
+      if (!countExternal && autoClock) reschedule(START_DELAY,if (reload) latch else counter)
+      startDelayCount = START_DELAY
     } 
     else 
     if (started && enabled) { // start from started
