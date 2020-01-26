@@ -38,10 +38,13 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   private[this] val POTY_OFS = 0x1A
   private[this] var mouseEnabled = false
   private[this] var sid2 : SID = null
-  
+
   private[this] var lastCycles = Clock.systemClock.currentCycles
   private[this] var nextRest = 0
   private[this] var removeSample = false
+  private[this] var nextSample = 0
+  private[this] var cycleExact = false
+  private[this] var fullSpeed = false
   private[this] var driver = externalDriver.getOrElse(new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE * 2))
   private[this] val driverProxy : AudioDriverDevice = new AudioDriverDevice {
     def getMasterVolume : Int = driver.getMasterVolume
@@ -52,10 +55,19 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     def discard = driver.discard
   }
 
+  def setCycleExact(ce:Boolean): Unit = {
+    if (!cycleExact && ce) Clock.systemClock.cancel(componentID)
+
+    cycleExact = ce
+    if (sid2 != null) sid2.setCycleExact(ce)
+    if (!fullSpeed) start
+  }
+
   def setStereo(isStereo:Boolean,sid2:Option[SID] = None) {
     if (this.sid2 != null) this.sid2.stop
 
     this.sid2 = sid2.getOrElse(null)
+    if (this.sid2 != null) this.sid2.setCycleExact(cycleExact)
     externalDriver match {
       case None =>
         driver.discard
@@ -124,9 +136,9 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
         sid.write(ofs,value)
     }
   }
-  
+
   private[this] val sidEventCallBack = sidEvent _
-  
+
   private def sidEvent(cycles:Long) {
     var nextSample = cycles + CLOCKS_PER_SAMPLE
     nextRest += CLOCKS_PER_SAMPLE_REST
@@ -134,14 +146,33 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
       nextRest -= 1000
       nextSample += 1
     }
-    
+
     val delta = cycles - lastCycles
     lastCycles = cycles
     sid.clock(delta.toInt)
-    
+
     driver.addSample(sid.output)
-    
+
     if (!removeSample) Clock.systemClock.schedule(new ClockEvent(componentID,nextSample,sidEventCallBack))
+  }
+
+  def clock: Unit = {
+    sid.clock
+    if (sid2 != null) sid2.clock
+
+    if (!removeSample) {
+      nextSample += 1
+      if (nextSample == CLOCKS_PER_SAMPLE) {
+        nextRest += CLOCKS_PER_SAMPLE_REST
+        if (nextRest > 1000) {
+          nextRest -= 1000
+          nextSample = -1
+        }
+        else nextSample = 0
+
+        driver.addSample(sid.output)
+      }
+    }
   }
   
   def stop = {
@@ -154,21 +185,25 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   }
   def start {
     driver.setSoundOn(true)
-    Clock.systemClock.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 5,sidEventCallBack))
-    lastCycles = Clock.systemClock.currentCycles
     nextRest = 0
-    driver.reset
+    nextSample = 0
     removeSample = false
+    driver.reset
+    if (!cycleExact) Clock.systemClock.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 5,sidEventCallBack))
+    lastCycles = Clock.systemClock.currentCycles
   }
   def setFullSpeed(full:Boolean) = {
+    fullSpeed = full
     if (full) stop else start
   }
   // state
   protected def saveState(out:ObjectOutputStream) {
     out.writeObject(sid.read_state)
+    out.writeBoolean(cycleExact)
   }
   protected def loadState(in:ObjectInputStream) {
     sid.write_state(in.readObject.asInstanceOf[ucesoft.cbm.peripheral.sid.resid.SID.State])
+    cycleExact = in.readBoolean
     Clock.systemClock.cancel(componentID)
     start
   }
