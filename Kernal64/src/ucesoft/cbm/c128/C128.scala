@@ -74,6 +74,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   private[this] var headless = false // used with --headless command line option
   private[this] var cpujamContinue = false // used with --cpujam-continue
   private[this] var zoomOverride = false // used with --screen-dim
+  private[this] var sidCycleExact = false // used with --sid-cycle-exact
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mmu = new C128MMU(this)
   private[this] val cpu = CPU6510.make(mmu)  
@@ -576,6 +577,8 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
       cpu.fetchAndExecute(1)
       if (cpuFrequency == 2 && !mmu.isIOACC && !vicChip.isRefreshCycle) cpu.fetchAndExecute(1)
     }
+    // SID
+    if (sidCycleExact) sid.clock
   }
 
   private def irqRequest(low:Boolean) {
@@ -2060,6 +2063,27 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
       sid2AdrItem.addActionListener(_ => setDualSID(Some(Integer.parseInt(adr,16))) )
       group8.add(sid2AdrItem)
     }
+    val sidCycleExactItem = new JCheckBoxMenuItem("SID cycle exact emulation")
+    sidCycleExactItem.setSelected(false)
+    sidCycleExactItem.addActionListener(_ => {
+      sidCycleExact = sidCycleExactItem.isSelected
+      sid.setCycleExact(sidCycleExactItem.isSelected)
+    }
+    )
+    sidItem.add(sidCycleExactItem)
+    // Setting ---------------------------
+    settings.add("sid-cycle-exact",
+      "With this option enabled the SID emulation is more accurate with a decrease of performance",
+      "SID_CYCLE_EXACT",
+      (sce:Boolean) => {
+        clock.pause
+        sidCycleExact = sce
+        sid.setCycleExact(sidCycleExact)
+        sidCycleExactItem.setSelected(sidCycleExact)
+        clock.play
+      },
+      sidCycleExact
+    )
     
     optionMenu.addSeparator
 
@@ -2395,13 +2419,13 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
       Clock.systemClock.play
     }
   }
-  
+
   private def swapJoysticks {
     import ucesoft.cbm.peripheral.controlport.Joysticks._
     val j1 = configuration.getProperty(CONFIGURATION_JOY_PORT_1)
     val j2 = configuration.getProperty(CONFIGURATION_JOY_PORT_2)
-    if (j2 != null) configuration.setProperty(CONFIGURATION_JOY_PORT_1,j2)
-    if (j1 != null) configuration.setProperty(CONFIGURATION_JOY_PORT_2,j1)
+    if (j2 != null) configuration.setProperty(CONFIGURATION_JOY_PORT_1,j2) else configuration.remove(CONFIGURATION_JOY_PORT_1)
+    if (j1 != null) configuration.setProperty(CONFIGURATION_JOY_PORT_2,j1) else configuration.remove(CONFIGURATION_JOY_PORT_2)
     configureJoystick
   }
   

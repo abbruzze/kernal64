@@ -102,6 +102,7 @@ class C64 extends CBMComponent with GamePlayer {
   private[this] var headless = false // used with --testcart command options
   private[this] var cpujamContinue = false // used with --cpujam-continue
   private[this] var zoomOverride = false // used with --screen-dim
+  private[this] var sidCycleExact = false // used with --sid-cycle-exact
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mem = new C64MMU.MAIN_MEMORY
   private[this] val cpu = CPU6510.make(mem)  
@@ -493,6 +494,8 @@ class C64 extends CBMComponent with GamePlayer {
     // CPU PHI2
     ProgramLoader.checkLoadingInWarpMode(true)
     cpu.fetchAndExecute(1)
+    // SID
+    if (sidCycleExact) sid.clock
   }
 
   private def setDMA(dma:Boolean) {
@@ -1763,7 +1766,28 @@ class C64 extends CBMComponent with GamePlayer {
       sid2AdrItem.addActionListener(_ => setDualSID(Some(Integer.parseInt(adr,16))) )
       group8.add(sid2AdrItem)
     }
-
+    val sidCycleExactItem = new JCheckBoxMenuItem("SID cycle exact emulation")
+    sidCycleExactItem.setSelected(false)
+    sidCycleExactItem.addActionListener(_ => {
+        sidCycleExact = sidCycleExactItem.isSelected
+        sid.setCycleExact(sidCycleExactItem.isSelected)
+      }
+    )
+    sidItem.add(sidCycleExactItem)
+    // Setting ---------------------------
+    settings.add("sid-cycle-exact",
+      "With this option enabled the SID emulation is more accurate with a decrease of performance",
+      "SID_CYCLE_EXACT",
+      (sce:Boolean) => {
+        clock.pause
+        sidCycleExact = sce
+        sid.setCycleExact(sidCycleExact)
+        sidCycleExactItem.setSelected(sidCycleExact)
+        clock.play
+      },
+      sidCycleExact
+    )
+    // -----------------------------------
     optionMenu.addSeparator
     
     for(drive <- 0 to 1) {
@@ -2003,6 +2027,7 @@ class C64 extends CBMComponent with GamePlayer {
         zoomOverride = true
       }
     )
+
     // games
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])
     var providers = loader.iterator
@@ -2071,8 +2096,8 @@ class C64 extends CBMComponent with GamePlayer {
   private def swapJoysticks {
     val j1 = configuration.getProperty(CONFIGURATION_JOY_PORT_1)
     val j2 = configuration.getProperty(CONFIGURATION_JOY_PORT_2)
-    if (j2 != null) configuration.setProperty(CONFIGURATION_JOY_PORT_1,j2)
-    if (j1 != null) configuration.setProperty(CONFIGURATION_JOY_PORT_2,j1)
+    if (j2 != null) configuration.setProperty(CONFIGURATION_JOY_PORT_1,j2) else configuration.remove(CONFIGURATION_JOY_PORT_1)
+    if (j1 != null) configuration.setProperty(CONFIGURATION_JOY_PORT_2,j1) else configuration.remove(CONFIGURATION_JOY_PORT_2)
     configureJoystick
   }
   
