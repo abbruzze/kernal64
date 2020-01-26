@@ -2027,6 +2027,13 @@ class C64 extends CBMComponent with GamePlayer {
         zoomOverride = true
       }
     )
+    settings.add("cia-model",
+      "Set the CIA model (both cia1 and cia2). 6526 for old cia, 8521 for the new one. Default is 6526. ",
+      (cm:String) => if (cm == "8521") {
+        cia1.setCIAModel(CIA.CIA_MODEL_8521)
+        cia2.setCIAModel(CIA.CIA_MODEL_8521)
+      }
+    )
 
     // games
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])

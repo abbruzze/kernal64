@@ -30,6 +30,7 @@ import ucesoft.cbm.peripheral.bus.IECBusLine
 import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.remote.RemoteC64
 import ucesoft.cbm.peripheral.bus.IECBusListener
+import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.vdc.VDC
 import ucesoft.cbm.peripheral.vic.Palette
@@ -2352,6 +2353,13 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
       (f:Int) => if (f == 1 || f == 2) {
         zoom(f)
         zoomOverride = true
+      }
+    )
+    settings.add("cia-model",
+      "Set the CIA model (both cia1 and cia2). 6526 for old cia, 8521 for the new one. Default is 6526. ",
+      (cm:String) => if (cm == "8521") {
+        cia1.setCIAModel(CIA.CIA_MODEL_8521)
+        cia2.setCIAModel(CIA.CIA_MODEL_8521)
       }
     )
     // games
