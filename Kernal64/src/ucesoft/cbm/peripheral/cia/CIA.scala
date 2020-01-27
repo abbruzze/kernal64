@@ -97,50 +97,55 @@ class CIA(val name:String,
         am = t.am
       }
       
-      private def incBCD(value: Int) = {
-        var c1 = value & 0x0F
-        var c2 = (value & 0xF0) >> 4
-        if (c1 == 0xF) {
-          c1 = 0
-          c2 += 1
-        }
-        else
-        if (c1 >= 0xA) {
-          c1 += 1
-        }
-        else
-        if (c1 < 9) c1 += 1
-        else {
-          c1 = 0
-          c2 += 1
-        }
-        (c2 << 4) | c1
-      }
-      
-      
       def tick {
-        // ts
-        ts = incBCD(ts)
-        if (ts == 0x10) {
+        var sl = s & 0x0F
+        var sh = (s & 0xF0) >> 4
+        var ml = m & 0x0F
+        var mh = (m & 0xF0) >> 4
+        var hl = h & 0x0F
+        var hh = (h & 0xF0) >> 4
+
+        //tenth seconds
+        ts = (ts + 1) & 0x0F
+        if (ts == 10) {
           ts = 0
-          // s
-          s = incBCD(s)
-          if (s == 0x60) {
-            s = 0
-            // m
-            m = incBCD(m)
-            if (m == 0x60) {
-              m = 0
-              // h
-              h = incBCD(h)
-              if (h == 0x12) {
-                //h = 0
-                am = !am
+          // seconds
+          sl = (sl + 1) & 0x0F
+          if (sl == 10) {
+            sl = 0
+            sh = (sh + 1) & 0x07
+            if (sh == 6) {
+              sh = 0
+              // minutes
+              ml = (ml + 1) & 0x0F
+              if (ml == 10) {
+                ml = 0
+                mh = (mh + 1) & 0x07
+                if (mh == 6) {
+                  mh = 0
+                  // hours
+                  hl = (hl + 1) & 0x0F
+                  if (hh > 0) {
+                    if (hl == 2) am ^= true
+                    else
+                    if (hl == 3) {
+                      hl = 1
+                      hh = 0
+                    }
+                  }
+                  else
+                  if (hl == 10) {
+                    hl = 0
+                    hh = 1
+                  }
+                }
               }
-              else h = h % 0x12
             }
           }
         }
+        s = sl | (sh << 4)
+        m = ml | (mh << 4)
+        h = hl | (hh << 4)
       }
       
       def saveState(out:ObjectOutputStream) {
