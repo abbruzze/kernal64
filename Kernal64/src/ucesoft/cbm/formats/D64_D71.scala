@@ -9,9 +9,11 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   val canBeEmulated = true
   // D64
   private[this] final  val DISK_SIZE_40_TRACKS = 196608
+  private[this] final  val DISK_SIZE_42_TRACKS = 205312
   private[this] final  val DISK_SIZE_35_TRACKS = 174848
   private[this] final  val DISK_SIZE_35_TRACKS_WITH_ERRORS = 175531
   private[this] final  val DISK_SIZE_40_TRACKS_WITH_ERRORS = 197376
+  private[this] final  val DISK_SIZE_42_TRACKS_WITH_ERRORS = 206114
   // D71
   private[this] final  val D71_DISK_SIZE_70_TRACKS = 349696
   private[this] final  val D71_DISK_SIZE_70_TRACKS_WITH_ERRORS = 351062
@@ -45,7 +47,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
    */
   private[this] final val TRACK_ALLOCATION = // Key = #track => Value = #sectors per track
     if (file.toUpperCase.endsWith(".D64"))
-      (for (t <- 0 to 40) yield {
+      (for (t <- 0 to 42) yield {
         if (t <= 17) (t, 21)
         else if (t <= 24) (t, 19)
         else if (t <= 30) (t, 18)
@@ -99,6 +101,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   private def TOTAL_TRACKS = disk.length match {
     case DISK_SIZE_35_TRACKS|DISK_SIZE_35_TRACKS_WITH_ERRORS => 35
     case DISK_SIZE_40_TRACKS|DISK_SIZE_40_TRACKS_WITH_ERRORS => 40
+    case DISK_SIZE_42_TRACKS|DISK_SIZE_42_TRACKS_WITH_ERRORS => 42
     case D71_DISK_SIZE_70_TRACKS | D71_DISK_SIZE_70_TRACKS_WITH_ERRORS => if (_bam != null && _bam.singleSide) 35 else 70
     case _ => throw new IllegalArgumentException("Unsupported file format. size is " + disk.length)
   }
@@ -112,12 +115,15 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   
   @inline private def getSectorError(t:Int,s:Int) : Option[Int] = {
     disk.length match {
-      case DISK_SIZE_35_TRACKS|DISK_SIZE_40_TRACKS => None
+      case DISK_SIZE_35_TRACKS|DISK_SIZE_40_TRACKS|DISK_SIZE_42_TRACKS => None
       case DISK_SIZE_35_TRACKS_WITH_ERRORS =>
         disk.seek(DISK_SIZE_35_TRACKS + absoluteSector(t,s))
         Some(disk.read)
       case DISK_SIZE_40_TRACKS_WITH_ERRORS =>
         disk.seek(DISK_SIZE_40_TRACKS + absoluteSector(t,s))
+        Some(disk.read)
+      case DISK_SIZE_42_TRACKS_WITH_ERRORS =>
+        disk.seek(DISK_SIZE_42_TRACKS + absoluteSector(t,s))
         Some(disk.read)
       case D71_DISK_SIZE_70_TRACKS => None
       case D71_DISK_SIZE_70_TRACKS_WITH_ERRORS => 
