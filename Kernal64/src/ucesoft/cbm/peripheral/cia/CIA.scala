@@ -30,12 +30,12 @@ object CIA {
   val ICR = 13
   val CRA = 14
   val CRB = 15
-  
-  val IRQ_SRC_TA = "Timer A"
-  val IRQ_SRC_TB = "Timer B"
-  val IRQ_SRC_ALARM = "ALARM"    
-  val IRQ_SERIAL = "SERIAL"
-  val IRQ_FLAG = "FLAG"
+  // IRQ sources (bit)
+  val IRQ_SRC_ALARM = 4
+  val IRQ_SRC_TA = 1
+  val IRQ_SRC_TB = 2
+  val IRQ_SERIAL = 8
+  val IRQ_FLAG = 16
 
   val CIA_MODEL_6526 = 0 // old
   val CIA_MODEL_8521 = 1 // new
@@ -191,8 +191,8 @@ class CIA(val name:String,
     
     def tick(cycles:Long) { // every 1/10 seconds
       // increment actual time if not freezed
+      if (!actualTime.freezed) actualTime.tick
       if (!actualTime.freezed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
-      if (!actualTime.freezed) actualTime.tick      
       // reschedule tick
       reschedule
     }
@@ -235,34 +235,36 @@ class CIA(val name:String,
         actualTime.am = (hour & 0x80) == 0
         if (actualTime.h == 0x12) actualTime.am = !actualTime.am        
       }
+      if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
     }
     def writeMin(min:Int) {
       if ((timerB.readCR & 0x80) > 0) { // set alarm
         alarmTime.m = min & 0x7F
       }
       else 
-      actualTime.m = min & 0x7F    
+      actualTime.m = min & 0x7F
+      if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
     }
     def writeSec(sec:Int) {
       if ((timerB.readCR & 0x80) > 0) { // set alarm
         alarmTime.s = sec & 0x7F
       }
       else 
-      actualTime.s = sec & 0x7F      
+      actualTime.s = sec & 0x7F
+      if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
     }
     def writeTenthSec(tsec:Int) {
       if ((timerB.readCR & 0x80) > 0) { // set alarm
         alarmTime.ts = tsec & 0x0F
-        if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
       }
       else {
         actualTime.ts = tsec  & 0x0F
         actualTime.freezed = false
-        if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
         // reschedule tick
+        println("Actual time "+actualTime + "  alarm " + alarmTime + " IRQ " + (actualTime == alarmTime))
         reschedule
       }
-      //if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
+      if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
     }
     // state
     protected def saveState(out:ObjectOutputStream) {
@@ -316,20 +318,12 @@ class CIA(val name:String,
   
   def setFlagLow = irqHandling(IRQ_FLAG)
   
-  final def irqHandling(src:String) {
-    val bit = src match {
-      case IRQ_SRC_ALARM => 4   
-      case IRQ_SRC_TA => 1
-      case IRQ_SRC_TB => 2
-      case IRQ_SERIAL => 8
-      case IRQ_FLAG => 16
-      case _ => 0
-    }
+  final def irqHandling(bit:Int) {
     icr |= bit
-    setIRQOnNextClock(src,1)
+    setIRQOnNextClock(bit,1)
   }
 
-  @inline private def setIRQOnNextClock(src:String,delay:Int): Unit = {
+  @inline private def setIRQOnNextClock(src:Int,delay:Int): Unit = {
     def setIRQ = {
       if ((icrMask & icr) > 0) {
         icr |= 0x80
@@ -338,7 +332,7 @@ class CIA(val name:String,
       }
     }
     val actualDelay = if (ciaModel == CIA_MODEL_8521) delay - 1 else delay
-    if (actualDelay == 0) setIRQ // set immediately
+    if (actualDelay == 0 || src == IRQ_SRC_ALARM) setIRQ // set immediately
     else {
       val clk = Clock.systemClock
       clk.schedule(new ClockEvent(componentID + "_IRQ", clk.currentCycles + delay, _ => setIRQ))
@@ -438,7 +432,7 @@ class CIA(val name:String,
       val mustSet = (value & 0x80) == 0x80 
       if (mustSet) icrMask |= value & 0x7f else icrMask &= ~value
       
-      if ((icrMask & icr & 0x1f) != 0) setIRQOnNextClock("Write to ICR",2)
+      if ((icrMask & icr & 0x1f) != 0) setIRQOnNextClock(-1,2)
       Log.debug(s"${name} ICR's value is ${Integer.toBinaryString(value)} => ICR = ${Integer.toBinaryString(icrMask)}")
     case CRA =>
       val oldSerialOut = timerA.readCR & 0x40

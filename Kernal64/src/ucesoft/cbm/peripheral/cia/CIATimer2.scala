@@ -10,11 +10,11 @@ import java.io.ObjectInputStream
 import javax.swing.JFrame
 
 class CIATimerA2(ciaName: String,
-                 id: String,
-                 irqAction: (String) => Unit,
+                 id: Int,
+                 irqAction: (Int) => Unit,
                  autoClock: Boolean = true,
                  timerToNotify: Option[CIATimerA2] = None) extends CBMComponent {
-  val componentID = ciaName + id
+  val componentID = ciaName + "_TA"
   val componentType = CBMComponentType.CHIP 
   
   final private[this] val EVENT_ID = componentID
@@ -76,15 +76,15 @@ class CIATimerA2(ciaName: String,
   final def writeLo(lo: Int) {
     latch = (latch & 0xFF00) | (lo & 0xFF)
     //if ((cr & 0x10) > 0) counter = (counter & 0xFF00) | lo & 0xFF
-    Log.debug(s"${ciaName}-${id} set counter lo to ${lo} latch=${latch}")
+    Log.debug(s"${componentID} set counter lo to ${lo} latch=${latch}")
     //println(s"${ciaName}-${id} set counter lo to ${lo} latch=${latch} prev=${prev}")
   }
 
   final def writeHi(hi: Int) {
     latch = ((hi & 0xFF) << 8) | (latch & 0x00FF)
     if (!started) counter = latch
-    Log.debug(s"${ciaName}-${id} set counter hi to ${hi} latch=${latch} started=$started")
-    //println(s"${ciaName}-${id} set counter hi to ${hi} latch=${latch} prev=${prev}")
+    Log.debug(s"${componentID} set counter hi to ${hi} latch=${latch} started=$started")
+    //println(s"${componentID} set counter hi to ${hi} latch=${latch} prev=${prev}")
   }
 
   final def readLo = (if (autoClock) getCounter else counter) & 0xFF  
@@ -117,7 +117,7 @@ class CIATimerA2(ciaName: String,
       counter = latch // reload immediately
     }
 
-    Log.debug(s"${ciaName}-${id} control register set to ${cr} latch=${latch} countSystemClock=$countSystemClock")
+    Log.debug(s"${componentID} control register set to ${cr} latch=${latch} countSystemClock=$countSystemClock")
   }
 
   protected def handleCR567 {}
@@ -168,7 +168,7 @@ class CIATimerA2(ciaName: String,
   }
   protected def setCountExternal(enabled: Boolean) {
     countExternal = enabled
-    Log.debug(s"${ciaName}-${id} countExternal=${enabled}")
+    Log.debug(s"${componentID} countExternal=${enabled}")
   }
   
   /**
@@ -191,7 +191,7 @@ class CIATimerA2(ciaName: String,
     if (/*!oneShot &&*/ serialActionCallback.isDefined) serialActionCallback.get()
     // reset counter with latch value
     if (!countExternal) counter = latch// else counter = (latch + 1) & 0xFFFF
-    //Log.debug(s"${ciaName}-${id} counter is zero")
+    //Log.debug(s"${componentID} counter is zero")
     if (timerUnderflowOnPortB) {
       if (toggleMode) flipFlop = !flipFlop
       else {
@@ -251,7 +251,7 @@ class CIATimerA2(ciaName: String,
   protected def allowsStateRestoring(parent:JFrame) : Boolean = true
 }
 
-class CIATimerB2(ciaName: String, id: String, irqAction: (String) => Unit,autoClock:Boolean = true) extends CIATimerA2(ciaName, id, irqAction,autoClock) {
+class CIATimerB2(ciaName: String, id: Int, irqAction: (Int) => Unit,autoClock:Boolean = true) extends CIATimerA2(ciaName, id, irqAction,autoClock) {
   override protected def handleCR567 {
     val bit56 = (cr >> 5) & 0x3
     setCountExternal(bit56 == 2)
