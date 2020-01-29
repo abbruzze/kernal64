@@ -2073,17 +2073,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
       tracing = true
       breakCallBack(toString)
     }
-    val tracingNow = tracing && (state == 0 || state == O_JAM)
-    if (tracingNow) Log.debug(formatDebug)
-    if (tracingOnFile && (state == 0 || state == O_JAM)) tracingFile.println(formatDebug)
 
-    CURRENT_OP_PC = PC
-    if (tracingNow) {
-      stepCallBack(toString)
-      syncObject.synchronized {
-        syncObject.wait
-      }
-    }
 
     // check interrupts
     if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - nmiFirstCycle >= 2) {
@@ -2106,6 +2096,18 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
         tracing = true
         breakCallBack(toString)
         Log.debug("IRQ Break")
+      }
+    }
+    else {
+      val tracingNow = tracing && (state == 0 || state == O_JAM)
+      if (tracingNow) Log.debug(formatDebug)
+      if (tracingOnFile && (state == 0 || state == O_JAM)) tracingFile.println(formatDebug)
+      CURRENT_OP_PC = PC
+      if (tracingNow) {
+        stepCallBack(toString)
+        syncObject.synchronized {
+          syncObject.wait
+        }
       }
     }
     delay1CycleIRQCheck = false
