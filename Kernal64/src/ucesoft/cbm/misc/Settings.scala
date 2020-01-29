@@ -3,6 +3,8 @@ package ucesoft.cbm.misc
 import java.util.Properties
 
 object Settings {
+  class SettingIllegalArgumentException(msg:String) extends Exception(msg)
+
   trait SettingConv[T] {
     def convert(value:String) : T
     val defValue : T
@@ -100,24 +102,33 @@ class Settings {
   def parseAndLoad(args:Array[String]) : Option[String] = {
     var p = 0
     while (p < args.length && args(p).startsWith("--")) {
-      settings find { _.cmdLine == args(p).substring(2) } match {
-        case Some(s) if s.consume == 0 =>
-          if (p + 1 < args.length && !args(p + 1).startsWith("--")) {
-            s.load(args(p + 1))
+      try {
+        settings find {
+          _.cmdLine == args(p).substring(2)
+        } match {
+          case Some(s) if s.consume == 0 =>
+            if (p + 1 < args.length && !args(p + 1).startsWith("--")) {
+              s.load(args(p + 1))
+              p += 2
+            }
+            else {
+              s.load("true")
+              p += 1
+            }
+          case Some(s) if s.consume == 1 =>
+            if (p + 1 < args.length) s.load(args(p + 1))
+            else throw new SettingIllegalArgumentException("Value for setting " + args(p) + " not found")
             p += 2
-          }
-          else {
-            s.load("true")
-            p += 1
-          }
-        case Some(s) if s.consume == 1 =>
-          if (p + 1 < args.length) s.load(args(p + 1))
-          else throw new IllegalArgumentException("Value for setting " + args(p) + " not found")
-          p += 2
-        case None =>
-          throw new IllegalArgumentException("Invalid setting: " + args(p))
+          case None =>
+            throw new SettingIllegalArgumentException("Invalid setting: " + args(p))
+        }
+      }
+      catch {
+        case e:Throwable =>
+          throw new SettingIllegalArgumentException(s"error while applying command option ${args(p)}: ${e.getMessage}")
       }
     }
+
     if (p < args.length) Some(args(p)) else None
   }
 }

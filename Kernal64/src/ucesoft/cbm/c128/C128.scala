@@ -39,7 +39,14 @@ import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 object C128 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
   val c128 = new C128
-  c128.run(args)  
+  try {
+    c128.run(args)
+  }
+  catch {
+    case i:Settings.SettingIllegalArgumentException =>
+      println(s"Bad command line argument: ${i.getMessage}")
+      sys.exit(1)
+  }
 }
 
 class C128 extends CBMComponent with GamePlayer with MMUChangeListener {

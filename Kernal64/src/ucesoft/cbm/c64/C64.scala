@@ -69,7 +69,14 @@ import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 object C64 extends App {
   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
   val c64 = new C64
-  c64.run(args)  
+  try {
+    c64.run(args)
+  }
+  catch {
+    case i:Settings.SettingIllegalArgumentException =>
+      println(s"Bad command line argument: ${i.getMessage}")
+      sys.exit(1)
+  }
 }
 
 class C64 extends CBMComponent with GamePlayer {
