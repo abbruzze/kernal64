@@ -7,7 +7,7 @@
 	<property name="c64.install" value="${dist.dir}/kernal64_install.zip"/>
 	
 	<!-- VERSION -->
-	<property name="VERSION" value="1.5.4"/>
+	<property name="VERSION" value="1.6.0"/>
 	
 	<!-- label is set only if ant is executed by CI -->
  	<condition property="BUILD_NUMBER" value="?">
