@@ -40,5 +40,5 @@ class FloppyComponent(device:Int,var drive:Drive,driveLed:DriveLed) extends CBMC
         case None =>
       }
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }

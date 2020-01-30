@@ -45,5 +45,5 @@ abstract class Connector extends CBMComponent {
     dir = in.readInt
     latch = in.readInt
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

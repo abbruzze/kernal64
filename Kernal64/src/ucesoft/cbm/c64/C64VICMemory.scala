@@ -78,5 +78,5 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU6510) extends VICMemory {
     memLastByteRead = in.readInt
     ultimax = in.readBoolean
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

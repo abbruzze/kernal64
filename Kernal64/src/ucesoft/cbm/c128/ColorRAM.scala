@@ -60,6 +60,6 @@ class ColorRAM extends RAMComponent {
     processorBank = in.readInt
     vicBank = in.readInt
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }
  

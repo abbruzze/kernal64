@@ -37,5 +37,5 @@ class ExtendedROM(ram: Memory,val name:String,val startAddress:Int) extends RAMC
   // state
   protected def saveState(out:ObjectOutputStream) {}
   protected def loadState(in:ObjectInputStream) {}
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

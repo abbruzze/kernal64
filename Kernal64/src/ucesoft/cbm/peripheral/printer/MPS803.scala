@@ -46,5 +46,5 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
   protected def loadState(in:ObjectInputStream) {
     active = in.readBoolean
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

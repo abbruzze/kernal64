@@ -202,5 +202,5 @@ class Keyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) => Un
     enabled = in.readBoolean
     keypadEnabled = in.readBoolean
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

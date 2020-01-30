@@ -2408,5 +2408,5 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
     busREQ = in.readBoolean
     ctx.loadState(in)
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

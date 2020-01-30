@@ -226,7 +226,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     cycles = in.readLong
     events = null
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 
   def getSubIdListFor(id:String) : List[(Int,Long)] = {
     var ids : List[(Int,Long)] = Nil

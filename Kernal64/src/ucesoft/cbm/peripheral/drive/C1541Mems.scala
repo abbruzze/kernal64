@@ -70,7 +70,7 @@ object C1541Mems {
       loadMemory[Int](mem,in)
       channelActive = in.readInt
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
   
   class EXP_RAM(baseAddress:Int) extends RAMComponent {
@@ -106,7 +106,7 @@ object C1541Mems {
       loadMemory[Int](mem,in)
       isActive = in.readBoolean
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
   
   private[this] val KERNEL = new DISK_KERNEL
@@ -147,6 +147,6 @@ object C1541Mems {
     // state
     protected def saveState(out:ObjectOutputStream) {}
     protected def loadState(in:ObjectInputStream) {}
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
 }

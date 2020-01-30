@@ -405,5 +405,5 @@ class D1581(val driveID: Int,
     cycleFrac = in.readDouble
     CYCLE_ADJ = in.readDouble
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

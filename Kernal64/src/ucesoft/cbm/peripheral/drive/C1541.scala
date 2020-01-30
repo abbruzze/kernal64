@@ -364,7 +364,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       viaBusIRQLow = in.readBoolean
       viaDiskIRQLow = in.readBoolean
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
 
   override def getMem = mem
@@ -455,5 +455,5 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     goSleepingCycles = in.readLong
     canSleep = in.readBoolean
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

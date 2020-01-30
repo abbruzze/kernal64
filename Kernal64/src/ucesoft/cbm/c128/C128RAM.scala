@@ -263,5 +263,5 @@ private[c128] class C128RAM extends RAMComponent {
     page_0_bank = in.readInt
     page_1_bank = in.readInt
   }
-  protected def allowsStateRestoring(parent:JFrame) = true
+  protected def allowsStateRestoring = true
 }

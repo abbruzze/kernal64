@@ -54,5 +54,5 @@ class NMISwitcher(nmiHandler:(Boolean) => Unit) extends CBMComponent {
       cia2NMILow = in.readBoolean
       expPortNMILow = in.readBoolean
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }

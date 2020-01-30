@@ -305,10 +305,10 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
   // state
   protected def saveState(out:ObjectOutputStream) {}
   protected def loadState(in:ObjectInputStream) {}
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = {
+  protected def allowsStateRestoring : Boolean = {
     driveReader match {
       case Some(d64) =>
-        JOptionPane.showMessageDialog(parent,s"Warning: 1541 emulation is active with $d64. The disk will not be saved/loaded.","State warning",JOptionPane.WARNING_MESSAGE)
+        showError("State warning",s"Warning: 1541 emulation is active with $d64. The disk will not be saved/loaded.")
       case None =>
     }
     true

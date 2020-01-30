@@ -235,5 +235,5 @@ abstract class VIA(val name:String,
     active = in.readBoolean
     loadMemory[Int](regs,in)
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

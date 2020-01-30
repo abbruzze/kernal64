@@ -194,7 +194,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
     lastWrite = in.readInt
     lastByteReady = in.readBoolean
   }
-  protected def allowsStateRestoring(parent:JFrame) = true
+  protected def allowsStateRestoring = true
  // ================== Abstract methods =============================================== 
  def changeSide(side:Int)
  def isSync : Boolean

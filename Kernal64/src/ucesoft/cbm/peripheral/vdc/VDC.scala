@@ -161,19 +161,19 @@ class VDC extends RAMComponent {
   private[this] val PALETTE = Array(
     0xFF000000,  // 00 Black
     0xFF555555,  // 01 Medium Gray
-    0xFF000078,  // 02 Blue (78)
+    0xFF0000AA,  // 02 Blue
     0xFF5555FF,  // 03 Light blue
-    0xFF007800,  // 04 Green (78)
+    0xFF00AA00,  // 04 Green
     0xFF55FF55,  // 05 Light green
-    0xFF007878,  // 06 Dark cyan (78)
+    0xFF00AAAA,  // 06 Dark cyan
     0xFF55FFFF,  // 07 Light cyan
-    0xFF780000,  // 08 Dark red (78)
+    0xFFAA0000,  // 08 Dark red
     0xFFFF5555,  // 09 Light red
-    0xFF780078,  // 10 Dark purple (78)
+    0xFFAA00AA,  // 10 Dark purple
     0xFFFF55FF,  // 11 Light purple
-    0xFF785500,  // 12 Brown (78)
+    0xFFAA5500,  // 12 Brown
     0xFFFFFF55,  // 13 Yellow
-    0xFF787878,  // 14 Light Gray (78)
+    0xFFAAAAAA,  // 14 Light Gray
     0xFFFFFFFF   // 15 White
   )
   // Clock management ====================================
@@ -1052,5 +1052,5 @@ class VDC extends RAMComponent {
     bitmap = display.displayMem
     play
   }
-  protected def allowsStateRestoring(parent:JFrame) = true
+  protected def allowsStateRestoring = true
 }

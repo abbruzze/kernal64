@@ -124,5 +124,5 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
   // state
   protected def saveState(out:ObjectOutputStream) {}
   protected def loadState(in:ObjectInputStream) {}
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

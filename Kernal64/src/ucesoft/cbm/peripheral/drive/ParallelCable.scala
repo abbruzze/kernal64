@@ -52,5 +52,5 @@ object ParallelCable extends CBMComponent {
   protected def loadState(in:ObjectInputStream) {
     cableValue = in.readInt()
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

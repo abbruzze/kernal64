@@ -869,5 +869,5 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     check128_1
     check64_1
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

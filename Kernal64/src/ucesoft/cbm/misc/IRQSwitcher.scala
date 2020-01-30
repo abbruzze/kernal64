@@ -60,5 +60,5 @@ class IRQSwitcher(irqHandler: (Boolean) => Unit) extends CBMComponent {
       vicIRQLow = in.readBoolean
       expPortIRQLow = in.readBoolean
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }

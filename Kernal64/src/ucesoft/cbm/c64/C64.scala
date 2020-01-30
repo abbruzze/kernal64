@@ -1,85 +1,43 @@
 package ucesoft.cbm.c64
 
-import ucesoft.cbm.cpu._
-import ucesoft.cbm.peripheral._
-import javax.swing._
-import java.awt.event._
-import java.awt._
-
-import ucesoft.cbm.expansion.ExpansionPort
-import ucesoft.cbm.formats._
-import ucesoft.cbm.formats.ExpansionPortFactory
-import ucesoft.cbm.trace.TraceListener
-import ucesoft.cbm.trace.TraceDialog
-import java.awt.Toolkit
+import java.awt.{Toolkit, _}
 import java.awt.datatransfer.DataFlavor
-
-import ucesoft.cbm.peripheral.bus.IECBus
+import java.awt.event._
 import java.io._
+import java.util.{Properties, ServiceLoader}
 
+import javax.swing._
 import javax.swing.filechooser.FileFilter
-import ucesoft.cbm.peripheral.drive.C1541Emu
-import java.util.Properties
-
+import ucesoft.cbm.cpu.CPU6510.CPUJammedException
+import ucesoft.cbm.cpu._
+import ucesoft.cbm.expansion._
+import ucesoft.cbm.expansion.cpm.CPMCartridge
+import ucesoft.cbm.formats.{ExpansionPortFactory, _}
+import ucesoft.cbm.game.{GamePlayer, GameUI}
+import ucesoft.cbm.misc._
+import ucesoft.cbm.peripheral._
+import ucesoft.cbm.peripheral.bus.{BusSnoop, IECBus}
+import ucesoft.cbm.peripheral.c2n.Datassette
+import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.controlport.JoystickSettingDialog
 import ucesoft.cbm.peripheral.controlport.Joysticks._
-import ucesoft.cbm.peripheral.drive.C1541
-import ucesoft.cbm.peripheral.drive.Drive
-import ucesoft.cbm.peripheral.cia.CIA
-import ucesoft.cbm.trace.InspectPanel
-import ucesoft.cbm.peripheral.c2n.Datassette
-import ucesoft.cbm.peripheral.bus.BusSnoop
-import ucesoft.cbm.peripheral.printer.MPS803
-import ucesoft.cbm.peripheral.printer.MPS803GFXDriver
-import ucesoft.cbm.peripheral.printer.MPS803ROM
-import ucesoft.cbm.cpu.CPU6510.CPUJammedException
-import ucesoft.cbm.expansion.REU
-import ucesoft.cbm.peripheral.rs232._
-import ucesoft.cbm.peripheral.drive.LocalDrive
-import ucesoft.cbm.expansion.SwiftLink
-import ucesoft.cbm.peripheral.drive.ParallelCable
-import ucesoft.cbm.expansion.DualSID
-import ucesoft.cbm.peripheral.drive.FlyerIEC
-import ucesoft.cbm.remote.RemoteC64
-import ucesoft.cbm.game.GamePlayer
-import java.util.ServiceLoader
-
-import ucesoft.cbm.game.GameUI
-
-import scala.util.Success
-import scala.util.Failure
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.Clock
-import ucesoft.cbm.Log
-import ucesoft.cbm.ClockEvent
-import ucesoft.cbm.misc._
-import ucesoft.cbm.peripheral.drive.DriveType
-import ucesoft.cbm.peripheral.drive.D1571
-import ucesoft.cbm.peripheral.drive.D1581
-import ucesoft.cbm.trace.InspectPanelDialog
-import ucesoft.cbm.expansion.DigiMAX
-import ucesoft.cbm.expansion.DigiMaxCart
-import ucesoft.cbm.expansion.cpm.CPMCartridge
-import ucesoft.cbm.peripheral.drive.EmptyFloppy
+import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
+import ucesoft.cbm.peripheral.printer.{MPS803, MPS803GFXDriver, MPS803ROM}
+import ucesoft.cbm.peripheral.rs232._
 import ucesoft.cbm.peripheral.vic.Palette
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
+import ucesoft.cbm.remote.RemoteC64
+import ucesoft.cbm.trace.{InspectPanel, InspectPanelDialog, TraceDialog, TraceListener}
+import ucesoft.cbm._
+
+import scala.util.{Failure, Success}
 
 object C64 extends App {
-  UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
-  val c64 = new C64
-  try {
-    c64.run(args)
-  }
-  catch {
-    case i:Settings.SettingIllegalArgumentException =>
-      println(s"Bad command line argument: ${i.getMessage}")
-      sys.exit(1)
-  }
+  CBMComputer.turnOn(new C64,args)
 }
 
-class C64 extends CBMComponent with GamePlayer {
+class C64 extends CBMComponent with GamePlayer with CBMComputer {
   val componentID = "Commodore 64"
   val componentType = CBMComponentType.INTERNAL
   
@@ -99,7 +57,7 @@ class C64 extends CBMComponent with GamePlayer {
         props.load(new FileReader(propsFile))
       }
       catch {
-        case io:IOException =>
+        case _:IOException =>
       }
     }
     ROM.props = props
@@ -124,9 +82,7 @@ class C64 extends CBMComponent with GamePlayer {
   private[this] val displayFrame = {
     val f = new JFrame("Kernal64 " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
-      override def windowClosing(e:WindowEvent) {
-        close
-      }
+      override def windowClosing(e:WindowEvent) : Unit = turnOff
     })
     f.setIconImage(new ImageIcon(getClass.getResource("/resources/commodore.png")).getImage)    
     f
@@ -234,7 +190,7 @@ class C64 extends CBMComponent with GamePlayer {
     // state
     protected def saveState(out:ObjectOutputStream) {}
     protected def loadState(in:ObjectInputStream) {}
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
   // ------------------------------------ Drag and Drop ----------------------------
   private[this] val DNDHandler = new DNDHandler(handleDND(_,true,true))
@@ -381,7 +337,8 @@ class C64 extends CBMComponent with GamePlayer {
     displayFrame.addKeyListener(keyb)
     displayFrame.addKeyListener(keypadControlPort)
     displayFrame.addKeyListener(keyboardControlPort)
-    display.addMouseListener(keypadControlPort)    
+    display.addMouseListener(keypadControlPort)
+    display.addMouseListener(controlport.ControlPort.emptyControlPort)
     val lightPen = new LightPenButtonListener
     add(lightPen)
     display.addMouseListener(lightPen)
@@ -448,7 +405,7 @@ class C64 extends CBMComponent with GamePlayer {
     driveLeds(1).setVisible(false)        
   }
   
-  private def errorHandler(t:Throwable) {
+  def errorHandler(t:Throwable) {
     t match {
       case j:CPUJammedException if !cpujamContinue =>
         JOptionPane.showConfirmDialog(displayFrame,
@@ -469,9 +426,13 @@ class C64 extends CBMComponent with GamePlayer {
         Log.info(CPU6510.disassemble(mem,cpu.getCurrentInstructionPC).toString)
         t.printStackTrace(Log.getOut)
         t.printStackTrace
-        if (headless) sys.exit(1) // exit if headless
-        JOptionPane.showMessageDialog(displayFrame,t.toString + " [PC=" + Integer.toHexString(cpu.getCurrentInstructionPC) + "]", "Fatal error",JOptionPane.ERROR_MESSAGE)
-        //trace(true,true)
+        if (headless) {
+          println(s"Fatal error occurred on cycle ${clock.currentCycles}: $cpu\n${CPU6510.disassemble(mem,cpu.getCurrentInstructionPC)}")
+          t.printStackTrace
+          sys.exit(1)
+        } // exit if headless
+        
+        showError("Fatal error",t.toString + " [PC=" + Integer.toHexString(cpu.getCurrentInstructionPC) + "]")
         reset(true)
     }    
   }
@@ -535,7 +496,7 @@ class C64 extends CBMComponent with GamePlayer {
     device10DriveEnabled = enabled
   }
   private def enableMouse(mouseEnabled:Boolean) {
-    keypadControlPort.setMouse1351Emulation(mouseEnabled)
+    controlPortA.setMouse1351Emulation(mouseEnabled)
     sid.setMouseEnabled(mouseEnabled)
     if (mouseEnabled) MouseCage.enableMouseCageOn(display) else MouseCage.disableMouseCage
   }
@@ -589,7 +550,7 @@ class C64 extends CBMComponent with GamePlayer {
   private def setLightPen(setting:Int): Unit = {
     lightPenButtonEmulation = setting
     vicChip.enableLightPen(setting != LIGHT_PEN_NO_BUTTON)
-    keypadControlPort.setLightPenEmulation(setting != LIGHT_PEN_NO_BUTTON)
+    controlPortB.setLightPenEmulation(setting != LIGHT_PEN_NO_BUTTON)
   }
 
   private def setDualSID(address:Option[Int]): Unit = {
@@ -615,7 +576,8 @@ class C64 extends CBMComponent with GamePlayer {
           }
           catch {
             case io:IOException =>
-              JOptionPane.showMessageDialog(displayFrame,io.toString, "Remoting init error",JOptionPane.ERROR_MESSAGE)
+              
+              showError("Remoting init error",io.toString)
               source.setSelected(false)
               display.setRemote(None)
           }
@@ -662,7 +624,8 @@ class C64 extends CBMComponent with GamePlayer {
         }
         catch {
           case t:Throwable =>
-            JOptionPane.showMessageDialog(displayFrame,t.toString, "REU loading error",JOptionPane.ERROR_MESSAGE)
+            
+            showError("REU loading error",t.toString)
         }
       case _ =>
     }
@@ -745,7 +708,8 @@ class C64 extends CBMComponent with GamePlayer {
             }
             catch {
               case _:IllegalArgumentException =>
-                JOptionPane.showMessageDialog(displayFrame,"Invalid keyboard layout file", "Keyboard..",JOptionPane.ERROR_MESSAGE)
+                
+                showError("Keyboard..","Invalid keyboard layout file")
             }
             finally {
               in.close
@@ -760,9 +724,10 @@ class C64 extends CBMComponent with GamePlayer {
     clock.pause
     var in : ObjectInputStream = null
     try {
-      val canLoad = allowsState(displayFrame)
+      val canLoad = allowsState
       if (!canLoad) {
-        JOptionPane.showMessageDialog(displayFrame,"Can't load state", "State saving error",JOptionPane.ERROR_MESSAGE)
+        
+        showError("State saving error","Can't load state")
         return
       }
       val fc = new JFileChooser
@@ -784,7 +749,8 @@ class C64 extends CBMComponent with GamePlayer {
     }
     catch {
       case t:Throwable =>
-        JOptionPane.showMessageDialog(displayFrame,"Can't load state. Unexpected error occurred: " + t, "State loading error",JOptionPane.ERROR_MESSAGE)
+        
+        showError("State loading error","Can't load state. Unexpected error occurred: " + t)
         t.printStackTrace
         reset(false)
     }
@@ -798,9 +764,10 @@ class C64 extends CBMComponent with GamePlayer {
     clock.pause
     var out : ObjectOutputStream = null
     try {
-      val canSave = allowsState(displayFrame)
+      val canSave = allowsState
       if (!canSave) {
-        JOptionPane.showMessageDialog(displayFrame,"Can't save state", "State saving error",JOptionPane.ERROR_MESSAGE)
+        
+        showError("State saving error","Can't save state")
         return
       }
       val fc = new JFileChooser
@@ -822,7 +789,8 @@ class C64 extends CBMComponent with GamePlayer {
     }
     catch {
       case t:Throwable =>
-        JOptionPane.showMessageDialog(displayFrame,"Can't save state. Unexpected error occurred: " + t, "State saving error",JOptionPane.ERROR_MESSAGE)
+        
+        showError("State saving error","Can't save state. Unexpected error occurred: " + t)
         t.printStackTrace
     }
     finally {
@@ -871,7 +839,8 @@ class C64 extends CBMComponent with GamePlayer {
         }
         catch {
           case t:Throwable => 
-            JOptionPane.showMessageDialog(displayFrame,t.toString, "Disk making error",JOptionPane.ERROR_MESSAGE)
+            
+            showError("Disk making error",t.toString)
         }
       case _ =>
     }
@@ -955,7 +924,8 @@ class C64 extends CBMComponent with GamePlayer {
     catch {
       case t:Throwable =>
         t.printStackTrace(traceDialog.logPanel.writer)
-        JOptionPane.showMessageDialog(displayFrame,t.toString, "Cartridge loading error",JOptionPane.ERROR_MESSAGE)
+        
+        showError("Cartridge loading error",t.toString)
     }
     finally {
       clock.play
@@ -979,7 +949,8 @@ class C64 extends CBMComponent with GamePlayer {
       if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
       val isD64 = file.getName.toUpperCase.endsWith(".D64")
       if (drives(driveID) == c1541 && !isD64) {
-        JOptionPane.showMessageDialog(displayFrame,"Format not allowed on a 1541 not in true emulation mode", "Disk attaching error",JOptionPane.ERROR_MESSAGE)
+        
+        showError("Disk attaching error","Format not allowed on a 1541 not in true emulation mode")
         return
       }
       val disk = Diskette(file.toString)
@@ -1006,7 +977,8 @@ class C64 extends CBMComponent with GamePlayer {
     catch {
       case t:Throwable =>
         t.printStackTrace
-        JOptionPane.showMessageDialog(displayFrame,t.toString, "Disk attaching error",JOptionPane.ERROR_MESSAGE)
+        
+        showError("Disk attaching error",t.toString)
     }
   }
   
@@ -1126,7 +1098,7 @@ class C64 extends CBMComponent with GamePlayer {
   } 
   
   private def detachCtr {
-    if (ExpansionPort.getExpansionPort.isEmpty) JOptionPane.showMessageDialog(displayFrame,"No cartridge attached!", "Detach error",JOptionPane.ERROR_MESSAGE)
+    if (ExpansionPort.getExpansionPort.isEmpty) showError("Detach error","No cartridge attached!")
     else {
       if (Thread.currentThread != Clock.systemClock) clock.pause
       ExpansionPort.getExpansionPort.eject
@@ -1174,7 +1146,7 @@ class C64 extends CBMComponent with GamePlayer {
   
   private def loadFileFromAttachedFile(driveID:Int,relocate:Boolean) {
     val floppy = drives(driveID).getFloppy
-    if (floppy.isEmpty) JOptionPane.showMessageDialog(displayFrame,"No disk attached!", "Loading error",JOptionPane.ERROR_MESSAGE)
+    if (floppy.isEmpty) showError("Loading error","No disk attached!")
     else {
       Option(JOptionPane.showInputDialog(displayFrame,"Load file","*")) match {
         case None =>
@@ -1184,7 +1156,8 @@ class C64 extends CBMComponent with GamePlayer {
           }
           catch {
             case t:Throwable =>
-              JOptionPane.showMessageDialog(displayFrame, "Errore while loading from disk: " + t.getMessage,"Loading error",JOptionPane.ERROR_MESSAGE)
+              
+              showError("Loading error","Error while loading from disk: " + t.getMessage)
           }
       }
     }
@@ -1245,7 +1218,8 @@ class C64 extends CBMComponent with GamePlayer {
           } 
         }
       case Failure(t) =>
-        JOptionPane.showMessageDialog(displayFrame,t.toString,s"Error while opening zip file $file",JOptionPane.ERROR_MESSAGE)
+        
+        showError(s"Error while opening zip file $file",t.toString)
     }    
   }
   
@@ -1472,7 +1446,7 @@ class C64 extends CBMComponent with GamePlayer {
     fileMenu.addSeparator
 
     val exitItem = new JMenuItem("Exit")
-    exitItem.addActionListener(_ => close )
+    exitItem.addActionListener(_ => turnOff )
     fileMenu.add(exitItem)
 
     // edit
@@ -1674,16 +1648,16 @@ class C64 extends CBMComponent with GamePlayer {
     noPenItem.addActionListener(_ => setLightPen(LIGHT_PEN_NO_BUTTON) )
     group3.add(noPenItem)
     lightPenMenu.add(noPenItem)
-    val penUp = new JRadioButtonMenuItem("Light pen with button up")
+    val penUp = new JRadioButtonMenuItem("Light pen with button up on control port 2")
     penUp.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_UP) )
     group3.add(penUp)
     lightPenMenu.add(penUp)
-    val penLeft = new JRadioButtonMenuItem("Light pen with button left")
+    val penLeft = new JRadioButtonMenuItem("Light pen with button left on control port 2")
     penLeft.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_LEFT) )
     group3.add(penLeft)
     lightPenMenu.add(penLeft)
     
-    val mouseEnabledItem = new JCheckBoxMenuItem("Mouse 1351 enabled")
+    val mouseEnabledItem = new JCheckBoxMenuItem("Mouse 1351 enabled on port 1")
     mouseEnabledItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_M,java.awt.event.InputEvent.ALT_DOWN_MASK))
     mouseEnabledItem.setSelected(false)
     mouseEnabledItem.addActionListener(e => enableMouse(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
@@ -2063,7 +2037,8 @@ class C64 extends CBMComponent with GamePlayer {
               }
               catch {
                 case t:Throwable =>
-                  JOptionPane.showMessageDialog(displayFrame,t.toString,s"Error while contacting provider ${provider.name}'s server",JOptionPane.ERROR_MESSAGE)
+                  
+                  showError(s"Error while contacting provider ${provider.name}'s server",t.toString)
               }
             }
           })
@@ -2115,7 +2090,7 @@ class C64 extends CBMComponent with GamePlayer {
     configureJoystick
   }
   
-  private def close {
+  def turnOff {
     if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
     for(d <- drives)
       d.getFloppy.close
@@ -2176,14 +2151,10 @@ class C64 extends CBMComponent with GamePlayer {
       case _ => throw new IOException("State loading aborted")
     }
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
   // -----------------------------------------------------------------------------------------
   
-  private def swing(f: => Unit) {
-    SwingUtilities.invokeAndWait(() => f)
-  }
-  
-  def run(args:Array[String]) {
+  def turnOn(args:Array[String]) {
     swing { setMenu }
     // check help
     if (settings.checkForHelp(args)) {

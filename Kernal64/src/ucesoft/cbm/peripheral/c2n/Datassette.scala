@@ -160,8 +160,8 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
   // state
   protected def saveState(out:ObjectOutputStream) {}
   protected def loadState(in:ObjectInputStream) {}
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = {
-    if (motorOn) JOptionPane.showMessageDialog(parent,"Can't load/save state if datassette is playing or recording","State error",JOptionPane.ERROR_MESSAGE)
+  protected def allowsStateRestoring : Boolean = {
+    if (motorOn) showError("State error","Can't load/save state if datassette is playing or recording")
     !motorOn
   }
 }

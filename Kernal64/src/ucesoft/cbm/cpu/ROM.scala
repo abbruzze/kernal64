@@ -49,7 +49,7 @@ class ROM(ram: Memory,
     active = in.readBoolean
     loadMemory[Int](mem,in)
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }
 
 object ROM {

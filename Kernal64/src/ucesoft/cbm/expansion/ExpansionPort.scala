@@ -53,8 +53,8 @@ abstract class ExpansionPort extends RAMComponent {
   // state
   protected def saveState(out:ObjectOutputStream) {}
   protected def loadState(in:ObjectInputStream) {}
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = {
-    JOptionPane.showMessageDialog(parent,s"Loading/storing of cartridge's state is not supported [$componentID].","State error",JOptionPane.ERROR_MESSAGE)
+  protected def allowsStateRestoring : Boolean = {
+    showError("State error",s"Loading/storing of cartridge's state is not supported [$componentID].")
     false
   }
 }
@@ -78,7 +78,7 @@ object ExpansionPort {
     val ROMH = EmptyROM: Memory
     override def isEmpty = true
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = memoryForEmptyExpansionPort.lastByteRead
-    override protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    override protected def allowsStateRestoring : Boolean = true
   }
   private val proxyExpansionPort : ExpansionPort = new ExpansionPort {
     val name = "Proxy Expansion Port"
@@ -99,7 +99,7 @@ object ExpansionPort {
     // state
     final override protected def saveState(out:ObjectOutputStream) = expansionPort.saveState(out)
     final override protected def loadState(in:ObjectInputStream) = expansionPort.loadState(in)
-    final override protected def allowsStateRestoring(parent:JFrame) : Boolean = expansionPort.allowsStateRestoring(parent)
+    final override protected def allowsStateRestoring : Boolean = expansionPort.allowsStateRestoring
   }
 
   private[this] var expansionPort = emptyExpansionPort

@@ -248,7 +248,7 @@ class CIATimerA2(ciaName: String,
         new ClockEvent(EVENT_ID,w, toggleToFalse,TOGGLE_TO_FALSE_SUBID)
     }
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }
 
 class CIATimerB2(ciaName: String, id: Int, irqAction: (Int) => Unit,autoClock:Boolean = true) extends CIATimerA2(ciaName, id, irqAction,autoClock) {

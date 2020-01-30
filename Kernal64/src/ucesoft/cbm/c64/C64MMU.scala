@@ -88,7 +88,7 @@ object C64MMU {
       loadMemory[Int](mem,in)
       ULTIMAX = in.readBoolean
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
   
   class COLOR_RAM extends RAMComponent {
@@ -121,7 +121,7 @@ object C64MMU {
     protected def loadState(in:ObjectInputStream) {
       loadMemory[Int](mem,in)
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
 
   class IO(ram: Memory,colorRam:Memory) extends BridgeMemory {
@@ -149,7 +149,7 @@ object C64MMU {
     // state
     protected def saveState(out:ObjectOutputStream) {}
     protected def loadState(in:ObjectInputStream) {}
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
   
   class MAIN_MEMORY extends RAMComponent with ExpansionPortConfigurationListener {
@@ -398,6 +398,6 @@ object C64MMU {
       memConfig = in.readInt
       check0001
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
 }

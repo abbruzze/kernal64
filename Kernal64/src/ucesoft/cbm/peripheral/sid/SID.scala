@@ -207,5 +207,5 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     Clock.systemClock.cancel(componentID)
     start
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

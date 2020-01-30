@@ -866,5 +866,5 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
   }
   protected def loadState(in:ObjectInputStream) {}
     
-  protected def allowsStateRestoring(parent:JFrame) = true
+  protected def allowsStateRestoring = true
 }

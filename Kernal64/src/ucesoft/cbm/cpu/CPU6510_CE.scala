@@ -2173,5 +2173,5 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     prevIClearedFlag = in.readBoolean
   }
 
-  protected def allowsStateRestoring(parent: JFrame): Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

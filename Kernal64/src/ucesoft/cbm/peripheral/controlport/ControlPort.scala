@@ -48,7 +48,7 @@ abstract class ControlPort extends CBMComponent {
   // state
   protected def saveState(out:ObjectOutputStream) {}
   protected def loadState(in:ObjectInputStream) {}
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }
 
 object ControlPort {
@@ -69,12 +69,18 @@ object ControlPort {
     def mouseEntered(e:MouseEvent) {}
     def mouseExited(e:MouseEvent) {}
     def mousePressed(e:MouseEvent) {
-      if (SwingUtilities.isRightMouseButton(e) && isMouse1351EmulationEnabled) mask |= 1 // 1351 right button emulates joy-UP
+      if (isMouse1351EmulationEnabled) {
+        if (SwingUtilities.isRightMouseButton(e)) mask |= 1 // 1351 right button emulates joy-UP
+        else mask |= 16 // 1351 right button emulates joy-FIRE
+      }
       else
       if (!isLightPenEmulationEnabled) mask |= 16
     }
     def mouseReleased(e:MouseEvent) {
-      if (SwingUtilities.isRightMouseButton(e) && isMouse1351EmulationEnabled) mask &= ~1
+      if (isMouse1351EmulationEnabled) {
+        if (SwingUtilities.isRightMouseButton(e)) mask &= ~1 // 1351 right button emulates joy-UP
+        else mask &= ~16 // 1351 right button emulates joy-FIRE
+      }
       else
       if (!isLightPenEmulationEnabled) mask &= ~16
     }
@@ -87,8 +93,14 @@ object ControlPort {
     protected def read = ~mask & 0xFF
   }
   
-  def emptyControlPort = new ControlPort {
-    protected def read = 0xFF
+  val emptyControlPort : ControlPort with MouseListener = new AbstractControlPort {
+    protected def getKeyMask(e:KeyEvent) : Int = 0
+    override def mousePressed(e:MouseEvent): Unit = {
+      if (isMouse1351EmulationEnabled) super.mousePressed(e)
+    }
+    override def mouseReleased(e: MouseEvent): Unit = {
+      if (isMouse1351EmulationEnabled) super.mouseReleased(e)
+    }
   }
   /**
    * Joystick emulation via KeyPad

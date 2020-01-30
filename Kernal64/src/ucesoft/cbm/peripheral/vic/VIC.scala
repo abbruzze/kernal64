@@ -515,7 +515,7 @@ final class VIC(mem: VICMemory,
       mcCounter = in.readInt
       loadMemory[Int](pixels,in)
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
   // ------------------------------ SHIFTERS ----------------------------------------------
   private[this] final val borderShifter = new BorderShifter
@@ -603,7 +603,7 @@ final class VIC(mem: VICMemory,
       loadMemory[Int](pixels,in)
 
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
 
   /**
@@ -780,7 +780,7 @@ final class VIC(mem: VICMemory,
       mcFlop = in.readInt
 
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
 
   def init {
@@ -1594,7 +1594,7 @@ final class VIC(mem: VICMemory,
     loadMemory[Int](vml_c,in)
     lastBackground = in.readInt
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 
   def getRasterLine : Int = rasterLine
   def getRasterCycle : Int = if (rasterCycle == RASTER_CYCLES) 1 else rasterCycle + 1

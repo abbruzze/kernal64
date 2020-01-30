@@ -1,55 +1,38 @@
 package ucesoft.cbm.c128
 
-import javax.swing._
+import java.awt._
+import java.awt.datatransfer.DataFlavor
 import java.awt.event._
+import java.io._
+import java.util.{Properties, ServiceLoader}
 
-import ucesoft.cbm.game.GamePlayer
-import ucesoft.cbm.trace._
+import javax.swing._
 import ucesoft.cbm._
 import ucesoft.cbm.cpu._
-import ucesoft.cbm.peripheral._
-import ucesoft.cbm.misc._
 import ucesoft.cbm.expansion._
-import ucesoft.cbm.peripheral.drive._
-import ucesoft.cbm.peripheral.rs232._
-import java.awt._
-import java.util.Properties
-import java.io._
-
 import ucesoft.cbm.formats._
-import java.awt.datatransfer.DataFlavor
-import java.util
-
-import scala.util.Success
-import scala.util.Failure
-import java.util.ServiceLoader
-
-import ucesoft.cbm.game.GameUI
-import ucesoft.cbm.peripheral.controlport.JoystickSettingDialog
-import ucesoft.cbm.peripheral.bus.IECBusLine
-import ucesoft.cbm.peripheral.bus.IECBus
-import ucesoft.cbm.remote.RemoteC64
-import ucesoft.cbm.peripheral.bus.IECBusListener
+import ucesoft.cbm.game.{GamePlayer, GameUI}
+import ucesoft.cbm.misc._
+import ucesoft.cbm.peripheral._
+import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
 import ucesoft.cbm.peripheral.cia.CIA
+import ucesoft.cbm.peripheral.controlport.JoystickSettingDialog
+import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
+import ucesoft.cbm.peripheral.rs232._
 import ucesoft.cbm.peripheral.vdc.VDC
 import ucesoft.cbm.peripheral.vic.Palette
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
+import ucesoft.cbm.remote.RemoteC64
+import ucesoft.cbm.trace._
+
+import scala.util.{Failure, Success}
 
 object C128 extends App {
-  UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
-  val c128 = new C128
-  try {
-    c128.run(args)
-  }
-  catch {
-    case i:Settings.SettingIllegalArgumentException =>
-      println(s"Bad command line argument: ${i.getMessage}")
-      sys.exit(1)
-  }
+  CBMComputer.turnOn(new C128,args)
 }
 
-class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
+class C128 extends CBMComponent with GamePlayer with MMUChangeListener with CBMComputer {
   val componentID = "Commodore 128"
   val componentType = CBMComponentType.INTERNAL
   
@@ -105,9 +88,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   private[this] val vicDisplayFrame = {
     val f = new JFrame("Kernal128 " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
-      override def windowClosing(e:WindowEvent) {
-        close
-      }
+      override def windowClosing(e:WindowEvent) : Unit = turnOff
     })
     f.setIconImage(new ImageIcon(getClass.getResource("/resources/commodore.png")).getImage)    
     f
@@ -115,9 +96,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   private[this] val vdcDisplayFrame = {
     val f = new JFrame("Kernal128 " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
-      override def windowClosing(e:WindowEvent) {
-        close
-      }
+      override def windowClosing(e:WindowEvent) : Unit = turnOff
     })
     f.setIconImage(new ImageIcon(getClass.getResource("/resources/commodore.png")).getImage)    
     f
@@ -225,7 +204,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     // state
     protected def saveState(out:ObjectOutputStream) {}
     protected def loadState(in:ObjectInputStream) {}
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
   // ------------------------------------ Drag and Drop ----------------------------
   private[this] val DNDHandler = new DNDHandler(handleDND(_,true,true))
@@ -390,6 +369,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     vicDisplayFrame.addKeyListener(keypadControlPort)
     vicDisplayFrame.addKeyListener(keyboardControlPort)
     vicDisplay.addMouseListener(keypadControlPort)
+    vicDisplay.addMouseListener(controlport.ControlPort.emptyControlPort)
     // VDC vicDisplay
     vdcDisplay = new vic.Display(ucesoft.cbm.peripheral.vdc.VDC.SCREEN_WIDTH,ucesoft.cbm.peripheral.vdc.VDC.SCREEN_HEIGHT,vdcDisplayFrame.getTitle,vdcDisplayFrame)
     add(vdcDisplay)
@@ -401,6 +381,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     vdcDisplayFrame.addKeyListener(keypadControlPort)
     vdcDisplayFrame.addKeyListener(keyboardControlPort)
     vdcDisplay.addMouseListener(keypadControlPort)
+    vdcDisplay.addMouseListener(controlport.ControlPort.emptyControlPort)
     val resRootPanel = new JPanel(new BorderLayout())
     val resPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
     val resLabel = new JLabel("Initializing ...")
@@ -424,9 +405,8 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
               vdcDisplay.setPaused
             }
           case java.awt.event.KeyEvent.VK_M if e.isAltDown =>
-            mouseEnabled = !mouseEnabled
-            sid.setMouseEnabled(mouseEnabled)
-            if (mouseEnabled) MouseCage.enableMouseCageOn(vdcDisplay) else MouseCage.disableMouseCage
+            mouseEnabled ^= true
+            enableMouse(mouseEnabled,vdcDisplay)
           // reset
           case java.awt.event.KeyEvent.VK_R if e.isAltDown =>
             reset(true)
@@ -529,7 +509,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     cpuChanged(false)
   }
   
-  private def errorHandler(t:Throwable) {
+  def errorHandler(t:Throwable) {
     import CPU6510.CPUJammedException
     t match {
       case j:CPUJammedException if !cpujamContinue =>
@@ -545,13 +525,17 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
           case _ =>
             reset(true)
         }
-      case j:CPUJammedException => // continue
+      case _:CPUJammedException => // continue
       case _ =>
         Log.info("Fatal error occurred: " + cpu + "-" + t)
         Log.info(CPU6510.disassemble(mmu,cpu.getCurrentInstructionPC).toString)
         t.printStackTrace(Log.getOut)
         t.printStackTrace
-        if (headless) sys.exit(1) // exit if headless
+        if (headless) {
+          println(s"Fatal error occurred on cycle ${clock.currentCycles}: $cpu\n${CPU6510.disassemble(mmu,cpu.getCurrentInstructionPC)}")
+          t.printStackTrace
+          sys.exit(1)
+        } // exit if headless
         JOptionPane.showMessageDialog(vicDisplayFrame,t.toString + " [PC=" + Integer.toHexString(cpu.getCurrentInstructionPC) + "]", "Fatal error",JOptionPane.ERROR_MESSAGE)
         //trace(true,true)
         reset(true)
@@ -662,10 +646,10 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     }
     device10DriveEnabled = enabled
   }
-  private def enableMouse(mouseEnabled:Boolean) {
-    keypadControlPort.setMouse1351Emulation(mouseEnabled)
+  private def enableMouse(mouseEnabled:Boolean,display:vic.Display) {
+    controlPortA.setMouse1351Emulation(mouseEnabled)
     sid.setMouseEnabled(mouseEnabled)
-    if (mouseEnabled) MouseCage.enableMouseCageOn(vicDisplay) else MouseCage.disableMouseCage
+    if (mouseEnabled) MouseCage.enableMouseCageOn(display) else MouseCage.disableMouseCage
   }
   private def enablePrinter(enable:Boolean) {
     printerEnabled = enable
@@ -718,7 +702,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   private def setLightPen(setting:Int): Unit = {
     lightPenButtonEmulation = setting
     vicChip.enableLightPen(setting != LIGHT_PEN_NO_BUTTON)
-    keypadControlPort.setLightPenEmulation(setting != LIGHT_PEN_NO_BUTTON)
+    controlPortB.setLightPenEmulation(setting != LIGHT_PEN_NO_BUTTON)
   }
 
   private def choose16MREU: Unit = {
@@ -736,7 +720,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
         }
         catch {
           case t:Throwable =>
-            JOptionPane.showMessageDialog(vicDisplayFrame,t.toString, "REU loading error",JOptionPane.ERROR_MESSAGE)
+            showError("REU loading error",t.toString)
         }
       case _ =>
     }
@@ -790,7 +774,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
           }
           catch {
             case io:IOException =>
-              JOptionPane.showMessageDialog(vicDisplayFrame,io.toString, "Remoting init error",JOptionPane.ERROR_MESSAGE)
+              showError("Remoting init error",io.toString)
               source.setSelected(false)
               vicDisplay.setRemote(None)
           }
@@ -899,7 +883,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
             }
             catch {
               case _:IllegalArgumentException =>
-                JOptionPane.showMessageDialog(vicDisplayFrame,"Invalid keyboard layout file", "Keyboard..",JOptionPane.ERROR_MESSAGE)
+                showError("Keyboard..","Invalid keyboard layout file")
             }
             finally {
               in.close
@@ -944,7 +928,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     }
     catch {
       case t:Throwable =>
-        JOptionPane.showMessageDialog(vicDisplayFrame,"Can't load ROM. Unexpected error occurred: " + t, "ROM loading error",JOptionPane.ERROR_MESSAGE)
+        showError("ROM loading error","Can't load ROM. Unexpected error occurred: " + t)
         t.printStackTrace
     }
   }
@@ -953,9 +937,9 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     clock.pause
     var in : ObjectInputStream = null
     try {
-      val canLoad = allowsState(vicDisplayFrame)
+      val canLoad = allowsState
       if (!canLoad) {
-        JOptionPane.showMessageDialog(vicDisplayFrame,"Can't load state", "State saving error",JOptionPane.ERROR_MESSAGE)
+        showError("State saving error","Can't load state")
         return
       }
       val fc = new JFileChooser
@@ -977,7 +961,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     }
     catch {
       case t:Throwable =>
-        JOptionPane.showMessageDialog(vicDisplayFrame,"Can't load state. Unexpected error occurred: " + t, "State loading error",JOptionPane.ERROR_MESSAGE)
+        showError("State loading error","Can't load state. Unexpected error occurred: " + t)
         t.printStackTrace
         reset(false)
     }
@@ -991,9 +975,9 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     clock.pause
     var out : ObjectOutputStream = null
     try {
-      val canSave = allowsState(vicDisplayFrame)
+      val canSave = allowsState
       if (!canSave) {
-        JOptionPane.showMessageDialog(vicDisplayFrame,"Can't save state", "State saving error",JOptionPane.ERROR_MESSAGE)
+        showError("State saving error","Can't save state")
         return
       }
       val fc = new JFileChooser
@@ -1015,7 +999,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     }
     catch {
       case t:Throwable =>
-        JOptionPane.showMessageDialog(vicDisplayFrame,"Can't save state. Unexpected error occurred: " + t, "State saving error",JOptionPane.ERROR_MESSAGE)
+        showError("State saving error","Can't save state. Unexpected error occurred: " + t)
         t.printStackTrace
     }
     finally {
@@ -1082,7 +1066,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
         }
         catch {
           case t:Throwable => 
-            JOptionPane.showMessageDialog(vicDisplayFrame,t.toString, "Disk making error",JOptionPane.ERROR_MESSAGE)
+            showError("Disk making error",t.toString)
         }
       case _ =>
     }
@@ -1165,7 +1149,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     catch {
       case t:Throwable =>
         t.printStackTrace(traceDialog.logPanel.writer)
-        JOptionPane.showMessageDialog(vicDisplayFrame,t.toString, "Cartridge loading error",JOptionPane.ERROR_MESSAGE)
+        showError("Cartridge loading error",t.toString)
     }
     finally {
       clock.play
@@ -1201,7 +1185,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     catch {
       case t:Throwable =>
         t.printStackTrace
-        JOptionPane.showMessageDialog(vicDisplayFrame,t.toString, "Disk attaching error",JOptionPane.ERROR_MESSAGE)
+        showError("Disk attaching error",t.toString)
     }
   }
   
@@ -1331,7 +1315,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   } 
   
   private def detachCtr {
-    if (ExpansionPort.getExpansionPort.isEmpty) JOptionPane.showMessageDialog(vicDisplayFrame,"No cartridge attached!", "Detach error",JOptionPane.ERROR_MESSAGE)
+    if (ExpansionPort.getExpansionPort.isEmpty) showError("Detach error","No cartridge attached!")
     else {
       if (Thread.currentThread != Clock.systemClock) clock.pause
       ExpansionPort.getExpansionPort.eject
@@ -1388,7 +1372,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
   
   private def loadFileFromAttachedFile(driveID:Int,relocate:Boolean) {
     val floppy = drives(driveID).getFloppy
-    if (floppy.isEmpty) JOptionPane.showMessageDialog(vicDisplayFrame,"No disk attached!", "Loading error",JOptionPane.ERROR_MESSAGE)
+    if (floppy.isEmpty) showError("Loading error","No disk attached!")
     else {
       Option(JOptionPane.showInputDialog(vicDisplayFrame,"Load file","*")) match {
         case None =>
@@ -1398,7 +1382,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
           }
           catch {
             case t:Throwable =>
-              JOptionPane.showMessageDialog(vicDisplayFrame, "Errore while loading from disk: " + t.getMessage,"Loading error",JOptionPane.ERROR_MESSAGE)
+              showError("Loading error","Errore while loading from disk: " + t.getMessage)
           }
       }
     }
@@ -1459,7 +1443,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
           } 
         }
       case Failure(t) =>
-        JOptionPane.showMessageDialog(vicDisplayFrame,t.toString,s"Error while opening zip file $file",JOptionPane.ERROR_MESSAGE)
+        showError(s"Error while opening zip file $file",t.toString)
     }    
   }
   
@@ -1684,7 +1668,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     fileMenu.addSeparator
     
     val exitItem = new JMenuItem("Exit")
-    exitItem.addActionListener(_ => close )
+    exitItem.addActionListener(_ => turnOff )
     fileMenu.add(exitItem)
     
     // edit
@@ -1975,10 +1959,10 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     group3.add(penLeft)
     lightPenMenu.add(penLeft)
     
-    val mouseEnabledItem = new JCheckBoxMenuItem("Mouse 1351 enabled")
+    val mouseEnabledItem = new JCheckBoxMenuItem("Mouse 1351 enabled on port 1")
     mouseEnabledItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_M,java.awt.event.InputEvent.ALT_DOWN_MASK))
     mouseEnabledItem.setSelected(false)
-    mouseEnabledItem.addActionListener(e => enableMouse(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    mouseEnabledItem.addActionListener(e => enableMouse(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected,vicDisplay) )
     optionMenu.add(mouseEnabledItem)
     
     optionMenu.addSeparator
@@ -2390,7 +2374,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
               }
               catch {
                 case t:Throwable =>
-                  JOptionPane.showMessageDialog(vicDisplayFrame,t.toString,s"Error while contacting provider ${provider.name}'s server",JOptionPane.ERROR_MESSAGE)
+                  showError(s"Error while contacting provider ${provider.name}'s server",t.toString)
               }
             }
           })
@@ -2444,7 +2428,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
     configureJoystick
   }
   
-  private def close {
+  def turnOff {
     if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
     for(d <- drives)
       d.getFloppy.close
@@ -2519,14 +2503,10 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener {
       case _ => throw new IOException("State loading aborted")
     }
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
   // -----------------------------------------------------------------------------------------
-  
-  private def swing(f: => Unit) {
-    SwingUtilities.invokeAndWait(() => f)
-  }
-  
-  def run(args:Array[String]) {        
+
+  def turnOn(args:Array[String]) {
     swing { setMenu }
     // check help
     if (settings.checkForHelp(args)) {

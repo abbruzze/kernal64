@@ -308,8 +308,8 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   // state
   override protected def saveState(out:ObjectOutputStream) {}
   override protected def loadState(in:ObjectInputStream) {}
-  override protected def allowsStateRestoring(parent:JFrame) : Boolean = {
-    JOptionPane.showMessageDialog(parent,"Loading/storing of cartridge's state is not supported [SwiftLink].","State error",JOptionPane.ERROR_MESSAGE)
+  override protected def allowsStateRestoring : Boolean = {
+    showError("State error","Loading/storing of cartridge's state is not supported [SwiftLink].")
     false
   }
 }

@@ -261,7 +261,7 @@ class CIA(val name:String,
         actualTime.ts = tsec  & 0x0F
         actualTime.freezed = false
         // reschedule tick
-        println("Actual time "+actualTime + "  alarm " + alarmTime + " IRQ " + (actualTime == alarmTime))
+        //println("Actual time "+actualTime + "  alarm " + alarmTime + " IRQ " + (actualTime == alarmTime))
         reschedule
       }
       if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
@@ -282,7 +282,7 @@ class CIA(val name:String,
           new ClockEvent(componentID,w,tickCallback,TICK_SUBID)        
       }
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
   
   // ===============================================================================
@@ -524,5 +524,5 @@ class CIA(val name:String,
     SP = in.readBoolean
     ciaModel = in.readInt
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

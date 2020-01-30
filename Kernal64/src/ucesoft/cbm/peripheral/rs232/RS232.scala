@@ -68,8 +68,8 @@ trait RS232 extends CBMComponent {
   // state
   protected def saveState(out:ObjectOutputStream) {}
   protected def loadState(in:ObjectInputStream) {}
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = {
-    if (isEnabled) JOptionPane.showMessageDialog(parent,"Warning: an RS-232 device is enabled.","State warning",JOptionPane.WARNING_MESSAGE)
+  protected def allowsStateRestoring : Boolean = {
+    if (isEnabled) showError("State warning","Warning: an RS-232 device is enabled.")
     true
   }
 }

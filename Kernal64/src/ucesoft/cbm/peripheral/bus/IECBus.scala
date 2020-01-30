@@ -155,5 +155,5 @@ class IECBus extends CBMComponent {
     DATA = in.readLong
     SRQ = in.readLong
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }

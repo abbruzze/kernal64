@@ -1,10 +1,13 @@
 package ucesoft.cbm
 
+import java.awt.Frame
+
 import scala.collection.mutable.ListBuffer
 import java.util.Properties
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
-import javax.swing.JFrame
+
+import javax.swing.{JFrame, JOptionPane}
 import java.io.IOException
 
 object CBMComponentType extends Enumeration {
@@ -82,7 +85,7 @@ trait CBMComponent {
   
   protected def saveState(out:ObjectOutputStream)
   protected def loadState(in:ObjectInputStream)
-  protected def allowsStateRestoring(parent:JFrame) : Boolean
+  protected def allowsStateRestoring : Boolean
   
   final def save(out:ObjectOutputStream) {
     Log.info(s"Saving $componentID/$componentType's state ...")
@@ -97,9 +100,9 @@ trait CBMComponent {
     loadState(in)
     for(c <- _components) c.load(in)
   }
-  final def allowsState(parent:JFrame) : Boolean = {
-    if (allowsStateRestoring(parent)) {
-      _components forall { _.allowsStateRestoring(parent) }
+  final def allowsState : Boolean = {
+    if (allowsStateRestoring) {
+      _components forall { _.allowsStateRestoring }
     }
     else false
   }
@@ -120,5 +123,23 @@ trait CBMComponent {
     val ram = in.readObject.asInstanceOf[Array[T]]
     if (ram.length != mem.length) throw new IOException(s"ROM/RAM length mismatch while loading $componentID.Expected ${mem.length}, found ${ram.length}")
     Array.copy(ram,0,mem,0,ram.length)
+  }
+
+  protected def getActiveFrame : Option[Frame] = {
+    Frame.getFrames filter { _.isActive } headOption match {
+      case f@Some(_) =>
+        f
+      case None =>
+        Frame.getFrames filter { _.isVisible } headOption
+    }
+  }
+
+  def showError(title:String,error:String) : Unit = {
+    getActiveFrame match {
+      case Some(activeWindow) =>
+        JOptionPane.showMessageDialog(activeWindow,error,title,JOptionPane.ERROR_MESSAGE)
+      case None =>
+        println(s"[$title] $error")
+    }
   }
 }

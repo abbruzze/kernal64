@@ -81,5 +81,5 @@ class DriveLed extends JComponent with CBMComponent {
       driveWriteMode = in.readBoolean
       powerLedMode = in.readBoolean
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }

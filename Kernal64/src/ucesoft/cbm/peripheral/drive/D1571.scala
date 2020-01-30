@@ -124,7 +124,7 @@ class D1571(val driveID: Int,
       viaDiskIRQLow = in.readBoolean
       ciaIRQLow = in.readBoolean
     }
-    protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+    protected def allowsStateRestoring : Boolean = true
   }
   /**
    * Empty CIA Connector
@@ -578,6 +578,6 @@ class D1571(val driveID: Int,
     cycleFrac = in.readDouble
     CYCLE_ADJ = in.readDouble
   }
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }
   
