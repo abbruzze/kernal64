@@ -11,6 +11,7 @@ object MouseCage extends MouseAdapter {
   private val mousePointer = new Point
   private val robot : Robot = Try(new Robot).getOrElse(null)
   private var component : JComponent = _
+  private var lastMoveTs = 0L
 
   def x = if (robot != null) mousePointer.x else MouseInfo.getPointerInfo.getLocation.x
   def y = if (robot != null) mousePointer.y else MouseInfo.getPointerInfo.getLocation.y
@@ -47,9 +48,13 @@ object MouseCage extends MouseAdapter {
   override def mouseExited(e:MouseEvent) = robotMove(center)
 
   override def mouseMoved(e:MouseEvent) {
+    val moveTs = System.currentTimeMillis()
+    val deltaT = moveTs - lastMoveTs
+    lastMoveTs = moveTs
+    val factor = math.ceil(20.0 / deltaT)
     val compCenter = center
-    mousePointer.x += e.getXOnScreen - compCenter.x
-    mousePointer.y += e.getYOnScreen - compCenter.y
+    mousePointer.x += ((e.getXOnScreen - compCenter.x) / factor).toInt
+    mousePointer.y += ((e.getYOnScreen - compCenter.y) / factor).toInt
     robotMove(compCenter)
   }
 
