@@ -1,20 +1,13 @@
 package ucesoft.cbm.peripheral.vic
 
-import javax.swing._
 import java.awt._
-import java.awt.image.MemoryImageSource
-import ucesoft.cbm.Log
-import ucesoft.cbm.Clock
-import java.io.File
-import java.awt.image.BufferedImage
+import java.awt.event.{MouseEvent, MouseListener, MouseMotionListener}
+import java.awt.image.{BufferedImage, MemoryImageSource}
+import java.io.{File, ObjectInputStream, ObjectOutputStream}
+
 import javax.imageio.ImageIO
-import java.awt.event.MouseMotionListener
-import java.awt.event.MouseEvent
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import java.awt.event.MouseListener
+import javax.swing._
+import ucesoft.cbm.{CBMComponent, CBMComponentType, Clock, Log}
 
 class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = Clock.systemClock) extends JComponent with MouseMotionListener with MouseListener with CBMComponent {
   val componentID = "Display"
@@ -54,10 +47,10 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   private[this] var showRemotingLabel = true
   private[this] var interlaced = false
   private[this] var renderingHints = RenderingHints.VALUE_INTERPOLATION_BILINEAR
-  
+
   addMouseMotionListener(this)
   addMouseListener(this)
-  
+
   def setNewResolution(height:Int,width:Int) {
     Log.debug(s"New resolution: $width x $height")
     normalDisplayMem = Array.fill(width * height)(0xFF000000)
@@ -134,10 +127,10 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   // light pen events
   def mouseDragged(e:MouseEvent) { mouseMoved(e) }
   def mouseMoved(e:MouseEvent) {
-    mouseX = (e.getX / zoomFactorX).toInt
-    mouseY = (e.getY / zoomFactorY).toInt
-    lpX =  mouseX + (if (clipArea != null) clipArea._1.x else 0)
-    lpY = mouseY + (if (clipArea != null) clipArea._1.y else 0)
+    val mX = (e.getX / zoomFactorX).toInt
+    val mY = (e.getY / zoomFactorY).toInt
+    lpX =  mX + (if (clipArea != null) clipArea._1.x else 0)
+    lpY = mY + (if (clipArea != null) clipArea._1.y else 0)
     if (mouseZoomEnabled) {
       mouseZoomEndPoint.x = e.getX
       mouseZoomEndPoint.y = e.getY
@@ -146,9 +139,6 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   
   def getLightPenX = lpX
   def getLightPenY = lpY
-  
-  def getMouseX = mouseX
-  def getMouseY = mouseY
   
   def getFrameCounter = totalFrameCounter
   
@@ -263,5 +253,5 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   // state
   protected def saveState(out:ObjectOutputStream) {}
   protected def loadState(in:ObjectInputStream) {}
-  protected def allowsStateRestoring(parent:JFrame) : Boolean = true
+  protected def allowsStateRestoring : Boolean = true
 }
