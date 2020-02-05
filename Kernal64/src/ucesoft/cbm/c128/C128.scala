@@ -66,6 +66,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener with CBMC
   private[this] var cpujamContinue = false // used with --cpujam-continue
   private[this] var zoomOverride = false // used with --screen-dim
   private[this] var sidCycleExact = false // used with --sid-cycle-exact
+  private[this] var vdcEnabled = true // used with --vdc-disabled
   private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mmu = new C128MMU(this)
   private[this] val cpu = CPU6510.make(mmu)  
@@ -628,6 +629,8 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener with CBMC
   def _1571mode(_1571Mode:Boolean) {
     mmuStatusPanel._1571mode(_1571Mode)
   }
+
+  override def isHeadless = headless
   // ======================================== Settings ==============================================
   private def writeOnDiskSetting(enabled:Boolean) {    
     canWriteOnDisk = enabled
@@ -1738,14 +1741,14 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener with CBMC
     vdcEnabled.addActionListener(e => enabledVDC(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     vdcMenu.add(vdcEnabled)
     // Setting ---------------------------
-    settings.add("vdc-enabled",
-                 "Enable VDC monitor",
-                 "VDCENABLED",
-                 (vdcE:Boolean) => { 
-                   enabledVDC(vdcE)
-                   vdcEnabled.setSelected(vdcE)
+    settings.add("vdc-disabled",
+                 "Disable VDC monitor",
+                 "VDCDISABLED",
+                 (vdcE:Boolean) => {
+                   this.vdcEnabled &= !vdcE
+                   vdcEnabled.setSelected(!vdcE)
                  },
-                 vdcEnabled.isSelected
+                 !vdcEnabled.isSelected
     )
     // -----------------------------------
     val vdcSeparateThreadItem = new JCheckBoxMenuItem("VDC on its own thread")
@@ -2305,7 +2308,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener with CBMC
     )
     settings.add("headless",
                  "Run with no windows",
-                 (hl:Boolean) => if (hl) headless = true                 
+                 (hl:Boolean) => if (hl) headless = true
     )
     settings.add("testcart",
                  "Run with test cart",
@@ -2539,7 +2542,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener with CBMC
     // SETTINGS
     loadSettings(args)
     // VIEW
-    if (headless) vdcDisplayFrame.setVisible(false)
+    vdcDisplayFrame.setVisible(!headless && vdcEnabled)
     swing { vicDisplayFrame.setVisible(!headless) }
     // PLAY    
     vdc.play
