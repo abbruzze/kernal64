@@ -52,15 +52,26 @@ object C64MMU {
     final val isActive = true
     def init {
       Log.info("Initializing RAM memory ...")
-      var i = 0
-      while (i < mem.length) {
-        for(j <- 1 to 64) {
-          mem(i) = 0
-          i += 1
+      var m = 0
+      var v0 = 0xFF
+      var v2 = 0
+      for(_ <- 0 to 255) {
+        if (m == 0x4000) {
+          v0 = 0
+          v2 = 0xFF
         }
-        for(j <- 1 to 64) {
-          mem(i) = 0xFF
-          i += 1
+        else
+        if (m == 0xC000) {
+          v0 = 0xFF
+          v2 = 0
+        }
+        for(j <- 0 to 127) {
+          mem(m) = if (j == 0) ~v0 & 0xFF else v0
+          m += 1
+        }
+        for(_ <- 0 to 127) {
+          mem(m) = v2
+          m += 1
         }
       }
     }

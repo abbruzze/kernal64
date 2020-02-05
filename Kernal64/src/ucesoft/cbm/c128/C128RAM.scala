@@ -68,20 +68,31 @@ private[c128] class C128RAM extends RAMComponent {
   }
   
   final def init {
-    Log.info("Initialaizing C128 RAM memory ...")
+    Log.info("Initializing C128 RAM memory ...")
     // only the first two banks are initialized
     mem(0) = Array.ofDim[Int](0x10000)
     mem(1) = Array.ofDim[Int](0x10000)
-    for(m <- 0 until 4;if mem(m) != null) {
-      var i = 0
-      while (i < mem(m).length) {
-        for(j <- 1 to 64) {
-          mem(m)(i) = 0
-          i += 1
+    for(b <- 0 until 4;if mem(b) != null) {
+      var m = 0
+      var v0 = 0xFF
+      var v2 = 0
+      for(_ <- 0 to 255) {
+        if (m == 0x4000) {
+          v0 = 0
+          v2 = 0xFF
         }
-        for(j <- 1 to 64) {
-          mem(m)(i) = 0xFF
-          i += 1
+        else
+        if (m == 0xC000) {
+          v0 = 0xFF
+          v2 = 0
+        }
+        for(j <- 0 to 127) {
+          mem(b)(m) = if (j == 0) ~v0 & 0xFF else v0
+          m += 1
+        }
+        for(_ <- 0 to 127) {
+          mem(b)(m) = v2
+          m += 1
         }
       }
     }
