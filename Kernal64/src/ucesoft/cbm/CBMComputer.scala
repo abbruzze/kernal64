@@ -16,6 +16,7 @@ object CBMComputer {
         sys.exit(1)
       case t:Throwable =>
         cbm.errorHandler(t)
+        if (cbm.isHeadless) sys.exit(1)
     }
   }
 }

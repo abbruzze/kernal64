@@ -135,11 +135,15 @@ trait CBMComponent {
   }
 
   def showError(title:String,error:String) : Unit = {
+    if (isHeadless) throw new RuntimeException(s"[$title] $error")
     getActiveFrame match {
       case Some(activeWindow) =>
         JOptionPane.showMessageDialog(activeWindow,error,title,JOptionPane.ERROR_MESSAGE)
       case None =>
         println(s"[$title] $error")
     }
+
   }
+
+  def isHeadless : Boolean = true
 }

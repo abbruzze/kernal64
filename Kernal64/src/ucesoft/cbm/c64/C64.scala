@@ -475,7 +475,8 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
     cpu.setBaLow(low)
     expansionPort.setBaLow(low)
   }
-  
+
+  override def isHeadless = headless
 
   // ======================================== Settings ==============================================
   private def writeOnDiskSetting(enabled:Boolean) {    
