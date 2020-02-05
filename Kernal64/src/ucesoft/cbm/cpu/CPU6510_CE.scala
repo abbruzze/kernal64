@@ -50,6 +50,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
   private[this] var delay1CycleIRQCheck = false
   private[this] var forceIRQNow = false
   private[this] var prevIClearedFlag = false
+  private[this] var pageCrossed,notReadyDuringInstr = false
 
   // -----------------------------------------
   final override def setBaLow(baLow: Boolean) {
@@ -518,6 +519,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 
   @inline private[this] def Last {
     state = 0
+    notReadyDuringInstr = false
   }
 
   private def initStates {
@@ -529,6 +531,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
             op = mem.read(PC);
             PC = (PC + 1) & 0xFFFF
             state = MODE_TAB(op)
+            pageCrossed = false
           }
         }
         // IRQ
@@ -683,6 +686,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
           if (ready) {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
+            pageCrossed = true
             Execute
           }
         }
@@ -711,6 +715,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
           if (ready) {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
+            pageCrossed = true
             Execute
           }
         }
@@ -771,6 +776,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
           if (ready) {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
+            pageCrossed = true
             Execute
           }
         }
@@ -799,6 +805,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
           if (ready) {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
+            pageCrossed = true
             Execute
           }
         }
@@ -826,6 +833,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
           if (ready) {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
+            pageCrossed = true
             Execute
           }
         }
@@ -858,6 +866,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
           if (ready) {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
+            pageCrossed = true
             Execute
           }
         }
@@ -937,6 +946,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
           if (ready) {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
+            pageCrossed = true
             DoRMW
           }
         }
@@ -965,6 +975,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
           if (ready) {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
+            pageCrossed = true
             DoRMW
           }
         }
@@ -1025,6 +1036,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
           if (ready) {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
+            pageCrossed = true
             DoRMW
           }
         }
@@ -1690,6 +1702,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
             mem.read(PC)
             PC = ar
             state = O_BRANCH_BP1
+            pageCrossed = true
           }
         }
         case O_BRANCH_BP1 => () => {
@@ -1703,6 +1716,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
             mem.read(PC)
             PC = ar
             state = O_BRANCH_FP1
+            pageCrossed = true
           }
         }
         case O_BRANCH_FP1 => () => {
@@ -1902,9 +1916,10 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
         }
         case O_ANE_I => () => {
           if (ready) {
+            val const = if (notReadyDuringInstr) 0xEE else 0xEF
             data = mem.read(PC);
             PC = (PC + 1) & 0xFFFF
-            A = (A | 0xee) & X & data
+            A = (A | const) & X & data
             set_nz(A)
             Last
           }
@@ -1913,7 +1928,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
           if (ready) {
             data = mem.read(PC);
             PC = (PC + 1) & 0xFFFF
-            A = (A | 0xee) & data
+            val const = if (notReadyDuringInstr) 0xEE else 0xEF
+            A = (A | const) & data
             X = A
             set_nz(A)
             Last
@@ -1942,19 +1958,27 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
         }
         case O_SHS => () => { // ar2 contains the high byte of the operand address
           SP = A & X
-          mem.write(ar, (ar2 + 1) & SP)
+          val value = if (notReadyDuringInstr) SP else (ar2 + 1) & SP
+          val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
+          mem.write(target,value)
           Last
         }
         case O_SHY => () => { // ar2 contains the high byte of the operand address
-          mem.write(ar, Y & (ar2 + 1))
+          val value = if (notReadyDuringInstr) Y else Y & (ar2 + 1)
+          val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
+          mem.write(target,value)
           Last
         }
         case O_SHX => () => { // ar2 contains the high byte of the operand address
-          mem.write(ar, X & (ar2 + 1))
+          val value = if (notReadyDuringInstr) X else X & (ar2 + 1)
+          val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
+          mem.write(target,value)
           Last
         }
         case O_SHA => () => { // ar2 contains the high byte of the operand address
-          mem.write(ar, A & X & (ar2 + 1))
+          val value = if (notReadyDuringInstr) A & X else A & X & (ar2 + 1)
+          val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
+          mem.write(target, value)
           Last
         }
         case O_JAM => () => {
@@ -1999,12 +2023,13 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     if (isDecimal) {
       tmp = (A & 0xf) + (data & 0xf) + (if (isCarry) 1 else 0)
       if (tmp > 0x9) tmp += 0x6
+
       if (tmp <= 0x0f) tmp = (tmp & 0xf) + (A & 0xf0) + (data & 0xf0)
       else tmp = (tmp & 0xf) + (A & 0xf0) + (data & 0xf0) + 0x10
       if ((((A ^ data) & 0x80) == 0) && (((A ^ tmp) & 0x80) != 0)) sev else clv
       if ((tmp & 0x80) > 0) sen else cln
       if ((tmp & 0x1f0) > 0x90) tmp += 0x60
-      if (tmp > 0x99) sec else clc
+      if (tmp >= 0x100) sec else clc
       A = tmp & 0xff
     } else {
       if ((((A ^ data) & 0x80) == 0) && (((A ^ tmp) & 0x80) != 0)) sev else clv
@@ -2046,6 +2071,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     delay1CycleIRQCheck = false
     forceIRQNow = false
     prevIClearedFlag = false
+    pageCrossed = false
+    notReadyDuringInstr = false
     A = 0
     X = 0
     Y = 0
@@ -2113,6 +2140,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     delay1CycleIRQCheck = false
     prevIClearedFlag = false
 
+    if (!ready) notReadyDuringInstr = true
     states(state)()
   }
 
