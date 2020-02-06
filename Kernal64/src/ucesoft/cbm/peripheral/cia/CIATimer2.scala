@@ -252,6 +252,7 @@ class CIATimerA2(ciaName: String,
 }
 
 class CIATimerB2(ciaName: String, id: Int, irqAction: (Int) => Unit,autoClock:Boolean = true) extends CIATimerA2(ciaName, id, irqAction,autoClock) {
+  override val componentID = ciaName + "_TB"
   override protected def handleCR567 {
     val bit56 = (cr >> 5) & 0x3
     setCountExternal(bit56 == 2)
