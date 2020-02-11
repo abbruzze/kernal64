@@ -139,8 +139,8 @@ class CIATimerA2(ciaName: String,
   private def enableTimer(enabled: Boolean,reload:Boolean,oldCountExternal:Boolean) {
     val startDelay = START_DELAY + (if (reload) 1 else 0)
     if (!started && enabled) { // start from stopped
-      if (!countExternal && autoClock) reschedule(START_DELAY,if (reload) latch else counter)
-      startDelayCount = START_DELAY
+      if (!countExternal && autoClock) reschedule(startDelay,if (reload) latch else counter)
+      startDelayCount = startDelay
     } 
     else 
     if (started && enabled) { // start from started
