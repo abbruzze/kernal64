@@ -226,7 +226,7 @@ class CIA(val name:String,
     }
     def writeHour(hour:Int) {
       if ((timerB.readCR & 0x80) > 0) { // set alarm
-        alarmTime.h = hour & 0x7F
+        alarmTime.h = hour & 0x9F
         alarmTime.am = (hour & 0x80) == 0        
       }
       else {
