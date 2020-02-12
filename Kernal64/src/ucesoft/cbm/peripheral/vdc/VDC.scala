@@ -560,7 +560,8 @@ class VDC extends RAMComponent {
       val pixelSize = ((regs(22) >> 4) & 0x0F) + (if (doublePixelMode) 0 else 1)
       val isIdle = currentCharScanLine > ychars_visible || xsmooth >= pixelSize
 
-      val allBlank = ((regs(25) & 0x10) == 0 && regs(34) > regs(0)) || regs(34) == regs(35)
+      val allBlank = (regs(34) > regs(0) && regs(35) <= regs(0)) ||
+                     (regs(34) == regs(35) && regs(34) <= regs(0))
       if (allBlank) {
         videoMode = VideoMode.BLANK
         drawTextLine(false)
