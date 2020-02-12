@@ -47,11 +47,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   final private[this] val CHARACTERS64_ADDR = 0xD000
   final private[this] val ROML64_ADDR = 0x8000
   // 128
-  final private[this] val COLOR_RAM_ADDR = 0xD800
   final private[this] val KERNAL_ADDR = 0xC000
   final private[this] val BASIC_LOW_ADDR = 0x4000
-  final private[this] val BASIC_HI_ADDR = 0x8000
-  final private[this] val IO_ADDR = 0xD000
   final private[this] val Z80_BIOS_ADDR = 0xD000
   final private[this] val CHARACTERS128_ADDR = 0xD000
   // RAM ---------------------------------------
@@ -769,7 +766,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     one
   }
   @inline private[this] def check64_1 {
-    val pr = read64_1
     // check tape motor
     datassette.setMotor((_0 & 0x20) > 0 && (_1 & 0x20) == 0)
     datassette.setWriteLine((_0 & 0x08) > 0 && (_1 & 0x08) > 0)
