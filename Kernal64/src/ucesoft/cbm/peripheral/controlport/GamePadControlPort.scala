@@ -18,6 +18,7 @@ class GamePadControlPort(configuration:Properties) extends ControlPort {
   findController
   
   def findController {
+    System.setProperty("jinput.loglevel","SEVERE")
     controllerName = configuration.getProperty(CONFIG_CONTROLLER_NAME)
     controllerFireName = configuration.getProperty(CONFIG_CONTROLLER_FIRE_BUTTON,"1")
     val controllers = ControllerEnvironment.getDefaultEnvironment.getControllers
