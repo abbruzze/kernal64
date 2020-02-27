@@ -49,7 +49,7 @@ class CIA(val name:String,
 		  portAConnector:Connector,
 		  portBConnector:Connector,
 		  irqAction:(Boolean) => Unit,
-		  autoClock:Boolean = true,
+      idleAction:(Boolean) => Unit = null,
 		  manualClockTODUpdate:Boolean = false) extends Chip with RAMComponent {
   import CIA._
   
@@ -58,10 +58,11 @@ class CIA(val name:String,
   val length = 0x100
   val isActive = true
   val id = ChipID.CIA
-    
-  private[this] val timerB = new CIATimerB2(name,IRQ_SRC_TB,irqHandling _,autoClock)
-  private[this] val timerA = new CIATimerA2(name,IRQ_SRC_TA,irqHandling _,autoClock,Some(timerB))
-  private[this] val tod = new TOD2//new TOD((timerB.readCR & 0x80) == 0)
+
+  private[this] val timerABRunning = Array(true,true)
+  private[this] val timerB = new TimerB(name,IRQ_SRC_TB,irqHandling _, idle => timerIdleCallBack(1,idle))
+  private[this] val timerA = new TimerA(name,IRQ_SRC_TA,irqHandling _,timerB, idle => timerIdleCallBack(0,idle))
+  private[this] val tod = new TOD2
   private[this] var icr = 0
   private[this] var sdr,sdrlatch,shiftRegister = 0
   private[this] var sdrLoaded,sdrOut = false
@@ -70,6 +71,16 @@ class CIA(val name:String,
   private[this] var sdrIndex = 0
   private[this] var icrMask = 0	// bits 0 - 4
   private[this] var ciaModel = CIA_MODEL_6526
+  private[this] var ackCycle = false
+  private[this] var irqOnNextClock = false
+  private[this] var irqSrcOnNextClock = 0
+
+  @inline private def timerIdleCallBack(id:Int,idle:Boolean): Unit = {
+    val lastRunning = timerABRunning(0) || timerABRunning(1)
+    timerABRunning(id) = !idle
+    val nowRunning = timerABRunning(0) || timerABRunning(1)
+    if (idleAction != null && lastRunning != nowRunning) idleAction(!nowRunning)
+  }
   
   // ========================== TOD ================================================
   
@@ -172,6 +183,7 @@ class CIA(val name:String,
     private val actualTime = Time(0,0,0,0,true)
     private val latchTime = Time(1,0,0,0,true)
     private val alarmTime = Time(0,0,0,0,true)
+    private var resetSync = false
     
     override def getProperties = {
       properties.setProperty("Time",actualTime.toString)
@@ -186,6 +198,7 @@ class CIA(val name:String,
       actualTime.reset(1,0,0,0,true,true)
       latchTime.reset(1,0,0,0,true,false)
       alarmTime.reset(0,0,0,0,true,false)
+      resetSync = false
       reschedule
     }
     
@@ -198,12 +211,12 @@ class CIA(val name:String,
     }
     
     private[this] val tickCallback = tick _
-    
+
     @inline private def reschedule = {
       if (!manualClockTODUpdate) {
         val clk = Clock.systemClock
         clk.cancel(componentID)
-        clk.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 98524,tickCallback,TICK_SUBID))
+        clk.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 98990,tickCallback,TICK_SUBID))//98524//98990
       }
     }
     
@@ -225,46 +238,74 @@ class CIA(val name:String,
       }
     }
     def writeHour(hour:Int) {
+      var changed = false
       if ((timerB.readCR & 0x80) > 0) { // set alarm
-        alarmTime.h = hour & 0x9F
-        alarmTime.am = (hour & 0x80) == 0        
+        val oldH = alarmTime.h
+        val oldAM = alarmTime.am
+        alarmTime.h = hour & 0x1F
+        alarmTime.am = (hour & 0x80) == 0
+        changed = oldH != alarmTime.h || oldAM != alarmTime.am
       }
       else {
         actualTime.freezed = true
-        actualTime.h = hour & 0x7F
+        val oldH = actualTime.h
+        val oldAM = actualTime.am
+        actualTime.h = hour & 0x1F
         actualTime.am = (hour & 0x80) == 0
+        changed = oldH != actualTime.h || oldAM != actualTime.am
         if (actualTime.h == 0x12) actualTime.am = !actualTime.am        
       }
-      if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
+      if (changed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
+      resetSync = true
     }
     def writeMin(min:Int) {
+      var changed = false
       if ((timerB.readCR & 0x80) > 0) { // set alarm
+        val oldM = alarmTime.m
         alarmTime.m = min & 0x7F
-      }
-      else 
-      actualTime.m = min & 0x7F
-      if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
-    }
-    def writeSec(sec:Int) {
-      if ((timerB.readCR & 0x80) > 0) { // set alarm
-        alarmTime.s = sec & 0x7F
-      }
-      else 
-      actualTime.s = sec & 0x7F
-      if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
-    }
-    def writeTenthSec(tsec:Int) {
-      if ((timerB.readCR & 0x80) > 0) { // set alarm
-        alarmTime.ts = tsec & 0x0F
+        changed = oldM != alarmTime.m
       }
       else {
+        val oldM = actualTime.m
+        actualTime.m = min & 0x7F
+        changed = oldM != actualTime.m
+      }
+      if (changed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
+    }
+    def writeSec(sec:Int) {
+      var changed = false
+      if ((timerB.readCR & 0x80) > 0) { // set alarm
+        val oldS = alarmTime.s
+        alarmTime.s = sec & 0x7F
+        changed = oldS != alarmTime.s
+      }
+      else {
+        val oldS = actualTime.s
+        actualTime.s = sec & 0x7F
+        changed = oldS != actualTime.s
+      }
+      if (changed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
+    }
+    def writeTenthSec(tsec:Int) {
+      var changed = false
+      if ((timerB.readCR & 0x80) > 0) { // set alarm
+        val oldTS = alarmTime.ts
+        alarmTime.ts = tsec & 0x0F
+        changed = oldTS != alarmTime.ts
+      }
+      else {
+        val oldTS = actualTime.ts
         actualTime.ts = tsec  & 0x0F
+        changed = oldTS != actualTime.ts
         actualTime.freezed = false
         // reschedule tick
         //println("Actual time "+actualTime + "  alarm " + alarmTime + " IRQ " + (actualTime == alarmTime))
-        reschedule
       }
-      if (actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
+      if (resetSync) {
+        reschedule
+        resetSync = false
+      }
+      if (changed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
     }
     // state
     protected def saveState(out:ObjectOutputStream) {
@@ -293,9 +334,14 @@ class CIA(val name:String,
    * Manual clock
    */
   final def clock(updateTOD:Boolean) {
-    timerA.clock
-    timerB.clock
+    if (irqOnNextClock) {
+      irqOnNextClock = false
+      setIRQ(irqSrcOnNextClock)
+    }
+    if (timerABRunning(1)) timerB.clock
+    if (timerABRunning(0)) timerA.clock
     if (updateTOD) tod.tick(0)
+    ackCycle = false
   }
       
   def init {
@@ -314,28 +360,34 @@ class CIA(val name:String,
     sdrLoaded = false
     sdrOut = false
     SP = false
+    timerABRunning(0) = true
+    timerABRunning(1) = true
+    ackCycle = false
   }
   
   def setFlagLow = irqHandling(IRQ_FLAG)
   
   final def irqHandling(bit:Int) {
-    icr |= bit
-    setIRQOnNextClock(bit,1)
+    // handle TimerB bug for old cias when reading ICR "near" underflow: the bit is not set
+    if (!(ciaModel == CIA_MODEL_6526 && bit == IRQ_SRC_TB && ackCycle)) icr |= bit
+    if ((icrMask & icr) > 0) setIRQOnNextClock(bit)
   }
 
-  @inline private def setIRQOnNextClock(src:Int,delay:Int): Unit = {
-    def setIRQ = {
-      if ((icrMask & icr) > 0) {
-        icr |= 0x80
-        Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
-        irqAction(true)
-      }
-    }
-    val actualDelay = if (ciaModel == CIA_MODEL_8521) delay - 1 else delay
-    if (actualDelay == 0 || src == IRQ_SRC_ALARM) setIRQ // set immediately
+  @inline private def setIRQ(src:Int) = {
+    //if ((icrMask & icr) > 0) {
+    icr |= 0x80
+    Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
+    irqAction(true)
+    //}
+  }
+
+  @inline private def setIRQOnNextClock(src:Int): Unit = {
+    if (ciaModel == CIA_MODEL_8521) setIRQ(src) // set immediately
     else {
-      val clk = Clock.systemClock
-      clk.schedule(new ClockEvent(componentID + "_IRQ", clk.currentCycles + delay, _ => setIRQ))
+      //val clk = Clock.systemClock
+      //clk.schedule(new ClockEvent(componentID + "_IRQ", clk.currentCycles + 1, _ => setIRQ))
+      irqOnNextClock = true
+      irqSrcOnNextClock = src
     }
   }
   
@@ -345,7 +397,7 @@ class CIA(val name:String,
     properties.setProperty("Shift register",Integer.toHexString(shiftRegister))
     properties.setProperty("SDR index",Integer.toHexString(sdrIndex))
     properties.setProperty("SDR out",sdrOut.toString)
-    properties.setProperty("Model", if (ciaModel == CIA_MODEL_8521) "8521" else "6521")
+    properties.setProperty("Model", if (ciaModel == CIA_MODEL_8521) "8521" else "6526")
     super.getProperties
   }
   
@@ -390,6 +442,7 @@ class CIA(val name:String,
       val lastIcr = icr
       icr = 0
       irqAction(false)
+      ackCycle = true
       lastIcr & 0x9F	// bit 5 & 6 always 0
     case CRA => timerA.readCR
     case CRB => timerB.readCR
@@ -425,14 +478,14 @@ class CIA(val name:String,
         sdrlatch = -1
       }
       if ((timerA.readCR & 0x40) == 0x40) { // serial out
-        sdrLoaded = true        
-        //println(s"$name SDR=${Integer.toHexString(value)} '${value.toChar}'")
+        sdrLoaded = true
+    //println(s"$name SDR=${Integer.toHexString(value)} '${value.toChar}'")
       }
     case ICR =>
       val mustSet = (value & 0x80) == 0x80 
       if (mustSet) icrMask |= value & 0x7f else icrMask &= ~value
       
-      if ((icrMask & icr & 0x1f) != 0) setIRQOnNextClock(-1,2)
+      if ((icrMask & icr & 0x1f) != 0) setIRQOnNextClock(-1)
       Log.debug(s"${name} ICR's value is ${Integer.toBinaryString(value)} => ICR = ${Integer.toBinaryString(icrMask)}")
     case CRA =>
       val oldSerialOut = timerA.readCR & 0x40
@@ -512,6 +565,9 @@ class CIA(val name:String,
     out.writeBoolean(sdrOut)
     out.writeBoolean(SP)
     out.writeInt(ciaModel)
+    out.writeBoolean(ackCycle)
+    out.writeBoolean(irqOnNextClock)
+    out.writeInt(irqSrcOnNextClock)
   }
   protected def loadState(in:ObjectInputStream) {
     icr = in.readInt
@@ -523,6 +579,9 @@ class CIA(val name:String,
     sdrOut = in.readBoolean
     SP = in.readBoolean
     ciaModel = in.readInt
+    ackCycle = in.readBoolean
+    irqOnNextClock = in.readBoolean
+    irqSrcOnNextClock = in.readInt
   }
   protected def allowsStateRestoring : Boolean = true
 }
