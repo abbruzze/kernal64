@@ -9,6 +9,10 @@ import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
 
+/**
+ * Fast emulation for CIA: but lot of incompatibilities...
+ * @deprecated since 1.6
+ */
 class CIATimerA2(ciaName: String,
                  id: Int,
                  irqAction: (Int) => Unit,
@@ -66,7 +70,7 @@ class CIATimerA2(ciaName: String,
   override def getProperties = {
     properties.setProperty("Control register",Integer.toHexString(readCR))
     properties.setProperty("Started",started.toString)
-    properties.setProperty("Counter",Integer.toHexString(readLo | readHi << 8))
+    properties.setProperty("Counter",Integer.toHexString(getCounter))
     properties.setProperty("Latch",Integer.toHexString(latch))
     properties.setProperty("One shot",oneShot.toString)
     properties.setProperty("Count external",countExternal.toString)
@@ -95,8 +99,8 @@ class CIATimerA2(ciaName: String,
     if (!started || countExternal || cycles < startCycle || !countSystemClock) counter
     else {
       val elapsed = cycles - startCycle
-      val actualCounter = ((counter - elapsed).asInstanceOf[Int] & 0xFFFF)
-      if (actualCounter > 0) actualCounter else 0
+      (counter - elapsed).asInstanceOf[Int] & 0xFFFF
+      //if (actualCounter > 0) actualCounter else 0
     }
   }
 
@@ -108,16 +112,30 @@ class CIATimerA2(ciaName: String,
     timerUnderflowOnPortB = (cr & 2) == 2
     toggleMode = (cr & 4) == 0
     val reload = (cr & 0x10) == 0x10
-    countSystemClock = (value & 0x20) == 0
+    val newCountSystemClock = (value & 0x20) == 0
+    var startedWithCountSystemClock = false
+    if (!newCountSystemClock && countSystemClock) {
+      if (autoClock && started) {
+        systemClock.cancel(EVENT_ID)
+        counter = getCounter - 2
+      }
+    }
+    else
+    if (newCountSystemClock && !countSystemClock) {
+      if (autoClock && started && startTimer) startedWithCountSystemClock = true
+    }
+
+    countSystemClock = newCountSystemClock
     // bit 1,2 and 5 ignored
     val currentCountExternal = countExternal
     handleCR567
-    enableTimer(startTimer,reload,currentCountExternal)
+    enableTimer(startTimer,reload,currentCountExternal,startedWithCountSystemClock)
+/*
     if (reload) {
       counter = latch // reload immediately
     }
-
-    Log.debug(s"${componentID} control register set to ${cr} latch=${latch} countSystemClock=$countSystemClock")
+*/
+    Log.debug(s"${componentID} control register set to ${cr}: started=$started latch=${latch} countSystemClock=$countSystemClock reload=$reload onshot=$oneShot countExt=$countExternal")
   }
 
   protected def handleCR567 {}
@@ -131,30 +149,49 @@ class CIATimerA2(ciaName: String,
       startCycle = cycles + delay
       val zeroCycle = startCycle + count
       flipFlop = true
-
       systemClock.schedule(new ClockEvent(EVENT_ID, zeroCycle, underflowCallback, UNDERFLOW_SUBID))
     }
   }
 
-  private def enableTimer(enabled: Boolean,reload:Boolean,oldCountExternal:Boolean) {
-    val startDelay = START_DELAY + (if (reload) 1 else 0)
-    if (!started && enabled) { // start from stopped
-      if (!countExternal && autoClock) reschedule(startDelay,if (reload) latch else counter)
+  private def enableTimer(enabled: Boolean,reload:Boolean,oldCountExternal:Boolean,startedWithCountSystemClock:Boolean) {
+    // STOPPED AND REQUEST TO START || CNT -> CLK
+    if ((!started && enabled) || startedWithCountSystemClock) {
+      val toCount = if (reload) latch else counter
+      val startDelay = /*if (toCount == 1) 1 else*/ START_DELAY + (if (reload) 1 else 0)
+
+      if (!countExternal && autoClock) reschedule(startDelay,toCount)
       startDelayCount = startDelay
     } 
-    else 
-    if (started && enabled) { // start from started
+    else
+    // STARTED AND REQUEST TO START
+    if (started && enabled) {
       if (reload && autoClock) {
+        val startDelay = 1//if (latch == 1) 1 else 2
         systemClock.cancel(EVENT_ID)
-        if (!countExternal) reschedule(startDelay,latch)
+        if (!countExternal) {
+          counter = getCounter
+          reschedule(startDelay,latch)
+        }
       }
+      else
+      if (reload) counter = latch
     }
     else
-    if (started && !enabled) { // stop timer from started
+    // STARTED AND REQUEST TO STOP
+    if (started && !enabled) {
       if (autoClock) {
         systemClock.cancel(EVENT_ID)
-        if (!oldCountExternal && countSystemClock) counter = getCounter + 1
-      }            
+        if (!oldCountExternal && countSystemClock) {
+          if (reload) counter = latch else counter = getCounter + 1
+        }
+      }
+      else {
+        if (reload) counter = latch
+      }
+    }
+    // STOPPED AND REQUEST TO STOP
+    else {
+      if (reload) counter = latch
     }
 
     started = enabled
@@ -179,7 +216,7 @@ class CIATimerA2(ciaName: String,
       if (startDelayCount > 0) startDelayCount -= 1
       else {
         if (counter == 0) underflow(0)
-        else counter -= 1
+        else if (countSystemClock && !countExternal) counter -= 1
       }
     }
   }
@@ -203,7 +240,8 @@ class CIATimerA2(ciaName: String,
     }
     timerToNotify match {
       case None =>
-      case Some(tm) => tm.externalUnderflow
+      case Some(tm) =>
+        tm.externalUnderflow
     }
 
     irqAction(id)
