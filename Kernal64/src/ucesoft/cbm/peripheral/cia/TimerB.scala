@@ -6,7 +6,8 @@ import ucesoft.cbm.{CBMComponent, CBMComponentType, Log}
 
 class TimerB(ciaName: String,
              id: Int,
-             irqAction: (Int) => Unit) extends CBMComponent {
+             irqAction: (Int) => Unit,
+             idleAction : (Boolean) => Unit) extends CBMComponent {
 
   val componentID = ciaName + "_TB"
   val componentType = CBMComponentType.CHIP
@@ -22,6 +23,10 @@ class TimerB(ciaName: String,
   final private val S_LOAD_THEN_WAIT_THEN_COUNT = 4
   final private val S_COUNT = 5
   final private val S_COUNT_THEN_STOP = 6
+  final private val S_WAIT_THEN_COUNT_CASCADE = 7
+  final private val S_COUNT_CASCADE = 8
+  final private val S_LOAD_PB7_IRQ_THEN_COUNT_CASCADE = 9
+  final private val S_LOAD_PB7_IRQ_THEN_STOP = 10
 
   private[this] var latch = 0xFFFF
   private[this] var counter = 0xFFFF
@@ -44,7 +49,7 @@ class TimerB(ciaName: String,
   @inline private def isStarted(cr:Int) = (cr & 0x01) == 0x01
   @inline private def isOneshot(cr:Int) = (cr & 0x08) == 0x08
   @inline private def isTimerUnderflowOnPortB(cr:Int) = (cr & 0x02) == 0x02
-  @inline private def isToggleMode(cr:Int) = (cr & 0x04) == 0x00
+  @inline private def isToggleMode(cr:Int) = (cr & 0x04) == 0x04
   @inline private def isReload(cr:Int) = (cr & 0x10) == 0x10
   // -----------------------------------------------------------------
 
@@ -56,6 +61,10 @@ class TimerB(ciaName: String,
     case S_LOAD_THEN_STOP => "LOAD_THEN_STOP"
     case S_COUNT_THEN_STOP => "COUNT_THEN_STOP"
     case S_LOAD_THEN_WAIT_THEN_COUNT => "LOAD_THEN_WAIT_THEN_COUNT"
+    case S_WAIT_THEN_COUNT_CASCADE => "WAIT_THEN_COUNT_CASCADE"
+    case S_LOAD_PB7_IRQ_THEN_COUNT_CASCADE => "LOAD_PB7_IRQ_THEN_COUNT_CASCADE"
+    case S_COUNT_CASCADE => "COUNT_CASCADE"
+    case S_LOAD_PB7_IRQ_THEN_STOP => "LOAD_PB7_IRQ_THEN_STOP"
   }
 
   private def countModeToString = countMode match {
@@ -72,6 +81,11 @@ class TimerB(ciaName: String,
     properties.setProperty("One shot",isOneshot(cr).toString)
     properties.setProperty("State",stateToString)
     properties.setProperty("Count mode",countModeToString)
+    properties.setProperty("Idle",isIdle.toString)
+    properties.setProperty("TimerUnderflowOnPortB",isTimerUnderflowOnPortB(cr).toString)
+    properties.setProperty("ToggleMode",isToggleMode(cr).toString)
+    properties.setProperty("FlipFlop",flipFlop.toString)
+    properties.setProperty("Toggle value",toggleValue.toString)
     properties
   }
 
@@ -128,25 +142,29 @@ class TimerB(ciaName: String,
     newCR = value
     setCountMode(value)
 
+    if ((cr & 1) == 0 && (newCR & 1) == 1) flipFlop = latch != 1 // don't know WHY ?? without this ciavarious/c10-13 don't work for M & O
+
     if (countMode != newCountMode) {
+    //if ((countMode == COUNT_CLOCK && newCountMode == COUNT_CNT) || (newCountMode == COUNT_CLOCK && countMode == COUNT_CNT)) {
       hasNewCountMode = true
       newCountModeCounter = 2
     }
     else countMode = newCountMode
+
+    idleAction(false)
   }
 
   final def clock: Unit = {
+    val oldIdle = isIdle
     state match {
       case S_STOP =>
       case S_WAIT_THEN_COUNT =>
         state = S_COUNT
-        flipFlop = true
       case S_LOAD_THEN_STOP =>
         state = S_STOP
         reloadFromLatch
       case S_LOAD_THEN_COUNT =>
         state = S_COUNT
-        flipFlop = true
         reloadFromLatch
       case S_LOAD_THEN_WAIT_THEN_COUNT =>
         state = S_WAIT_THEN_COUNT
@@ -157,9 +175,28 @@ class TimerB(ciaName: String,
       case S_COUNT_THEN_STOP =>
         state = S_STOP
         count
+      case S_WAIT_THEN_COUNT_CASCADE =>
+        state = S_COUNT_CASCADE
+      case S_COUNT_CASCADE =>
+        state = S_COUNT
+        countCascade
+      case S_LOAD_PB7_IRQ_THEN_COUNT_CASCADE =>
+        reloadFromLatch
+        pb67
+        irqAction(id)
+        state = S_COUNT
+      case S_LOAD_PB7_IRQ_THEN_STOP =>
+        reloadFromLatch
+        pb67
+        irqAction(id)
+        state = S_STOP
     }
     check_new_cr
+    val newIdle = isIdle
+    if (oldIdle != newIdle) idleAction(newIdle)
   }
+
+  @inline private def isIdle : Boolean = state == S_STOP && !hasNewCountMode && !hasNewCR && resetToggleCounter == 0
 
   @inline private def decrement: Unit = {
     if (counter == 0 || counter - 1 == 0) {
@@ -170,10 +207,33 @@ class TimerB(ciaName: String,
     else counter = (counter - 1) & 0xFFFF
   }
 
-  final def externalUnderflow = decrement
+  final def externalUnderflow = {
+    /*
+    if (state != S_STOP && state != S_COUNT_THEN_STOP && state != S_LOAD_THEN_STOP) {
+      if (counter == 0) {
+        if (isOneshot(cr)) {
+          cr &= 0xFE // stop timer
+          newCR &= 0xFE
+          state = S_LOAD_PB7_IRQ_THEN_STOP
+        }
+        else state = S_LOAD_PB7_IRQ_THEN_COUNT_CASCADE
+      }
+      else state = S_WAIT_THEN_COUNT_CASCADE
+    }
 
-  private def count: Unit = {
+     */
+    if (state != S_STOP && state != S_COUNT_THEN_STOP && state != S_LOAD_THEN_STOP) {
+      if (counter == 0) underflow
+      else countCascade
+    }
+  }
+
+  @inline private def count: Unit = {
     if (countMode == COUNT_CLOCK) decrement
+  }
+
+  @inline private def countCascade: Unit = {
+    counter = (counter - 1) & 0xFFFF
   }
 
   protected def underflow: Unit = {
@@ -185,16 +245,22 @@ class TimerB(ciaName: String,
       newCR &= 0xFE
       state = S_LOAD_THEN_STOP
     }
-    else state = S_LOAD_THEN_COUNT
+    else state = S_WAIT_THEN_COUNT
 
-    flipFlop ^= true
-    if (!toggleMode) {
-      toggleValue = true
-      resetToggleCounter = 2
-    }
+    pb67
 
     // check serial callback
     if (/*!oneShot &&*/ serialActionCallback != null && (cr & 0x40) == 0x40) serialActionCallback()
+  }
+
+  @inline private def pb67: Unit = {
+    //if (isTimerUnderflowOnPortB(cr)) {
+      flipFlop ^= true
+      if (!toggleMode) {
+        toggleValue = true
+        resetToggleCounter = 2
+      }
+    //}
   }
 
   @inline private def reloadFromLatch: Unit = counter = latch
@@ -224,14 +290,26 @@ class TimerB(ciaName: String,
             if (isReload(newCR)) state = S_LOAD_THEN_WAIT_THEN_COUNT
           }
           else state = S_STOP // request to stop
+        case S_COUNT_CASCADE =>
+          if (!isStarted(newCR)) {
+            state = if (isReload(newCR)) S_LOAD_THEN_STOP else S_COUNT_THEN_STOP
+          }
+          else {
+            if (isReload(newCR))
+              state = S_LOAD_THEN_COUNT
+          }
       }
+
       cr = newCR & 0xEF // mask reload
       hasNewCR = false
     }
 
     if (hasNewCountMode) {
       newCountModeCounter -= 1
-      if (newCountModeCounter == 0) countMode = newCountMode
+      if (newCountModeCounter == 0) {
+        countMode = newCountMode
+        hasNewCountMode = false
+      }
     }
 
     if (resetToggleCounter > 0) {

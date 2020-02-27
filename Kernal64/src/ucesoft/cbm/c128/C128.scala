@@ -77,6 +77,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener with CBMC
   private[this] var clockSpeed = 1
   private[this] var vicChip : vic.VIC = _
   private[this] var cia1,cia2 : cia.CIA = _
+  private[this] val cia12Running = Array(true,true)
   private[this] val vdc = new ucesoft.cbm.peripheral.vdc.VDC
   private[this] val sid = new ucesoft.cbm.peripheral.sid.SID
   private[this] var vicDisplay : vic.Display = _
@@ -224,6 +225,8 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener with CBMC
     clock.maximumSpeed = false
     maxSpeedItem.setSelected(false)
     ProgramLoader.reset
+    cia12Running(0) = true
+    cia12Running(1) = true
   }
 
   private def initDrive(id:Int,driveType:DriveType.Value) {
@@ -330,12 +333,12 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener with CBMC
     				   0xDC00,
     				   cia1CP1,
     				   cia1CP2,
-    				   irqSwitcher.ciaIRQ _) with IECBusListener {
+    				   irqSwitcher.ciaIRQ _,idle => cia12Running(0) = !idle) with IECBusListener {
       val busid = name
       
       bus.registerListener(this)
       
-      override def srqTriggered = if (FSDIRasInput) cia1.serialIN(bus.data == IECBus.GROUND)            
+      override def srqTriggered = if (FSDIRasInput) cia1.serialIN(bus.data == IECBus.GROUND)
       
       setSerialOUT(bitOut => {
         if (!FSDIRasInput && !c64Mode) {
@@ -353,7 +356,7 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener with CBMC
     				   0xDD00,
     				   cia2CP1,
     				   cia2CP2,
-    				   nmiSwitcher.cia2NMIAction _)
+    				   nmiSwitcher.cia2NMIAction _,idle => cia12Running(1) = !idle)
     rs232.setCIA12(cia1,cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
@@ -543,9 +546,12 @@ class C128 extends CBMComponent with GamePlayer with MMUChangeListener with CBMC
     }    
   }
   
-  private def mainLoop(cycles:Long) { 
+  private def mainLoop(cycles:Long) {
     // VIC PHI1
     vicChip.clock
+    // CIAs
+    if (cia12Running(0)) cia1.clock(false)
+    if (cia12Running(1)) cia2.clock(false)
     //DRIVES
     var d = 0
     while (d < 2) {

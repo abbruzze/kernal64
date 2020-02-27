@@ -3,12 +3,12 @@ package ucesoft.cbm.peripheral.cia
 class TimerA(ciaName: String,
              id: Int,
              irqAction: (Int) => Unit,
-             timerB : TimerB) extends TimerB(ciaName,id,irqAction) {
+             timerB : TimerB,
+             idleAction : (Boolean) => Unit) extends TimerB(ciaName,id,irqAction,idleAction) {
   override val componentID = ciaName + "_TA"
 
   final override protected def setCountMode(cr:Int) : Unit = {
     newCountMode = if ((cr & 0x20) == 0) COUNT_CLOCK else COUNT_CNT
-    hasNewCountMode = true
   }
 
   final override protected def underflow: Unit = {

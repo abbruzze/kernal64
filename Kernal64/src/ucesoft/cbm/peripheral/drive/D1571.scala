@@ -138,8 +138,10 @@ class D1571(val driveID: Int,
    * CIA for fast serial bus
    * 
    ***********************************************************************************************************/
-  private[this] val CIA = new CIA("CIA_FAST_" + driveID,0x4000,EmptyCIAConnector,EmptyCIAConnector,IRQSwitcher.ciaIRQ _,false,true) with IECBusListener {
-    val busid = name    
+  private[this] var ciaRunning = true
+  private[this] val CIA = new CIA("CIA_FAST_" + driveID,0x4000,EmptyCIAConnector,EmptyCIAConnector,IRQSwitcher.ciaIRQ _,isIdle => ciaRunning = !isIdle,false) with IECBusListener {
+    val busid = name
+    setCIAModel(ucesoft.cbm.peripheral.cia.CIA.CIA_MODEL_8521)
     
     override def srqTriggered = if (busDataDirection == 0) serialIN(bus.data == IECBus.GROUND)    
     
@@ -469,6 +471,7 @@ class D1571(val driveID: Int,
     cycleFrac = 0.0
     if (ledListener != null) ledListener.turnOn
     java.util.Arrays.fill(ram,0)
+    ciaRunning = true
   }
   
   private def setFilename {
@@ -516,7 +519,7 @@ class D1571(val driveID: Int,
       }
       while (n_cycles > 0) {
         cpu.fetchAndExecute(1)
-        CIA.clock(false)
+        if (ciaRunning) CIA.clock(false)
         VIA1.clock(cycles)
         VIA2.clock(cycles)
         n_cycles -= 1
@@ -541,6 +544,9 @@ class D1571(val driveID: Int,
   }
     
   // ================== Tracing ====================================
+  def setCycleMode(cycleMode: Boolean): Unit = {
+    cpu.setCycleMode(cycleMode)
+  }
   def setTraceOnFile(out:PrintWriter,enabled:Boolean) {/* ignored */}
   def setTrace(traceOn: Boolean) = {
     tracing = traceOn
