@@ -94,11 +94,14 @@ object CPU6510 {
   }
   
   case class DisassembledInfo(address: Int, op: String, ind: String, bytes: Array[Int]) {
+    val LENGHT = 30
     val len = bytes.length
     override def toString = {
       val addressString = hex4(address)
       val bytesString = bytes map hex2 mkString " "
-      "%s  %-8s  %s %s".format(addressString, bytesString, op, ind)
+      val fmt = "%s  %-8s  %s %s".format(addressString, bytesString, op, ind)
+      val spaces = if (fmt.length < LENGHT) " " * (LENGHT - fmt.length) else ""
+      fmt + spaces
     }
   }  
   

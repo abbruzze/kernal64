@@ -421,6 +421,9 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   }
 
   // ------------ TRACING -----------
+  def setCycleMode(cycleMode: Boolean): Unit = {
+    cpu.setCycleMode(cycleMode)
+  }
   def setTraceOnFile(out:PrintWriter,enabled:Boolean) {/* ignored */}
   def setTrace(traceOn: Boolean) = {
     tracing = traceOn

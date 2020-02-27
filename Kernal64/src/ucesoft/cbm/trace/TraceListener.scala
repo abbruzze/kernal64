@@ -57,10 +57,11 @@ object BreakType {
 }
 
 trait TraceListener {
-  def setTraceOnFile(out:PrintWriter,enabled:Boolean)
-  def setTrace(traceOn:Boolean)
-  def step(updateRegisters: (String) => Unit)
-  def setBreakAt(breakType:BreakType,callback:(String) => Unit)
-  def jmpTo(pc:Int)
+  def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit
+  def setTrace(traceOn:Boolean) : Unit
+  def step(updateRegisters: (String) => Unit) : Unit
+  def setBreakAt(breakType:BreakType,callback:(String) => Unit) : Unit
+  def jmpTo(pc:Int) : Unit
   def disassemble(mem:Memory,address:Int) : (String,Int)
+  def setCycleMode(cycleMode:Boolean) : Unit
 }

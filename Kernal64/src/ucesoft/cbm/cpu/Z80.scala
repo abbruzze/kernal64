@@ -2205,9 +2205,11 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   private[this] val syncObject = new Object
   private[this] var breakCallBack : (String) => Unit = _
   private[this] var breakType : BreakType = _
-  
+
   // =================================== Tracing =============================================================
-  
+  def setCycleMode(cycleMode: Boolean): Unit = {
+    // TODO
+  }
   def setTraceOnFile(out:PrintWriter,enabled:Boolean) {
     // TODO
   }
