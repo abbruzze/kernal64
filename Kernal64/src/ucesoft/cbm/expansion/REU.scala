@@ -252,19 +252,19 @@ object REU {
           incrementAddresses
           if (transferRegister == 0x01) {
             statusRegister |= STATUS_END_OF_BLOCK
-            clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 2,cycles => endOperation))
+            clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation))
             //endOperation
           }
           else {
             transferRegister = (transferRegister - 1) & 0xFFFF
-            clk.schedule(new ClockEvent("REUExchange",clk.nextCycles,cycles => exchangeOperation))          
+            clk.schedule(new ClockEvent("REUExchange",clk.nextCycles,cycles => exchangeOperation))
           }
         }
         exchangeFirstPhase = !exchangeFirstPhase
       }
       else clk.schedule(new ClockEvent("REUExchange",clk.nextCycles,cycles => exchangeOperation))
     }
-    
+
     private def verifyOperation {
       if (!baLow) { // verify
         if (mem.read(c64Address) != reuMem(reuAddress)) {
@@ -274,14 +274,14 @@ object REU {
         incrementAddresses
         if (transferRegister == 0x01) {
           statusRegister |= STATUS_END_OF_BLOCK
-          clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 2,cycles => endOperation))
+          clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation))
           //endOperation
         }
         else {
           transferRegister = (transferRegister - 1) & 0xFFFF
           if ((statusRegister & STATUS_VERIFY_ERROR) > 0) {
             if (transferRegister == 0x01) statusRegister |= STATUS_END_OF_BLOCK
-            clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 3,cycles => endOperation))
+            clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 2,cycles => endOperation))
             //endOperation
           }
           else
@@ -301,7 +301,6 @@ object REU {
         if (transferRegister == 0x01) {
           statusRegister |= STATUS_END_OF_BLOCK
           clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation))
-          //endOperation
         }
         else {
           transferRegister = (transferRegister - 1) & 0xFFFF
