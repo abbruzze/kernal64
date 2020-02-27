@@ -1,18 +1,15 @@
 package ucesoft.cbm.c64
 
+import java.io.{ObjectInputStream, ObjectOutputStream}
+
+import ucesoft.cbm.{CBMComponentType, ChipID, Clock, Log}
 import ucesoft.cbm.cpu._
-import ucesoft.cbm.ChipID
-import ucesoft.cbm.Log
-import ucesoft.cbm.expansion.ExpansionPort
-import ucesoft.cbm.expansion.ExpansionPortConfigurationListener
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.peripheral.c2n.Datassette
-import ucesoft.cbm.Clock
-import ucesoft.cbm.expansion.LastByteReadMemory
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
+import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortConfigurationListener, LastByteReadMemory}
 import ucesoft.cbm.misc.TestCart
+import ucesoft.cbm.peripheral.c2n.Datassette
+import ucesoft.cbm.peripheral.cia.CIA
+import ucesoft.cbm.peripheral.sid.SID
+import ucesoft.cbm.peripheral.vic.VIC
 
 object C64MMU {
   import ROM._
@@ -200,6 +197,17 @@ object C64MMU {
     private[this] var lastByteReadMemory : LastByteReadMemory = _
     private[this] var memConfig = -1
     private[this] val MEM_CONFIG = MemConfig.MEM_CONFIG
+
+    private[this] var cia1,cia2 : CIA = _
+    private[this] var sid : SID = _
+    private[this] var vic : VIC = _
+
+    def setIO(cia1:CIA,cia2:CIA,sid:SID,vic:VIC): Unit = {
+      this.cia1 = cia1
+      this.cia2 = cia2
+      this.sid = sid
+      this.vic = vic
+    }
     
     def getRAM : Memory = ram
     
@@ -283,13 +291,18 @@ object C64MMU {
       Log.info("Initializing main memory ...")
       
       add(ram)
-      add(IO)
+      //add(IO)
       add(BASIC_ROM)
       add(KERNAL_ROM)      
       add(CHAR_ROM)
       add(ROML)
       add(ROMH)
       add(ROMH_ULTIMAX)
+      add(cia1)
+      add(cia2)
+      add(sid)
+      add(vic)
+      add(COLOR_RAM)
     }
     
     override def afterInitHook {
@@ -305,7 +318,108 @@ object C64MMU {
       ram.ULTIMAX = false
       check0001
     }
-    
+
+    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
+      if (isForwardRead) forwardReadTo.read(address)
+      if (ULTIMAX) {
+        if (chipID == ChipID.VIC) {
+          val bank = address & 0xF000
+          if (bank == 0x3000) return ROMH_ULTIMAX.read(0xF000 + address - 0x3000, chipID)
+          if (bank == 0x7000) return ROMH_ULTIMAX.read(0xF000 + address - 0x7000, chipID)
+          if (bank == 0xB000) return ROMH_ULTIMAX.read(0xF000 + address - 0xB000, chipID)
+          if (bank == 0xF000) return ROMH_ULTIMAX.read(0xF000 + address - 0xF000, chipID)
+        }
+      }
+      if (chipID == ChipID.VIC) return ram.read(address, chipID)
+      if (address == 0) return ddr
+      if (address == 1) return read0001
+      if (address < 0x8000) return ram.read(address)
+      val c64MC = MEM_CONFIG(memConfig)
+      if (address < 0xA000) { // ROML or RAM
+        if (c64MC.roml) return ROML.read(address) else return ram.read(address)
+      }
+      if (address < 0xC000) { // BASIC or RAM or ROMH
+        if (c64MC.basic) return BASIC_ROM.read(address)
+        if (c64MC.romh) return ROMH.read(address)
+        return ram.read(address)
+      }
+      if (address < 0xD000) return ram.read(address) // RAM
+      if (address < 0xE000) { // I/O or RAM or CHAR
+        if (c64MC.io) { // I/O
+          if (address < 0xD400) return vic.read(address)
+          if (address < 0xD800) return sid.read(address)
+          if (address < 0xDC00) return COLOR_RAM.read(address)
+          if (address < 0xDD00) return cia1.read(address)
+          if (address < 0xDE00) return cia2.read(address)
+
+          return ExpansionPort.getExpansionPort.read(address)
+        }
+        if (c64MC.char) return CHAR_ROM.read(address)
+        return ram.read(address)
+      }
+      // KERNAL or RAM or ROMHULTIMAX
+      if (c64MC.kernal) return KERNAL_ROM.read(address)
+      if (c64MC.romhultimax) return ROMH_ULTIMAX.read(address)
+      ram.read(address)
+    }
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
+      if (isForwardWrite) forwardWriteTo.write(address,value)
+      val c64MC = MEM_CONFIG(memConfig)
+
+      if (address < 2) {
+        ram.write(address,lastByteReadMemory.lastByteRead)
+        if (address == 0) { // $00
+          val clk = Clock.systemClock.currentCycles
+          if ((ddr & 0x80) > 0 && (value & 0x80) == 0 && !capacitor7) {
+            lastCycle1Written7 = clk
+            capacitor7 = true
+          }
+          //else capacitor7 = false
+          if ((value & 0x80) > 0 && capacitor7) capacitor7 = false
+          if ((value & 0x40) > 0 && capacitor6) capacitor6 = false
+          if ((ddr & 0x40) > 0 && (value & 0x40) == 0 && !capacitor6) {
+            lastCycle1Written6 = clk
+            capacitor6 = true
+          }
+          //else capacitor6 = false
+          ddr = value
+        }
+        else { // $01
+          pr = value & 0x3F | (pr & 0xC0)
+          if ((ddr & 0x80) > 0) {
+            if ((value & 0x80) > 0) pr |= 0x80 else pr &= 0x7F
+          }
+          if ((ddr & 0x40) > 0) {
+            if ((value & 0x40) > 0) pr |= 0x40 else pr &= 0xBF
+          }
+        }
+        check0001
+      }
+      else if (address < 0x8000) ram.write(address,value)
+      else if (address < 0xA000) { // ROML or RAM
+        if (c64MC.roml) ROML.write(address,value) else ram.write(address,value)
+      }
+      else if (address < 0xC000) { // BASIC or RAM or ROMH
+        if (c64MC.romh) ROMH.write(address,value) else ram.write(address,value)
+      }
+      else if (address < 0xD000) ram.write(address,value) // RAM
+      else if (address < 0xE000) { // I/O or RAM or CHAR
+        if (c64MC.io) { // I/O
+          if (address < 0xD400) vic.write(address,value)
+          else if (address < 0xD800) sid.write(address,value)
+          else if (address < 0xDC00) COLOR_RAM.write(address,value)
+          else if (address < 0xDD00) cia1.write(address,value)
+          else if (address < 0xDE00) cia2.write(address,value)
+          else ExpansionPort.getExpansionPort.write(address,value)
+        }
+        else ram.write(address,value)
+      }
+      // KERNAL or RAM or ROMH
+      else if (c64MC.romhultimax) ROMH_ULTIMAX.write(address,value) else ram.write(address,value)
+      // TestCart
+      if (TestCart.enabled) TestCart.write(address,value)
+    }
+    /*
     @inline final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (isForwardRead) forwardReadTo.read(address)
       if (ULTIMAX) {
@@ -342,7 +456,7 @@ object C64MMU {
         }
       }
     }
-    
+
     @inline final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
       if (isForwardWrite) forwardWriteTo.write(address,value)      
       
@@ -389,6 +503,8 @@ object C64MMU {
       // TestCart
       if (TestCart.enabled) TestCart.write(address,value)
     }
+
+     */
     
     override def toString = ram.toString + banks.map(_.toString).mkString("[",",","]")
     // state

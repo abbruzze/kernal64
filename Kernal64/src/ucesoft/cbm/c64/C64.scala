@@ -73,6 +73,7 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
   private[this] val cpu = CPU6510.make(mem)  
   private[this] var vicChip : vic.VIC = _
   private[this] var cia1,cia2 : CIA = _
+  private[this] val cia12Running = Array(true,true)
   private[this] val sid = new ucesoft.cbm.peripheral.sid.SID
   private[this] var display : vic.Display = _
   private[this] val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
@@ -98,7 +99,6 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
   private[this] var dma = false
   private[this] val expansionPort = ExpansionPort.getExpansionPort
   // -------------------- TRACE ----------------
-  private[this] var cpuTracer : TraceListener = cpu
   private[this] var traceDialog : TraceDialog = _
   private[this] var diskTraceDialog : TraceDialog = _
   private[this] var inspectDialog : InspectPanelDialog = _
@@ -260,6 +260,8 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
     clock.maximumSpeed = false
     maxSpeedItem.setSelected(false)
     ProgramLoader.reset
+    cia12Running(0) = true
+    cia12Running(1) = true
   }
   
   def init {
@@ -307,7 +309,8 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
     				   0xDC00,
     				   cia1CP1,
     				   cia1CP2,
-    				   irqSwitcher.ciaIRQ _)
+    				   irqSwitcher.ciaIRQ _,
+               idle => cia12Running(0) = !idle)
     val cia2CP1 = new CIA2Connectors.PortAConnector(vicMemory,bus,rs232)
     val cia2CP2 = new CIA2Connectors.PortBConnector(rs232)    
     add(cia2CP1)
@@ -317,18 +320,22 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
     				   0xDD00,
     				   cia2CP1,
     				   cia2CP2,
-    				   nmiSwitcher.cia2NMIAction _)
+    				   nmiSwitcher.cia2NMIAction _,
+               idle => cia12Running(1) = !idle)
     rs232.setCIA12(cia1,cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
     vicChip = new vic.VIC(vicMemory,mem.COLOR_RAM,irqSwitcher.vicIRQ _,baLow _)      
     mem.setLastByteReadMemory(vicMemory)
     // mapping I/O chips in memory
+    mem.setIO(cia1,cia2,sid,vicChip)
+    /*
     val io = mem.IO    
     io.addBridge(cia1)
     io.addBridge(cia2)
     io.addBridge(vicChip)
-    io.addBridge(sid)    
+    io.addBridge(sid)
+     */
     display = new vic.Display(vicChip.SCREEN_WIDTH,vicChip.SCREEN_HEIGHT,displayFrame.getTitle,displayFrame)
     add(display)
     display.setPreferredSize(new java.awt.Dimension(vicChip.VISIBLE_SCREEN_WIDTH,vicChip.VISIBLE_SCREEN_HEIGHT))
@@ -440,6 +447,9 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
   private def mainLoop(cycles:Long) {
     // VIC PHI1
     vicChip.clock
+    // CIAs
+    if (cia12Running(0)) cia1.clock(false)
+    if (cia12Running(1)) cia2.clock(false)
     //DRIVES
     var d = 0
     while (d < 2) {
