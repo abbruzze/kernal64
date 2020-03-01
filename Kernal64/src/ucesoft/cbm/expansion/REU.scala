@@ -71,19 +71,16 @@ object REU {
     final private[this] val EXCHANGE_OP = 2
     final private[this] val VERIFY_OP = 3
     
-    final private[this] val STATUS_IRQ_PENDING = 0x80
     final private[this] val STATUS_END_OF_BLOCK = 0x40
     final private[this] val STATUS_VERIFY_ERROR = 0x20
     final private[this] val CMD_EXECUTE = 0x80
     final private[this] val CMD_AUTOLOAD = 0x20
     final private[this] val CMD_FF00_TRIGGER = 0x10
     final private[this] val CMD_TRANSFER_TYPE = 0x3
-    final private[this] val ADDRESS_SELECT_PAGES = 0x7
     final private[this] val CTRL_IRQ_MASK = 0x80
     final private[this] val CTRL_IRQ_END_OF_BLOCK_MASK = 0x40
     final private[this] val CTRL_IRQ_VERIFY_ERROR_MASK = 0x20
-    final private[this] val CTRL_ADDRESS = 0xC0
-    
+
     override def eject {
       mem.setForwardWriteTo(None)      
     }
@@ -213,10 +210,7 @@ object REU {
     
     private def checkOperation {
       ff00 = (commandRegister & 0x90) == 0x80
-      if ((commandRegister & 0x90) == 0x90) {
-        clk.schedule(new ClockEvent("REUStartOperation",clk.nextCycles,cycles => startOperation))
-        //startOperation
-      }
+      if ((commandRegister & 0x90) == 0x90) clk.schedule(new ClockEvent("REUStartOperation",clk.nextCycles,cycles => startOperation))
   	  if (ff00) {
   	    //println(s"Start of operation ${currentOperation} deferred clk=${clk.currentCycles}")
   	    mem.setForwardWriteTo(Some(this))
@@ -253,7 +247,6 @@ object REU {
           if (transferRegister == 0x01) {
             statusRegister |= STATUS_END_OF_BLOCK
             clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation))
-            //endOperation
           }
           else {
             transferRegister = (transferRegister - 1) & 0xFFFF
@@ -267,22 +260,17 @@ object REU {
 
     private def verifyOperation {
       if (!baLow) { // verify
-        if (mem.read(c64Address) != reuMem(reuAddress)) {
-          statusRegister |= STATUS_VERIFY_ERROR
-          //println("Verify error")
-        }
+        if (mem.read(c64Address) != reuMem(reuAddress)) statusRegister |= STATUS_VERIFY_ERROR
         incrementAddresses
         if (transferRegister == 0x01) {
           statusRegister |= STATUS_END_OF_BLOCK
           clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation))
-          //endOperation
         }
         else {
           transferRegister = (transferRegister - 1) & 0xFFFF
           if ((statusRegister & STATUS_VERIFY_ERROR) > 0) {
-            if (transferRegister == 0x01) statusRegister |= STATUS_END_OF_BLOCK
+            if (transferRegister == 0x01 && mem.read(c64Address) == reuMem(reuAddress)) statusRegister |= STATUS_END_OF_BLOCK
             clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 2,cycles => endOperation))
-            //endOperation
           }
           else
           clk.schedule(new ClockEvent("REUVerify",clk.nextCycles,cycles => verifyOperation))
@@ -322,7 +310,7 @@ object REU {
       }
     }
     
-    private def endOperation {            
+    private def endOperation {
       // clear execute bit
       commandRegister &= ~CMD_EXECUTE
       // set FF00 bit
