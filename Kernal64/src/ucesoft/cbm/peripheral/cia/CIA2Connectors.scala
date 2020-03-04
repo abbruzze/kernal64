@@ -58,8 +58,7 @@ object CIA2Connectors {
         ParallelCable.onPC
         ParallelCable.read
       }
-      else
-      rs232.getOthers
+      else if (rs232.isEnabled) rs232.getOthers else latch | ~ddr
     }
     final protected def performWrite(data:Int) {
       if (ParallelCable.enabled) {
