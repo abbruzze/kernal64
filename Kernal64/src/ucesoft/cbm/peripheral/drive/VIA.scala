@@ -21,6 +21,8 @@ abstract class VIA(val name:String,
   private[this] var pbLatch = 0
   private[this] var t2ll 	= 0		// T2 low order latch
   private[this] var PB7 	= 0		// 7th bit of PB set by Timer 1
+  private[this] var pending_t1,pending_t2,reload_t1,reload_t2 = false
+  private[this] var oneshotB,oneshotBNew,acrNew = false
   protected[this] final val PB 	= 0x00	// Port B
   protected[this] final val PA 	= 0x01	// Port A
   protected[this] final val DDRB 	= 0x02  // Data Direction Register B
@@ -57,7 +59,18 @@ abstract class VIA(val name:String,
   
   def reset = {
     for(i <- 0 until regs.length) regs(i) = 0
-    init
+    active = true
+    paLatch = 0
+    pbLatch = 0
+    t2ll = 0
+    PB7 = 0
+    pending_t1 = false
+    pending_t2 = false
+    reload_t1 = false
+    reload_t2 = false
+    oneshotB = false
+    oneshotBNew = false
+    acrNew = false
   }
     
   def setActive(active:Boolean) {
@@ -100,7 +113,8 @@ abstract class VIA(val name:String,
       irq_clr(IRQ_CB1)
       val PCR_CB2_CTRL = (regs(PCR) >> 5) & 7
       if (PCR_CB2_CTRL != 1 && PCR_CB2_CTRL != 3) irq_clr(IRQ_CB2) // check for independent interrupt mode
-      (if (is_set(ACR,PB_LATCH_ENABLED)) paLatch else regs(PB)) | PB7 //& (~regs(DDRB) | (if (is_set(ACR,0x80)) 0x80 else 0))
+      val pb7 = if (is_set(ACR,0x80)) PB7 else 0
+      (if (is_set(ACR,PB_LATCH_ENABLED)) paLatch else regs(PB)) | pb7 //& (~regs(DDRB) | (if (is_set(ACR,0x80)) 0x80 else 0))
     case SR =>
       irq_clr(IRQ_SR)
       regs(SR)
@@ -140,8 +154,10 @@ abstract class VIA(val name:String,
       regs(T1HL) = value
       regs(T1HC) = value
       regs(T1LC) = regs(T1LL)
+      pending_t1 = true
+      reload_t1 = true
       irq_clr(IRQ_TIMER_1)
-      if (is_set(ACR,0x80)) PB7 = 0x80
+      if (is_set(ACR,0x80)) PB7 = 0x00
       Log.debug(s"${name} write T1HC => T1HL=${Integer.toHexString(regs(T1HL))} T1HC=${Integer.toHexString(regs(T1HC))} T1LC=${Integer.toHexString(regs(T1LC))} PB7=${PB7}")
     case T1LL =>
       regs(T1LL) = value
@@ -157,6 +173,8 @@ abstract class VIA(val name:String,
       regs(T2HC) = value
       regs(T2LC) = t2ll
       irq_clr(IRQ_TIMER_2)
+      pending_t2 = true
+      reload_t2 = true
       Log.debug(s"${name} writing T2HC => T2LC=${Integer.toHexString(regs(T2LC))} T2HC=${Integer.toHexString(regs(T2HC))}")
     case SR =>
       regs(SR) = value
@@ -171,6 +189,10 @@ abstract class VIA(val name:String,
       else regs(IER) &= ~value
       Log.debug(s"${name} writing IER => IER=${Integer.toBinaryString(regs(IER))}")
       checkIRQ
+    case ACR =>
+      acrNew = true
+      regs(ACR) = value
+      oneshotBNew = !is_set(ACR,0x20)
     case ofs => 
       regs(ofs) = value
       Log.debug(s"${name} writing reg ${ofs} => ${Integer.toBinaryString(value)}")
@@ -180,42 +202,64 @@ abstract class VIA(val name:String,
     if (active) {
       updateT1
       updateT2
+
+      if (acrNew) {
+        acrNew = false
+        oneshotB = oneshotBNew
+      }
     }
   }
-  
-  @inline private def updateT1 {
-    var counter = regs(T1LC) | regs(T1HC) << 8
-    //Log.debug(s"T1[${name}] counter = ${counter}")
-    counter -= 1
-    if (counter <= 0) {
-      if (is_set(ACR,0x40)) { // free running mode
-        if (is_set(ACR,0x80)) PB7 = if (PB7 == 0x00) 0x80 else 0x00
-        
-        // reset counter to latch
-        counter = regs(T1LL) | regs(T1HL) << 8
+
+  @inline private def updateT1: Unit = {
+    var counter = 0
+    if (reload_t1) {
+      counter = regs(T1LL) | regs(T1HL) << 8
+      reload_t1 = false
+    }
+    else {
+      counter = regs(T1LC) | regs(T1HC) << 8
+      counter = (counter - 1) & 0xFFFF
+      reload_t1 = counter == 0xFFFF
+      val timeout_t1 = pending_t1 && reload_t1
+      if (timeout_t1 && is_set(ACR,0x80)) {
+        if (is_set(ACR,0x40)) PB7 ^= 0x80
+        else PB7 = 0x80
       }
-      else { // one-shot mode
-	      if (is_set(ACR,0x80)) PB7 = 0x00	      
+      if (timeout_t1) {
+        irq_set(IRQ_TIMER_1)
+        pending_t1 = is_set(ACR,0x40)
       }
-      irq_set(IRQ_TIMER_1)
     }
     regs(T1LC) = counter & 0xFF
     regs(T1HC) = (counter >> 8) & 0xFF
   }
-  
-  @inline private def updateT2 {
-    if (!is_set(ACR,0x20)) {	// DO NOT count pulses on PB6
-      var counter = regs(T2LC) | regs(T2HC) << 8
-      counter -= 1//UPDATE_CLOCKS
-      if (counter <= 0) irq_set(IRQ_TIMER_2)
+
+  @inline private def updateT2: Unit = {
+    var counter = 0
+    if (reload_t2) {
+      counter = regs(T2LC) | regs(T2HC) << 8
+      reload_t2 = false
+      regs(T2LC) = counter & 0xFF
+      regs(T2HC) = (counter >> 8) & 0xFF
+    }
+    else
+    if (oneshotB) { // DO NOT count pulses on PB6
+      counter = regs(T2LC) | regs(T2HC) << 8
+      counter = (counter - 1) & 0xFFFF
+      val timeout_t2 = pending_t2 && counter == 0xFFFF
+      if (timeout_t2) {
+        irq_set(IRQ_TIMER_2)
+        pending_t2 = false
+      }
       regs(T2LC) = counter & 0xFF
       regs(T2HC) = (counter >> 8) & 0xFF
     }
   }
-  
+
   override def getProperties = {
     properties.setProperty("T1 counter",Integer.toHexString(regs(T1LC) | regs(T1HC) << 8))
     properties.setProperty("T2 counter",Integer.toHexString(regs(T2LC) | regs(T2HC) << 8))
+    properties.setProperty("T1 free running mode",is_set(ACR,0x40).toString)
     super.getProperties
   }
   // state
@@ -226,6 +270,13 @@ abstract class VIA(val name:String,
     out.writeInt(PB7)
     out.writeBoolean(active)
     out.writeObject(regs)
+    out.writeBoolean(reload_t1)
+    out.writeBoolean(reload_t2)
+    out.writeBoolean(pending_t1)
+    out.writeBoolean(pending_t1)
+    out.writeBoolean(oneshotB)
+    out.writeBoolean(oneshotBNew)
+    out.writeBoolean(acrNew)
   }
   protected def loadState(in:ObjectInputStream) {
     paLatch = in.readInt
@@ -234,6 +285,13 @@ abstract class VIA(val name:String,
     PB7 = in.readInt
     active = in.readBoolean
     loadMemory[Int](regs,in)
+    reload_t1 = in.readBoolean
+    reload_t2 = in.readBoolean
+    pending_t1 = in.readBoolean
+    pending_t2 = in.readBoolean
+    oneshotB = in.readBoolean
+    oneshotBNew = in.readBoolean
+    acrNew = in.readBoolean
   }
   protected def allowsStateRestoring : Boolean = true
 }
