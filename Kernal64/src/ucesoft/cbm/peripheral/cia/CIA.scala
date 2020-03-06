@@ -14,31 +14,31 @@ import java.io.ObjectInputStream
 import javax.swing.JFrame
 
 object CIA {
-  val PRA = 0
-  val PRB = 1
-  val DDRA = 2
-  val DDRB = 3
-  val TALO = 4
-  val TAHI = 5
-  val TBLO = 6
-  val TBHI = 7
-  val TOD_10THS = 8
-  val TOD_SEC = 9
-  val TOD_MIN = 10
-  val TOD_HR = 11
-  val SDR = 12
-  val ICR = 13
-  val CRA = 14
-  val CRB = 15
+  final val PRA = 0
+  final val PRB = 1
+  final val DDRA = 2
+  final val DDRB = 3
+  final val TALO = 4
+  final val TAHI = 5
+  final val TBLO = 6
+  final val TBHI = 7
+  final val TOD_10THS = 8
+  final val TOD_SEC = 9
+  final val TOD_MIN = 10
+  final val TOD_HR = 11
+  final val SDR = 12
+  final val ICR = 13
+  final val CRA = 14
+  final val CRB = 15
   // IRQ sources (bit)
-  val IRQ_SRC_ALARM = 4
-  val IRQ_SRC_TA = 1
-  val IRQ_SRC_TB = 2
-  val IRQ_SERIAL = 8
-  val IRQ_FLAG = 16
+  final val IRQ_SRC_ALARM = 4
+  final val IRQ_SRC_TA = 1
+  final val IRQ_SRC_TB = 2
+  final val IRQ_SERIAL = 8
+  final val IRQ_FLAG = 16
 
-  val CIA_MODEL_6526 = 0 // old
-  val CIA_MODEL_8521 = 1 // new
+  final val CIA_MODEL_6526 = 0 // old
+  final val CIA_MODEL_8521 = 1 // new
 }
 
 /**
@@ -60,9 +60,9 @@ class CIA(val name:String,
   val id = ChipID.CIA
 
   private[this] val timerABRunning = Array(true,true)
-  private[this] val timerB = new TimerB(name,IRQ_SRC_TB,irqHandling _, idle => timerIdleCallBack(1,idle))
-  private[this] val timerA = new TimerA(name,IRQ_SRC_TA,irqHandling _,timerB, idle => timerIdleCallBack(0,idle))
-  private[this] val tod = new TOD2
+  private[this] val timerB = new Timer_B(name,IRQ_SRC_TB,irqHandling _, idle => timerIdleCallBack(1,idle))
+  private[this] val timerA = new Timer_A(name,IRQ_SRC_TA,irqHandling _,timerB, idle => timerIdleCallBack(0,idle))
+  private[this] val tod = new TOD
   private[this] var icr = 0
   private[this] var sdr,sdrlatch,shiftRegister = 0
   private[this] var sdrLoaded,sdrOut = false
@@ -84,7 +84,7 @@ class CIA(val name:String,
   
   // ========================== TOD ================================================
   
-  private class TOD2 extends CBMComponent {
+  private class TOD extends CBMComponent {
     val componentID = name + " TOD"
     val componentType = CBMComponentType.CHIP 
     final private[this] val TICK_SUBID = 1
@@ -342,6 +342,8 @@ class CIA(val name:String,
     if (timerABRunning(0)) timerA.clock
     if (updateTOD) tod.tick(0)
     ackCycle = false
+
+    if (!timerABRunning(0) && !timerABRunning(1)) idleAction(true)
   }
       
   def init {
@@ -365,20 +367,23 @@ class CIA(val name:String,
     ackCycle = false
   }
   
-  def setFlagLow = irqHandling(IRQ_FLAG)
+  def setFlagLow = {
+    irqHandling(IRQ_FLAG)
+    idleAction(false)
+  }
   
   final def irqHandling(bit:Int) {
     // handle TimerB bug for old cias when reading ICR "near" underflow: the bit is not set
     if (!(ciaModel == CIA_MODEL_6526 && bit == IRQ_SRC_TB && ackCycle)) icr |= bit
-    if ((icrMask & icr) > 0) setIRQOnNextClock(bit)
+    if (bit == IRQ_SRC_ALARM) setIRQ(bit) else setIRQOnNextClock(bit)
   }
 
   @inline private def setIRQ(src:Int) = {
-    //if ((icrMask & icr) > 0) {
-    icr |= 0x80
-    Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
-    irqAction(true)
-    //}
+    if ((icrMask & icr) > 0) {
+      icr |= 0x80
+      Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
+      irqAction(true)
+    }
   }
 
   @inline private def setIRQOnNextClock(src:Int): Unit = {
@@ -398,6 +403,7 @@ class CIA(val name:String,
     properties.setProperty("SDR index",Integer.toHexString(sdrIndex))
     properties.setProperty("SDR out",sdrOut.toString)
     properties.setProperty("Model", if (ciaModel == CIA_MODEL_8521) "8521" else "6526")
+    properties.setProperty("Idle",(!timerABRunning(0) && !timerABRunning(1)).toString)
     super.getProperties
   }
   
@@ -406,24 +412,18 @@ class CIA(val name:String,
   final def read(address: Int, chipID: ChipID.ID): Int = decodeAddress(address) match {
     case PRA => portAConnector.read      
     case PRB => 
-      var portB = portBConnector.read
-      if (timerA.timerUnderflowOnPortB) {
-        timerA.toggleMode match {
-          case true => 
-            if (timerA.flipFlop) portB |= 0x40 else portB &= 0xBF
-          case false =>
-            if (timerA.toggleValue) portB |= 0x40 else portB &= 0xBF
-        }
+      var data = portBConnector.read
+      if ((timerA.readCR & 0x02) != 0) {
+        data &= 0xBF
+        val check = if ((timerA.readCR & 0x04) != 0) timerA.getPbToggle else timerA.isStateOut
+        if (check) data |= 0x40
       }
-      if (timerB.timerUnderflowOnPortB) {
-        timerB.toggleMode match {
-          case true => 
-            if (timerB.flipFlop) portB |= 0x80 else portB &= 0x7F
-          case false =>
-            if (timerB.toggleValue) portB |= 0x80 else portB &= 0x7F
-        }
+      if ((timerB.readCR & 0x02) != 0) {
+        data &= 0x7F
+        val check = if ((timerB.readCR & 0x04) != 0) timerB.getPbToggle else timerB.isStateOut
+        if (check) data |= 0x80
       }
-      portB
+      data
     case DDRA => portAConnector.ddr
     case DDRB => portBConnector.ddr
     // timer A
@@ -444,8 +444,8 @@ class CIA(val name:String,
       irqAction(false)
       ackCycle = true
       lastIcr & 0x9F	// bit 5 & 6 always 0
-    case CRA => timerA.readCR
-    case CRB => timerB.readCR
+    case CRA => timerA.readCR & 0xEE | timerA.getState & 0x01
+    case CRB => timerB.readCR & 0xEE | timerB.getState & 0x01
   }
   final def write(address: Int, value: Int, chipID: ChipID.ID) = decodeAddress(address) match {
     case PRA => 
@@ -485,7 +485,11 @@ class CIA(val name:String,
       val mustSet = (value & 0x80) == 0x80 
       if (mustSet) icrMask |= value & 0x7f else icrMask &= ~value
       
-      if ((icrMask & icr & 0x1f) != 0) setIRQOnNextClock(-1)
+      if ((icrMask & icr & 0x1f) != 0) {
+        val clk = Clock.systemClock
+        val delay = if (ciaModel == CIA_MODEL_8521) 1 else 2
+        clk.schedule(new ClockEvent(componentID + "_IRQ", clk.currentCycles + delay, _ => setIRQ(-1)))
+      }
       Log.debug(s"${name} ICR's value is ${Integer.toBinaryString(value)} => ICR = ${Integer.toBinaryString(icrMask)}")
     case CRA =>
       val oldSerialOut = timerA.readCR & 0x40
