@@ -56,7 +56,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   }
 
   def setCycleExact(ce:Boolean): Unit = {
-    if (!cycleExact && ce) Clock.systemClock.cancel(componentID)
+    Clock.systemClock.cancel(componentID)
 
     cycleExact = ce
     if (sid2 != null) sid2.setCycleExact(ce)
