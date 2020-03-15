@@ -17,14 +17,14 @@ object CIA2Connectors {
     override val isController = true
     val busid = CIA2_PORTA_BUSID
     
-    private[this] var bank = 0
+    private[this] var bank = 0x03
       
     bus.registerListener(this)
       
     import IECBus._
     final def read = {
       import bus._
-      (~((clk << 6) | (data << 7)) & 0xC0) | (latch & 0x38) | bank | rs232.getTXD << 2
+      (~((clk << 6) | (data << 7)) & 0xC0) | ((latch | ~ddr) & 0x38) | bank | rs232.getTXD << 2
     }
     final protected def performWrite(data:Int) = {
       val value = data | ~ddr // WHY ??
@@ -58,7 +58,7 @@ object CIA2Connectors {
         ParallelCable.onPC
         ParallelCable.read
       }
-      else if (rs232.isEnabled) rs232.getOthers else latch | ~ddr
+      else if (rs232.isEnabled) rs232.getOthers else (latch | ~ddr) & 0xFF
     }
     final protected def performWrite(data:Int) {
       if (ParallelCable.enabled) {
