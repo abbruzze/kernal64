@@ -137,7 +137,7 @@ class VDC extends RAMComponent {
   private[this] var geometryUpdateListener : String => Unit = _
   private[this] var useCacheForNextFrame,writeOnPrevFrame = false
   private[this] var updateGeometryOnNextFrame = false
-  private[this] var blankMode = false // TO BE IMPLEMENTED PROPERLY
+  private[this] var blankMode = false
   private[this] var rowCounter,rowCounterY = 0
   private[this] var verticalAdjFlag = 0
   // caches
@@ -979,6 +979,8 @@ class VDC extends RAMComponent {
 
   // state -----------------------------------------------
   protected def saveState(out:ObjectOutputStream) {
+    out.writeInt(address_reg)
+    out.writeBoolean(vblank)
     out.writeObject(ram)
     out.writeObject(regs)
     out.writeInt(videoMode.id)
@@ -986,6 +988,7 @@ class VDC extends RAMComponent {
     out.writeInt(currentScreenHeight)
     out.writeInt(screenWidth)
     out.writeInt(cycles_per_line)
+    out.writeInt(cycles_per_line_accu)
     out.writeInt(xchars_total)
     out.writeInt(ychars_total)
     out.writeInt(ychars_visible)
@@ -1014,6 +1017,8 @@ class VDC extends RAMComponent {
     out.writeObject(attrBuffer)
   }
   protected def loadState(in:ObjectInputStream) {
+    address_reg = in.readInt
+    vblank = in.readBoolean
     loadMemory[Int](ram,in)
     loadMemory[Int](regs,in)
     videoMode = VideoMode(in.readInt)
@@ -1021,6 +1026,7 @@ class VDC extends RAMComponent {
     currentScreenHeight = in.readInt
     screenWidth = in.readInt
     cycles_per_line = in.readInt
+    cycles_per_line_accu = in.readInt
     xchars_total = in.readInt
     ychars_total = in.readInt
     ychars_visible = in.readInt
