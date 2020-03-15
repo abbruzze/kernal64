@@ -6,7 +6,7 @@ import ucesoft.cbm.peripheral.cia.CIA
 object BridgeRS232 extends RS232 {
   val componentID = "RS-232 on UserPort"
   private[this] var rs232 : RS232 = _
-  private[this] var txd = 0
+  private[this] var txd = 1
   private[this] var others = 0XFF
   private[this] var cia1,cia2 : CIA = _
   private[this] var statusListener : RS232StatusListener = _
