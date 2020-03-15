@@ -206,7 +206,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   final def reset {
     Log.info("Resetting 128 main memory ...")
     _0 = 0
-    _1 = read128_1
+    _1 = 0//read128_1
     c128Mode = true
     c64MemConfig = -1
     ULTIMAX = false
@@ -762,7 +762,9 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     val capsLockSense =  if (keyboard.isCapsLockPressed) 0x0 else 0x1
     var one = _1 & 0x2F | capsLockSense << 6 | playSense | ((_0 & 0x7) ^ 0x7) // pull up resistors
     
-    if ((_0 & 0x20) == 0) one &= 0xDF
+    if ((_0 & 0x20) == 0) one &= 0xDF    // CASS MOTOR is output
+    if ((_0 & 0x40) == 0x40) one &= 0xBF // CAPS-LOCK is an input
+    if ((_0 & 0x10) == 0x10) one &= 0xEF // PLAY-SENSE is an input
     one
   }
   @inline private[this] def check64_1 {
