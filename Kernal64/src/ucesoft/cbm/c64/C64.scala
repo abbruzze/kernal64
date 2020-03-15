@@ -42,14 +42,9 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
   val componentType = CBMComponentType.INTERNAL
   
   private[this] val settings = new ucesoft.cbm.misc.Settings
-  private[this] val CONFIGURATION_FILENAME = "C64.config"
-  private[this] val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
-  private[this] val CONFIGURATION_FRAME_XY = "frame.xy"  
-  private[this] val CONFIGURATION_FRAME_DIM = "frame.dim"
-  private[this] val CONFIGURATION_KEYB_MAP_FILE = "keyb.map.file"
-  private[this] val CONFIGURATION_GMOD2_FILE = "gmod2.file"
-  private[this] val CONFIGURATION_AUTOSAVE = "autosave"
-  private[this] val configuration = {
+  protected val CONFIGURATION_FILENAME = "C64.config"
+
+  protected val configuration = {
     val props = new Properties
     val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
     if (propsFile.exists) {
@@ -68,7 +63,8 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
   private[this] var cpujamContinue = false // used with --cpujam-continue
   private[this] var zoomOverride = false // used with --screen-dim
   private[this] var sidCycleExact = false // used with --sid-cycle-exact
-  private[this] val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
+  private[this] var loadStateFromOptions = false // used with --load-state
+  protected val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   private[this] val mem = new C64MMU.MAIN_MEMORY
   private[this] val cpu = CPU6510.make(mem)  
   private[this] var vicChip : vic.VIC = _
@@ -409,7 +405,7 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
 	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)    
     // deactivate drive 9
     drives(1).setActive(false)    
-    driveLeds(1).setVisible(false)        
+    driveLeds(1).setVisible(false)
   }
   
   def errorHandler(t:Throwable) {
@@ -535,6 +531,9 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
       case Some(reuSize) =>
         ExpansionPort.setExpansionPort(REU.getREU(reuSize,mem,setDMA _,irqSwitcher.expPortIRQ _,None))
     }    
+  }
+  private def setGeoRAM(enabled:Boolean,size:Int = 0): Unit = {
+    if (enabled) ExpansionPort.setExpansionPort(new GeoRAM(size)) else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
   }
   private def setDisplayRendering(hints:java.lang.Object) {
     display.setRenderingHints(hints)
@@ -728,85 +727,6 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
           case _ =>
         }
       case JOptionPane.CANCEL_OPTION =>
-    }
-  }
-  
-  private def loadState {
-    clock.pause
-    var in : ObjectInputStream = null
-    try {
-      val canLoad = allowsState
-      if (!canLoad) {
-        
-        showError("State saving error","Can't load state")
-        return
-      }
-      val fc = new JFileChooser
-      fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-	    fc.setFileFilter(new FileFilter {
-	      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
-	      def getDescription = "Kernal64 state files"
-	    })
-      fc.setDialogTitle("Choose a state file to load")
-      val fn = fc.showOpenDialog(displayFrame) match {
-        case JFileChooser.APPROVE_OPTION =>
-          fc.getSelectedFile
-        case _ =>
-          return
-      }
-      in = new ObjectInputStream(new FileInputStream(fn))
-      reset(false)
-      load(in)
-    }
-    catch {
-      case t:Throwable =>
-        
-        showError("State loading error","Can't load state. Unexpected error occurred: " + t)
-        t.printStackTrace
-        reset(false)
-    }
-    finally {
-      if (in != null) in.close
-      clock.play
-    }
-  }
-  
-  private def saveState {
-    clock.pause
-    var out : ObjectOutputStream = null
-    try {
-      val canSave = allowsState
-      if (!canSave) {
-        
-        showError("State saving error","Can't save state")
-        return
-      }
-      val fc = new JFileChooser
-      fc.setDialogTitle("Choose where to save current state")
-      fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-	    fc.setFileFilter(new FileFilter {
-	      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
-	      def getDescription = "Kernal64 state files"
-	    })
-      val fn = fc.showSaveDialog(displayFrame) match {
-        case JFileChooser.APPROVE_OPTION =>
-          if (fc.getSelectedFile.getName.toUpperCase.endsWith(".K64")) fc.getSelectedFile.toString else fc.getSelectedFile.toString + ".k64" 
-        case _ =>
-          return
-      }
-      out = new ObjectOutputStream(new FileOutputStream(fn))
-      save(out)
-      out.close
-    }
-    catch {
-      case t:Throwable =>
-        
-        showError("State saving error","Can't save state. Unexpected error occurred: " + t)
-        t.printStackTrace
-    }
-    finally {
-      if (out != null) out.close
-      clock.play
     }
   }
   
@@ -1099,7 +1019,7 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
     }
   }
   
-  private def reset(play:Boolean=true) {
+  protected def reset(play:Boolean=true) {
     traceDialog.forceTracing(false)
     diskTraceDialog.forceTracing(false)
     if (Thread.currentThread != Clock.systemClock) clock.pause
@@ -1473,10 +1393,10 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
 
     //state
     val saveStateItem = new JMenuItem("Save state ...")
-    saveStateItem.addActionListener(_ => saveState )
+    saveStateItem.addActionListener(_ => saveState() )
     stateMenu.add(saveStateItem)
     val loadStateItem = new JMenuItem("Load state ...")
-    loadStateItem.addActionListener(_ => loadState )
+    loadStateItem.addActionListener(_ => loadState(None) )
     stateMenu.add(loadStateItem)
 
     // trace
@@ -1883,7 +1803,44 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
     group5.add(reu16MItem)
     reuItem.add(reu16MItem)
     IOItem.add(reuItem)
+
+    val geoItem = new JMenu("GeoRAM")
+    val groupgeo = new ButtonGroup
+    val noGeoItem = new JRadioButtonMenuItem("None")
+    noGeoItem.setSelected(true)
+    noGeoItem.addActionListener(_ => setGeoRAM(false) )
+    groupgeo.add(noGeoItem)
+    geoItem.add(noGeoItem)
+    val _256kGeoItem = new JRadioButtonMenuItem("256K")
+    _256kGeoItem.addActionListener(_ => setGeoRAM(true,256) )
+    groupgeo.add(_256kGeoItem)
+    geoItem.add(_256kGeoItem)
+    val _512kGeoItem = new JRadioButtonMenuItem("512K")
+    _512kGeoItem.addActionListener(_ => setGeoRAM(true,512) )
+    groupgeo.add(_512kGeoItem)
+    geoItem.add(_512kGeoItem)
+
+    IOItem.add(geoItem)
     // Setting ---------------------------
+    settings.add("geo-ram",
+      "Set the georam size (none,256,512)",
+      "GEO_RAM",
+      (geo:String) => {
+        if (geo == "512") {
+          _512kGeoItem.setSelected(true)
+          setGeoRAM(true,512)
+        }
+        else
+        if (geo == "256") {
+          _256kGeoItem.setSelected(true)
+          setGeoRAM(true,256)
+        }
+      },
+      if (_512kGeoItem.isSelected) "512"
+      else
+      if (_256kGeoItem.isSelected) "256"
+      else "none"
+    )
     settings.add("reu-type",
                  "Set the reu type (none,128,256,512,16384)",
                  "REU_TYPE",
@@ -2026,6 +1983,16 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
         cia2.setCIAModel(CIA.CIA_MODEL_8521)
       }
     )
+    settings.add("load-state",
+      "Load a previous saved state.",
+      (file:String) => if (file != "") {
+        try {
+          loadStateFromOptions = true
+          loadState(Some(file))
+        }
+        finally loadStateFromOptions = false
+      }
+    )
 
     // games
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])
@@ -2155,11 +2122,13 @@ class C64 extends CBMComponent with GamePlayer with CBMComputer {
     val ts = in.readLong
     drivesEnabled(0) = in.readBoolean
     drivesEnabled(1) = in.readBoolean
-    printerEnabled = in.readBoolean 
-    val msg = s"<html><b>Version:</b> $ver<br><b>Date:</b> ${new java.util.Date(ts)}</html>"
-    JOptionPane.showConfirmDialog(displayFrame,msg,"State loading confirmation",JOptionPane.YES_NO_OPTION,JOptionPane.QUESTION_MESSAGE) match {
-      case JOptionPane.YES_OPTION =>
-      case _ => throw new IOException("State loading aborted")
+    printerEnabled = in.readBoolean
+    if (!loadStateFromOptions) {
+      val msg = s"<html><b>Version:</b> $ver<br><b>Date:</b> ${new java.util.Date(ts)}</html>"
+      JOptionPane.showConfirmDialog(displayFrame, msg, "State loading confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) match {
+        case JOptionPane.YES_OPTION =>
+        case _ => throw new IOException("State loading aborted")
+      }
     }
   }
   protected def allowsStateRestoring : Boolean = true
