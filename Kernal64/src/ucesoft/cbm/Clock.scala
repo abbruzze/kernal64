@@ -224,6 +224,9 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   }
   protected def loadState(in:ObjectInputStream) {
     cycles = in.readLong
+    lastCorrectionTime = System.currentTimeMillis
+    lastCorrectionCycles = cycles
+    throttleStartedAt = cycles
     events = null
   }
   protected def allowsStateRestoring : Boolean = true
