@@ -8,7 +8,7 @@ import ucesoft.cbm.{Clock, ClockEvent, Log}
 object TelnetRS232 extends TelnetRS232
 
 class TelnetRS232 extends StreamRS232 {
-  val componentID = "Telnet RS-232"
+  val componentID = "Telnet (BBS) RS-232"
   
   private[this] var client = new TelnetClient
   private[this] var host = ""
