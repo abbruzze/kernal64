@@ -375,7 +375,7 @@ class CIA(val name:String,
   final def irqHandling(bit:Int) {
     // handle TimerB bug for old cias when reading ICR "near" underflow: the bit is not set
     if (!(ciaModel == CIA_MODEL_6526 && bit == IRQ_SRC_TB && ackCycle)) icr |= bit
-    if (bit == IRQ_SRC_ALARM) setIRQ(bit) else setIRQOnNextClock(bit)
+    if (bit == IRQ_SRC_ALARM || bit == IRQ_SERIAL) setIRQ(bit) else setIRQOnNextClock(bit)
   }
 
   @inline private def setIRQ(src:Int) = {
