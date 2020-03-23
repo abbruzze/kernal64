@@ -132,34 +132,6 @@ object C64MMU {
     protected def allowsStateRestoring : Boolean = true
   }
 
-  class IO(ram: Memory,colorRam:Memory) extends BridgeMemory {
-    val componentID = "IO RAM"
-    val componentType = CBMComponentType.MEMORY
-    
-    val isRom = false
-    val name = "I/O"
-    val startAddress = M_IO
-    val length = 4096
-    private[this] var active = false
-    
-    final def isActive = active
-    def setActive(active:Boolean) = this.active = active
-    
-    def reset {}
-    
-    def init {
-      Log.info("Initialaizing IO memory ...")
-      //addBridge(ram,COLOR_RAM,1024 + 24) // + 24 unused bytes
-      addBridge(colorRam)
-      //addBridge(ram,SID_RAM,1024)
-      addBridge(ExpansionPort.getExpansionPort)      
-    }
-    // state
-    protected def saveState(out:ObjectOutputStream) {}
-    protected def loadState(in:ObjectInputStream) {}
-    protected def allowsStateRestoring : Boolean = true
-  }
-  
   class MAIN_MEMORY extends RAMComponent with ExpansionPortConfigurationListener {
     val componentID = "Main RAM"
     val componentType = CBMComponentType.MEMORY
@@ -171,7 +143,6 @@ object C64MMU {
     val length = ram.length
     val CHAR_ROM = new CHARACTERS_ROM(ram)
     val COLOR_RAM = new COLOR_RAM
-    val IO = new IO(ram,COLOR_RAM)    
     val isActive = true
     
     private[this] val BASIC_ROM = new BASIC_ROM(ram)
@@ -179,12 +150,6 @@ object C64MMU {
     private[this] val ROML = new ExtendedROM(ram,"ROML",M_ROML)
     private[this] val ROMH = new ExtendedROM(ram,"ROMH",M_BASIC)
     private[this] val ROMH_ULTIMAX = new ExtendedROM(ram,"ROMH_ULTIMAX",M_KERNAL)
-    private[this] val banks = Array(KERNAL_ROM,IO,CHAR_ROM,BASIC_ROM,ROML,ROMH,ROMH_ULTIMAX)
-    // cache
-    private[this] val banksStart = banks map { _.startAddress }
-    private[this] val banksEnd = banks map { _.endAddress }
-    private[this] val minAddress = banksStart.min
-
     
     private[this] var ULTIMAX = false
     private[this] var ddr = 0
@@ -283,7 +248,6 @@ object C64MMU {
       ROMH.setActive(mc.romh)
       CHAR_ROM.setActive(mc.char)
       KERNAL_ROM.setActive(mc.kernal)
-      IO.setActive(mc.io)
       ROMH_ULTIMAX.setActive(mc.romhultimax)
     }
     
@@ -291,7 +255,6 @@ object C64MMU {
       Log.info("Initializing main memory ...")
       
       add(ram)
-      //add(IO)
       add(BASIC_ROM)
       add(KERNAL_ROM)      
       add(CHAR_ROM)
@@ -419,94 +382,8 @@ object C64MMU {
       // TestCart
       if (TestCart.enabled) TestCart.write(address,value)
     }
-    /*
-    @inline final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
-      if (isForwardRead) forwardReadTo.read(address)
-      if (ULTIMAX) {
-        if (chipID == ChipID.VIC) {
-          val bank = address & 0xF000
-          if (bank == 0x3000) return ROMH_ULTIMAX.read(0xF000 + address - 0x3000,chipID)
-          if (bank == 0x7000) return ROMH_ULTIMAX.read(0xF000 + address - 0x7000,chipID)
-          if (bank == 0xB000) return ROMH_ULTIMAX.read(0xF000 + address - 0xB000,chipID)
-          if (bank == 0xF000) return ROMH_ULTIMAX.read(0xF000 + address - 0xF000,chipID)
-        }
-      }
-      if (chipID == ChipID.VIC) ram.read(address, chipID)
-      else {        
-        var b = 0
-        var found = false
-        val length = banks.length
-        if (address >= minAddress)
-        while (b < length && !found) {
-          if (banks(b).isActive && address >= banksStart(b) && address < banksEnd(b)) found = true
-          else b += 1
-        }
-        if (found) {
-          val r = banks(b).read(address, chipID)
-          //Log.debug("Reading from bank %s %4X = %2X".format(bank.name,address,r)) 
-          r
-        }
-        else {
-          val r = if (address == 0) ddr 
-        		  else
-        		  if (address == 1) read0001
-        		  else ram.read(address, chipID)
-          //Log.debug("Reading from RAM %4X = %2X".format(address,r))
-          r
-        }
-      }
-    }
-
-    @inline final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
-      if (isForwardWrite) forwardWriteTo.write(address,value)      
-      
-      var b = 0
-      var found = false
-      val length = banks.length
-      if (address >= minAddress)
-      while (b < length && !found) {
-        if (banks(b).isActive && address >= banksStart(b) && address < banksEnd(b)) found = true
-        else b += 1
-      }
-      val bank = if (!found) ram else banks(b)
-      //Log.debug("Writing to %s %4X = %2X".format(bank.name,address,value))      
-      if (!found && address < 2) {
-        ram.write(address,lastByteReadMemory.lastByteRead)
-        if (address == 0) { // $00
-          val clk = Clock.systemClock.currentCycles
-          if ((ddr & 0x80) > 0 && (value & 0x80) == 0 && !capacitor7) {
-            lastCycle1Written7 = clk
-            capacitor7 = true
-          }
-          //else capacitor7 = false
-          if ((value & 0x80) > 0 && capacitor7) capacitor7 = false
-          if ((value & 0x40) > 0 && capacitor6) capacitor6 = false
-          if ((ddr & 0x40) > 0 && (value & 0x40) == 0 && !capacitor6) {
-            lastCycle1Written6 = clk
-            capacitor6 = true
-          }
-          //else capacitor6 = false
-          ddr = value
-        }
-        else { // $01
-          pr = value & 0x3F | (pr & 0xC0)
-          if ((ddr & 0x80) > 0) {
-            if ((value & 0x80) > 0) pr |= 0x80 else pr &= 0x7F
-          }
-          if ((ddr & 0x40) > 0) {
-            if ((value & 0x40) > 0) pr |= 0x40 else pr &= 0xBF
-          }
-        }
-        check0001
-      }
-      else bank.write(address,value,chipID)           
-      // TestCart
-      if (TestCart.enabled) TestCart.write(address,value)
-    }
-
-     */
     
-    override def toString = ram.toString + banks.map(_.toString).mkString("[",",","]")
+    override def toString = ram.toString
     // state
     protected def saveState(out:ObjectOutputStream) {
       out.writeBoolean(ULTIMAX)
