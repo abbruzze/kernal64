@@ -84,9 +84,7 @@ kernal64c64-testlist.txt: c64-testlist.in Makefile
         | grep -v ",isepic" \
         | grep -v ",dqbb" \
         | grep -v ",ramcart128k" \
-        | grep -v "GEO-RAM" \
         | grep -v "ultimax" \
-        | grep -v ",geo256k" \
     >> kernal64c64-testlist.txt
 
 kernal64c128c64-testlist.txt: c64-testlist.in Makefile
@@ -99,9 +97,7 @@ kernal64c128c64-testlist.txt: c64-testlist.in Makefile
         | grep -v ",isepic" \
         | grep -v ",dqbb" \
         | grep -v ",ramcart128k" \
-        | grep -v "GEO-RAM" \
         | grep -v "ultimax" \
-        | grep -v ",geo256k" \
     >> kernal64c128c64-testlist.txt
 
 kernal64c128c128-testlist.txt: c128-testlist.in Makefile
@@ -112,7 +108,6 @@ kernal64c128c128-testlist.txt: c128-testlist.in Makefile
 		| grep -v ",vicii-drean" \
 		| grep -v ",efnram" \
 		| grep -v ",ifnram" \
-		| grep -v ",geo256k" \
 		| grep -v ",plus60k" \
 		| grep -v ",plus256k" \
 		| grep -v ",isepic" \
