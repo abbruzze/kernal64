@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
 
-Kernal64 ver 1.5.3
+Kernal64 ver 1.6.0
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -18,6 +18,47 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.6.0 (Apr 3rd 2020)
+- General
+   - General code refactoring
+   - GeoRAM cart supported: added --geo-ram command line option
+   - PageFox cart supported
+   - New implementation of CIAs
+   - Added --cia-model command line option in order to choose new or old CIA
+   - VIA implementation fixed
+   - SID emulation: added --sid-cycle-exact command line option (see also in GUI's settings) in order to improve the SID emulation
+   - Debugger: added cycle step by step debugging
+   - CPU: fixed illegals ANE,SHS,SHY,SHX,SHA for RDY signal and ADC in decimal mode
+   - Mouse : now the mouse emulation takes into account the delta T in order to slow down the movement
+   - Drive emulation: 42 track D64 now supported
+   - Added --cpujam-continue command line option for testbench
+   - Added --screen-dim command line option for testbench
+   - Added --screenshot command line option for testbench
+- Testbench
+  - Added support for Vice's testbench (see testbench directory)
+- C128
+  - registers 34 & 35 now are implemented
+  - --vdc-enabled command line option changed in --vdc-disabled
+  - Fixed handling of diverted pages in case of 256K
+  - VDC
+     - removed slider to select video size. Now the video resize is automatic!
+     - Fixed char displaying when visible width < char width
+     - Added xscroll table that following instructions of 128 Programmers Reference Guide : now Soci test 9 is almost there
+     - Halved line cycles per row in case of interlace & text mode
+     - Fixed calculation of total screen height (missing a + 1 for regs(4))
+     - Fixed caching of chars & attr: added 1 position (for scrolling)
+     - Added bound check for bitmap array to avoid ArrayIndexOutOfBoundException when screen height is adjusting
+     - Introduced graphics & attributes buffers per row.
+     -  emulated the maximum number of chars displayable: 82 chars. For positions > 82 the chars starting from 42th position are corrupted
+     - Improved busy-flag emulation
+     - Fixed attribute offset on reg(9) = 0
+     - Little adjustment to busyFlagClearCycle delay in case of writing on reg(31)
+     - On copyfill operation now the delay depends on copy or fill operation
+     - Added handling of forced vsync if vsync is out of screen
+     - CurrentCharScanLine & rowCounterY are now limited to 31
+     - Fixed restoring of VDC state when interlace mode was selected   
+     - New vertical handling: now VDC101 is fully supported
 
 ### What's new in 1.5.3 (Nov 22th 2019)
 - Fixed bug that prevents G64 floppy to run properly on 1571 drive.
