@@ -4,7 +4,7 @@ import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.cpu.RAMComponent
 import ucesoft.cbm.trace.TraceListener
 import ucesoft.cbm.Clock
-import ucesoft.cbm.cpu.CPU6510
+import ucesoft.cbm.cpu.CPU65xx
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.peripheral.Connector
 import ucesoft.cbm.peripheral.cia.CIA
@@ -80,7 +80,7 @@ class D1581(val driveID: Int,
    * CPU
    * 
    ***********************************************************************************************************/
-  private[this] val cpu = CPU6510.make(this,ChipID.CPU_1581)
+  private[this] val cpu = CPU65xx.make(this,ChipID.CPU_1581)
   /************************************************************************************************************
    * CIA
    * 

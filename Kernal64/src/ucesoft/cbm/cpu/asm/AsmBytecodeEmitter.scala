@@ -2,7 +2,7 @@ package ucesoft.cbm.cpu.asm
 
 import java.io.PrintStream
 import AsmEvaluator._
-import ucesoft.cbm.cpu.CPU6510
+import ucesoft.cbm.cpu.CPU65xx
 
 case class AsmEncoding(org:Int,mem:Array[Byte])
 
@@ -62,7 +62,7 @@ class AsmBytecodeEmitter(console:PrintStream,blocks:List[ByteCodeBlock]) {
   
   private def emitByteCodeFor(startOffset:Int,bcs:ByteCodeStatement,mem:Array[Byte]) {
     import AsmParser._
-    import CPU6510._
+    import CPU65xx._
     import Mode._
     
     var pc = bcs.pc - startOffset

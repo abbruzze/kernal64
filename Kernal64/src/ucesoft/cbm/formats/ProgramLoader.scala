@@ -3,11 +3,11 @@ package ucesoft.cbm.formats
 import java.io.{File, FileInputStream, FileOutputStream}
 
 import ucesoft.cbm.Clock
-import ucesoft.cbm.cpu.{CPU6510, Memory}
+import ucesoft.cbm.cpu.{CPU65xx, Memory}
 ;
 
 object ProgramLoader {
-  var cpu : CPU6510 = _
+  var cpu : CPU65xx = _
   private[this] var loadingWithWarp = false
   var loadingWithWarpEnabled = true
   var warpModeListener : (Boolean) => Unit = _

@@ -8,7 +8,7 @@ import java.io.PrintWriter
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 
-class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
+class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
   override lazy val componentID = "6510_CE"
   private[this] var baLow = false
   private[this] var dma = false
@@ -1997,7 +1997,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
         case 1 => () => {
           state = O_JAM
           PC -= 1
-          throw new CPU6510.CPUJammedException(id, CURRENT_OP_PC)
+          throw new CPU65xx.CPUJammedException(id, CURRENT_OP_PC)
         }
         case RESET => () => {
           if (ready) {
@@ -2088,11 +2088,12 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
     Y = 0
     SR = 0
     SP = 0
+    import ucesoft.cbm.cpu
     Log.info(s"CPU reset! PC = ${hex4(PC)}")
   }
 
   def disassemble(mem: Memory, address: Int) = {
-    val dinfo = CPU6510.disassemble(mem, address)
+    val dinfo = CPU65xx.disassemble(mem, address)
     (dinfo.toString, dinfo.len)
   }
 
@@ -2164,7 +2165,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU6510 {
 
   def isFetchingInstruction: Boolean = state == 0
 
-  protected def formatDebug = s"[${id.toString}] ${CPU6510.disassemble(mem, if (tracingCycleMode) tracingCyclePC else PC).toString} ${if (tracingCycleMode) s"\t-- C$instructionCycle/${state.toHexString.toUpperCase}" else ""} ${if (state >= IRQ_STATE && state <= NMI_STATE_7) s"IRQ" else ""} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
+  protected def formatDebug = s"[${id.toString}] ${CPU65xx.disassemble(mem, if (tracingCycleMode) tracingCyclePC else PC).toString} ${if (tracingCycleMode) s"\t-- C$instructionCycle/${state.toHexString.toUpperCase}" else ""} ${if (state >= IRQ_STATE && state <= NMI_STATE_7) s"IRQ" else ""} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
 
   // state
   protected def saveState(out: ObjectOutputStream) {

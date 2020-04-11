@@ -162,6 +162,7 @@ object C64MMU {
     private[this] var lastByteReadMemory : LastByteReadMemory = _
     private[this] var memConfig = -1
     private[this] val MEM_CONFIG = MemConfig.MEM_CONFIG
+    private[this] val expansionPort = ExpansionPort.getExpansionPort
 
     private[this] var cia1,cia2 : CIA = _
     private[this] var sid : SID = _
@@ -226,7 +227,6 @@ object C64MMU {
       // check tape motor
       datassette.setMotor((ddr & 0x20) > 0 && (pr & 0x20) == 0)
       datassette.setWriteLine((ddr & 0x08) > 0 && (pr & 0x08) > 0)
-      val expansionPort = ExpansionPort.getExpansionPort
       val EXROM = expansionPort.EXROM
       val GAME = expansionPort.GAME
       expansionPortConfigurationChanged(GAME,EXROM)
@@ -243,12 +243,6 @@ object C64MMU {
       val mc = MEM_CONFIG(memConfig)
       ULTIMAX = mc.romhultimax
       ram.ULTIMAX = ULTIMAX
-      BASIC_ROM.setActive(mc.basic)
-      ROML.setActive(mc.roml)
-      ROMH.setActive(mc.romh)
-      CHAR_ROM.setActive(mc.char)
-      KERNAL_ROM.setActive(mc.kernal)
-      ROMH_ULTIMAX.setActive(mc.romhultimax)
     }
     
     def init {
@@ -282,7 +276,8 @@ object C64MMU {
       check0001
     }
 
-    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
+    final def read(_address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
+      val address = _address & 0xFFFF
       if (isForwardRead) forwardReadTo.read(address)
       if (ULTIMAX) {
         if (chipID == ChipID.VIC) {
@@ -315,7 +310,7 @@ object C64MMU {
           if (address < 0xDD00) return cia1.read(address)
           if (address < 0xDE00) return cia2.read(address)
 
-          return ExpansionPort.getExpansionPort.read(address)
+          return expansionPort.read(address)
         }
         if (c64MC.char) return CHAR_ROM.read(address)
         return ram.read(address)
@@ -325,7 +320,8 @@ object C64MMU {
       if (c64MC.romhultimax) return ROMH_ULTIMAX.read(address)
       ram.read(address)
     }
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
+    final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit  = {
+      val address = _address & 0xFFFF
       if (isForwardWrite) forwardWriteTo.write(address,value)
       val c64MC = MEM_CONFIG(memConfig)
 
@@ -373,7 +369,7 @@ object C64MMU {
           else if (address < 0xDC00) COLOR_RAM.write(address,value)
           else if (address < 0xDD00) cia1.write(address,value)
           else if (address < 0xDE00) cia2.write(address,value)
-          else ExpansionPort.getExpansionPort.write(address,value)
+          else expansionPort.write(address,value)
         }
         else ram.write(address,value)
       }

@@ -7,7 +7,7 @@ import java.util.{Properties, ServiceLoader}
 
 import javax.swing._
 import javax.swing.filechooser.FileFilter
-import ucesoft.cbm.cpu.{CPU6510, Memory, ROM}
+import ucesoft.cbm.cpu.{CPU65xx, Memory, ROM}
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.formats._
 import ucesoft.cbm.game.{GamePlayer, GameUI}
@@ -87,7 +87,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected var loadStateFromOptions = false // used with --load-state
   // memory & main cpu
   protected val mmu : Memory
-  protected lazy val cpu = CPU6510.make(mmu)
+  protected lazy val cpu = CPU65xx.make(mmu)
   // main chips
   protected val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   protected var vicChip : vic.VIC = _
@@ -247,7 +247,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def setSettingsMenu(optionsMenu:JMenu) : Unit
 
   protected def errorHandler(t:Throwable) {
-    import CPU6510.CPUJammedException
+    import CPU65xx.CPUJammedException
     t match {
       case j:CPUJammedException if !cpujamContinue =>
         JOptionPane.showConfirmDialog(displayFrame,
@@ -265,11 +265,11 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       case _:CPUJammedException => // continue
       case _ =>
         Log.info("Fatal error occurred: " + cpu + "-" + t)
-        Log.info(CPU6510.disassemble(mmu,cpu.getCurrentInstructionPC).toString)
+        try Log.info(CPU65xx.disassemble(mmu,cpu.getCurrentInstructionPC).toString) catch { case _:Throwable => }
         t.printStackTrace(Log.getOut)
         t.printStackTrace
         if (headless) {
-          println(s"Fatal error occurred on cycle ${clock.currentCycles}: $cpu\n${CPU6510.disassemble(mmu,cpu.getCurrentInstructionPC)}")
+          println(s"Fatal error occurred on cycle ${clock.currentCycles}: $cpu\n${CPU65xx.disassemble(mmu,cpu.getCurrentInstructionPC)}")
           t.printStackTrace
           sys.exit(1)
         } // exit if headless

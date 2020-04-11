@@ -2,7 +2,7 @@ package ucesoft.cbm.cpu.asm
 
 import java.io.PrintStream
 import AsmParser._
-import ucesoft.cbm.cpu.CPU6510._
+import ucesoft.cbm.cpu.CPU65xx._
 import Mode._
 import AsmEvaluator._
 import scala.util.parsing.input.Position

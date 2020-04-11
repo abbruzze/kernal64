@@ -2,7 +2,7 @@ package ucesoft.cbm.peripheral.drive
 
 import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.Log
-import ucesoft.cbm.cpu.CPU6510
+import ucesoft.cbm.cpu.CPU65xx
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.Clock
 import ucesoft.cbm.trace.TraceListener
@@ -33,7 +33,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] var currentSpeedHz = MIN_SPEED_HZ
   private[this] var cycleFrac = 0.0
   private[this] val mem = new C1541Mems.C1541_RAM
-  private[this] val cpu = CPU6510.make(mem,ChipID.CPU_1541)
+  private[this] val cpu = CPU65xx.make(mem,ChipID.CPU_1541)
   private[this] val clk = Clock.systemClock
   private[this] var running = true
   private[this] var awakeCycles = 0L

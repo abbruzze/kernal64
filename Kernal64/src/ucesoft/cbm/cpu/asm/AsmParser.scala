@@ -4,7 +4,7 @@ import util.parsing.combinator._
 import scala.util.parsing.input.Positional
 
 object AsmParser {
-  import ucesoft.cbm.cpu.CPU6510._
+  import ucesoft.cbm.cpu.CPU65xx._
   import Mode._
   
   private val OPCODES = (Instruction.values.map { _.toString.toLowerCase }) ++ (Instruction.values map { _.toString.toUpperCase })
@@ -63,7 +63,7 @@ object AsmParser {
 
 class AsmParser(fileName:String) extends JavaTokenParsers {
   import AsmParser._
-  import ucesoft.cbm.cpu.CPU6510._
+  import ucesoft.cbm.cpu.CPU65xx._
   import Mode._
   import Instruction._
   

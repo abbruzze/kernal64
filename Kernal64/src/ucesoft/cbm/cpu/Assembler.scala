@@ -22,7 +22,7 @@ import scala.language.postfixOps
 class AssemblerException(msg: String) extends Exception(msg)
 
 class Assembler {
-  import CPU6510._
+  import CPU65xx._
   import Mode._
   import Instruction._
 

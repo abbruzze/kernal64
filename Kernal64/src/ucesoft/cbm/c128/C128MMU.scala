@@ -1,6 +1,6 @@
 package ucesoft.cbm.c128
 
-import ucesoft.cbm.cpu.{CPU6510, Memory, RAMComponent, ROM, Z80}
+import ucesoft.cbm.cpu.{CPU65xx, Memory, RAMComponent, ROM, Z80}
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.ChipID
 import java.io.ObjectOutputStream
@@ -109,9 +109,9 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   private[this] var internalFunctionROM,internalFunctionROM_mid,internalFunctionROM_high,externalFunctionROM_mid,externalFunctionROM_high : Array[Int] = _
   private[this] var internalROMType : FunctionROMType.Value = FunctionROMType.NORMAL
   // ==========================================================================================
-  private[this] var cpu : CPU6510 = _
+  private[this] var cpu : CPU65xx = _
 
-  def setCPU(cpu:CPU6510) : Unit = this.cpu = cpu
+  def setCPU(cpu:CPU65xx) : Unit = this.cpu = cpu
 
   def getBank0RAM : Memory = ram.getBank0
   def colorRAM = COLOR_RAM
@@ -226,12 +226,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     memLastByteRead = 0
     ioacc = false
     check128_1
-    BASIC64_ROM.setActive(false)
-    ROML.setActive(false)
-    ROMH.setActive(false)
-    CHARACTERS64_ROM.setActive(false)
-    KERNAL64_ROM.setActive(false)
-    ROMH_ULTIMAX.setActive(false)
+
   }
   
   final def setIO(cia_dc00:CIA,cia_dd00:CIA,vic:VIC,sid:SID,vdc:VDC) {
@@ -251,16 +246,10 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
    */
   final def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
     val newMemConfig = (~_0 | _1) & 0x7 | (if (game) 1 << 3 else 0) | (if (exrom) 1 << 4 else 0)
-    if (c64MemConfig == newMemConfig) return    
+    if (c64MemConfig == newMemConfig) return
     c64MemConfig = newMemConfig
     c64MC = C64_MEM_CONFIG(c64MemConfig)
     ULTIMAX = c64MC.romhultimax
-    BASIC64_ROM.setActive(c64MC.basic)
-    ROML.setActive(c64MC.roml)
-    ROMH.setActive(c64MC.romh)
-    CHARACTERS64_ROM.setActive(c64MC.char)
-    KERNAL64_ROM.setActive(c64MC.kernal)
-    ROMH_ULTIMAX.setActive(c64MC.romhultimax)
   }
 
   final override def byteOnBUS: Int = lastByteOnBUS
@@ -699,7 +688,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
         if (address < 0xDD00) return cia_dc00.read(address)
         if (address < 0xDE00) return cia_dd00.read(address)
         
-        return ExpansionPort.getExpansionPort.read(address) 
+        return expansionPort.read(address)
       }
       if (c64MC.char) return CHARACTERS64_ROM.read(address)
       return ram.read(address)

@@ -6,9 +6,9 @@ import ucesoft.cbm.trace.TraceListener
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.ChipID
 
-object CPU6510 {
+object CPU65xx {
   class CPUJammedException(val cpuID:ChipID.ID,val pcError:Int) extends Exception
-  
+
   object Instruction extends Enumeration {
     type CODE = Value
     val ORA, AND, EOR, ADC, STA, LDA, CMP, SBC = Value
@@ -36,7 +36,7 @@ object CPU6510 {
     val UNKNOWN_ABX_OR_ZPX = Value // just for assembler
     val UNKNOWN_ABY_OR_ZPY = Value // just for assembler
   }
-  
+
   private[cpu] type OperationCell = (Instruction.CODE, Mode.MODE, Int)
   import Instruction._
   import Mode._
@@ -78,21 +78,21 @@ object CPU6510 {
       case None => None
     }
   }
-  
+
   def hasMode(op:String,m:Mode.MODE) : Boolean = {
     OP_Map get op.toUpperCase match {
       case None => false
       case Some(l) => l map { _._2 } exists { _ == m }
     }
   }
-  
+
   @inline private[cpu] def opcode(mem:Memory,address: Int) = {
     val opcode = mem.read(address) & 0xff
     val col = opcode & 0x0f
     val row = (opcode & 0xf0) >> 4
     OP_MATRIX(row)(col)
   }
-  
+
   case class DisassembledInfo(address: Int, op: String, ind: String, bytes: Array[Int]) {
     val LENGHT = 30
     val len = bytes.length
@@ -103,8 +103,8 @@ object CPU6510 {
       val spaces = if (fmt.length < LENGHT) " " * (LENGHT - fmt.length) else ""
       fmt + spaces
     }
-  }  
-  
+  }
+
   def disassemble(mem:Memory,address: Int) = {
     val op = opcode(mem,address)
     val (ind, len) = op._2 match {
@@ -124,11 +124,11 @@ object CPU6510 {
     val bytes = for (a <- address to address + len) yield mem.read(a)
     DisassembledInfo(address, op._1.toString, ind, bytes.toArray)
   }
-  
-  def make(mem:Memory,id:ChipID.ID = ChipID.CPU) : CPU6510 = new CPU6510_CE(mem,id)
+
+  def make(mem:Memory,id:ChipID.ID = ChipID.CPU) : CPU65xx = new CPU6510_CE(mem,id)
 }
 
-trait CPU6510 extends Chip with TraceListener {
+trait CPU65xx extends Chip with TraceListener {
   override lazy val componentID = "6510"
   override val componentType = CBMComponentType.CPU
   

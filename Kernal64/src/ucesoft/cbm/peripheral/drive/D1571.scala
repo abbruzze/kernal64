@@ -4,7 +4,7 @@ import ucesoft.cbm.cpu.RAMComponent
 import ucesoft.cbm.trace.TraceListener
 import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.Log
-import ucesoft.cbm.cpu.CPU6510
+import ucesoft.cbm.cpu.CPU65xx
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
@@ -65,7 +65,7 @@ class D1571(val driveID: Int,
    * CPU
    * 
    ***********************************************************************************************************/
-  private[this] val cpu = CPU6510.make(this,ChipID.CPU_1571)  
+  private[this] val cpu = CPU65xx.make(this,ChipID.CPU_1571)
   /**
    * IRQ Manager for VIA1,VIA2 and CIA
    */
