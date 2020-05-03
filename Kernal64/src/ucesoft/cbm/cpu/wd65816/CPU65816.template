@@ -1,0 +1,271 @@
+package ucesoft.cbm.cpu.wd65816
+
+import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.ChipID
+import ucesoft.cbm.Log
+import ucesoft.cbm.Clock
+import ucesoft.cbm.cpu.CPU65xx
+import ucesoft.cbm.trace.BreakType
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import java.io.PrintWriter
+
+class CPU65816(mem:Memory) extends CPU65xx {
+  val id = ChipID.CPU
+  override lazy val componentID = "6510_CE"
+  private[this] var baLow = false
+  private[this] var dma = false
+  private[this] var ready = true
+  // ------------- Tracing --------------------
+  private[this] var tracing, tracingOnFile = false
+  private[this] var tracingFile: PrintWriter = _
+  private[this] var breakType: BreakType = null
+  private[this] var breakCallBack: (String) => Unit = _
+  private[this] var stepCallBack: (String) => Unit = _
+  private[this] val syncObject = new Object
+  private[this] var nmiOnNegativeEdge = false
+  private[this] var irqLow = false
+  private[this] var nmiLow = false
+  private[this] var irqFirstCycle, nmiFirstCycle = 0L
+  private[this] val clk = Clock.systemClock
+  // ----------------- registers -------------------------------------------
+  private[this] val A : Word16 = new Word16  /* Accumulator               */
+  private[this] val D : Word16 = new Word16  /* Direct Page Register      */
+  /**
+     * Native mode
+     *                             +---+
+     *                             | e |
+     * +---+---+---+---+---+---+---+---+
+     * | n | v | m | x | d | i | z | c |
+     * +---+---+---+---+---+---+---+---+
+     *   7   6   5   4   3   2   1   0
+     *
+     * Emulation mode
+     * +---+---+---+---+---+---+---+---+
+     * | n | v | 1 | b | d | i | z | c |
+     * +---+---+---+---+---+---+---+---+
+     *   7   6   5   4   3   2   1   0
+     */
+  private[this] var P : Int = 0              /* Processor Status Register */
+  private[this] var E : Boolean = false      /* Emulation Mode Flag       */
+  private[this] val S : Word16 = new Word16  /* Stack Pointer             */
+  private[this] val X : Word16 = new Word16  /* X Index Register          */
+  private[this] val Y : Word16 = new Word16  /* Y Index Register          */
+  private[this] var DB : Int = 0             /* Data Bank Register        */
+  private[this] val PC = new ProgramCounter  /* Program Counter */
+
+  private[this] var cpu_abort : Boolean = false
+  private[this] var cpu_stop : Boolean = false
+  private[this] var cpu_wait : Boolean = false
+  private[this] var cpu_cycle_count,remaining_cpu_cycle_count = 0L
+
+  private[this] var opcode_table_ptr : Array[() => Unit] = _
+
+  private[this] val atmp,opaddr = new Address
+  private[this] val wtmp,otmp,operand = new Word16
+  private[this] var a1,a2,a3,a4,o1,o2,o3,o4 = 0
+
+  final private[this] val RESET_INDEX = 0x100
+  final private[this] val ABORT_INDEX = 0x101
+  final private[this] val NMI_INDEX = 0x102
+  final private[this] val IRQ_INDEX = 0x103
+
+  private[this] var nativeModeListener : Boolean => Unit = _
+  private[this] var interruptVectorMapper : Int => Int = _
+
+  def setNativeModeListener(l:Boolean => Unit) : Unit = nativeModeListener = l
+  def setInterruptVectorMapper(m:Int => Int) : Unit = interruptVectorMapper = m
+
+  final override def setBaLow(baLow: Boolean) : Unit = {
+      this.baLow = baLow
+      ready = !this.baLow && !dma
+    }
+
+    final override def setDMA(dma: Boolean) : Unit = {
+      this.dma = dma
+      ready = !this.baLow && !dma
+    }
+
+    final def getPC : Int = PC.A
+
+    final def getCurrentInstructionPC : Int = PC.A
+
+    final def getMem(address: Int) : Int = mem.read(address)
+
+    final def irqRequest(low: Boolean) : Unit = {
+      if (tracing) Log.debug(s"IRQ request low=${low}")
+      if (tracingOnFile && low) tracingFile.println("IRQ low")
+      if (low && !irqLow /* && irqFirstCycle == 0*/ ) {
+        irqFirstCycle = clk.currentCycles
+        Log.debug(s"IRQ request low irqFirstCycle=$irqFirstCycle")
+      }
+      irqLow = low
+    }
+
+    final def nmiRequest(low: Boolean) : Unit = {
+      if (!nmiLow && low) {
+        nmiOnNegativeEdge = true
+        nmiFirstCycle = clk.currentCycles
+        if (tracing) Log.debug(s"NMI request on negative edge nmiFirstCycle=$nmiFirstCycle")
+        if (tracingOnFile && low) tracingFile.println("NMI low")
+      }
+      //else nmiFirstCycle = 0
+      nmiLow = low
+    }
+
+  def init {
+    reset
+  }
+
+  def reset {
+    // TODO
+    remaining_cpu_cycle_count = 0
+    cpu_cycle_count = 0
+    irqLow = false
+    nmiLow = false
+    nmiOnNegativeEdge = false
+    dma = false
+    ready = true
+    baLow = false
+
+    opcodes_table_emu(RESET_INDEX)()
+    import ucesoft.cbm.cpu._
+    Log.info(s"CPU 65816 reset! PC = ${hex4(PC.A)}")
+  }
+
+  def setOverflowFlag : Unit = {}
+
+  def isFetchingInstruction: Boolean = true // TODO
+
+  protected def saveState(out: ObjectOutputStream) : Unit = {
+  }
+
+  protected def loadState(in: ObjectInputStream) : Unit = {
+  }
+
+  protected def allowsStateRestoring : Boolean = true
+
+    // ================== Tracing ==================================
+  def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {}
+  def setTrace(traceOn:Boolean) : Unit = tracing = traceOn
+  def step(updateRegisters: (String) => Unit) : Unit = {
+    stepCallBack = updateRegisters
+        syncObject.synchronized {
+          syncObject.notify
+    }
+  }
+  def setBreakAt(breakType:BreakType,callback:(String) => Unit) : Unit = {
+    tracing = false
+    breakCallBack = callback
+    this.breakType = breakType
+  }
+  def jmpTo(pc:Int) : Unit = {}
+  def setCycleMode(cycleMode:Boolean) : Unit = {}
+  def disassemble(mem:Memory,address:Int) : (String,Int) = {
+    val dinfo = CPU65816Disassembler.disassemble(mem, address,P)
+    (dinfo.toString, dinfo.bytes)
+  }
+
+  // ------------------------------------------------------------------------------
+    #define M_READ(a)         mem.read(a)
+    #define M_READ_OPCODE(a)  mem.read(a)
+    #define M_READ_VECTOR(a)  if (interruptVectorMapper != null) mem.read(interruptVectorMapper(a)) else mem.read(a)
+    #define M_WRITE(a,v)      mem.write((a),(v))
+
+    #include "cycles.h"
+    #include "cpumicro.h"
+  // ------------------------------------------------------------------------------
+
+  protected def formatDebug = s"[${id.toString}] ${CPU65816Disassembler.disassemble(mem,PC.A,P).toString}"
+
+  override def toString = CPU65816Disassembler.formatRegisters(A,X,Y,D,S,DB,PC,P,E)
+
+  // ================ Fetching ===================================
+    final def fetchAndExecute(cycles: Int) : Unit = {
+      var c = cycles
+      while (c > 0 && !dma) {
+        fetchAndExecute
+        c -= 1
+      }
+    }
+
+    @inline private def fetchAndExecute : Unit = {
+      if (breakType != null && breakType.isBreak(PC.A, false, false)) {
+        breakType = null
+        tracing = true
+        breakCallBack(toString)
+      }
+      if (baLow || dma || cpu_stop) return
+
+      if (remaining_cpu_cycle_count > 0) remaining_cpu_cycle_count -= 1
+        else {
+            cpu_cycle_count = 0
+            // check NMI first
+            if (nmiOnNegativeEdge) {
+                if (breakType != null && breakType.isBreak(PC.A, false, true)) {
+                    breakType = null
+                    tracing = true
+                    breakCallBack(toString)
+                    Log.debug("NMI Break")
+                }
+                nmiOnNegativeEdge = false
+                opcode_table_ptr(NMI_INDEX)()
+            }
+            else if (irqLow && !((P & 0x04) == 0x04)) {
+                if (breakType != null && breakType.isBreak(PC.A, true, false)) {
+                    breakType = null
+                    tracing = true
+                    breakCallBack(toString)
+                    Log.debug("IRQ Break")
+                }
+                opcode_table_ptr(IRQ_INDEX)()
+            }
+            else if (irqLow && cpu_wait) cpu_wait = false
+            else if (!cpu_wait) {
+                if (tracing) {
+                    Log.debug(formatDebug)
+                    stepCallBack(toString)
+                    syncObject.synchronized {
+                        syncObject.wait
+                    }
+                }
+                // fetching
+                val opcode = M_READ(PC.A)
+                PC.W.PC_++
+                opcode_table_ptr(opcode)()
+            }
+            else cpu_cycle_count = 1
+
+            remaining_cpu_cycle_count = cpu_cycle_count - 1
+        }
+    }
+
+
+  private def CPU_modeSwitch() : Unit = {
+    if (E) {
+        opcode_table_ptr = opcodes_table_emu
+        if (nativeModeListener != null) nativeModeListener(false)
+    }
+    else {
+        if (F_getX) {
+            X.B.H = 0
+            Y.B.H = 0
+        }
+        val mx = (P >> 4) & 0x03
+        opcode_table_ptr = opcodes_table_native(mx)
+        if (nativeModeListener != null) nativeModeListener(true)
+    }
+  }
+
+  private def E_WDM(value : Int) : Unit = {
+    // NOP
+  }
+
+  // ------------------------------------------------------------------------------
+  #include "opcodes_table.h"
+  #include "opcodes1.h"
+  #include "opcodes2.h"
+  #include "opcodes3.h"
+  #include "opcodes4.h"
+  #include "opcodes5.h"
+}

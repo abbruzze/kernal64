@@ -81,7 +81,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
 
   def getClockHz = C64_CLOCK_HZ
 
-  def setClockHz(hz:Double) {
+  def setClockHz(hz:Double) : Unit = {
     C64_CLOCK_HZ = hz
     C64_CLOCK_HZ_DIV_1000 = hz / 1000
     C64_CLOCK_HZ_INV_BY_1000 = 1000 / hz
@@ -93,7 +93,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   def nextCycles = cycles + 1
 
   def maximumSpeed = _maximumSpeed
-  def maximumSpeed_=(maximumSpeed:Boolean) {
+  def maximumSpeed_=(maximumSpeed:Boolean) : Unit = {
     _maximumSpeed = maximumSpeed
     if (!maximumSpeed) skipThrottle = true
   }
@@ -170,7 +170,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
 
   def getLastPerformancePerc = lastPerformance
 
-  final def cancel(id:String) {
+  final def cancel(id:String) : Unit = {
     if (events != null) {
       var ptr = events
       while (ptr != null) {
@@ -180,7 +180,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     }
   }
 
-  final def schedule(e:ClockEvent) {
+  final def schedule(e:ClockEvent) : Unit = {
     //require(e.when > cycles,"Can't schedule an event in the past " + e.when + "(" + cycles + ")")
     if (events == null) {
       events = new EventList(e)
@@ -219,10 +219,10 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   def printEvents { println(if (events != null) events else "No events") }
 
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeLong(cycles)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     cycles = in.readLong
     lastCorrectionTime = System.currentTimeMillis
     lastCorrectionCycles = cycles

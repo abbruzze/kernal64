@@ -21,6 +21,14 @@
 	<target name="scala-compile">
 		<tstamp/>
 		<echo file="${sources.dir}/ucesoft/cbm/Version.scala" message='package ucesoft.cbm ; object Version { val VERSION = "${version}" ; val BUILD_DATE="${TODAY}"}'/>
+		<echo message="Generating 65816 CPU class ..."/>
+		<java classname="CPP" fork="true" failonerror="true">
+			<classpath>
+				<pathelement location="${lib.dir}/anarres-cpp.jar"/>
+			</classpath>
+			<arg value="${sources.dir}/ucesoft/cbm/cpu/wd65816/CPU65816.template"/>
+			<arg value="${sources.dir}/ucesoft/cbm/cpu/wd65816/CPU65816.scala"/>
+		</java>
 		<!-- source scala files -->
 		<path id="scala.path">
 			<fileset dir="${sources.dir}">
@@ -32,6 +40,7 @@
 		<path id="kernal.lib">
 			<fileset dir="${lib.dir}">
 				<include name="**/*.jar"/>
+				<exclude name="anarres-cpp.jar"/>
 			</fileset>
 			<pathelement location="${build.dir}" />
 		</path>
@@ -95,7 +104,7 @@
 	
 	<target name="pack" depends="deploy">
 		<copy todir="${dist.dir}/pack/kernal64/lib">
-			<fileset dir="${basedir}/lib/" includes="*jinput* *.jar" excludes="scala-compiler.jar"/>
+			<fileset dir="${basedir}/lib/" includes="*jinput* *.jar" excludes="scala-compiler.jar anarres-cpp.jar"/>
 			<fileset dir="${dist.dir}" includes="*.jar"/>
 		</copy>
 		<copy todir="${dist.dir}/pack/kernal64">
@@ -109,5 +118,6 @@
 	<target name="clean">
 		<delete dir="${build.dir}"/>
 		<delete dir="${dist.dir}"/>
+		<delete file="${sources.dir}/ucesoft/cbm/cpu/wd65816/CPU65816.scala"/>
 	</target>				
 </project>

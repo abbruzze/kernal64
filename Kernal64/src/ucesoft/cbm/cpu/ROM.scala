@@ -13,7 +13,8 @@ class ROM(ram: Memory,
           val startAddress: Int,
           val length: Int,
           val resourceName: String,
-          initialOffset:Int = 0) extends RAMComponent {
+          initialOffset:Int = 0,
+          validLengths:List[Int] = Nil) extends RAMComponent {
   val componentID = "ROM " + name
   val componentType = CBMComponentType.MEMORY
 
@@ -28,11 +29,29 @@ class ROM(ram: Memory,
     mem = Array.fill(length)(0)
     Log.info(s"Initialaizing ${name} memory ...")
     val in = new DataInputStream(ROM.getROMInputStream(resourceName))
-    in.skip(initialOffset)
-    val buffer = Array.ofDim[Byte](length)
-    in.readFully(buffer)
-    in.close
-    for (i <- 0 until length) mem(i) = buffer(i) & 0xff
+    if (length > 0) {
+      in.skip(initialOffset)
+      val buffer = Array.ofDim[Byte](length)
+      in.readFully(buffer)
+      in.close
+      for (i <- 0 until length) mem(i) = buffer(i) & 0xff
+    }
+    else {
+      // Loading variable length ROM ...
+      val buffer = new ByteArrayOutputStream()
+      val bin = new BufferedInputStream(in)
+      var read = bin.read
+      while (read != -1) {
+        buffer.write(read)
+        read = bin.read
+      }
+      bin.close
+      if (!validLengths.contains(buffer.size)) throw new IllegalArgumentException(s"Bad ROM size: ${buffer.size}. Valid sizes: ${validLengths.mkString(",")}")
+      val bufferArray = buffer.toByteArray
+      mem = Array.fill(buffer.size)(0)
+      for (i <- 0 until buffer.size) mem(i) = bufferArray(i) & 0xff
+      Log.info(s"Loaded ${name} as a variable ROM: size is ${bufferArray.length}")
+    }
   }
 
   def reset {}
@@ -56,6 +75,7 @@ object ROM {
   val C64_KERNAL_ROM_PROP = "kernal64.rom.file"
   val C64_BASIC_ROM_PROP = "basic64.rom.file"
   val C64_CHAR_ROM_PROP = "char64.rom.file"
+  val SCPU64_ROM_PROP = "kernal64.rom.file" // TODO must be changed in scpu64.rom.file
 
   val C128_KERNAL_ROM_PROP = "kernal128.rom.file"
   val C128_BASIC_ROM_PROP = "basic128.rom.file"
@@ -70,6 +90,7 @@ object ROM {
   private val ROM_DEFAULT_MAP : Map[String,String] = Map(C64_KERNAL_ROM_PROP -> "roms/kernal.rom",
                                                          C64_BASIC_ROM_PROP -> "roms/basic.rom",
                                                          C64_CHAR_ROM_PROP -> "roms/chargen.rom",
+                                                         //SCPU64_ROM_PROP -> "roms/scpu/scpu.rom",
                                                          C128_KERNAL_ROM_PROP -> "roms/128/kernal.rom",
                                                          C128_BASIC_ROM_PROP -> "roms/128/basic.rom",
                                                          C128_CHAR_ROM_PROP -> "roms/128/characters.rom",

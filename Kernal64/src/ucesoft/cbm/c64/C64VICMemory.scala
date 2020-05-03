@@ -8,8 +8,6 @@ import ucesoft.cbm.cpu.{CPU65xx, Memory}
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 
-import javax.swing.JFrame
-
 class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
   val componentID = "VIC Banked Memory"
   val componentType = CBMComponentType.MEMORY

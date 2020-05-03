@@ -183,25 +183,25 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     val componentID = "Light pen"
     val componentType = CBMComponentType.INPUT_DEVICE
 
-    override def mousePressed(e:MouseEvent) {
+    override def mousePressed(e:MouseEvent) : Unit = {
       lightPenButtonEmulation match {
         case LIGHT_PEN_NO_BUTTON =>
         case LIGHT_PEN_BUTTON_UP => controlPortB.emulateUp
         case LIGHT_PEN_BUTTON_LEFT => controlPortB.emulateLeft
       }
     }
-    override def mouseReleased(e:MouseEvent) {
+    override def mouseReleased(e:MouseEvent) : Unit = {
       lightPenButtonEmulation match {
         case LIGHT_PEN_NO_BUTTON =>
         case _ => controlPortB.releaseEmulated
       }
     }
 
-    def init {}
-    def reset {}
+    def init  : Unit = {}
+    def reset  : Unit = {}
     // state
-    protected def saveState(out:ObjectOutputStream) {}
-    protected def loadState(in:ObjectInputStream) {}
+    protected def saveState(out:ObjectOutputStream) : Unit = {}
+    protected def loadState(in:ObjectInputStream) : Unit = {}
     protected def allowsStateRestoring : Boolean = true
   }
   // ------------------------------------ Drag and Drop ----------------------------
@@ -217,6 +217,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   def turnOn(args:Array[String]) : Unit
   def turnOff : Unit
 
+  protected val tapeAllowed = true
+
   protected def getRAM : Memory
   protected def getCharROM : Memory
 
@@ -224,7 +226,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def mainLoop(cycles:Long) : Unit
 
-  protected def reset(play:Boolean=true) {
+  protected def reset(play:Boolean=true) : Unit = {
     traceDialog.forceTracing(false)
     diskTraceDialog.forceTracing(false)
     if (Thread.currentThread != Clock.systemClock) clock.pause
@@ -246,7 +248,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def setSettingsMenu(optionsMenu:JMenu) : Unit
 
-  protected def errorHandler(t:Throwable) {
+  protected def errorHandler(t:Throwable) : Unit = {
     import CPU65xx.CPUJammedException
     t match {
       case j:CPUJammedException if !cpujamContinue =>
@@ -368,7 +370,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   // ------------------------------- TRACE LISTENER ------------------------------------------
-  def setTraceListener(tl:Option[TraceListener]) {
+  def setTraceListener(tl:Option[TraceListener]) : Unit = {
     tl match {
       case None =>
         traceDialog.traceListener = cpu
@@ -377,7 +379,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
   // ------------------------------------------------------------------------------------------
-  protected def handleDND(file:File,_reset:Boolean,autorun:Boolean) {
+  protected def handleDND(file:File,_reset:Boolean,autorun:Boolean) : Unit = {
     val name = file.getName.toUpperCase
     if (name.endsWith(".CRT")) loadCartridgeFile(file)
     else {
@@ -394,14 +396,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   def attachDevice(file:File) : Unit = attachDevice(file,false)
 
-  protected def attachDevice(file:File,autorun:Boolean,fileToLoad:Option[String] = None,emulateInserting:Boolean = true) {
+  protected def attachDevice(file:File,autorun:Boolean,fileToLoad:Option[String] = None,emulateInserting:Boolean = true) : Unit = {
     val name = file.getName.toUpperCase
 
     if (name.endsWith(".PRG")) loadPRGFile(file,autorun)
     else
     if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun,fileToLoad,emulateInserting)
     else
-    if (name.endsWith(".TAP")) attachTapeFile(file,autorun)
+    if (tapeAllowed && name.endsWith(".TAP")) attachTapeFile(file,autorun)
     else
     if (name.endsWith(".T64")) attachT64File(file,autorun)
     else
@@ -410,7 +412,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     if (name.endsWith(".CRT")) loadCartridgeFile(file)
   }
 
-  protected def printerSaveImage {
+  protected def printerSaveImage  : Unit = {
     val fc = new JFileChooser
     fc.showSaveDialog(printerDialog) match {
       case JFileChooser.APPROVE_OPTION =>
@@ -420,7 +422,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def attachZip {
+  protected def attachZip  : Unit = {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new FileFilter {
@@ -434,7 +436,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def loadCartridgeFile(file:File) {
+  protected def loadCartridgeFile(file:File) : Unit = {
     try {
       if (Thread.currentThread != Clock.systemClock) clock.pause
       val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.expPortIRQ _,nmiSwitcher.expansionPortNMI _,getRAM,configuration)
@@ -458,7 +460,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def attachDisk(driveID:Int,autorun:Boolean,c64Mode:Boolean) {
+  protected def attachDisk(driveID:Int,autorun:Boolean,c64Mode:Boolean) : Unit = {
     val fc = new JFileChooser
     val canvas = new D64Canvas(fc,getCharROM,c64Mode)
     val sp = new javax.swing.JScrollPane(canvas)
@@ -477,7 +479,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def loadFileFromAttachedFile(driveID:Int,relocate:Boolean,c64Mode:Boolean) {
+  protected def loadFileFromAttachedFile(driveID:Int,relocate:Boolean,c64Mode:Boolean) : Unit = {
     val floppy = drives(driveID).getFloppy
     if (floppy.isEmpty) showError("Loading error","No disk attached!")
     else {
@@ -496,7 +498,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def loadFileFromTape {
+  protected def loadFileFromTape  : Unit = {
     val fc = new JFileChooser
     val canvas = new T64Canvas(fc,getCharROM,true)
     val sp = new javax.swing.JScrollPane(canvas)
@@ -515,7 +517,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def attachT64File(file:File,autorun:Boolean) {
+  protected def attachT64File(file:File,autorun:Boolean) : Unit = {
     val tape = new T64(file.toString)
     try {
       val values = tape.entries map { e => e.asInstanceOf[Object] }
@@ -534,7 +536,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def attachZIPFile(file:File,autorun:Boolean) {
+  protected def attachZIPFile(file:File,autorun:Boolean) : Unit = {
     ZIP.zipEntries(file) match {
       case Success(entries) =>
         if (entries.size > 0) {
@@ -556,7 +558,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def attachTape {
+  protected def attachTape  : Unit = {
     val fc = new JFileChooser
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
@@ -571,7 +573,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def attachTapeFile(file:File,autorun:Boolean) {
+  protected def attachTapeFile(file:File,autorun:Boolean) : Unit = {
     datassette.setTAP(Some(new TAP(file.toString)))
     tapeMenu.setEnabled(true)
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
@@ -580,7 +582,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def loadPrg {
+  protected def loadPrg  : Unit = {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileView(new C64FileView)
@@ -595,7 +597,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def detachCtr {
+  protected def detachCtr  : Unit = {
     if (ExpansionPort.getExpansionPort.isEmpty) showError("Detach error","No cartridge attached!")
     else {
       if (Thread.currentThread != Clock.systemClock) clock.pause
@@ -608,7 +610,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     ExpansionPort.currentCartFileName = ""
   }
 
-  protected def attachCtr {
+  protected def attachCtr  : Unit = {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileView(new C64FileView)
@@ -623,7 +625,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def initDrive(id:Int,driveType:DriveType.Value) {
+  protected def initDrive(id:Int,driveType:DriveType.Value) : Unit = {
     val old = Option(drives(id))
     old match {
       case Some(od) if od.driveType == driveType => return
@@ -677,7 +679,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def loadKeyboard {
+  protected def loadKeyboard  : Unit = {
     JOptionPane.showConfirmDialog(displayFrame,"Would you like to set default keyboard or load a configuration from file ?","Keyboard layout selection", JOptionPane.YES_NO_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE) match {
       case JOptionPane.YES_OPTION =>
         configuration.remove(CONFIGURATION_KEYB_MAP_FILE)
@@ -708,12 +710,12 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def writeOnDiskSetting(enabled:Boolean) {
+  protected def writeOnDiskSetting(enabled:Boolean) : Unit = {
     canWriteOnDisk = enabled
     for(d <- 0 to 1) drives(d).getFloppy.canWriteOnDisk = canWriteOnDisk
   }
 
-  protected def enableDrive10(enabled:Boolean,fn:Option[String]) {
+  protected def enableDrive10(enabled:Boolean,fn:Option[String]) : Unit = {
     if (enabled) {
       device10Drive = new LocalDrive(bus,10)
       changeLocalDriveDir(fn)
@@ -721,7 +723,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     device10DriveEnabled = enabled
   }
 
-  protected def changeLocalDriveDir(fileName:Option[String] = None) {
+  protected def changeLocalDriveDir(fileName:Option[String] = None) : Unit = {
     fileName match {
       case None =>
         val fc = new JFileChooser
@@ -738,18 +740,18 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def enableMouse(mouseEnabled:Boolean,display:vic.Display) {
+  protected def enableMouse(mouseEnabled:Boolean,display:vic.Display) : Unit = {
     controlPortA.setMouse1351Emulation(mouseEnabled)
     sid.setMouseEnabled(mouseEnabled)
     if (mouseEnabled) MouseCage.enableMouseCageOn(display) else MouseCage.disableMouseCage
   }
 
-  protected def enablePrinter(enable:Boolean) {
+  protected def enablePrinter(enable:Boolean) : Unit = {
     printerEnabled = enable
     printer.setActive(enable)
   }
 
-  protected def setDriveType(drive:Int,dt:DriveType.Value,dontPlay:Boolean = false) {
+  protected def setDriveType(drive:Int,dt:DriveType.Value,dontPlay:Boolean = false) : Unit = {
     clock.pause
     initDrive(drive,dt)
     if (!dontPlay) clock.play
@@ -759,7 +761,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     if (enabled) ExpansionPort.setExpansionPort(new GeoRAM(size)) else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
   }
 
-  protected def setREU(reu:Option[Int],reu16FileName:Option[String]) {
+  protected def setREU(reu:Option[Int],reu16FileName:Option[String]) : Unit = {
     reu match {
       case None =>
         ExpansionPort.getExpansionPort.eject
@@ -951,7 +953,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     handleDND(file,true,true)
   }
 
-  protected def showAbout {
+  protected def showAbout  : Unit = {
     val about = new AboutCanvas(getCharROM,ucesoft.cbm.Version.VERSION.toUpperCase + " (" + ucesoft.cbm.Version.BUILD_DATE.toUpperCase + ")")
     JOptionPane.showMessageDialog(displayFrame,about,"About",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
   }
@@ -970,7 +972,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def ejectDisk(driveID:Int) {
+  protected def ejectDisk(driveID:Int) : Unit = {
     drives(driveID).getFloppy.close
     driveLeds(driveID).setToolTipText("")
     if (!traceDialog.isTracing) clock.pause
@@ -1151,28 +1153,30 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     tapeItem.addActionListener(_ => loadFileFromTape )
     fileMenu.add(tapeItem)
 
-    val attachTapeItem = new JMenuItem("Attach tape ...")
-    attachTapeItem.addActionListener(_ => attachTape )
-    fileMenu.add(attachTapeItem)
+    if (tapeAllowed) {
+      val attachTapeItem = new JMenuItem("Attach tape ...")
+      attachTapeItem.addActionListener(_ => attachTape)
+      fileMenu.add(attachTapeItem)
 
-    tapeMenu.setEnabled(false)
-    fileMenu.add(tapeMenu)
+      tapeMenu.setEnabled(false)
+      fileMenu.add(tapeMenu)
 
-    val tapePlayItem = new JMenuItem("Cassette press play")
-    tapePlayItem.addActionListener(_ => datassette.pressPlay )
-    tapeMenu.add(tapePlayItem)
+      val tapePlayItem = new JMenuItem("Cassette press play")
+      tapePlayItem.addActionListener(_ => datassette.pressPlay)
+      tapeMenu.add(tapePlayItem)
 
-    val tapeStopItem = new JMenuItem("Cassette press stop")
-    tapeStopItem.addActionListener(_ => datassette.pressStop )
-    tapeMenu.add(tapeStopItem)
+      val tapeStopItem = new JMenuItem("Cassette press stop")
+      tapeStopItem.addActionListener(_ => datassette.pressStop)
+      tapeMenu.add(tapeStopItem)
 
-    val tapeRecordItem = new JMenuItem("Cassette press record & play")
-    tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay )
-    tapeMenu.add(tapeRecordItem)
+      val tapeRecordItem = new JMenuItem("Cassette press record & play")
+      tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay)
+      tapeMenu.add(tapeRecordItem)
 
-    val tapeRewindItem = new JMenuItem("Cassette press rewind")
-    tapeRewindItem.addActionListener(_ => datassette.pressRewind )
-    tapeMenu.add(tapeRewindItem)
+      val tapeRewindItem = new JMenuItem("Cassette press rewind")
+      tapeRewindItem.addActionListener(_ => datassette.pressRewind)
+      tapeMenu.add(tapeRewindItem)
+    }
 
     fileMenu.addSeparator
 
@@ -1369,7 +1373,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
           val item = new JCheckBoxMenuItem(provider.name)
           gamesMenu.add(item)
           item.addActionListener(new ActionListener {
-            def actionPerformed(e:ActionEvent) {
+            def actionPerformed(e:ActionEvent) : Unit = {
               try {
                 val ui = GameUI.getUIFor(item,displayFrame,provider,cbmComputer)
                 ui.setVisible(item.isSelected)

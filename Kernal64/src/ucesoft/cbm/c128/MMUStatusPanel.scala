@@ -9,7 +9,7 @@ import java.awt.Font
 import java.awt.FlowLayout
 import java.awt.Component
 
-private class LabelledLed(label:String,labelUp:Boolean,colorON : Color = Color.GREEN,colorOFF : Color = Color.DARK_GRAY) extends JPanel {
+class LabelledLed(label:String,labelUp:Boolean,colorON : Color = Color.GREEN,colorOFF : Color = Color.DARK_GRAY) extends JPanel {
   var on : Boolean = false
   
   private[this] val led = new JComponent {

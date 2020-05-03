@@ -150,14 +150,14 @@ class TraceDialog private (displayFrame: JFrame,
             }
             else
             if (address.contains("-")) {
-              val addresses = address split "-" map s2a
+              val addresses = address split "-" map { s => s2a(s.trim) }
               var col = 0
-              var sb = new StringBuilder
-              for (a <- addresses(0) until addresses(0) + addresses(1)) {
-                if (col == 0) sb.append("%4X: ".format(a))
-                sb.append("%2X ".format(mem.read(a)))
+              val sb = new StringBuilder
+              for (a <- addresses(0) to addresses(1)) {
+                if (col == 0) sb.append("%04X: ".format(a))
+                sb.append("%02X ".format(mem.read(a)))
                 col += 1
-                if (col == 8) {
+                if (col == 16) {
                   col = 0
                   Log.info(sb.toString)
                   sb.clear

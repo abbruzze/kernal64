@@ -300,7 +300,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     cpuChanged(false)
   }
   
-  protected def mainLoop(cycles:Long) {
+  protected def mainLoop(cycles:Long) : Unit = {
     // VIC PHI1
     vicChip.clock
     // CIAs
@@ -334,7 +334,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     if (sidCycleExact) sid.clock
   }
 
-  private def irqRequest(low:Boolean) {
+  private def irqRequest(low:Boolean) : Unit = {
     cpu.irqRequest(low)
     z80.irq(low)
   }
@@ -344,21 +344,21 @@ class C128 extends CBMComputer with MMUChangeListener {
     if (z80Active) z80.requestBUS(dma) else cpu.setDMA(dma)    
   }
   
-  private def baLow(low:Boolean) {
+  private def baLow(low:Boolean) : Unit = {
     baLow = low
     if (z80Active) z80.requestBUS(baLow) else cpu.setBaLow(low)
     expansionPort.setBaLow(low)
   }
   
   // MMU change listener
-  def frequencyChanged(f:Int) {
+  def frequencyChanged(f:Int) : Unit = {
     Log.debug(s"Frequency set to $f Mhz")
     mmuStatusPanel.frequencyChanged(f)
     cpuFrequency = f
     val _2MhzMode = f == 2
     vicChip.set2MhzMode(_2MhzMode)
   }
-  def cpuChanged(is8502:Boolean) {
+  def cpuChanged(is8502:Boolean) : Unit = {
     if (is8502) {
       traceDialog.traceListener = cpu      
       z80Active = false
@@ -375,43 +375,43 @@ class C128 extends CBMComputer with MMUChangeListener {
     mmuStatusPanel.cpuChanged(is8502)
     Log.debug("Enabling CPU " + (if (z80Active) "Z80" else "8502"))
   }
-  def c64Mode(c64Mode:Boolean) {
+  def c64Mode(c64Mode:Boolean) : Unit = {
     mmuStatusPanel.c64Mode(c64Mode)
     this.c64Mode = c64Mode
   }  
   
-  def fastSerialDirection(input:Boolean) {
+  def fastSerialDirection(input:Boolean) : Unit = {
     FSDIRasInput = input
     if (input) bus.setLine(cia1.asInstanceOf[IECBusListener],IECBusLine.DATA,IECBus.VOLTAGE)
     //println(s"FSDIR set to input $input")
   }
   
-  def _1571mode(_1571Mode:Boolean) {
+  def _1571mode(_1571Mode:Boolean) : Unit = {
     mmuStatusPanel._1571mode(_1571Mode)
   }
 
   override def isHeadless = headless
   // ======================================== Settings ==============================================
 
-  protected def enableDrive(id:Int,enabled:Boolean) {
+  protected def enableDrive(id:Int,enabled:Boolean) : Unit = {
     drivesEnabled(id) = enabled
     drives(id).setActive(enabled)
     driveLeds(id).setVisible(enabled)
     adjustRatio(true)
   }
 
-  private def enableVDC80(enabled:Boolean) {
+  private def enableVDC80(enabled:Boolean) : Unit = {
     keyb.set4080Pressed(enabled)
   }
-  private def enabledVDC(enabled:Boolean) {
+  private def enabledVDC(enabled:Boolean) : Unit = {
     if (enabled) vdc.play else vdc.pause
     vdcDisplayFrame.setVisible(enabled)
   }
-  private def enableMMUPanel(enabled:Boolean) {
+  private def enableMMUPanel(enabled:Boolean) : Unit = {
     mmuStatusPanel.setVisible(enabled)
   }
 
-  private def setDisplayRendering(hints:java.lang.Object) {
+  private def setDisplayRendering(hints:java.lang.Object) : Unit = {
     display.setRenderingHints(hints)
     vdcDisplay.setRenderingHints(hints)
   }
@@ -432,7 +432,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   }
   // ================================================================================================
   
-  private def loadFunctionROM(internal:Boolean,fileName:Option[String] = None,romType:FunctionROMType.Value = FunctionROMType.NORMAL) {
+  private def loadFunctionROM(internal:Boolean,fileName:Option[String] = None,romType:FunctionROMType.Value = FunctionROMType.NORMAL) : Unit = {
     val fn = fileName match {
       case None =>
         val fc = new JFileChooser
@@ -471,7 +471,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     }
   }
 
-  private def adjustRatio(vic:Boolean=true,vdcResize:Boolean=false,vdcHalfSize:Boolean = false) {
+  private def adjustRatio(vic:Boolean=true,vdcResize:Boolean=false,vdcHalfSize:Boolean = false) : Unit = {
     if (vic) {
       val dim = display.asInstanceOf[java.awt.Component].getSize
       dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).round.toInt
@@ -496,7 +496,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     }
   } 
 
-  protected def loadPRGFile(file:File,autorun:Boolean) {
+  protected def loadPRGFile(file:File,autorun:Boolean) : Unit = {
     val (start,end) = ProgramLoader.loadPRG(mmu.getBank0RAM,file,c64Mode,8)
     Log.info(s"BASIC program loaded from $start to $end")
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
@@ -505,7 +505,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     }
   }
 
-  protected def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String],emulateInserting:Boolean = true) {
+  protected def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String],emulateInserting:Boolean = true) : Unit = {
     try {
       if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
       val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
@@ -538,7 +538,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     }
   }
   
-  private def zoom(f:Int) {
+  private def zoom(f:Int) : Unit = {
     val dim = new Dimension(vicChip.VISIBLE_SCREEN_WIDTH * f,vicChip.VISIBLE_SCREEN_HEIGHT * f)
     updateScreenDimension(dim)
   }
@@ -573,7 +573,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     }
   }
 
-  private def takeSnapshot(vic:Boolean) {
+  private def takeSnapshot(vic:Boolean) : Unit = {
     val fc = new JFileChooser
     fc.showSaveDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
@@ -1240,7 +1240,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     sys.exit(0)
   }
   
-  protected def saveSettings(save:Boolean) {
+  protected def saveSettings(save:Boolean) : Unit = {
     configuration.setProperty(CONFIGURATION_FRAME_XY,displayFrame.getX + "," + displayFrame.getY)
     if (!zoomOverride) {
       val dimension = display.getSize()
@@ -1266,7 +1266,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   }
   
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeChars("KERNAL128")
     out.writeObject(ucesoft.cbm.Version.VERSION)
     out.writeLong(System.currentTimeMillis)
@@ -1279,7 +1279,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     out.writeBoolean(c64Mode)
     out.writeInt(cpuFrequency)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     val header = "KERNAL128"
     for(i <- 0 until header.length) if (in.readChar != header(i)) throw new IOException("Bad header")
     val ver = in.readObject.asInstanceOf[String]
@@ -1305,7 +1305,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   protected def getRAM = mmu.RAM
   protected def getCharROM = mmu.CHAR_ROM
 
-  def turnOn(args:Array[String]) {
+  def turnOn(args:Array[String]) : Unit = {
     swing { setMenu }
     // check help
     if (settings.checkForHelp(args)) {
