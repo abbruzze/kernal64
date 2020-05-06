@@ -14,7 +14,7 @@ class LabelledLed(label:String,labelUp:Boolean,colorON : Color = Color.GREEN,col
   
   private[this] val led = new JComponent {
     setAlignmentX(Component.CENTER_ALIGNMENT)
-    override def paint(g:Graphics) {
+    override def paint(g:Graphics) : Unit = {
       val size = getSize()
       val g2 = g.asInstanceOf[Graphics2D]
       g2.setColor(Color.BLACK)
@@ -57,9 +57,9 @@ class MMUStatusPanel extends JPanel with MMUChangeListener {
   add(c64)
   add(_1571)
   
-  def frequencyChanged(f:Int) { m2.on = f == 2 ; m2.repaint() }
-  def cpuChanged(is8502:Boolean) { z.on = !is8502 ; z.repaint() }
-  def c64Mode(c64Mode:Boolean) { c64.on = c64Mode ; c64.repaint() }
-  def fastSerialDirection(input:Boolean) {}
-  def _1571mode(_1571Mode:Boolean) { _1571.on = _1571Mode ; _1571.repaint() }
+  def frequencyChanged(f:Int) : Unit = { m2.on = f == 2 ; m2.repaint() }
+  def cpuChanged(is8502:Boolean) : Unit = { z.on = !is8502 ; z.repaint() }
+  def c64Mode(c64Mode:Boolean) : Unit = { c64.on = c64Mode ; c64.repaint() }
+  def fastSerialDirection(input:Boolean) : Unit = {}
+  def _1571mode(_1571Mode:Boolean) : Unit = { _1571.on = _1571Mode ; _1571.repaint() }
 }

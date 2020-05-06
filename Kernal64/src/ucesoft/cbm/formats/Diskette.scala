@@ -36,7 +36,7 @@ object Diskette {
         }
         def isLast = index == buffer.length - 1
         def getPerc = (100 * index.toFloat / buffer.length).toInt
-        def goto(pos:Int) {
+        def goto(pos:Int) : Unit = {
           index = pos
         }
       }
@@ -71,7 +71,7 @@ object Diskette {
     else throw new IllegalArgumentException("Unsupported file format")
   }
   
-  def makeEmptyDisk(file:String) {
+  def makeEmptyDisk(file:String) : Unit = {
     val p = file.lastIndexOf('.')
     if (p == -1) throw new IllegalArgumentException("File name must have a valid extension")
     val ext = file.substring(p + 1).toUpperCase    

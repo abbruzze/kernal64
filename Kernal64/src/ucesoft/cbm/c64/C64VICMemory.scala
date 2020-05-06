@@ -23,10 +23,10 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
   
   def getBank = bank
   
-  def init {
+  def init  : Unit = {
     Log.info("Initialaizing banked memory ...")
   }
-  def reset {
+  def reset  : Unit = {
     bank = 0
     baseAddress = 0
     memLastByteRead = 0
@@ -34,7 +34,7 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
   }
   val isActive = true
 
-  final def setVideoBank(bank: Int) {
+  final def setVideoBank(bank: Int) : Unit = {
     this.bank = ~bank & 3
     baseAddress = this.bank << 14
     //Log.debug(s"Set VIC bank to ${bank}. Internal bank is ${this.bank}")
@@ -42,7 +42,7 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
   
   final def lastByteRead = memLastByteRead
   
-  def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
+  def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) : Unit = {
     ultimax = !game && exrom
   }
   
@@ -63,14 +63,14 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
 
   override def readPCOpcode = mem.read(cpu.getPC)
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeInt(bank)
     out.writeInt(baseAddress)
     out.writeInt(memLastByteRead)
     out.writeBoolean(ultimax)
     
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     bank = in.readInt
     baseAddress = in.readInt
     memLastByteRead = in.readInt

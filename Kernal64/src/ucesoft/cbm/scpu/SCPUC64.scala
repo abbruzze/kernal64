@@ -192,6 +192,8 @@ class SCPUC64 extends CBMComputer {
     // deactivate drive 9
     drives(1).setActive(false)
     driveLeds(1).setVisible(false)
+    //cpu.setTrace(true)
+    //traceDialog.forceTracing(true)
   }
 
   protected def mainLoop(cycles: Long) {
@@ -864,7 +866,7 @@ class SCPUC64 extends CBMComputer {
 
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
-    romItem.addActionListener(_ => ROMPanel.showROMPanel(displayFrame, configuration, true, () => saveSettings(false)))
+    romItem.addActionListener(_ => ROMPanel.showROMPanel(displayFrame, configuration, true,true, () => saveSettings(false)))
   }
 
   override protected def setGlobalCommandLineOptions: Unit = {

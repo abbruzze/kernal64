@@ -55,12 +55,12 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
   private[this] var pageCrossed,notReadyDuringInstr = false
 
   // -----------------------------------------
-  final override def setBaLow(baLow: Boolean) {
+  final override def setBaLow(baLow: Boolean) : Unit = {
     this.baLow = baLow
     ready = !this.baLow && !dma
   }
 
-  final override def setDMA(dma: Boolean) {
+  final override def setDMA(dma: Boolean) : Unit = {
     this.dma = dma
     ready = !this.baLow && !dma
   }
@@ -71,7 +71,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   final def getMem(address: Int) = mem.read(address)
 
-  final def irqRequest(low: Boolean) {
+  final def irqRequest(low: Boolean) : Unit = {
     if (tracing) Log.debug(s"IRQ request low=${low}")
     if (tracingOnFile && low) tracingFile.println("IRQ low")
     if (low && !irqLow /* && irqFirstCycle == 0*/ ) {
@@ -81,7 +81,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
     irqLow = low
   }
 
-  final def nmiRequest(low: Boolean) {
+  final def nmiRequest(low: Boolean) : Unit = {
     if (!nmiLow && low) {
       nmiOnNegativeEdge = true
       nmiFirstCycle = clk.currentCycles
@@ -96,59 +96,59 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   @inline private[this] def SR_=(sr: Int) = SREG = (sr | FLAG_#) & NOT_B_FLAG
 
-  @inline private[this] def sen {
+  @inline private[this] def sen : Unit = {
     SREG |= N_FLAG
   }
 
-  @inline private[this] def cln {
+  @inline private[this] def cln : Unit ={
     SREG &= (~N_FLAG & 0xFF)
   }
 
-  @inline private[this] def sev {
+  @inline private[this] def sev : Unit ={
     SREG |= V_FLAG
   }
 
-  @inline private[this] def clv {
+  @inline private[this] def clv : Unit ={
     SREG &= (~V_FLAG & 0xFF)
   }
 
-  @inline private[this] def seb {
+  @inline private[this] def seb : Unit ={
     SREG |= B_FLAG
   }
 
-  @inline private[this] def clb {
+  @inline private[this] def clb : Unit ={
     SREG &= (~B_FLAG & 0xFF)
   }
 
-  @inline private[this] def sed {
+  @inline private[this] def sed : Unit ={
     SREG |= D_FLAG
   }
 
-  @inline private[this] def cld {
+  @inline private[this] def cld : Unit ={
     SREG &= (~D_FLAG & 0xFF)
   }
 
-  @inline private[this] def sei {
+  @inline private[this] def sei : Unit ={
     SREG |= I_FLAG
   }
 
-  @inline private[this] def cli {
+  @inline private[this] def cli : Unit ={
     SREG &= (~I_FLAG & 0xFF)
   }
 
-  @inline private[this] def sez {
+  @inline private[this] def sez : Unit ={
     SREG |= Z_FLAG
   }
 
-  @inline private[this] def clz {
+  @inline private[this] def clz : Unit ={
     SREG &= (~Z_FLAG & 0xFF)
   }
 
-  @inline private[this] def sec {
+  @inline private[this] def sec : Unit ={
     SREG |= C_FLAG
   }
 
-  @inline private[this] def clc {
+  @inline private[this] def clc : Unit ={
     SREG &= (~C_FLAG & 0xFF)
   }
 
@@ -197,27 +197,27 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
     tracingCycleMode = cycleMode
   }
 
-  def setTraceOnFile(out: PrintWriter, enabled: Boolean) {
+  def setTraceOnFile(out: PrintWriter, enabled: Boolean) : Unit = {
     tracingOnFile = enabled
     tracingFile = if (enabled) out else null
   }
 
   def setTrace(traceOn: Boolean) = tracing = traceOn
 
-  def step(updateRegisters: (String) => Unit) {
+  def step(updateRegisters: (String) => Unit) : Unit = {
     stepCallBack = updateRegisters
     syncObject.synchronized {
       syncObject.notify
     }
   }
 
-  def setBreakAt(breakType: BreakType, callback: (String) => Unit) {
+  def setBreakAt(breakType: BreakType, callback: (String) => Unit) : Unit = {
     tracing = false
     breakCallBack = callback
     this.breakType = breakType
   }
 
-  def jmpTo(pc: Int) {
+  def jmpTo(pc: Int) : Unit = {
     state = 0
     PC = pc
   }
@@ -507,31 +507,31 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   // -----------------------------------------------------------------------------------------------------  
 
-  @inline private[this] def push(data: Int) {
+  @inline private[this] def push(data: Int) : Unit = {
     mem.write(0x0100 | SP, data)
     SP = (SP - 1) & 0xff
   }
 
-  @inline private[this] final def set_nz(src: Int) {
+  @inline private[this] final def set_nz(src: Int) : Unit = {
     val value = src & 0xff
     if (value >= 0x80) sen else cln
     if (value == 0) sez else clz
   }
 
-  @inline private[this] def DoRMW {
+  @inline private[this] def DoRMW  : Unit = {
     state = RMW_DO_IT
   }
 
-  @inline private[this] def Execute {
+  @inline private[this] def Execute  : Unit = {
     state = OP_TAB(op)
   }
 
-  @inline private[this] def Last {
+  @inline private[this] def Last  : Unit = {
     state = 0
     notReadyDuringInstr = false
   }
 
-  private def initStates {
+  private def initStates  : Unit = {
     for (s <- 0 until states.length) states(s) =
       s match {
         // Opcode fetch (cycle 0)
@@ -2013,7 +2013,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
       }
   }
 
-  @inline private[this] def branch(flag: Boolean) {
+  @inline private[this] def branch(flag: Boolean) : Unit = {
     if (ready) {
       data = mem.read(PC)
       PC = (PC + 1) & 0xFFFF
@@ -2026,7 +2026,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
     }
   }
 
-  @inline private[this] def do_adc(data: Int) {
+  @inline private[this] def do_adc(data: Int) : Unit = {
     var tmp = A + data + (if (isCarry) 1 else 0)
     if ((tmp & 0xFF) == 0) sez else clz
 
@@ -2049,7 +2049,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
     }
   }
 
-  @inline private[this] def do_sbc(data: Int) {
+  @inline private[this] def do_sbc(data: Int) : Unit = {
     var tmp = A - data - (if (isCarry) 0 else 1)
     val nextCarry = tmp >= 0
     tmp = tmp & 0x1ff
@@ -2070,7 +2070,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
     reset
   }
 
-  def reset {
+  def reset  : Unit = {
     irqLow = false
     nmiLow = false
     nmiOnNegativeEdge = false
@@ -2097,7 +2097,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
     (dinfo.toString, dinfo.len)
   }
 
-  final def fetchAndExecute(cycles: Int) {
+  final def fetchAndExecute(cycles: Int) : Unit = {
     var c = cycles
     while (c > 0) {
       fetchAndExecute
@@ -2105,7 +2105,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
     }
   }
 
-  @inline private def fetchAndExecute {
+  @inline private def fetchAndExecute  : Unit = {
     if (breakType != null && state == 0 && breakType.isBreak(PC, false, false)) {
       breakType = null
       tracing = true
@@ -2168,7 +2168,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
   protected def formatDebug = s"[${id.toString}] ${CPU65xx.disassemble(mem, if (tracingCycleMode) tracingCyclePC else PC).toString} ${if (tracingCycleMode) s"\t-- C$instructionCycle/${state.toHexString.toUpperCase}" else ""} ${if (state >= IRQ_STATE && state <= NMI_STATE_7) s"IRQ" else ""} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
 
   // state
-  protected def saveState(out: ObjectOutputStream) {
+  protected def saveState(out: ObjectOutputStream) : Unit = {
     out.writeBoolean(baLow)
     out.writeBoolean(dma)
     out.writeBoolean(ready)
@@ -2194,7 +2194,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
     out.writeBoolean(prevIClearedFlag)
   }
 
-  protected def loadState(in: ObjectInputStream) {
+  protected def loadState(in: ObjectInputStream) : Unit = {
     baLow = in.readBoolean
     dma = in.readBoolean
     ready = in.readBoolean

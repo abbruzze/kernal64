@@ -22,14 +22,14 @@ class DigiMaxCart(digiAddress:Int) extends ExpansionPort {
   final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
     if (checkAddress(address)) soundData(address & 3) else 0
   }
-  final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+  final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
     if (checkAddress(address)) {
       val channel = address & 3
       DigiMAX.selectChannel(channel)
       DigiMAX.write(value)      
     }
   }
-  override def eject {
+  override def eject  : Unit = {
     DigiMAX.enabled(false,false)
   }  
 }
@@ -63,7 +63,7 @@ object DigiMAX {
   
   def getSampleRate : Int = sampleRate
   
-  def setSampleRate(fHz:Int) {
+  def setSampleRate(fHz:Int) : Unit = {
     sampleRate = fHz
     if (lines != null) {
       for(l <- lines) if (l != null) l.close
@@ -72,13 +72,13 @@ object DigiMAX {
     if (_enabled) for(l <- lines) if (l != null) l.start
   }
   
-  def selectChannel(channel:Int) {
+  def selectChannel(channel:Int) : Unit = {
     this.channel = channel
   }
   def enabled = _enabled
   def isEnabledOnUserPort = _enabled && enabledOnUserPort
   
-  def enabled(on:Boolean,enabledOnUserPort:Boolean = false) {
+  def enabled(on:Boolean,enabledOnUserPort:Boolean = false) : Unit = {
     _enabled = on
     if (on && lines == null) setSampleRate(DEFAULT_SAMPLE_RATE)
     this.enabledOnUserPort = enabledOnUserPort
@@ -92,7 +92,7 @@ object DigiMAX {
     }    
   }
   
-  def write(value:Int) {
+  def write(value:Int) : Unit = {
     val buffer = buffers(channel)
     buffer(pos(channel)) = value.asInstanceOf[Byte]
     pos(channel) = pos(channel) + 1

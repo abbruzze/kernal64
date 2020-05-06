@@ -85,14 +85,14 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     setConfiguration(address)
     setEnabled(true)
   }
-  def ring(ringing:Boolean) {}
+  def ring(ringing:Boolean) : Unit = {}
   
   // RS-232 interface
-  def setTXD(high:Int) {}
+  def setTXD(high:Int) : Unit = {}
   def getTXD = 0
-  def setOthers(value:Int) {}
+  def setOthers(value:Int) : Unit = {}
   def getOthers = 0
-  def setConfiguration(conf:String) {
+  def setConfiguration(conf:String) : Unit = {
     if (conf != "") {
       hostAndConf = conf
       val pars = conf.split(":")
@@ -109,7 +109,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   
   def isEnabled = connected == 0
   
-  def setEnabled(enabled:Boolean) {
+  def setEnabled(enabled:Boolean) : Unit = {
     eject
     if (enabled) {      
       if (host != "") connect
@@ -122,7 +122,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     }
   }
   
-  private def connect {
+  private def connect  : Unit = {
     try {
       telnetClient.connect(host, port)
       modem.setStreams(telnetClient.getInputStream,telnetClient.getOutputStream)
@@ -137,7 +137,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     }
   }
   
-  private def disconnect {
+  private def disconnect  : Unit = {
     try {
       connected = DATA_SET_READY
       if (telnetClient != null) telnetClient.disconnect
@@ -154,7 +154,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     }
   }
   
-  def setCIA12(cia1:CIA,cia2:CIA) {}
+  def setCIA12(cia1:CIA,cia2:CIA) : Unit = {}
   
   def getDescription = "<html>SwiftLink TCP/IP cartridge.<br>Connection string: <i>host:port</i> or leave empty to connect later via <i>atdt host:port</i> modem command</html>"
   
@@ -163,7 +163,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   override def toString = componentID + (if (isEnabled) "(enabled)" else "") + (if (reu.isDefined) " $DE00 + REU" else " $DF00")
   // ----------------
   
-  override def reset {
+  override def reset  : Unit = {
     disconnect
     ctrl = 8
     cmd = 0xE0 // found into desterm 128 
@@ -177,7 +177,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     }
   }
   
-  override def eject {
+  override def eject  : Unit = {
     disconnect
     clk.cancel(RX_EVENT)
     clk.cancel(TX_EVENT)
@@ -187,13 +187,13 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   @inline private def isDataTerminalReady = ((cmd & DATA_TERMINAL_READY) > 0)
   @inline private def isReceiverInterruptEnabled = (cmd & RECEIVER_INTERRUPT_ENABLED) == 0
   @inline private def isTransmitterInterruptEnabled = (cmd & TRANSMITTER_INTERRUPT_CONTROL) == 0x04
-  @inline private def nmi {    
+  @inline private def nmi  : Unit = {
     nmiHandler(true)
     nmiHandler(false)
     irq = IRQ
   }
   
-  private def readCycle(cycles:Long) {
+  private def readCycle(cycles:Long) : Unit = {
     try {
       if (isRTS && isDataTerminalReady && modem.inputStream != null && modem.inputStream.available > 0) {
         statusListener.update(RS232.RXD,1)
@@ -212,7 +212,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     clk.schedule(new ClockEvent(RX_EVENT,cycles + clockTicks,readCycle _))
   }  
   
-  private def socketError(t:Throwable) {
+  private def socketError(t:Throwable) : Unit = {
     Log.info("Error while reading/writing byte from/to SwiftLink: " + t)
     t.printStackTrace
     hangUp
@@ -289,7 +289,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     }
   }
   
-  private def updateClockTicks {
+  private def updateClockTicks  : Unit = {
     val stopBits = 1 + ((ctrl & 0x80) >> 7)
     val wordLength = 8 - ((ctrl & 0x60) >> 5)
     val parityBit = (cmd & 0x20) >> 5
@@ -306,8 +306,8 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     }
   }
   // state
-  override protected def saveState(out:ObjectOutputStream) {}
-  override protected def loadState(in:ObjectInputStream) {}
+  override protected def saveState(out:ObjectOutputStream) : Unit = {}
+  override protected def loadState(in:ObjectInputStream) : Unit = {}
   override protected def allowsStateRestoring : Boolean = {
     showError("State error","Loading/storing of cartridge's state is not supported [SwiftLink].")
     false

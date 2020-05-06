@@ -135,13 +135,13 @@ trait CPU65xx extends Chip with TraceListener {
   def getPC : Int
   def getCurrentInstructionPC : Int
   def getMem(address:Int) : Int
-  def setOverflowFlag  
-  def fetchAndExecute(cycles:Int)
+  def setOverflowFlag : Unit
+  def fetchAndExecute(cycles:Int) : Unit
   
-  def nmiRequest(low: Boolean)
-  def irqRequest(low: Boolean)
+  def nmiRequest(low: Boolean) : Unit
+  def irqRequest(low: Boolean) : Unit
   
-  def setBaLow(low:Boolean) {}
-  def setDMA(dma:Boolean) {}
+  def setBaLow(low:Boolean) : Unit = {}
+  def setDMA(dma:Boolean) : Unit = {}
   def isFetchingInstruction : Boolean
 }

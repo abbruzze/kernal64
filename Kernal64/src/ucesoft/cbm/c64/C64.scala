@@ -38,7 +38,7 @@ class C64 extends CBMComputer {
   protected var busSnooperActive = false
   protected val c1541 = new C1541Emu(bus,DriveLed8Listener)
 
-  def reset {
+  def reset  : Unit = {
     dma = false
     clock.maximumSpeed = false
     maxSpeedItem.setSelected(false)
@@ -47,7 +47,7 @@ class C64 extends CBMComputer {
     cia12Running(1) = true
   }
   
-  def init {
+  def init  : Unit = {
     val sw = new StringWriter
     Log.setOutput(new PrintWriter(sw))
     Log.setInfo
@@ -181,7 +181,7 @@ class C64 extends CBMComputer {
     DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive _,attachDisk(_,_,true),attachDiskFile(_,_,_,None),drivesEnabled)
   }
   
-  override def afterInitHook {    
+  override def afterInitHook  : Unit = {
 	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)    
     // deactivate drive 9
     drives(1).setActive(false)    
@@ -246,7 +246,7 @@ class C64 extends CBMComputer {
 
 
   
-  private def adjustRatio {
+  private def adjustRatio  : Unit = {
     val dim = display.asInstanceOf[java.awt.Component].getSize
     dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).round.toInt
     display.setPreferredSize(dim) 
@@ -330,7 +330,7 @@ class C64 extends CBMComputer {
     }
   }
 
-  private def takeSnapshot {
+  private def takeSnapshot  : Unit = {
     val fc = new JFileChooser
     fc.showSaveDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
@@ -856,7 +856,7 @@ class C64 extends CBMComputer {
 
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
-    romItem.addActionListener( _ => ROMPanel.showROMPanel(displayFrame,configuration,true,() => saveSettings(false)) )
+    romItem.addActionListener( _ => ROMPanel.showROMPanel(displayFrame,configuration,true,false,() => saveSettings(false)) )
   }
   
   override protected def setGlobalCommandLineOptions : Unit = {
@@ -870,7 +870,7 @@ class C64 extends CBMComputer {
     )
   }
   
-  def turnOff {
+  def turnOff  : Unit = {
     if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
     for(d <- drives)
       d.getFloppy.close

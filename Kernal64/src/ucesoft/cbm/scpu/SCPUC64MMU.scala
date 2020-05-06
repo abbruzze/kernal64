@@ -158,7 +158,8 @@ object SCPUC64MMU {
     private[this] var vic : VIC = _
 
     // -------------- SCPU staff ---------------------------------------
-    private[this] val fastram = Array.ofDim[Int](0xF8 * 65536) // about 16M
+    private[this] val fastram = Array.ofDim[Int](2 * 65536) // 128K
+    private[this] val simmram = Array.ofDim[Int](0xF6 * 65536)
 
     private[this] var bootMap = true
     private[this] var switch_1Mhz = false
@@ -169,9 +170,11 @@ object SCPUC64MMU {
     private[this] var reg_dosext_enabled = false
     private[this] var reg_ramlink_enabled = false
     private[this] var reg_simm_config = 0
+    private[this] var mem_conf_page_size,mem_conf_size,mem_simm_page_size,mem_simm_ram_mask = 0
     private[this] var reg_opt_mode = 0
     private[this] var cpuEmulationMode = false
     private[this] var mirroringMode = 0
+    private[this] var SCPU_ROM_MASK = 0
 
     /**
      * MIRRORING mode
@@ -267,10 +270,37 @@ object SCPUC64MMU {
       add(vic)
       add(COLOR_RAM)
       add(SCPU_ROM)
+
+      Log.debug("Initializing static & SIMM ram ...")
+      initSIMMMemory(fastram)
+      initSIMMMemory(simmram)
+      setSIMMSize(16)
+    }
+
+    private def initSIMMMemory(ram:Array[Int]) : Unit = {
+      val banks = ram.length / 65536
+
+      var bank = 0x00
+      while (bank < banks) {
+        var m = 0x0002
+        var v = 0
+        var n = 0
+        while (m < 0x10000) {
+          if ((n % 4) == 0) v = ~v & 0xFF
+          if (m == 0x4000) v = 0xFF
+
+          ram(bank << 16 | m) = v
+          m += 1
+          n += 1
+        }
+
+        bank += 1
+      }
     }
     
     override def afterInitHook {
       check0001
+      SCPU_ROM_MASK = (0xF7 + SCPU_ROM.getDynamicLength / 65536) << 16 | 0xFFFF
     }
     
     def reset {
@@ -314,12 +344,15 @@ object SCPUC64MMU {
       if (isForwardRead) forwardReadTo.read(address)
 
       if (bank == 0) readBank0(address)
-      else if (bank < 0xF8) fastram(address)
-      else if (bank < 0xF9) SCPU_ROM.read(address)
-      else {
-        println(s"Reading from ${address.toHexString}")
-        0xFF
+      else if (bank == 1) fastram(address)
+      else if (bank < 0xF8) {
+        val offset = address & 0x00FFFF
+        var address2 = if (bank == 0xF6) offset else if (bank == 0xF7) 0x010000 | offset else address
+        if (mem_simm_page_size != mem_conf_page_size) address2 = ((address2 >> mem_conf_page_size) << mem_simm_page_size) | (address2 & ((1 << mem_simm_page_size) - 1))
+        if ((mem_simm_ram_mask & address2) < mem_conf_size) simmram(address2 & mem_simm_ram_mask)
+        else bank
       }
+      else SCPU_ROM.read(address & SCPU_ROM_MASK)
     }
 
     /**
@@ -366,7 +399,7 @@ object SCPUC64MMU {
       else if (address < 0xC000) {
         if (bootMap) SCPU_ROM.read(0xF80000 | address)
         else if (c64MemConfig.basic) fastram(0x010000 | address) // bank 1 mirroring of BASIC
-        else if (c64MemConfig.roml) ROML.read(address)
+        else if (c64MemConfig.romh) ROMH.read(address)
         else fastram(address)
       }
       else if (address < 0xD000) { // RAM
@@ -403,18 +436,13 @@ object SCPUC64MMU {
       if (isForwardWrite) forwardWriteTo.write(address,value)
 
       if (bank == 0) writeBank0(address,value)
-      else if (bank == 1) {
-        if (address < 0x011000) fastram(address) = value
-        if (address < 0x01C000) {
-          /*if (bootMap)*/ fastram(address) = value
-        }
-        if (address < 0x01E000) fastram(address) = value
-        else /*if (bootMap)*/ fastram(address) = value
+      else if (bank == 1) fastram(address) = value
+      else if (bank < 0xF8) {
+        val offset = address & 0x00FFFF
+        var address2 = if (bank == 0xF6) offset else if (bank == 0xF7) 0x010000 | offset else address
+        if (mem_simm_page_size != mem_conf_page_size) address2 = ((address2 >> mem_conf_page_size) << mem_simm_page_size) | (address2 & ((1 << mem_simm_page_size) - 1))
+        if ((mem_simm_ram_mask & address2) < mem_conf_size) simmram(address2 & mem_simm_ram_mask) = value
       }
-      else if (bank < 0xF8) fastram(address) = value
-
-      // mirroring handling
-      if (address >= mirroringArea(0) && address <= mirroringArea(1)) ram.write(address,value)
     }
 
     @inline private def writeBank0(address:Int,value:Int) : Unit = {
@@ -467,6 +495,9 @@ object SCPUC64MMU {
       }
       else if (c64MemConfig.romh) ROMH.write(address,value)
       else if (!bootMap) fastram(address) = value
+
+      // mirroring handling
+      if (address >= mirroringArea(0) && address <= mirroringArea(1)) ram.write(address,value)
     }
 
     @inline private def readRegisters(address:Int) : Int = {
@@ -673,9 +704,39 @@ object SCPUC64MMU {
       Log.debug("Changing PLA config ...")
     }
 
+    def setSIMMSize(mb:Int) : Unit = {
+      val size = mb << 20
+      mem_simm_ram_mask = if (size == 0) 0 else size - 1
+      mb match {
+        case 1 => mem_simm_page_size = 9 + 2
+        case 4|8 => mem_simm_page_size = 10 + 2
+        case _ => mem_simm_page_size = 11 + 2
+      }
+      mem_conf_page_size = mem_simm_page_size
+      mem_conf_size = mb * 1024 * 1024
+
+      Log.debug(s"Set ${mb}M of memory. mem_simm_ram_mask=${mem_simm_ram_mask.toHexString} mem_simm_page_size=$mem_simm_page_size")
+    }
+
     private def updateSIMMConfig : Unit = {
-      println(s"Updating SIMM configuration: $reg_simm_config")
-      Log.debug(s"Updating SIMM configuration: $reg_simm_config")
+      reg_simm_config match {
+        case 0 =>
+          mem_conf_page_size = 9 + 2
+          mem_conf_size = 1 * 1024 * 1024
+        case 1 =>
+          mem_conf_page_size = 10 + 2
+          mem_conf_size = 4 * 1024 * 1024
+        case 2 =>
+          mem_conf_page_size = 10 + 2
+          mem_conf_size = 8 * 1024 * 1024
+        case 3 =>
+          mem_conf_page_size = 10 + 2
+          mem_conf_size = 16 * 1024 * 1024
+        case _ =>
+          mem_conf_page_size = 11 + 2
+          mem_conf_size = 16 * 1024 * 1024
+      }
+      Log.debug(s"Updating SIMM configuration: $reg_simm_config mem_conf_page_size=$mem_conf_page_size mem_conf_size=${mem_conf_size.toHexString}")
     }
 
     private def updateMirroringMode : Unit = {

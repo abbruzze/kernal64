@@ -8,7 +8,7 @@ import javax.swing._
 import javax.swing.event.{DocumentEvent, DocumentListener}
 import ucesoft.cbm.c128.FunctionROMType
 
-class ROMPanel(prop:Properties,c64Only:Boolean) extends JPanel {
+class ROMPanel(prop:Properties,c64Only:Boolean,scpu:Boolean = false) extends JPanel {
   import ucesoft.cbm.cpu.ROM._
 
   private val C64 = 1
@@ -16,6 +16,7 @@ class ROMPanel(prop:Properties,c64Only:Boolean) extends JPanel {
   private val DRIVE = 4
   private val C128_I_F_ROM = 8
   private val C128_E_F_ROM = 16
+  private val SCPU = 32
   private case class ROM(label:String,propName:String,romType:Int,var path:Option[String] = None,var item:Option[String] = None) {
     def apply(prop:Properties): Unit = {
       var value = if (!path.isDefined || path.get == "") "" else {
@@ -25,9 +26,10 @@ class ROMPanel(prop:Properties,c64Only:Boolean) extends JPanel {
     }
   }
 
-  private val romList = List(ROM("C64 Kernal",C64_KERNAL_ROM_PROP,C64),
+  private val romList = List(ROM("SCPU ROM",SCPU64_ROM_PROP,SCPU),
+                             ROM("C64 Kernal",C64_KERNAL_ROM_PROP,C64),
                              ROM("C64 Basic",C64_BASIC_ROM_PROP,C64),
-                             ROM("C64 Char",C64_CHAR_ROM_PROP,C64),
+                             ROM("C64 Char",C64_CHAR_ROM_PROP,C64|SCPU),
                              ROM("C128 Kernal",C128_KERNAL_ROM_PROP,C128),
                              ROM("C128 Basic",C128_BASIC_ROM_PROP,C128),
                              ROM("C128 Char",C128_CHAR_ROM_PROP,C128),
@@ -37,7 +39,11 @@ class ROMPanel(prop:Properties,c64Only:Boolean) extends JPanel {
                              ROM("Drive 1571 Kernal",D1571_DOS_ROM_PROP,DRIVE),
                              ROM("Drive 1581 Kernal",D1581_DOS_ROM_PROP,DRIVE))
 
-  private val romMap : Map[String,ROM] = romList filter { r => if (c64Only) r.romType == C64 || r.romType == DRIVE else true } map { r => r.propName -> r } toMap
+  private val romMap : Map[String,ROM] = romList filter { r =>
+    if (scpu) (r.romType & SCPU) == SCPU || r.romType == DRIVE
+    else if (c64Only) r.romType == C64 || r.romType == DRIVE
+    else true
+  } map { r => r.propName -> r } toMap
   private var lastDir = "./"
 
   def applyUpdates : Unit = {
@@ -142,18 +148,19 @@ class ROMPanel(prop:Properties,c64Only:Boolean) extends JPanel {
   }
 
   setLayout(new BoxLayout(this,BoxLayout.Y_AXIS))
-  add(makePanel("Commodore 64",C64))
+  if (!scpu) add(makePanel("Commodore 64",C64))
+  else add(makePanel("SCPU",SCPU))
   if (!c64Only) add(makePanel("Commodore 128",C128 | C128_I_F_ROM | C128_E_F_ROM))
   add(makePanel("Drives",DRIVE))
 }
 
 object ROMPanel {
-  def showROMPanel(parent:JFrame,prop:Properties,c64Only:Boolean,applyCallBack : () => Unit) = {
+  def showROMPanel(parent:JFrame,prop:Properties,c64Only:Boolean,scpu:Boolean = false,applyCallBack : () => Unit) = {
     val f = new JDialog(parent,"System ROMs",true)
     f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
 
     val contentPane = f.getContentPane
-    val romPanel = new ROMPanel(prop,c64Only)
+    val romPanel = new ROMPanel(prop,c64Only,scpu)
     contentPane.add("Center",romPanel)
     val buttonPanel = new JPanel
     val okB = new JButton("Apply")

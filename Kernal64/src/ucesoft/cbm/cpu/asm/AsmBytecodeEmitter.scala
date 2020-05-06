@@ -60,14 +60,14 @@ class AsmBytecodeEmitter(console:PrintStream,blocks:List[ByteCodeBlock]) {
     s map encodeChar toArray
   }
   
-  private def emitByteCodeFor(startOffset:Int,bcs:ByteCodeStatement,mem:Array[Byte]) {
+  private def emitByteCodeFor(startOffset:Int,bcs:ByteCodeStatement,mem:Array[Byte]) : Unit = {
     import AsmParser._
     import CPU65xx._
     import Mode._
     
     var pc = bcs.pc - startOffset
     
-    def emitListOf(isByte:Boolean) {
+    def emitListOf(isByte:Boolean) : Unit = {
       for(ListVal(l) <- bcs.operandValue;e <- l) {
         getOperand(e) match {
           case Some(o) =>

@@ -11,7 +11,7 @@ class Cartridge(file:String) {
     
     var romData : Array[Int] = null
     
-    def load(in:RandomAccessFile) {
+    def load(in:RandomAccessFile) : Unit = {
       if (in.readByte != 'C' || in.readByte != 'H' || in.readByte != 'I' || in.readByte != 'P') throw new IOException("CHIP signature not found")
       in.skipBytes(6)
       bankNumber = in.readByte * 256 + in.readByte
@@ -32,7 +32,7 @@ class Cartridge(file:String) {
   
   load 
   
-  def load {
+  def load  : Unit = {
     println("Opening file " + file)
     val in = new RandomAccessFile(file,"r")
     try {

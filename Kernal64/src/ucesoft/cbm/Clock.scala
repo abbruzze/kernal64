@@ -103,15 +103,15 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     properties
   }
 
-  def init {}
+  def init  : Unit = {}
 
-  def reset {
+  def reset  : Unit = {
     events = null
     lastCorrectionTime = System.currentTimeMillis
     lastCorrectionCycles = cycles
   }
 
-  final override def run {
+  final override def run  : Unit = {
     running = true
     while (running) {
       try {
@@ -143,14 +143,14 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     }
   }
 
-  @inline private def setupNextMeasurement {
+  @inline private def setupNextMeasurement  : Unit = {
     lastCorrectionTime = System.currentTimeMillis
     lastCorrectionCycles = cycles
     throttleStartedAt = cycles
     nextPerformanceMeasurementTime = System.currentTimeMillis + PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS
   }
 
-  @inline private def throttle {
+  @inline private def throttle  : Unit = {
     if (!_maximumSpeed && !skipThrottle) {
       val timeDiff = System.currentTimeMillis - lastCorrectionTime
       val cyclesDiff = cycles - lastCorrectionCycles
@@ -203,7 +203,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
 
   def isPaused = suspendedConfim
 
-  def pause {
+  def pause  : Unit = {
     if (Thread.currentThread == this) return
 
     suspendedLock.synchronized { suspended = true }
@@ -216,7 +216,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     suspendedLock.notify
   }
   def halt = running = false
-  def printEvents { println(if (events != null) events else "No events") }
+  def printEvents  : Unit = { println(if (events != null) events else "No events") }
 
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {

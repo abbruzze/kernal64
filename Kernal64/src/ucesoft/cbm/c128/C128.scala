@@ -58,7 +58,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   private[this] var baLow = false
   private[this] var FSDIRasInput = true
 
-  def reset {
+  def reset  : Unit = {
     baLow = false
     dma = false
     z80Active = true
@@ -70,7 +70,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     cia12Running(1) = true
   }
 
-  def init {
+  def init  : Unit = {
     val sw = new StringWriter
     Log.setOutput(new PrintWriter(sw))
     Log.setInfo
@@ -185,7 +185,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     // VDC KEYSTROKES =======================================================    
     vdcDisplayFrame.addKeyListener(new KeyAdapter {
       private var mouseEnabled = false
-      override def keyPressed(e:KeyEvent) {
+      override def keyPressed(e:KeyEvent) : Unit = {
         e.getKeyCode match {
           // mouse
           case java.awt.event.KeyEvent.VK_P if e.isAltDown => 
@@ -291,7 +291,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive _,attachDisk(_,_,c64Mode),attachDiskFile(_,_,_,None),drivesEnabled)
   }
   
-  override def afterInitHook {    
+  override def afterInitHook  : Unit = {
 	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)    
     // deactivate drive 9
     drives(1).setActive(false)    
@@ -1189,7 +1189,7 @@ class C128 extends CBMComputer with MMUChangeListener {
 
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
-    romItem.addActionListener( _ => ROMPanel.showROMPanel(displayFrame,configuration,false,() => {
+    romItem.addActionListener( _ => ROMPanel.showROMPanel(displayFrame,configuration,false,false,() => {
       saveSettings(false)
       checkFunctionROMS
     }) )
@@ -1232,7 +1232,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     )
   }
   
-  def turnOff {
+  def turnOff  : Unit = {
     if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
     for(d <- drives)
       d.getFloppy.close

@@ -113,11 +113,11 @@ class CPU65816(mem:Memory) extends CPU65xx {
       nmiLow = low
     }
 
-  def init {
+  def init : Unit = {
     reset
   }
 
-  def reset {
+  def reset : Unit = {
     // TODO
     remaining_cpu_cycle_count = 0
     cpu_cycle_count = 0
@@ -138,9 +138,51 @@ class CPU65816(mem:Memory) extends CPU65xx {
   def isFetchingInstruction: Boolean = true // TODO
 
   protected def saveState(out: ObjectOutputStream) : Unit = {
+    out.writeInt(A.W)
+    out.writeInt(D.W)
+    out.writeInt(P)
+    out.writeBoolean(E)
+    out.writeInt(S.W)
+    out.writeInt(X.W)
+    out.writeInt(Y.W)
+    out.writeInt(DB)
+    out.writeInt(PC.A)
+    out.writeBoolean(cpu_abort)
+    out.writeBoolean(cpu_stop)
+    out.writeBoolean(cpu_wait)
+    out.writeLong(remaining_cpu_cycle_count)
+    out.writeBoolean(baLow)
+    out.writeBoolean(dma)
+    out.writeBoolean(ready)
+    out.writeBoolean(nmiOnNegativeEdge)
+    out.writeBoolean(irqLow)
+    out.writeBoolean(nmiLow)
+    out.writeLong(irqFirstCycle)
+    out.writeLong(nmiFirstCycle)
   }
 
   protected def loadState(in: ObjectInputStream) : Unit = {
+    A.W = in.readInt
+    D.W = in.readInt
+    P = in.readInt
+    E = in.readBoolean
+    S.W = in.readInt
+    X.W = in.readInt
+    Y.W = in.readInt
+    DB = in.readInt
+    PC.A = in.readInt
+    cpu_abort = in.readBoolean
+    cpu_abort = in.readBoolean
+    cpu_wait = in.readBoolean
+    remaining_cpu_cycle_count = in.readLong
+    baLow = in.readBoolean
+    dma = in.readBoolean
+    ready = in.readBoolean
+    nmiOnNegativeEdge = in.readBoolean
+    irqLow = in.readBoolean
+    nmiLow = in.readBoolean
+    irqFirstCycle = in.readLong
+    nmiFirstCycle = in.readLong
   }
 
   protected def allowsStateRestoring : Boolean = true

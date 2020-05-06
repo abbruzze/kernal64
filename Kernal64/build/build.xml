@@ -64,7 +64,7 @@
 		<java classname="scala.tools.nsc.Main"
 			  fork="true"
 			  failonerror="true"
-			  maxmemory="256m">
+			  maxmemory="512m">
 			<arg value="-classpath"/>
 			<arg value="${project.lib}"/>
 			<arg value="-d"/>

@@ -18,7 +18,7 @@ class ByteCodeBlock(_org:Int,var name:Option[String]) {
   private var org = _org
   private var PC = _org
   
-  def setNewOrg(newOrg:Int) {
+  def setNewOrg(newOrg:Int) : Unit = {
     org = newOrg
     PC = org
   }
@@ -27,16 +27,16 @@ class ByteCodeBlock(_org:Int,var name:Option[String]) {
   
   def pc = PC
   
-  def addSizeOf(asm:ASMStatement)(implicit ctx:EvaluationContext) {
+  def addSizeOf(asm:ASMStatement)(implicit ctx:EvaluationContext) : Unit = {
     PC += sizeAndCheck(asm)
   }
   
-  def addAsm(asm:ASMStatement,operandValue:Option[RuntimeValue])(implicit ctx:EvaluationContext) {
+  def addAsm(asm:ASMStatement,operandValue:Option[RuntimeValue])(implicit ctx:EvaluationContext) : Unit = {
     asmList += ByteCodeStatement(PC,asm,operandValue,asm.pos)
     PC += sizeAndCheck(asm)             
   }
   
-  def alignTo(alignment:Int) {
+  def alignTo(alignment:Int) : Unit = {
     val offset = alignment - PC % alignment
     PC += offset
   }
@@ -210,7 +210,7 @@ class AsmCompiler(console:PrintStream,importDir:String) {
     private var _linking = false
     
     def linking = _linking
-    def linking_=(l:Boolean) {
+    def linking_=(l:Boolean) : Unit = {
       require(isTop)
       _linking = true
       if (l) top.asInstanceOf[Context].clearVars
@@ -347,11 +347,11 @@ class AsmCompiler(console:PrintStream,importDir:String) {
       }
     }
     
-    def addUserFunction(f:FUNCTION,module:Option[String],isPrivate:Boolean) {
+    def addUserFunction(f:FUNCTION,module:Option[String],isPrivate:Boolean) : Unit = {
       if (userFunctions.put(ModuleRef(f.name,module.getOrElse(STD_MODULE_NAME),f.parameters.size),f).isDefined) throw new CompilerException(s"Function ${f.name}/${f.parameters} already declared in module $module",Some(f))
     }
     
-    def addUserMacro(m:MACRO) {
+    def addUserMacro(m:MACRO) : Unit = {
       if (userMacros.put((m.name,m.parameters.size),m).isDefined) throw new CompilerException(s"Macro ${m.name}/${m.parameters} already declared",Some(m))
     }
     
@@ -636,7 +636,7 @@ class AsmCompiler(console:PrintStream,importDir:String) {
     }
   }
   
-  private def init {
+  private def init  : Unit = {
     byteCodeBlock = new ByteCodeBlock(0,Some("default"))
     byteCodeBlocks.clear
     byteCodeBlocks += byteCodeBlock
@@ -739,7 +739,7 @@ class AsmCompiler(console:PrintStream,importDir:String) {
     byteCodeBlocks.toList
   }
   
-  def printStack {
+  def printStack  : Unit = {
     println(ctx.peek.asInstanceOf[Context].content)
   }
 }

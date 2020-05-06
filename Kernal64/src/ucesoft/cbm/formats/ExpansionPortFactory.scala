@@ -14,14 +14,14 @@ object ExpansionPortFactory {
     class ROM(val name: String, val startAddress: Int, val length: Int, val data: Array[Int]) extends Memory {
       val isRom = true
       def isActive = true
-      def init {}
+      def init  : Unit = {}
       def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
         if (!game && exrom) {
           if (startAddress == 0xA000) data(address - 0xE000)
           else data(address - startAddress)
         } else data(address - startAddress)
       }
-      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
         ram.write(address,value,chipID)
       }
       override def toString = s"ROM(${name})[startAddress=${Integer.toHexString(startAddress)} length=${length}]"
@@ -69,7 +69,7 @@ object ExpansionPortFactory {
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       if (address == 0xDE00) m93c86.output << 7 else 0      
     }
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (address == 0xDE00) {
         reg = value
         if ((value & 0x40) == 0) {
@@ -85,13 +85,13 @@ object ExpansionPortFactory {
         }
       }
     }
-    override def reset {
+    override def reset  : Unit = {
       romlBankIndex = 0
       romhBankIndex = 0
     }
     override def eject = saveEeprom
     override def shutdown = saveEeprom
-    override def init {
+    override def init  : Unit = {
       Option(config.getProperty(CONFIGURATION_GMOD2_FILE)) match {
         case None =>
         case Some(eeprom) =>
@@ -102,7 +102,7 @@ object ExpansionPortFactory {
           }
       }
     }
-    private def saveEeprom {
+    private def saveEeprom  : Unit = {
       Option(config.getProperty(CONFIGURATION_GMOD2_FILE)) match {
         case None =>
         case Some(eeprom) =>
@@ -118,7 +118,7 @@ object ExpansionPortFactory {
       notifyMemoryConfigurationChange
       0
     }
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       val target = address - startAddress
       if (target == 0) {
         game = false
@@ -127,7 +127,7 @@ object ExpansionPortFactory {
     }
   }
   private class Comal80CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if ((value & 0x80) > 0) {
         val bank = value & 0x3
         romlBankIndex = bank
@@ -139,7 +139,7 @@ object ExpansionPortFactory {
   private class Type7CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override protected def convertBankNumber(bank: Int): Int = ((bank >> 3) & 7) | ((bank & 1) << 3)
 
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (address == startAddress) {
         romlBankIndex = ((value >> 3) & 7) | ((value & 1) << 3)
         if ((value & 0xc6) == 0x00) {
@@ -168,7 +168,7 @@ object ExpansionPortFactory {
       }
       romlBanks(0).read((address & 0x1fff) + 0x8000)
     }
-    override def reset {
+    override def reset  : Unit = {
       game = true
       exrom = false
       notifyMemoryConfigurationChange
@@ -187,7 +187,7 @@ object ExpansionPortFactory {
       notifyMemoryConfigurationChange
       romlBanks(0).read((address & 0x1fff) + 0x8000)
     }
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (address >= 0xDF00) { // IO2
         game = false
         exrom = false
@@ -201,7 +201,7 @@ object ExpansionPortFactory {
 
   private class Type8CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     private[this] var latch = false
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (!latch && address == 0xDF00) {
         val bank = value & 0x03
         romlBankIndex = bank
@@ -230,7 +230,7 @@ object ExpansionPortFactory {
     exrom = false
     game = true
     
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       reg = value
       romlBankIndex = value & 0x3F
       exrom = (value & 0x80) > 0
@@ -245,13 +245,13 @@ object ExpansionPortFactory {
       val length = 8192
       val isRom = true
       def isActive = true
-      def init {}
+      def init  : Unit = {}
       val roml = Type18CartridgeExpansionPort.super.ROML.asInstanceOf[ROM]
       def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
         romhBankIndex = if ((address & 0x9000) != 0x8000) 1 else 0
         roml.data(address & 0x0FFF)
       }
-      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
+      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
     }
 
     override def ROML: Memory  = ROMLMirrored
@@ -263,14 +263,14 @@ object ExpansionPortFactory {
       val length = 8192
       val isRom = true
       def isActive = true
-      def init {}
+      def init  : Unit = {}
       def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = romlBanks(romlBankIndex).read(0x8000 + address - startAddress)
-      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
+      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
     }
     private[this] val VALID_CRT = crt.kbSize == 128 || crt.kbSize == 256 || crt.kbSize == 512
     private[this] val CRT_16K = crt.kbSize == 128 || crt.kbSize == 256
 
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (address == 0xDE00) {
         val bank = value & 0x3F        
         if (CRT_16K) {
@@ -290,7 +290,7 @@ object ExpansionPortFactory {
       val offs = address - startAddress
       romlBanks(0).read(0x9E00 + offs)
     }
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (address >= 0xDF00) {
         game = true
         exrom = true        
@@ -323,7 +323,7 @@ object ExpansionPortFactory {
       }
       0
     }
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (address < 0xDF00) {
         romlBankIndex = (address - 0xDE00) & 0x3F
       }
@@ -337,7 +337,7 @@ object ExpansionPortFactory {
       if (address >= 0xDF00) io2mem(address & 0xFF) else 0
     }
     
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (address >= 0xDF00) io2mem(address & 0xFF) = value
       else {
         if ((address & 2) == 0) {//(address == 0xDE00) {
@@ -357,7 +357,7 @@ object ExpansionPortFactory {
       }
     }
     
-    override def reset {
+    override def reset  : Unit = {
       game = false//crt.GAME
       exrom = true//crt.EXROM
       romlBankIndex = 0
@@ -377,7 +377,7 @@ object ExpansionPortFactory {
       //romlBanks(romlBankIndex).read(0x8000 + 0x1E00 + (address & 0x1FF))
       romlBanks(romlBankIndex).asInstanceOf[ROM].data(0x1E00 + (address & 0x1FF))
     }
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (controlRegister && address == 0xdfff) {
         romlBankIndex = value & 3
         romhBankIndex = value & 3
@@ -391,7 +391,7 @@ object ExpansionPortFactory {
 
     override def isFreezeButtonSupported = true
 
-    override def freezeButton {      
+    override def freezeButton  : Unit = {
       val clk = Clock.systemClock
       clk.pause
       clk.schedule(new ClockEvent("Freeze", clk.currentCycles + 3, cycles => {
@@ -404,7 +404,7 @@ object ExpansionPortFactory {
       clk.play
     }
 
-    override def reset {
+    override def reset  : Unit = {
       controlRegister = true
       romlBankIndex = 0
       romhBankIndex = 0
@@ -434,8 +434,8 @@ object ExpansionPortFactory {
       val length = 0x2000
       val isActive = true
       val isRom = false
-      def init {}
-      def reset {}
+      def init  : Unit = {}
+      def reset  : Unit = {}
       def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = crtRAM(address & 0x1FFF)     
       def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = crtRAM(address & 0x1FFF) = value      
     }
@@ -451,7 +451,7 @@ object ExpansionPortFactory {
     
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = if (address < 0xDF00) writeIO1(address,value) else writeIO2(address,value)    
     
-    @inline private def writeIO1(address: Int, value: Int) {      
+    @inline private def writeIO1(address: Int, value: Int) : Unit = {
       if (isActive) {
         game = (value & 1) == 0
         exrom = (value & 2) > 0          
@@ -464,7 +464,7 @@ object ExpansionPortFactory {
       }
     }
     
-    @inline private def writeIO2(address: Int, value: Int) {
+    @inline private def writeIO2(address: Int, value: Int) : Unit = {
       if (isActive && exportRAM) crtRAM(0x1F00 + (address & 0xFF)) = value 
     }
     
@@ -473,7 +473,7 @@ object ExpansionPortFactory {
 
     override def isFreezeButtonSupported = true
 
-    override def freezeButton {
+    override def freezeButton  : Unit = {
       nmiAction(true)
       //nmiAction(false)
       val clk = Clock.systemClock
@@ -485,7 +485,7 @@ object ExpansionPortFactory {
       clk.play      
     }
     
-    override def reset {
+    override def reset  : Unit = {
       game = crt.GAME
       exrom = crt.EXROM
       isActive = true
@@ -504,8 +504,8 @@ object ExpansionPortFactory {
       val length = 0x8000
       val isActive = true
       val isRom = false
-      def init {}
-      def reset {}
+      def init  : Unit = {}
+      def reset  : Unit = {}
       def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
         if (ramEnabled) internalRam(address & 0x1FFF)
         else romlBanks(romlBankIndex).read(address)
@@ -523,7 +523,7 @@ object ExpansionPortFactory {
       romlBanks(romlBankIndex).asInstanceOf[ROM].data((address & 0x1FFF)) 
     }
     
-    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if ((address == 0xDE00 || address == 0xDE01) && enabled) {
         enabled = (value & 0x8) == 0
         romlBankIndex = ((value >> 2) & 0x1 | (value >> 3) & 0x2)
@@ -540,14 +540,14 @@ object ExpansionPortFactory {
 
     override def isFreezeButtonSupported = true
 
-    override def freezeButton {
+    override def freezeButton  : Unit = {
       exrom = true
       game = false
       notifyMemoryConfigurationChange
       nmiAction(true)
     }
 
-    override def reset {
+    override def reset  : Unit = {
       ramEnabled = false
       enabled = true
       romlBankIndex = 0
@@ -592,7 +592,7 @@ object ExpansionPortFactory {
       val length = 8192
       val isRom = true
       def isActive = true
-      def init {}
+      def init  : Unit = {}
 
       def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
         if (chipselect == 2) cart_ram((address & 0x3FFF) + (bankSelect << 14))
@@ -666,9 +666,9 @@ object ExpansionPortFactory {
     }
   }
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]) : Unit = {
     val crt = new Cartridge(args(0))
-    println(crt.ctrType + " -> " + new CartridgeExpansionPort(crt,null))
+    println(s"${crt.ctrType} -> " + new CartridgeExpansionPort(crt,null))
   }
 
 }

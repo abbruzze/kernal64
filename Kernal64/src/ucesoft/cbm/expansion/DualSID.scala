@@ -16,11 +16,11 @@ class DualSID(sid:SID,sidAddress:Int) extends ExpansionPort {
   final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
     if (address >= sidAddress && address < endAddress) sid.read(address) else super.read(address,chipID)
   }
-  final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+  final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
     if (address >= sidAddress && address < endAddress) sid.write(address,value)
   }
   
-  final override def eject {
+  final override def eject  : Unit = {
     sid.setStereo(false)
   }
 }

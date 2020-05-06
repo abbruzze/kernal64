@@ -22,11 +22,11 @@ import ucesoft.cbm.peripheral.vic.VICMemory
 import ucesoft.cbm.misc.TestCart
 
 trait MMUChangeListener {
-  def frequencyChanged(f:Int) // 1 or 2
-  def cpuChanged(is8502:Boolean)
-  def c64Mode(c64Mode:Boolean)
-  def fastSerialDirection(input:Boolean)
-  def _1571mode(_1571Mode:Boolean)
+  def frequencyChanged(f:Int) : Unit // 1 or 2
+  def cpuChanged(is8502:Boolean) : Unit
+  def c64Mode(c64Mode:Boolean) : Unit
+  def fastSerialDirection(input:Boolean) : Unit
+  def _1571mode(_1571Mode:Boolean) : Unit
 }
 
 class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with ExpansionPortConfigurationListener with VICMemory with Z80.IOMemory {
@@ -128,13 +128,13 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     properties
   }
   
-  def setKeyboard(keyboard:Keyboard) {
+  def setKeyboard(keyboard:Keyboard) : Unit = {
     this.keyboard = keyboard
   }
   
   final def isIOACC = ioacc
     
-  final def init {
+  final def init  : Unit = {
     if (cia_dc00 == null ||
         cia_dd00 == null ||
         vic == null ||
@@ -163,7 +163,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     add(vdc)    
   }
   
-  def configureFunctionROM(internal:Boolean,_rom:Array[Byte],romType:FunctionROMType.Value) {
+  def configureFunctionROM(internal:Boolean,_rom:Array[Byte],romType:FunctionROMType.Value) : Unit = {
     if (_rom == null) {
       if (internal) {
         internalFunctionROM_mid = null
@@ -193,17 +193,17 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     //else throw new IllegalArgumentException("Invalid function ROM: size must be less than 32K")
   }
   
-  private def setInternalROMPage(page:Int) {
+  private def setInternalROMPage(page:Int) : Unit = {
     val offset = page << 15
     Array.copy(internalFunctionROM,offset,internalFunctionROM_mid,0,16384)
     Array.copy(internalFunctionROM,offset + 16384,internalFunctionROM_high,0,16384)
   }
   
-  override def afterInitHook {
+  override def afterInitHook  : Unit = {
     check128_1
   }
   
-  final def reset {
+  final def reset  : Unit = {
     Log.info("Resetting 128 main memory ...")
     _0 = 0
     _1 = 0//read128_1
@@ -229,7 +229,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
 
   }
   
-  final def setIO(cia_dc00:CIA,cia_dd00:CIA,vic:VIC,sid:SID,vdc:VDC) {
+  final def setIO(cia_dc00:CIA,cia_dd00:CIA,vic:VIC,sid:SID,vdc:VDC) : Unit = {
     this.cia_dc00 = cia_dc00
     this.cia_dd00 = cia_dd00
     this.vic = vic
@@ -237,14 +237,14 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     this.vdc = vdc
   }
   
-  final def setDatassette(datassette:Datassette) {
+  final def setDatassette(datassette:Datassette) : Unit = {
     this.datassette = datassette
   }
   
   /**
    * Used in C64 mode
    */
-  final def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
+  final def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) : Unit = {
     val newMemConfig = (~_0 | _1) & 0x7 | (if (game) 1 << 3 else 0) | (if (exrom) 1 << 4 else 0)
     if (c64MemConfig == newMemConfig) return
     c64MemConfig = newMemConfig
@@ -264,7 +264,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     else read64(address)
     lastByteOnBUS
   }
-  final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+  final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
     val address = _address & 0xFFFF
     ioacc = false
     if (c128Mode) {
@@ -314,7 +314,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     if (address >= 0xD000 && address < 0xE000) return mem_read_0xD000_0xDFFF(address)
     read128(address)
   }
-  final def out(addressHI:Int,addressLO:Int,value:Int) {
+  final def out(addressHI:Int,addressLO:Int,value:Int) : Unit = {
     val address = addressHI << 8 | addressLO
     if (address < 0x1000) ram.write(0xD000 | address,0,value)
     else if (address < 0x1400) COLOR_RAM.write(address & 0x3FF,value)
@@ -357,7 +357,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // C000-FFFF --------------------------------------------
     mem_read_0xC000_0xFFFF(address,false)
   }
-  @inline private[this] def writeZ80(address:Int,value:Int) {
+  @inline private[this] def writeZ80(address:Int,value:Int) : Unit = {
     if (address < 0x1000) {
       if (ramBank == 0) KERNAL128_ROM.write(Z80_BIOS_ADDR | address,value) // ?
       else ram.write(address,value)
@@ -421,7 +421,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     one
   }
   
-  @inline private[this] def check128_1 {
+  @inline private[this] def check128_1  : Unit = {
     val pr = read128_1
     // check color bank
     COLOR_RAM.setProcessorAndVICColorBanks(pr)
@@ -433,7 +433,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   }
   
   // MMU regs handling ==========================================================
-  @inline private[this] def MMU_CR_write(value:Int) {
+  @inline private[this] def MMU_CR_write(value:Int) : Unit = {
     cr_reg = value
     ramBank = (cr_reg & 0xC0) >> 6
     ram.setProcessorBank(ramBank)
@@ -456,10 +456,10 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     _d505
   }
   // ----------------------------------------------------------------------------
-  def go64 {
+  def go64  : Unit = {
     MMU_D505_write(D500_REGS(5) | 0x41)
   }
-  @inline private[this] def MMU_D505_write(value:Int) {    
+  @inline private[this] def MMU_D505_write(value:Int) : Unit = {
     D500_REGS(5) = value
     // Z80/8502 check
     val oldZ80enabled = z80enabled
@@ -478,7 +478,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     //println(s"Writing D505 register: z80enabled=$z80enabled c128Mode=$c128Mode")
   }
   // ----------------------------------------------------------------------------
-  @inline private[this] def MMU_D506_write(value:Int) {
+  @inline private[this] def MMU_D506_write(value:Int) : Unit = {
     D500_REGS(6) = value
     // can be optimized in one call ...
     ram.setCommonAreaAndSize((value & 0xC) >> 2,value & 3)
@@ -486,13 +486,13 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     ram.setVICBank(vicBank)
   }
   // ----------------------------------------------------------------------------
-  @inline private[this] def MMU_D507_write(value:Int) {
+  @inline private[this] def MMU_D507_write(value:Int) : Unit = {
     D500_REGS(7) = value
     D500_REGS(8) = D508Latch | 0xF0
     ram.setDivertedPage(0,value,D500_REGS(8))
   }
   // ----------------------------------------------------------------------------
-  @inline private[this] def MMU_D509_write(value:Int) {
+  @inline private[this] def MMU_D509_write(value:Int) : Unit = {
     D500_REGS(9) = value
     D500_REGS(0xA) = D50ALatch | 0xF0
     ram.setDivertedPage(1,value,D500_REGS(0xA))
@@ -500,7 +500,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // ----------------------------------------------------------------------------
   @inline private[this] def MMU_D50B_read : Int = MMU_VER_NUMBER | ram.getBanksNumber << 4
   // ----------------------------------------------------------------------------
-  @inline private[this] def MMU_FF01_4_write(index:Int) {
+  @inline private[this] def MMU_FF01_4_write(index:Int) : Unit = {
     //println(s"Setting CR from PCR($index) = ${D500_REGS(index)}")
     MMU_CR_write(D500_REGS(index))
   }
@@ -561,7 +561,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // I/O expansion slots 1 & 2 -----------------------------------------
     expansionPort.read(address)
   }
-  @inline private[this] def mem_write_D030(reg:Int,value:Int) {
+  @inline private[this] def mem_write_D030(reg:Int,value:Int) : Unit = {
     val old_clkrate = vic_clkrate_reg & 1
     vic_clkrate_reg = value
     val clkrate = value & 1
@@ -570,7 +570,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     vic.c128TestBitEnabled((value & 2) > 0)
     Log.debug(s"Clock frequency set to ${clkrate + 1} Mhz")
   }
-  @inline private[this] def mem_write_D5xx(address:Int,value:Int) {
+  @inline private[this] def mem_write_D5xx(address:Int,value:Int) : Unit = {
     if (address == 0xD505) MMU_D505_write(value)
     else if (address == 0xD506) MMU_D506_write(value)
     else if (address == 0xD507) MMU_D507_write(value)
@@ -582,7 +582,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       Log.debug(s"D505_REG(${address & 0xF})=${Integer.toHexString(value)}")
     }
   }
-  @inline private[this] def mem_write_0xD000_0xDFFF(address:Int,value:Int) {
+  @inline private[this] def mem_write_0xD000_0xDFFF(address:Int,value:Int) : Unit = {
     ioacc = true
     // VIC ---------------------------------------------------------------
     if (address < 0xD400) {
@@ -698,7 +698,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     if (c64MC.romhultimax) return ROMH_ULTIMAX.read(address)
     ram.read(address)
   }
-  private[this] def write64(address: Int,value:Int) {
+  private[this] def write64(address: Int,value:Int) : Unit = {
     if (ULTIMAX) {
         if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return
       }
@@ -756,7 +756,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     if ((_0 & 0x10) == 0x10) one &= 0xEF // PLAY-SENSE is an input
     one
   }
-  @inline private[this] def check64_1 {
+  @inline private[this] def check64_1  : Unit = {
     // check tape motor
     datassette.setMotor((_0 & 0x20) > 0 && (_1 & 0x20) == 0)
     datassette.setWriteLine((_0 & 0x08) > 0 && (_1 & 0x08) > 0)
@@ -766,7 +766,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   }
   // VIC memory ===========================================================================
   final def getBank = videoBank
-  final def setVideoBank(bank: Int) {
+  final def setVideoBank(bank: Int) : Unit = {
     videoBank = ~bank & 3
     vicBaseAddress = videoBank << 14
   }
@@ -800,7 +800,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   }
   final def readPhi2(address:Int) : Int = vicReadPhi1(address)
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeBoolean(c128Mode)
     out.writeBoolean(z80enabled)
     out.writeObject(D500_REGS)
@@ -819,7 +819,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     out.writeInt(vicBaseAddress)
     out.writeInt(memLastByteRead)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     val old128Mode = c128Mode
     val oldZ80enabled = z80enabled
     c128Mode = in.readBoolean

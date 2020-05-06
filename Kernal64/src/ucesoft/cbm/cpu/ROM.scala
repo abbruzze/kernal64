@@ -22,10 +22,12 @@ class ROM(ram: Memory,
   private[this] var mem : Array[Int] = _
   private[this] var active = false
 
+  def getDynamicLength : Int = mem.length
+
   final def isActive = active
   def setActive(active:Boolean) = this.active = active
 
-  def init {
+  def init  : Unit = {
     mem = Array.fill(length)(0)
     Log.info(s"Initialaizing ${name} memory ...")
     val in = new DataInputStream(ROM.getROMInputStream(resourceName))
@@ -54,17 +56,17 @@ class ROM(ram: Memory,
     }
   }
 
-  def reset {}
+  def reset  : Unit = {}
 
   final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address - startAddress)
   def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = ram.write(address,value,chipID)
   final def patch(address:Int,value:Int) = mem(address - startAddress) = value
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeBoolean(active)
     out.writeObject(mem)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     active = in.readBoolean
     loadMemory[Int](mem,in)
   }
@@ -75,7 +77,7 @@ object ROM {
   val C64_KERNAL_ROM_PROP = "kernal64.rom.file"
   val C64_BASIC_ROM_PROP = "basic64.rom.file"
   val C64_CHAR_ROM_PROP = "char64.rom.file"
-  val SCPU64_ROM_PROP = "kernal64.rom.file" // TODO must be changed in scpu64.rom.file
+  val SCPU64_ROM_PROP = "scpu.rom.file"
 
   val C128_KERNAL_ROM_PROP = "kernal128.rom.file"
   val C128_BASIC_ROM_PROP = "basic128.rom.file"
@@ -90,7 +92,7 @@ object ROM {
   private val ROM_DEFAULT_MAP : Map[String,String] = Map(C64_KERNAL_ROM_PROP -> "roms/kernal.rom",
                                                          C64_BASIC_ROM_PROP -> "roms/basic.rom",
                                                          C64_CHAR_ROM_PROP -> "roms/chargen.rom",
-                                                         //SCPU64_ROM_PROP -> "roms/scpu/scpu.rom",
+                                                         SCPU64_ROM_PROP -> "roms/scpu/scpu64.rom",
                                                          C128_KERNAL_ROM_PROP -> "roms/128/kernal.rom",
                                                          C128_BASIC_ROM_PROP -> "roms/128/basic.rom",
                                                          C128_CHAR_ROM_PROP -> "roms/128/characters.rom",

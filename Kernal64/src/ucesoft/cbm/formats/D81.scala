@@ -127,7 +127,7 @@ private[formats] class D81(val file: String) extends Diskette {
    * 1 <= s <= 10
    * 0 <= h <= 1
    */
-  @inline private def seekLogical(h:Int,t:Int,s:Int) {
+  @inline private def seekLogical(h:Int,t:Int,s:Int) : Unit = {
     var offset = t * 0x2800
     if (h == 0) offset += 20 * 256
     offset += (s - 1) * 2 * 256
@@ -139,7 +139,7 @@ private[formats] class D81(val file: String) extends Diskette {
     disk.readFully(buffer)    
     buffer map { _.toInt & 0xFF }
   }
-  @inline private def writeLogical(h:Int,t:Int,s:Int,buffer:Array[Int]) {
+  @inline private def writeLogical(h:Int,t:Int,s:Int,buffer:Array[Int]) : Unit = {
     //println(s"Writing back side $h track $t sector $s")
     seekLogical(h,t,s)    
     if (buffer.length != 512) throw new IllegalArgumentException(s"Cannot write to D81 format: sector $s on side $h track $t has illegal size of ${buffer.length}")
@@ -151,7 +151,7 @@ private[formats] class D81(val file: String) extends Diskette {
     
   }
     
-  private def init {
+  private def init  : Unit = {
     for(side <- 0 to 1;
         track <- 0 to 79) {
       MFM.buildPhysicalTrack(1 - side,2,track,physicalTracks(1 - side)(track),readLogical _)
@@ -161,11 +161,11 @@ private[formats] class D81(val file: String) extends Diskette {
   override def isOnIndexHole = trackOffset < 5
   
   final override def side = _side
-  final override def side_=(newSide:Int) {
+  final override def side_=(newSide:Int) : Unit = {
     _side = newSide
   }
   
-  @inline private def checkSector(byte:Int) {
+  @inline private def checkSector(byte:Int) : Unit = {
     sectorData <<= 8
     sectorData |= byte
     if (sectorHeader) {
@@ -189,7 +189,7 @@ private[formats] class D81(val file: String) extends Diskette {
     checkSector(byte)
     byte
   }
-  final def writeNextByte(b:Int) {
+  final def writeNextByte(b:Int) : Unit = {
     //println(s"Wrote ${b.toHexString} on " + physicalTracks(_side)(track - 1)(trackOffset).toHexString)
     physicalTracks(_side)(track - 1)(trackOffset) = b
     trackModificationMap(_side)(track - 1) = true
@@ -199,7 +199,7 @@ private[formats] class D81(val file: String) extends Diskette {
   }
   
   final def nextBit : Int = 0
-  final def writeNextBit(bit:Boolean) {}
+  final def writeNextBit(bit:Boolean) : Unit = {}
   
   final def currentTrack = track
   final def currentSector = sector
@@ -207,7 +207,7 @@ private[formats] class D81(val file: String) extends Diskette {
    * trackSteps > 0 inc track
    * trackSteps < 0 dec track
    */
-  final def changeTrack(trackSteps:Int) {
+  final def changeTrack(trackSteps:Int) : Unit = {
     if (trackSteps > 0) {
       if (track < maxTrack) track += 1 
     }
@@ -223,7 +223,7 @@ private[formats] class D81(val file: String) extends Diskette {
   
   override def defaultZoneFor(track:Int) = 4 // 250.0000 bit/sec
   
-  override def flush {
+  override def flush  : Unit = {
     if (trackModified && canWriteOnDisk) {
       trackModified = false
       flushListener.flushing(file.toString,{
@@ -245,11 +245,11 @@ private[formats] class D81(val file: String) extends Diskette {
     }
   }
   
-  final def close {
+  final def close  : Unit = {
     flush
     disk.close
   }
-  final def reset {
+  final def reset  : Unit = {
     _side = 0
     track = 1
     trackOffset = 0
@@ -257,12 +257,12 @@ private[formats] class D81(val file: String) extends Diskette {
   
   override def toString = s"Disk fileName=$file totalTracks=$totalTracks t=$track s=$sector"
   // state
-  final def save(out:ObjectOutputStream) {
+  final def save(out:ObjectOutputStream) : Unit = {
     out.writeInt(_side)
     out.writeInt(track)
     out.writeInt(trackOffset)
   }
-  final def load(in:ObjectInputStream) {
+  final def load(in:ObjectInputStream) : Unit = {
     _side = in.readInt
     track = in.readInt
     trackOffset = in.readInt

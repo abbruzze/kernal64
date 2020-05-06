@@ -28,9 +28,9 @@ abstract class ExpansionPort extends RAMComponent {
 
   final def isUltimax = !GAME && EXROM
 
-  override def init {}
-  override def reset {}
-  def eject {}
+  override def init  : Unit = {}
+  override def reset  : Unit = {}
+  def eject  : Unit = {}
   def isEmpty = false
 
   override def getProperties = {
@@ -45,14 +45,14 @@ abstract class ExpansionPort extends RAMComponent {
   final def notifyMemoryConfigurationChange = ExpansionPort.updateListeners(GAME,EXROM)
 
   def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = ExpansionPort.emptyExpansionPort.read(address)
-  def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
+  def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
   
-  def freezeButton {}
+  def freezeButton  : Unit = {}
   def isFreezeButtonSupported = false
   
   // state
-  protected def saveState(out:ObjectOutputStream) {}
-  protected def loadState(in:ObjectInputStream) {}
+  protected def saveState(out:ObjectOutputStream) : Unit = {}
+  protected def loadState(in:ObjectInputStream) : Unit = {}
   protected def allowsStateRestoring : Boolean = {
     showError("State error",s"Loading/storing of cartridge's state is not supported [$componentID].")
     false
@@ -67,9 +67,9 @@ object ExpansionPort {
       val length = 0
       val isRom = true
       def isActive = false
-      def init {}
+      def init  : Unit = {}
       def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = 0
-      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
+      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
     }
     val name = "Empty Expansion Port"
     val EXROM = true
@@ -107,7 +107,7 @@ object ExpansionPort {
   private[this] var memoryForEmptyExpansionPort : LastByteReadMemory = _
   var currentCartFileName = ""
 
-  def addConfigurationListener(l: ExpansionPortConfigurationListener) {
+  def addConfigurationListener(l: ExpansionPortConfigurationListener) : Unit = {
     listeners = l :: listeners
   }
 

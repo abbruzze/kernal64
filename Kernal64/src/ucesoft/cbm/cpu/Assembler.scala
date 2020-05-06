@@ -32,8 +32,8 @@ class Assembler {
     var listeners: List[Step] = Nil
     val label: Option[String]
 
-    def notify(labelAddress: Int) {}
-    def addListener(l: Step) { listeners = l :: listeners }
+    def notify(labelAddress: Int) : Unit = {}
+    def addListener(l: Step) : Unit = { listeners = l :: listeners }
     def notifyListeners = listeners foreach { _.notify(PC.get) }
   }
   private trait Operand
@@ -46,7 +46,7 @@ class Assembler {
   private case class BYTE(label: Option[String], bytes: List[Int]) extends Step
   private case class WORD(label: Option[String], bytes: List[Int]) extends Step
   private case class OP(label: Option[String], op: String, var mode: Mode.MODE, var operand: Option[Operand]) extends Step {
-    override def notify(labelAddress: Int) {
+    override def notify(labelAddress: Int) : Unit = {
       operand match {
         case Some(Label(_,fn)) => operand = Some(Value(applyFunctionOnLabel(fn,labelAddress)))
         case _ => println("Error while notifying address to this: " + toString)
@@ -190,7 +190,7 @@ class Assembler {
     }
   }
     
-  private def encode(steps:List[Step],mem:Memory) {
+  private def encode(steps:List[Step],mem:Memory) : Unit = {
     for(s <- steps) {
       s match {
         case BYTE(_,bl) =>
@@ -260,7 +260,7 @@ object Assembler {
     val assembler = new Assembler
     val textArea = new JTextArea(20,50)
     val al = new ActionListener {
-      def actionPerformed(e:ActionEvent) {
+      def actionPerformed(e:ActionEvent) : Unit = {
         e.getActionCommand match {
           case "LOAD" =>
             val fc = new JFileChooser

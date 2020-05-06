@@ -16,7 +16,7 @@ trait Memory {
   
   final def isForwardRead = forwardRead
   final def isForwardWrite = forwardWrite
-  final def setForwardReadTo(forwardReadTo:Option[Memory]) {
+  final def setForwardReadTo(forwardReadTo:Option[Memory]) : Unit = {
     this.forwardReadTo = forwardReadTo match {
       case Some(fr) =>
         forwardRead = true
@@ -26,7 +26,7 @@ trait Memory {
         null
     }
   }
-  final def setForwardWriteTo(forwardWriteTo:Option[Memory]) {
+  final def setForwardWriteTo(forwardWriteTo:Option[Memory]) : Unit = {
     this.forwardWriteTo = forwardWriteTo match {
       case Some(fw) =>
         forwardWrite = true
@@ -37,10 +37,10 @@ trait Memory {
     }
   }
 
-  def init
+  def init : Unit
   def isActive: Boolean  
   def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int
-  def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU)
+  def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit
   def byteOnBUS : Int = 0
   
   override def toString = s"${name}(${hex4(startAddress)}-${hex4(startAddress + length - 1)},active=${isActive})"
@@ -53,7 +53,7 @@ abstract class BridgeMemory extends RAMComponent {
   private[this] var bridgesEnd : Array[Int] = _
   private[this] var bridgesMem : Array[Memory] = _
   
-  def addBridge(m:Memory,start:Int= -1,length:Int= -1,addComponent:Boolean=true) {
+  def addBridge(m:Memory,start:Int= -1,length:Int= -1,addComponent:Boolean=true) : Unit = {
     val startAddress = if (start != -1) start else m.startAddress
     val endAddress = startAddress + (if (length != -1) length else m.length) - 1
     
@@ -118,7 +118,7 @@ object Memory {
     val startAddress = address
     val name = "DUMMY"
     
-    def init {}
+    def init  : Unit = {}
     val isActive = true
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address - startAddress)
     def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address - startAddress) = value

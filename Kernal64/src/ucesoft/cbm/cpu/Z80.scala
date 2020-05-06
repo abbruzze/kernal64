@@ -18,12 +18,12 @@ object Z80 {
   
   trait IOMemory {
     def in(addressHI:Int,addressLO:Int) : Int
-    def out(addressHI:Int,addressLO:Int,value:Int)
+    def out(addressHI:Int,addressLO:Int,value:Int) : Unit
   }
   
   object EmptyIOMemory extends IOMemory {
     def in(addressHI:Int,addressLO:Int) = 0
-    def out(addressHI:Int,addressLO:Int,value:Int) {}
+    def out(addressHI:Int,addressLO:Int,value:Int) : Unit = {}
   }
     
   class Context(val mem:Memory,val io:IOMemory) {    
@@ -50,7 +50,7 @@ object Z80 {
     private[this] var additionalClockCycles = 0
     
     // state
-	  def saveState(out:ObjectOutputStream) {
+	  def saveState(out:ObjectOutputStream) : Unit = {
       out.writeInt(im)
 	  	out.writeInt(A1)
 	  	out.writeInt(B1)
@@ -80,7 +80,7 @@ object Z80 {
 	  	out.writeBoolean(delayInt)
 	  	out.writeInt(additionalClockCycles)
 	  }
-	  def loadState(in:ObjectInputStream) {
+	  def loadState(in:ObjectInputStream) : Unit = {
 	    im = in.readInt
 	  	A1 = in.readInt
 	  	B1 = in.readInt
@@ -239,11 +239,11 @@ object Z80 {
       H = (w >> 8) & 0xFF
       L = w & 0xFF
     }
-    def BC_=(w:Int) {
+    def BC_=(w:Int) : Unit = {
       B = (w >> 8) & 0xFF
       C = w & 0xFF
     }
-    def DE_=(w:Int) {
+    def DE_=(w:Int) : Unit = {
       D = (w >> 8) & 0xFF
       E = w & 0xFF
     }
@@ -255,15 +255,15 @@ object Z80 {
       H1 = (w >> 8) & 0xFF
       L1 = w & 0xFF
     }
-    def BC1_=(w:Int) {
+    def BC1_=(w:Int) : Unit = {
       B1 = (w >> 8) & 0xFF
       C1 = w & 0xFF
     }
-    def DE1_=(w:Int) {
+    def DE1_=(w:Int) : Unit = {
       D1 = (w >> 8) & 0xFF
       E1 = w & 0xFF
     }
-    def incDecBC(inc:Boolean) {
+    def incDecBC(inc:Boolean) : Unit = {
       if (inc) {
         C += 1
         if (C == 0x100) {
@@ -279,7 +279,7 @@ object Z80 {
         }
       }
     }
-    def incDecDE(inc:Boolean) {
+    def incDecDE(inc:Boolean) : Unit = {
       if (inc) {
         E += 1
         if (E == 0x100) {
@@ -295,7 +295,7 @@ object Z80 {
         }
       }
     }
-    def incDecHL(inc:Boolean) {
+    def incDecHL(inc:Boolean) : Unit = {
       if (inc) {
         L += 1
         if (L == 0x100) {
@@ -312,20 +312,20 @@ object Z80 {
       }
     }
     
-    def incDecSP(inc:Boolean) {
+    def incDecSP(inc:Boolean) : Unit = {
       if (inc) SP = (SP + 1) & 0xFFFF else SP = (SP - 1) & 0xFFFF
     }
-    def incDecIX(inc:Boolean) {
+    def incDecIX(inc:Boolean) : Unit = {
       if (inc) IX = (IX + 1) & 0xFFFF else IX = (IX - 1) & 0xFFFF
     }
-    def incDecIY(inc:Boolean) {
+    def incDecIY(inc:Boolean) : Unit = {
       if (inc) IY = (IY + 1) & 0xFFFF else IY = (IY - 1) & 0xFFFF
     }
     
     def IX_+(d:Int) = IX + d.asInstanceOf[Byte]
     def IY_+(d:Int) = IY + d.asInstanceOf[Byte]
          
-    def EX_AF {
+    def EX_AF  : Unit = {
       var tmp = A
       A = A1
       A1 = tmp
@@ -334,7 +334,7 @@ object Z80 {
       F1 = tmp
     }
     
-    def EX_DE_HL {
+    def EX_DE_HL  : Unit = {
       var tmp = D
       D = H
       H = tmp
@@ -343,7 +343,7 @@ object Z80 {
       L = tmp
     }
     
-    def EXX {
+    def EXX  : Unit = {
       // BC <=> BC'
       var tmp = B
       B = B1
@@ -369,7 +369,7 @@ object Z80 {
     
     def IXL = IX & 0xFF
     
-    def push(w:Int) {
+    def push(w:Int) : Unit = {
       SP = (SP - 1) & 0xFFFF
       mem.write(SP,(w >> 8) & 0xFF,ChipID.CPU)
       SP = (SP - 1) & 0xFFFF
@@ -395,7 +395,7 @@ object Z80 {
       mem.write(address + 1,(value >> 8) & 0xFF,ChipID.CPU)
     }
     
-    def reset {
+    def reset  : Unit = {
       AF = 0xFFFF
       SP = 0xFFFF
       PC = 0
@@ -836,7 +836,7 @@ object Z80 {
   // ===================================== 8 bit arithmetic ==================================================
   // *** ADD A,r
   // **************
-  @inline private def add(ctx:Context,value:Int) {
+  @inline private def add(ctx:Context,value:Int) : Unit = {
     val tmp = (ctx.A + value) & 0xFF
     ctx.F = ctx.SZP(tmp)
     ctx.setCarry(((ctx.A + value) & 0x100) > 0)
@@ -844,7 +844,7 @@ object Z80 {
     ctx.setParity(((~(ctx.A ^ value)) & (ctx.A ^ tmp) & 0x80) > 0)
     ctx.A = tmp
   }
-  @inline private def adc(ctx:Context,value:Int) {
+  @inline private def adc(ctx:Context,value:Int) : Unit = {
     val carry = ctx.carry
     val tmp = (ctx.A + value + carry) & 0xFF
     ctx.F = ctx.SZP(tmp)
@@ -898,7 +898,7 @@ object Z80 {
   val ADC_A_IXL = Opcode((0xDD,0x8D),4,2,"ADD IXL") { ctx => add(ctx,ctx.IXL) }
   // *** SUB r
   // **************
-  @inline private def sub(ctx:Context,value:Int) {
+  @inline private def sub(ctx:Context,value:Int) : Unit = {
     val tmp = (ctx.A - value) & 0xFF
     ctx.F = ctx.SZP(tmp)
     ctx.setNegative(true)
@@ -928,7 +928,7 @@ object Z80 {
   val SUB_n = Opcode(0xD6,7,2,MNEMONIC_n("SUB %s")) { ctx => sub(ctx,ctx.byte(1)) }
   // *** SBC r
   // **************
-  @inline private def sbc(ctx:Context,value:Int) {
+  @inline private def sbc(ctx:Context,value:Int) : Unit = {
     val carry = ctx.carry
     val tmp = (ctx.A - value - carry) & 0xFF
     ctx.F = ctx.SZP(tmp)
@@ -959,7 +959,7 @@ object Z80 {
   val SBC_n = Opcode(0xDE,7,2,MNEMONIC_n("SBC A,%s")) { ctx => sbc(ctx,ctx.byte(1)) }
   // *** AND r
   // **************
-  @inline private def and(ctx:Context,value:Int) {
+  @inline private def and(ctx:Context,value:Int) : Unit = {
     ctx.A &= value
     ctx.F = ctx.SZP(ctx.A)
     ctx.setHalf(true)    
@@ -986,7 +986,7 @@ object Z80 {
   val AND_n = Opcode(0xE6,7,2,MNEMONIC_n("AND %s")) { ctx => and(ctx,ctx.byte(1)) }
   // *** XOR r
   // **************
-  @inline private def xor(ctx:Context,value:Int) {
+  @inline private def xor(ctx:Context,value:Int) : Unit = {
     ctx.A ^= value
     ctx.F = ctx.SZP(ctx.A)
   }
@@ -1012,7 +1012,7 @@ object Z80 {
   val XOR_n = Opcode(0xEE,7,2,MNEMONIC_n("XOR %s")) { ctx => xor(ctx,ctx.byte(1)) }
   // *** OR r
   // **************
-  @inline private def or(ctx:Context,value:Int) {
+  @inline private def or(ctx:Context,value:Int) : Unit = {
     ctx.A |= value
     ctx.F = ctx.SZP(ctx.A)
   }
@@ -1037,7 +1037,7 @@ object Z80 {
   val OR_n = Opcode(0xF6,7,2,MNEMONIC_n("OR %s")) { ctx => or(ctx,ctx.byte(1)) }
   // *** CP r
   // **************
-  @inline private def cp(ctx:Context,value:Int) {
+  @inline private def cp(ctx:Context,value:Int) : Unit = {
     val tmp = (ctx.A - value) & 0xFF
     ctx.F = ctx.SZP(tmp)
     ctx.setNegative(true)
@@ -1066,7 +1066,7 @@ object Z80 {
   val CP_n = Opcode(0xFE,7,2,MNEMONIC_n("CP %s")) { ctx => cp(ctx,ctx.byte(1)) }
   // *** INC r
   // **************
-  @inline def incdecPrologue(ctx:Context,regValueAfter:Int,inc:Boolean) {
+  @inline def incdecPrologue(ctx:Context,regValueAfter:Int,inc:Boolean) : Unit = {
     val carry = ctx.carry
     ctx.F = ctx.SZP(regValueAfter) | carry
     if (inc) {
@@ -1218,7 +1218,7 @@ object Z80 {
   }
   // *** ADC HL,rr
   // **************
-  @inline private def adcHL(ctx:Context,value:Int) {
+  @inline private def adcHL(ctx:Context,value:Int) : Unit = {
     val valueH = (value >> 8) & 0xFF
     val tmp = ctx.HL + value + ctx.carry
     ctx.setZero((tmp & 0xFFFF) == 0)
@@ -1235,7 +1235,7 @@ object Z80 {
   val ADC_HL_SP = Opcode((0xED,0x7A),15,2,"ADC HL,SP") { ctx => adcHL(ctx,ctx.SP) }
   // *** SBC HL,rr
   // **************
-  @inline private def sbcHL(ctx:Context,value:Int) {
+  @inline private def sbcHL(ctx:Context,value:Int) : Unit = {
     val valueH = (value >> 8) & 0xFF
     val tmp = ctx.HL - value - ctx.carry
     ctx.setZero((tmp & 0xFFFF) == 0)
@@ -1584,7 +1584,7 @@ object Z80 {
   }
   // *** RLCA
   // **************
-  @inline private def rlca(ctx:Context) {
+  @inline private def rlca(ctx:Context) : Unit = {
     val value = ctx.A
     val h = (value & 0x80) >> 7
     val rot = (value << 1 | h) & 0xFF
@@ -1596,7 +1596,7 @@ object Z80 {
   val RLCA = Opcode(0x07,4,1,"RLCA") { ctx => rlca(ctx) }
   // *** RRCA
   // **************
-  @inline private def rrca(ctx:Context) {
+  @inline private def rrca(ctx:Context) : Unit = {
     val value = ctx.A
     val carry = value & 0x01
     val rot = (value >> 1 | carry << 7) & 0xFF
@@ -1608,7 +1608,7 @@ object Z80 {
   val RRCA = Opcode(0x0F,4,1,"RRCA") { ctx => rrca(ctx) }
   // *** RLA
   // **************
-  @inline private def rla(ctx:Context) {
+  @inline private def rla(ctx:Context) : Unit = {
     val value = ctx.A
     val carry = ctx.carry
     val h = value & 0x80
@@ -1621,7 +1621,7 @@ object Z80 {
   val RLA = Opcode(0x17,4,1,"RLA") { ctx => rla(ctx) }
   // *** RRA
   // **************
-  @inline private def rra(ctx:Context) {
+  @inline private def rra(ctx:Context) : Unit = {
     val value = ctx.A
     val carry = ctx.carry
     val l = value & 0x01
@@ -1933,7 +1933,7 @@ object Z80 {
   val JP_nn = Opcode(0xC3,10,3,MNEMONIC_nn("JP %s"),modifyPC = true) { ctx => ctx.PC = ctx.word(1) }
   // *** JP cc,nn
   // **************
-  @inline private def jp_cond_nn(ctx:Context,cond:Boolean) {
+  @inline private def jp_cond_nn(ctx:Context,cond:Boolean) : Unit = {
     if (cond) ctx.PC = ctx.word(1) else ctx.PC = (ctx.PC + 3) & 0xFFFF
   }
   val JP_C_nn = Opcode(0xDA,10,3,MNEMONIC_nn("JP C,%s"),modifyPC = true) { ctx => jp_cond_nn(ctx,ctx.carry > 0) }
@@ -1950,7 +1950,7 @@ object Z80 {
   val JR_e = Opcode(0x18,12,2,MNEMONIC_jr("JR %s"),modifyPC = true) { ctx => ctx.PC = (ctx.PC + 2 + ctx.byte(1).asInstanceOf[Byte]) & 0xFFFF }
   // *** JR cc,e
   // **************
-  @inline private def jr_cond_e(ctx:Context,cond:Boolean) {
+  @inline private def jr_cond_e(ctx:Context,cond:Boolean) : Unit = {
     if (cond) ctx.PC = (ctx.PC + 2 + ctx.byte(1).asInstanceOf[Byte]) & 0xFFFF
     else { ctx.PC = (ctx.PC + 2) & 0xFFFF ; ctx.setAdditionalClockCycles(-5) }
   }
@@ -1969,14 +1969,14 @@ object Z80 {
   val JP_$IY$ = Opcode((0xFD,0xE9),8,1,"JP (IY)",modifyPC = true) { ctx => ctx.PC = ctx.IY }
   // *** CALL nn
   // **************
-  @inline private def call(ctx:Context,addr:Int) {
+  @inline private def call(ctx:Context,addr:Int) : Unit = {
     ctx.push(ctx.PC + 3)
     ctx.PC = addr
   }
   val CALL_nn = Opcode(0xCD,17,3,MNEMONIC_nn("CALL %s"),modifyPC = true) { ctx => call(ctx,ctx.word(1)) }
   // *** CALL cc,nn
   // **************
-  @inline private def call_cond_nn(ctx:Context,cond:Boolean) {
+  @inline private def call_cond_nn(ctx:Context,cond:Boolean) : Unit = {
     if (cond) { call(ctx,ctx.word(1)) ; ctx.setAdditionalClockCycles(7) } 
     else ctx.PC = (ctx.PC + 3) & 0xFFFF
   }
@@ -2003,7 +2003,7 @@ object Z80 {
   val RET = Opcode(0xC9,10,1,"RET",modifyPC = true) { ctx => ctx.PC = ctx.pop }
   // *** RET cc
   // **************
-  @inline private def ret_cond(ctx:Context,cond:Boolean) {
+  @inline private def ret_cond(ctx:Context,cond:Boolean) : Unit = {
     if (cond) {
       ctx.PC = ctx.pop
       ctx.setAdditionalClockCycles(6)
@@ -2020,7 +2020,7 @@ object Z80 {
   val RET_M_nn = Opcode(0xF8,5,1,"RET M",modifyPC = true) { ctx => ret_cond(ctx,ctx.sign > 0) }
   // *** RETI
   // **************
-  @inline private def retni(ctx:Context) {
+  @inline private def retni(ctx:Context) : Unit = {
     ctx.PC = ctx.pop
     ctx.IFF1 = ctx.IFF2
   }
@@ -2028,7 +2028,7 @@ object Z80 {
   val RETN = Opcode((0xED,0x45),14,2,"RETN",modifyPC = true) { ctx => retni(ctx) }
   // *** RST p
   // **************
-  @inline private def rst(ctx:Context,pcl:Int) {
+  @inline private def rst(ctx:Context,pcl:Int) : Unit = {
     ctx.push(ctx.PC + 1)
     ctx.PC = pcl
   }
@@ -2069,7 +2069,7 @@ object Z80 {
       pf := parity of [[tmp2 AND 0x07] XOR b],
       hf := cf := tmp2 > 255
    */
-  @inline private def ini(ctx:Context,inc:Boolean) {
+  @inline private def ini(ctx:Context,inc:Boolean) : Unit = {
     val tmp = ctx.io.in(ctx.B,ctx.C)
     ctx.write(ctx.HL,tmp)
     ctx.incDecHL(inc)
@@ -2121,7 +2121,7 @@ object Z80 {
       pf := parity of [[tmp2 AND 0x07] XOR b],
       hf := cf := tmp2 > 255
    */
-  @inline private def outi(ctx:Context,inc:Boolean) {
+  @inline private def outi(ctx:Context,inc:Boolean) : Unit = {
     val tmp = ctx.read(ctx.HL)
     ctx.incDecHL(inc)
     ctx.B = (ctx.B - 1) & 0xFF
@@ -2153,7 +2153,7 @@ object Z80 {
   }
   // =========================================================================================================
   // ====================================== Reflection =======================================================
-  def initOpcodes {
+  def initOpcodes  : Unit = {
     if (opcodes_1(0) != null) return
     
     val fields = getClass.getDeclaredFields    
@@ -2210,22 +2210,22 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   def setCycleMode(cycleMode: Boolean): Unit = {
     // TODO
   }
-  def setTraceOnFile(out:PrintWriter,enabled:Boolean) {
+  def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {
     // TODO
   }
   def setTrace(traceOn:Boolean) = tracing = traceOn
-  def step(updateRegisters: (String) => Unit) {
+  def step(updateRegisters: (String) => Unit) : Unit = {
     stepCallBack = updateRegisters
     syncObject.synchronized {
       syncObject.notify
     }
   }
-  def setBreakAt(breakType:BreakType,callback:(String) => Unit) {
+  def setBreakAt(breakType:BreakType,callback:(String) => Unit) : Unit = {
     tracing = false
     breakCallBack = callback
     this.breakType = breakType
   }
-  def jmpTo(pc:Int) {
+  def jmpTo(pc:Int) : Unit = {
     ctx.PC = pc & 0xFFFF 
   }
   def disassemble(mem:Memory,address:Int) : (String,Int) = {
@@ -2235,7 +2235,7 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   // =================================== Interrupt Handling ==================================================
   
   final def irq(low:Boolean) = irqLow = low
-  final def nmi(low:Boolean) {
+  final def nmi(low:Boolean) : Unit = {
     if (!nmiLow && low) {
       nmiOnNegativeEdge = true
     }
@@ -2249,17 +2249,17 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
     if (io_memory == null) mem.read(addressHI << 8 | addressLO)
     else io_memory.in(addressHI,addressLO)
   }
-  def out(addressHI:Int,addressLO:Int,value:Int) {
+  def out(addressHI:Int,addressLO:Int,value:Int) : Unit = {
     if (io_memory == null) mem.write(addressHI << 8 | addressLO,value)
     else io_memory.out(addressHI,addressLO,value)
   }
   // ======================================== Fetch & Execute ================================================
   
-  def init {
+  def init  : Unit = {
     Log.info("Z80 initializing opcodes...")
     Z80.initOpcodes
   }
-  def reset {
+  def reset  : Unit = {
     ctx.reset
     irqLow = false
     nmiLow = false
@@ -2299,10 +2299,10 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   
   @inline private def incR(deltaR:Int) = ctx.R = (ctx.R & 0x80) | (ctx.R + deltaR) & 0x7F
   
-  @inline private def interruptMode0Handling {
+  @inline private def interruptMode0Handling  : Unit = {
     throw new IllegalArgumentException("Interrupt mode 0 is not implemented")
   }
-  @inline private def interruptMode2Handling {
+  @inline private def interruptMode2Handling  : Unit = {
     val addr = ctx.I << 8
     ctx.PC = (mem.read(addr) << 8) | mem.read(addr + 1)
   }
@@ -2384,7 +2384,7 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   }
   
   // ======================================== Clock ==========================================================
-  final def clock(cycles:Long,scaleFactor:Double = 1) {
+  final def clock(cycles:Long,scaleFactor:Double = 1) : Unit = {
     val canExecCPU = cycles > cpuWaitUntil && !busREQ
     if (canExecCPU) {
       val nextCPUCycles = cpuRestCycles + cycles + (fetchAndExecute - 1) / scaleFactor
@@ -2394,7 +2394,7 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   }
   
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
   	out.writeBoolean(irqLow)
   	out.writeBoolean(nmiLow)
   	out.writeBoolean(nmiOnNegativeEdge)
@@ -2402,7 +2402,7 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   	out.writeBoolean(busREQ)
   	ctx.saveState(out)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     irqLow = in.readBoolean
     nmiLow = in.readBoolean
     nmiOnNegativeEdge = in.readBoolean

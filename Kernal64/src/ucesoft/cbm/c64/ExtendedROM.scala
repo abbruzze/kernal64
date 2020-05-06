@@ -21,8 +21,8 @@ class ExtendedROM(ram: Memory,val name:String,val startAddress:Int) extends RAMC
     
   final def isActive = active
   def setActive(active:Boolean) = this.active = active
-  def init {}
-  def reset = active = false
+  def init : Unit = {}
+  def reset : Unit = active = false
   
   final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     val selectedROM = if (isROML) getExpansionPort.ROML else getExpansionPort.ROMH
@@ -35,7 +35,7 @@ class ExtendedROM(ram: Memory,val name:String,val startAddress:Int) extends RAMC
     else selectedROM.write(address,value)
   }
   // state
-  protected def saveState(out:ObjectOutputStream) {}
-  protected def loadState(in:ObjectInputStream) {}
+  protected def saveState(out:ObjectOutputStream) : Unit = {}
+  protected def loadState(in:ObjectInputStream) : Unit = {}
   protected def allowsStateRestoring : Boolean = true
 }

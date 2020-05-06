@@ -132,12 +132,12 @@ private[formats] class D64_D71(val file: String) extends Diskette {
     }
   }
   
-  private def loadGCRImage {
+  private def loadGCRImage  : Unit = {
     for(t <- 1 to TOTAL_TRACKS;
     	s <- 0 until TRACK_ALLOCATION(t)) GCRImage(t - 1)(s) = GCR.sector2GCR(s,t,readBlock(t,s),bam.diskID,getSectorError(t,s),s == TRACK_ALLOCATION(t) - 1)
   }
   
-  override def flush {
+  override def flush  : Unit = {
     if (sectorModified && canWriteOnDisk) {
       sectorModified = false
       flushListener.flushing(file.toString,{
@@ -234,7 +234,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   }
   
   override def side = _side
-  override def side_=(newSide:Int) {
+  override def side_=(newSide:Int) : Unit = {
     val oldT = track
     newSide match {
       case 0 if _side == 1 =>
@@ -255,7 +255,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
     _side = newSide    
   }
   
-  def reset {
+  def reset  : Unit = {
     _side = 0
     track = 1
     sector = 0
@@ -271,7 +271,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
     if (bit == 8) rotate else bit += 1
     b
   }
-  final def writeNextBit(value:Boolean) {
+  final def writeNextBit(value:Boolean) : Unit = {
     sectorModified = true
     trackSectorModified(track,sector)
     val mask = 1 << (8 - bit)
@@ -281,7 +281,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   final def nextByte : Int = gcrSector(gcrIndex)
   final def writeNextByte(b:Int) = gcrSector(gcrIndex) = b & 0xFF  
   
-  @inline private def rotate {
+  @inline private def rotate  : Unit = {
     bit = 1
     gcrIndex += 1
     if (gcrIndex >= gcrSector.length) { // end of current sector
@@ -298,7 +298,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
    * tracksteps & 1 == 0 are valid tracks, the others are half tracks not used
    * in the D64 format.
    */
-  def changeTrack(trackSteps:Int) {
+  def changeTrack(trackSteps:Int) : Unit = {
     val isOnTrack = (trackSteps & 1) == 0    
     if (isOnTrack) {
       val newTrack = trackSteps >> 1
@@ -318,7 +318,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   
   override def toString = s"Disk fileName=$file totalTracks=$TOTAL_TRACKS t=$track s=$sector"
   // state
-  def save(out:ObjectOutputStream) {
+  def save(out:ObjectOutputStream) : Unit = {
     out.writeInt(_side)
     out.writeInt(track)
     out.writeInt(sector)
@@ -326,7 +326,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
     out.writeInt(bit)
     out.writeBoolean(sectorModified)
   }
-  def load(in:ObjectInputStream) {
+  def load(in:ObjectInputStream) : Unit = {
     _side = in.readInt
     track = in.readInt
     sector = in.readInt

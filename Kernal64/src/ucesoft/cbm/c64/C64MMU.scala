@@ -47,7 +47,7 @@ object C64MMU {
     private[C64MMU] var lastByteReadMemory : LastByteReadMemory = _
     
     final val isActive = true
-    def init {
+    def init  : Unit = {
       Log.info("Initializing RAM memory ...")
       var m = 0
       var v0 = 0xFF
@@ -72,7 +72,7 @@ object C64MMU {
         }
       }
     }
-    def reset {}
+    def reset  : Unit = {}
     
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (ULTIMAX && chipID == ChipID.CPU) {
@@ -80,7 +80,7 @@ object C64MMU {
       }
       mem(address & 0xFFFF)
     }
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (ULTIMAX && chipID == ChipID.CPU) {
         if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return
       }
@@ -88,11 +88,11 @@ object C64MMU {
     }
     
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeObject(mem)
       out.writeBoolean(ULTIMAX)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       loadMemory[Int](mem,in)
       ULTIMAX = in.readBoolean
     }
@@ -112,8 +112,8 @@ object C64MMU {
     final val isActive = true
     private[this] var lastByteReadMemory : LastByteReadMemory = _
 
-    def init {}
-    def reset {
+    def init  : Unit = {}
+    def reset  : Unit = {
       for(i <- 0 until mem.length) mem(i) = 0xFF
     }
     def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory): Unit = {
@@ -123,10 +123,10 @@ object C64MMU {
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = (lastByteReadMemory.lastByteRead & 0xF0) | (mem(address & 0x3FF) & 0x0F)
     final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address & 0x3FF) = value & 0xff
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeObject(mem)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       loadMemory[Int](mem,in)
     }
     protected def allowsStateRestoring : Boolean = true
@@ -222,7 +222,7 @@ object C64MMU {
       one
     }
 
-    @inline private def check0001 {
+    @inline private def check0001  : Unit = {
       val pr = read0001
       // check tape motor
       datassette.setMotor((ddr & 0x20) > 0 && (pr & 0x20) == 0)
@@ -232,7 +232,7 @@ object C64MMU {
       expansionPortConfigurationChanged(GAME,EXROM)
     }
     
-    def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
+    def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) : Unit = {
       this.game = game
       this.exrom = exrom
       
@@ -245,7 +245,7 @@ object C64MMU {
       ram.ULTIMAX = ULTIMAX
     }
     
-    def init {
+    def init  : Unit = {
       Log.info("Initializing main memory ...")
       
       add(ram)
@@ -262,11 +262,11 @@ object C64MMU {
       add(COLOR_RAM)
     }
     
-    override def afterInitHook {
+    override def afterInitHook  : Unit = {
       check0001
     }
     
-    def reset {
+    def reset  : Unit = {
       Log.info("Resetting main memory...")
       ddr = 0
       pr = 0//read0001
@@ -381,7 +381,7 @@ object C64MMU {
     
     override def toString = ram.toString
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeBoolean(ULTIMAX)
       out.writeInt(ddr)
       out.writeInt(pr)
@@ -389,7 +389,7 @@ object C64MMU {
       out.writeBoolean(game)
       out.writeInt(memConfig)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       ULTIMAX = in.readBoolean
       ddr = in.readInt
       pr = in.readInt

@@ -21,8 +21,8 @@ class ColorRAM extends RAMComponent {
   private[this] var processorBank,vicBank = 0
   
   final val isActive = true
-  final def init {}
-  final def reset {
+  final def init  : Unit = {}
+  final def reset  : Unit = {
     for(b <- 0 until 2;i <- 0 until length) mem(b)(i) = 0xFF
     processorBank = 0
     vicBank = 0
@@ -33,7 +33,7 @@ class ColorRAM extends RAMComponent {
    * 
    * $01 (bit 0-1)
    */
-  final def setProcessorAndVICColorBanks(pvBank:Int) = {
+  final def setProcessorAndVICColorBanks(pvBank:Int): Unit = {
     processorBank = pvBank & 1
     vicBank = (pvBank & 2) >> 1
     Log.debug(s"Color banks: set $processorBank for processor and $vicBank for VIC")
@@ -48,13 +48,13 @@ class ColorRAM extends RAMComponent {
     mem(bank)(address & 0x3FF) = value & 0xff
   }
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeObject(mem(0))
     out.writeObject(mem(1))
     out.writeInt(processorBank)
     out.writeInt(vicBank)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     loadMemory[Int](mem(0),in)
     loadMemory[Int](mem(1),in)
     processorBank = in.readInt

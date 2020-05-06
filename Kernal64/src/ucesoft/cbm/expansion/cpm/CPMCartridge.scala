@@ -27,7 +27,7 @@ class CPMCartridge(mem:Memory,
     val startAddress = 0
     val name = "Z80 Memory"
     
-    def init {}
+    def init  : Unit = {}
     val isActive = true
     @inline private def z80Address(address:Int) = (address + 0x1000) & 0xFFFF
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = mem.read(z80Address(address),chipID)
@@ -38,13 +38,13 @@ class CPMCartridge(mem:Memory,
   
   z80.init
   
-  override def eject {
+  override def eject  : Unit = {
     Log.debug("Ejecting CP/M cartridge...")
     turnZ80(false)
     //clk.setDefaultClockHz
   }
   
-  @inline private def turnZ80(on:Boolean) {
+  @inline private def turnZ80(on:Boolean) : Unit = {
     setDMA(on)
     if (on && !z80Active) {
       z80Active = true
@@ -60,18 +60,18 @@ class CPMCartridge(mem:Memory,
     }
   }
   
-  override def reset {
+  override def reset  : Unit = {
     z80.reset
     z80Active = false
     //clk.setDefaultClockHz
   }
   
-  override def setBaLow(baLow:Boolean) {
+  override def setBaLow(baLow:Boolean) : Unit = {
     z80.requestBUS(baLow)
   }
   
   final override def read(address: Int, chipID: ChipID.ID) = 0
-  final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+  final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
     if ((address & 0xDE00) == 0xDE00) {
       turnZ80((value & 0x01) == 0)  
     }
@@ -79,7 +79,7 @@ class CPMCartridge(mem:Memory,
   
   private[this] val z80ClockCallback = z80Clock _
   
-  private def z80Clock(cycles:Long) {
+  private def z80Clock(cycles:Long) : Unit = {
     z80.clock(cycles,2)
     if (z80Active) clk.schedule(new ClockEvent("Z80 clock",clk.nextCycles,z80ClockCallback))
   }

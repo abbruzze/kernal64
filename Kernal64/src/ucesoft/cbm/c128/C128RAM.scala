@@ -43,7 +43,7 @@ private[c128] class C128RAM extends RAMComponent {
     val startAddress = 0
     val name = "RAM_bank0"
     
-    def init {}
+    def init  : Unit = {}
     def isActive = true  
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(0)(address)
     def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(0)(address) = value
@@ -67,7 +67,7 @@ private[c128] class C128RAM extends RAMComponent {
     properties
   }
   
-  final def init {
+  final def init  : Unit = {
     Log.info("Initializing C128 RAM memory ...")
     // only the first two banks are initialized
     mem(0) = Array.ofDim[Int](0x10000)
@@ -98,7 +98,7 @@ private[c128] class C128RAM extends RAMComponent {
     }
   }
   
-  final def reset {
+  final def reset  : Unit = {
     processorBank = 0
     VICbank = 0
     commonAreaSize = 0
@@ -116,7 +116,7 @@ private[c128] class C128RAM extends RAMComponent {
    * Set the bank that the processor sees
    * $D500/$FF00 (bit 7-6)
    */
-  final def setProcessorBank(bank:Int) {
+  final def setProcessorBank(bank:Int) : Unit = {
     if (expanded) processorBank = bank & 0x3 
     else processorBank = bank & 0x1
     Log.debug(s"Set processor bank to $processorBank")
@@ -126,7 +126,7 @@ private[c128] class C128RAM extends RAMComponent {
    * Set the bank that the VIC sees
    * $D506 (bit 7-6)
    */
-  final def setVICBank(bank:Int) {
+  final def setVICBank(bank:Int) : Unit = {
     if (expanded) VICbank = bank & 0x3 
     else VICbank = bank & 0x1 
     Log.debug(s"Set VIC bank to $VICbank")
@@ -137,7 +137,7 @@ private[c128] class C128RAM extends RAMComponent {
    *  $D507/$D508
    *  $D509/$D50A
    */
-  final def setDivertedPage(page:Int,divertedPage:Int,divertedPageBank:Int) {
+  final def setDivertedPage(page:Int,divertedPage:Int,divertedPageBank:Int) : Unit = {
     if (page == 0) {
       page_0 = divertedPage & 0xFF
       page_0_bank = divertedPageBank & (if (expanded) 0x3 else 0x1)
@@ -150,7 +150,7 @@ private[c128] class C128RAM extends RAMComponent {
     //println(s"Set diverted page $page $divertedPage $divertedPageBank")
   }
   
-  final def setExpansionBanks(expanded:Boolean) {
+  final def setExpansionBanks(expanded:Boolean) : Unit = {
     this.expanded = expanded
     if (expanded) {
       Log.info("C128 expanded to 256K")
@@ -167,7 +167,7 @@ private[c128] class C128RAM extends RAMComponent {
    * Set common ram area none, bottom,top top & bottom and size 1k,4k,8k,16k
    * $D506 (bit 3-2) (bit 1-0)
    */
-  final def setCommonAreaAndSize(commonArea:Int,commonAreaSize:Int) {
+  final def setCommonAreaAndSize(commonArea:Int,commonAreaSize:Int) : Unit = {
     this.commonArea = commonArea & 3
     this.commonAreaSize = commonAreaSize & 3
     commonAreaBottomLimit = COMMON_RAM_SIZE_FROM_BOTTOM(commonAreaSize + 1)
@@ -214,7 +214,7 @@ private[c128] class C128RAM extends RAMComponent {
     }
   }
   
-  final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+  final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
     val address = page_0_1(_address) & 0xFFFF
     if (_address < 0x100) mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_0_bank)(address) = value
     else if (_address < 0x200) mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_1_bank)(address) = value
@@ -236,7 +236,7 @@ private[c128] class C128RAM extends RAMComponent {
   }
   // state -----------------------------------------------
   
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeBoolean(expanded)
     out.writeObject(mem(0))
     out.writeObject(mem(1))
@@ -255,7 +255,7 @@ private[c128] class C128RAM extends RAMComponent {
     out.writeInt(page_0_bank)
     out.writeInt(page_1_bank)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     expanded = in.readBoolean    
     loadMemory[Int](mem(0),in)
     loadMemory[Int](mem(1),in)
