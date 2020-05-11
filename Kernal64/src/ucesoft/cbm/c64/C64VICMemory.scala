@@ -7,6 +7,7 @@ import ucesoft.cbm.ChipID
 import ucesoft.cbm.cpu.{CPU65xx, Memory}
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
+import java.util.Properties
 
 class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
   val componentID = "VIC Banked Memory"
@@ -33,6 +34,11 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
     ultimax = false
   }
   val isActive = true
+
+  override def getProperties: Properties = {
+    properties.setProperty("VIC base address: ",baseAddress.toHexString)
+    super.getProperties
+  }
 
   final def setVideoBank(bank: Int) : Unit = {
     this.bank = ~bank & 3

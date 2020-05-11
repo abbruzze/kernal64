@@ -224,63 +224,59 @@ class CPU65816(mem:Memory) extends CPU65xx {
 
   // ================ Fetching ===================================
     final def fetchAndExecute(cycles: Int) : Unit = {
-      var c = cycles
-      while (c > 0 && !dma) {
-        fetchAndExecute
-        c -= 1
-      }
-    }
-
-    @inline private def fetchAndExecute : Unit = {
-      if (breakType != null && breakType.isBreak(PC.A, false, false)) {
-        breakType = null
-        tracing = true
-        breakCallBack(toString)
-      }
-      if (baLow || dma || cpu_stop) return
-
-      if (remaining_cpu_cycle_count > 0) remaining_cpu_cycle_count -= 1
-        else {
-            cpu_cycle_count = 0
-            // check NMI first
-            if (nmiOnNegativeEdge) {
-                if (breakType != null && breakType.isBreak(PC.A, false, true)) {
-                    breakType = null
-                    tracing = true
-                    breakCallBack(toString)
-                    Log.debug("NMI Break")
-                }
-                nmiOnNegativeEdge = false
-                opcode_table_ptr(NMI_INDEX)()
-            }
-            else if (irqLow && !((P & 0x04) == 0x04)) {
-                if (breakType != null && breakType.isBreak(PC.A, true, false)) {
-                    breakType = null
-                    tracing = true
-                    breakCallBack(toString)
-                    Log.debug("IRQ Break")
-                }
-                opcode_table_ptr(IRQ_INDEX)()
-            }
-            else if (irqLow && cpu_wait) cpu_wait = false
-            else if (!cpu_wait) {
-                if (tracing) {
-                    Log.debug(formatDebug)
-                    stepCallBack(toString)
-                    syncObject.synchronized {
-                        syncObject.wait
-                    }
-                }
-                // fetching
-                val opcode = M_READ(PC.A)
-                PC.W.PC_++
-                opcode_table_ptr(opcode)()
-            }
-            else cpu_cycle_count = 1
-
-            remaining_cpu_cycle_count = cpu_cycle_count - 1
+          var c = cycles - remaining_cpu_cycle_count
+          while (c > 0 && !dma) {
+            fetchAndExecute
+            c -= cpu_cycle_count
+          }
+    	  if (!dma) remaining_cpu_cycle_count = -c
         }
-    }
+        @inline private def fetchAndExecute : Unit = {
+          if (breakType != null && breakType.isBreak(PC.A, false, false)) {
+            breakType = null
+            tracing = true
+            breakCallBack(toString)
+          }
+          if (baLow || dma || cpu_stop) return
+            else {
+                cpu_cycle_count = 0
+                // check NMI first
+                if (nmiOnNegativeEdge) {
+                    if (breakType != null && breakType.isBreak(PC.A, false, true)) {
+                        breakType = null
+                        tracing = true
+                        breakCallBack(toString)
+                        Log.debug("NMI Break")
+                    }
+                    nmiOnNegativeEdge = false
+                    opcode_table_ptr(NMI_INDEX)()
+                }
+                else if (irqLow && !((P & 0x04) == 0x04)) {
+                    if (breakType != null && breakType.isBreak(PC.A, true, false)) {
+                        breakType = null
+                        tracing = true
+                        breakCallBack(toString)
+                        Log.debug("IRQ Break")
+                    }
+                    opcode_table_ptr(IRQ_INDEX)()
+                }
+                else if (irqLow && cpu_wait) cpu_wait = false
+                else if (!cpu_wait) {
+                    if (tracing) {
+                        Log.debug(formatDebug)
+                        stepCallBack(toString)
+                        syncObject.synchronized {
+                            syncObject.wait
+                        }
+                    }
+                    // fetching
+                    val opcode = mem.read(PC.A)
+                    PC.W.PC_++
+                    opcode_table_ptr(opcode)()
+                }
+                else cpu_cycle_count = 1
+            }
+        }
 
 
   private def CPU_modeSwitch() : Unit = {

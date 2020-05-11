@@ -34,7 +34,7 @@ class SCPUC64 extends CBMComputer {
 
   protected val keybMapper: keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)), "/resources/default_keyboard_c64", C64KeyboardMapper)
 
-  protected val mmu = new SCPUC64MMU.SCPU_MMU(cpuFastMode _)
+  protected val mmu = new SCPUC64MMU.SCPU_MMU(cpuFastMode _, simmUsage _)
   override protected lazy val cpu = new CPU65816(mmu)
   protected val busSnooper = new BusSnoop(bus)
   protected var busSnooperActive = false
@@ -247,6 +247,8 @@ class SCPUC64 extends CBMComputer {
     mmuStatusPanel.setCPU20Mhz(fastMode)
     cpuClocks = if (fastMode) 20 else 1
   }
+
+  private def simmUsage(usage:Float) = mmuStatusPanel.setSIMMUsage(usage)
 
   override def isHeadless = headless
 
@@ -867,6 +869,58 @@ class SCPUC64 extends CBMComputer {
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
     romItem.addActionListener(_ => ROMPanel.showROMPanel(displayFrame, configuration, true,true, () => saveSettings(false)))
+
+    val scpuRamItem = new JMenu("SCPU RAM")
+    optionMenu.add(scpuRamItem)
+    val groupscpu = new ButtonGroup
+    val scpuNORAMItem = new JRadioButtonMenuItem("0M")
+    scpuNORAMItem.addActionListener(_ => mmu.setSIMMSize(0))
+    groupscpu.add(scpuNORAMItem)
+    scpuRamItem.add(scpuNORAMItem)
+    val scpu1MRAMItem = new JRadioButtonMenuItem("1M")
+    scpu1MRAMItem.addActionListener(_ => mmu.setSIMMSize(1))
+    groupscpu.add(scpu1MRAMItem)
+    scpuRamItem.add(scpu1MRAMItem)
+    val scpu4MRAMItem = new JRadioButtonMenuItem("4M")
+    scpu4MRAMItem.addActionListener(_ => mmu.setSIMMSize(4))
+    groupscpu.add(scpu4MRAMItem)
+    scpuRamItem.add(scpu4MRAMItem)
+    val scpu8MRAMItem = new JRadioButtonMenuItem("8M")
+    scpu8MRAMItem.addActionListener(_ => mmu.setSIMMSize(8))
+    groupscpu.add(scpu8MRAMItem)
+    scpuRamItem.add(scpu8MRAMItem)
+    val scpu16MRAMItem = new JRadioButtonMenuItem("16M")
+    scpu16MRAMItem.addActionListener(_ => mmu.setSIMMSize(16))
+    groupscpu.add(scpu16MRAMItem)
+    scpuRamItem.add(scpu16MRAMItem)
+    settings.add("scpu-ram",
+      s"super ram size: none,1,4,8,16",
+      "SCPU_MEM_SIZE",
+      (size: String) => {
+        if (size == "" || size == null) { scpu16MRAMItem.setSelected(true) ; mmu.setSIMMSize(16) }
+        else if (size == "none") { scpuNORAMItem.setSelected(true) ; mmu.setSIMMSize(0) }
+        else if (size == "1") { scpu1MRAMItem.setSelected(true) ; mmu.setSIMMSize(1) }
+        else if (size == "4") { scpu4MRAMItem.setSelected(true) ; mmu.setSIMMSize(4) }
+        else if (size == "8") { scpu8MRAMItem.setSelected(true) ; mmu.setSIMMSize(8) }
+        else if (size == "16") {scpu16MRAMItem.setSelected(true)  ; mmu.setSIMMSize(16) }
+        else throw new IllegalArgumentException(s"Bad SIMM size: $size")
+      },
+      if (scpuNORAMItem.isSelected) "none"
+      else if (scpu1MRAMItem.isSelected) "1"
+      else if (scpu4MRAMItem.isSelected) "4"
+      else if (scpu8MRAMItem.isSelected) "8"
+      else "16"
+    )
+
+    settings.add("scpu-jiffydos-enabled",
+      s"Enables JiffyDOS at startup",
+      "SCPU_JIFFYDOS_ENABLED",
+      (jiffyEnabled: Boolean) => {
+        mmu.setJiffyDOS(jiffyEnabled)
+        mmuStatusPanel.enableJiffyDOS(jiffyEnabled)
+      },
+      mmu.isJiffyDOSEnabled
+    )
   }
 
   override protected def setGlobalCommandLineOptions: Unit = {
@@ -921,6 +975,7 @@ class SCPUC64 extends CBMComputer {
     out.writeBoolean(drivesEnabled(0))
     out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
+    out.writeInt(cpuClocks)
   }
 
   protected def loadState(in: ObjectInputStream) {
@@ -931,6 +986,7 @@ class SCPUC64 extends CBMComputer {
     drivesEnabled(0) = in.readBoolean
     drivesEnabled(1) = in.readBoolean
     printerEnabled = in.readBoolean
+    cpuClocks = in.readInt
     if (!loadStateFromOptions) {
       val msg = s"<html><b>Version:</b> $ver<br><b>Date:</b> ${new java.util.Date(ts)}</html>"
       JOptionPane.showConfirmDialog(displayFrame, msg, "State loading confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) match {

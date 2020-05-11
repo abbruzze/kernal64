@@ -9,8 +9,9 @@ import java.awt.Font
 import java.awt.FlowLayout
 import java.awt.Component
 
-class LabelledLed(label:String,labelUp:Boolean,colorON : Color = Color.GREEN,colorOFF : Color = Color.DARK_GRAY) extends JPanel {
+class LabelledLed(label:String,labelUp:Boolean,colorON : Color = Color.GREEN,colorOFF : Color = Color.DARK_GRAY,xRatio:Float = 1.0f,yRatio:Float = 1.0f) extends JPanel {
   var on : Boolean = false
+  var perc = 1.0
   
   private[this] val led = new JComponent {
     setAlignmentX(Component.CENTER_ALIGNMENT)
@@ -20,20 +21,25 @@ class LabelledLed(label:String,labelUp:Boolean,colorON : Color = Color.GREEN,col
       g2.setColor(Color.BLACK)
       g2.drawRect(0,0,size.width - 1,size.height - 1)
       val color = if (on) colorON else colorOFF
+      if (perc != 1.0) {
+        g2.setColor(colorOFF)
+        g2.fillRect(1,1,size.width - 1,size.height - 1)
+      }
       g2.setColor(color)
-      g2.fillRect(1,1,size.width - 1,size.height - 1)
+      val width = ((size.width - 1) * perc).toInt
+      g2.fillRect(1,1,width,size.height - 1)
     }
   }
   private[this] val labelComponent = {
     val l = new JLabel(label)
-    l.setFont(new Font("Monospaced",Font.BOLD,10))
+    l.setFont(new Font("Arial",Font.BOLD,10))
     l.setAlignmentX(Component.CENTER_ALIGNMENT)
     l.setForeground(Color.RED)
     l
   }
   
-  led.setPreferredSize(new Dimension(10,10))
-  led.setMaximumSize(new Dimension(10,10))
+  led.setPreferredSize(new Dimension((10 * xRatio).toInt,(10 * yRatio).toInt))
+  led.setMaximumSize(new Dimension((10 * xRatio).toInt,(10 * yRatio).toInt))
   setLayout(new BoxLayout(this,BoxLayout.Y_AXIS))
   if (labelUp) {
     add(labelComponent)

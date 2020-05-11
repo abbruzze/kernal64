@@ -1,6 +1,8 @@
 package ucesoft.cbm.scpu
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util
+
 import ucesoft.cbm.cpu._
 import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortConfigurationListener, LastByteReadMemory}
 import ucesoft.cbm.misc.TestCart
@@ -91,7 +93,10 @@ object SCPUC64MMU {
     protected def allowsStateRestoring : Boolean = true
   }
 
-  class COLOR_RAM extends RAMComponent {
+  /**
+   * Wrapper for color ram stored in bank 1 of fastram
+   */
+  class COLOR_RAM(mem:Array[Int]) extends RAMComponent {
     val componentID = "COLOR RAM"
     val componentType = CBMComponentType.MEMORY
 
@@ -100,31 +105,24 @@ object SCPUC64MMU {
     val startAddress = COLOR_RAM
     val length = 1024
 
-    private[this] val mem = Array.fill(length)(0)
     final val isActive = true
     private[this] var lastByteReadMemory : LastByteReadMemory = _
 
     def init {}
-    def reset {
-      for(i <- 0 until mem.length) mem(i) = 0xFF
-    }
+    def reset {}
     def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory): Unit = {
       this.lastByteReadMemory = lastByteReadMemory
     }
 
-    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = (lastByteReadMemory.lastByteRead & 0xF0) | (mem(address & 0x3FF) & 0x0F)
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address & 0x3FF) = value & 0xff
+    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(0x010000 | address)
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(0x010000 | address) = value & 0x0f
     // state
-    protected def saveState(out:ObjectOutputStream) {
-      out.writeObject(mem)
-    }
-    protected def loadState(in:ObjectInputStream) {
-      loadMemory[Int](mem,in)
-    }
+    protected def saveState(out:ObjectOutputStream) {}
+    protected def loadState(in:ObjectInputStream) {}
     protected def allowsStateRestoring : Boolean = true
   }
 
-  class SCPU_MMU(cpuFastModeListener : Boolean => Unit = null) extends RAMComponent with ExpansionPortConfigurationListener {
+  class SCPU_MMU(cpuFastModeListener : Boolean => Unit = null,simmUsageListener: Float => Unit = null) extends RAMComponent with ExpansionPortConfigurationListener {
     val componentID = "Main RAM"
     val componentType = CBMComponentType.MEMORY
     
@@ -135,7 +133,6 @@ object SCPUC64MMU {
     val startAddress = ram.startAddress
     val length = ram.length
     val CHAR_ROM = new CHARACTERS_ROM(ram)
-    val COLOR_RAM = new COLOR_RAM
     val SCPU_ROM = new SCPU_ROM(ram)
     val isActive = true
     
@@ -160,6 +157,9 @@ object SCPUC64MMU {
     // -------------- SCPU staff ---------------------------------------
     private[this] val fastram = Array.ofDim[Int](2 * 65536) // 128K
     private[this] val simmram = Array.ofDim[Int](0xF6 * 65536)
+    private[this] val simmuseMap = Array.ofDim[Boolean](0xF6)
+    private[this] var simmuseBankCount = 0
+    val COLOR_RAM = new COLOR_RAM(fastram)
 
     private[this] var bootMap = true
     private[this] var switch_1Mhz = false
@@ -171,6 +171,7 @@ object SCPUC64MMU {
     private[this] var reg_ramlink_enabled = false
     private[this] var reg_simm_config = 0
     private[this] var mem_conf_page_size,mem_conf_size,mem_simm_page_size,mem_simm_ram_mask = 0
+    private[this] var simm_banks = 0
     private[this] var reg_opt_mode = 0
     private[this] var cpuEmulationMode = false
     private[this] var mirroringMode = 0
@@ -323,6 +324,9 @@ object SCPUC64MMU {
       mirroringMode = 0
       cpuEmulationMode = false
       mirroringArea = MIRROR_AREAS(MIRROR_NO_OPT)
+
+      util.Arrays.fill(simmuseMap,false)
+      simmuseBankCount = 0
     }
 
     @inline private def readVIC(address:Int) : Int = {
@@ -441,7 +445,15 @@ object SCPUC64MMU {
         val offset = address & 0x00FFFF
         var address2 = if (bank == 0xF6) offset else if (bank == 0xF7) 0x010000 | offset else address
         if (mem_simm_page_size != mem_conf_page_size) address2 = ((address2 >> mem_conf_page_size) << mem_simm_page_size) | (address2 & ((1 << mem_simm_page_size) - 1))
-        if ((mem_simm_ram_mask & address2) < mem_conf_size) simmram(address2 & mem_simm_ram_mask) = value
+        if ((mem_simm_ram_mask & address2) < mem_conf_size) {
+          simmram(address2 & mem_simm_ram_mask) = value
+          val bank2 = address2 >> 16
+          if (!simmuseMap(bank2)) {
+            simmuseMap(bank2) = true
+            simmuseBankCount += 1
+            if (simmUsageListener != null) simmUsageListener(simmuseBankCount.toFloat / simm_banks)
+          }
+        }
       }
     }
 
@@ -459,11 +471,13 @@ object SCPUC64MMU {
       }
       else if (address < 0x6000) {
         // ?? don't know if with dosext enabled the writes go to ram
-        if (!reg_dosext_enabled) fastram(address) = value
+        if (!reg_dosext_enabled)
+          fastram(address) = value
       }
       else if (address < 0x8000) {
         // ?? don't know if with alt. kernal enabled the writes go to ram
-        if (!(reg_hw_enabled && c64MemConfig.kernal)) fastram(address) = value
+        if (!(reg_hw_enabled && c64MemConfig.kernal))
+          fastram(address) = value
       }
       if (address < 0xA000) { // ROML or RAM
         // bootmap ignored ??
@@ -485,7 +499,7 @@ object SCPUC64MMU {
           else if (address < 0xD800) sid.write(address,value)
           else if (address < 0xDC00) {
             COLOR_RAM.write(address,value)
-            fastram(0x010000 | address) = value // color ram mirroring ??
+            //fastram(0x010000 | address) = value // color ram mirroring ??
           }
           else if (address < 0xDD00) cia1.write(address,value)
           else if (address < 0xDE00) cia2.write(address,value)
@@ -708,9 +722,18 @@ object SCPUC64MMU {
       val size = mb << 20
       mem_simm_ram_mask = if (size == 0) 0 else size - 1
       mb match {
-        case 1 => mem_simm_page_size = 9 + 2
-        case 4|8 => mem_simm_page_size = 10 + 2
-        case _ => mem_simm_page_size = 11 + 2
+        case 1 =>
+          mem_simm_page_size = 9 + 2
+          simm_banks = 16
+        case 4 =>
+          mem_simm_page_size = 10 + 2
+          simm_banks = 16 * 4
+        case 8 =>
+          mem_simm_page_size = 10 + 2
+          simm_banks = 16 * 8
+        case _ =>
+          mem_simm_page_size = 11 + 2
+          simm_banks = 0xF6
       }
       mem_conf_page_size = mem_simm_page_size
       mem_conf_size = mb * 1024 * 1024
@@ -746,6 +769,7 @@ object SCPUC64MMU {
     }
 
     def setJiffyDOS(enabled:Boolean) : Unit = switch_Jiffy = enabled
+    def isJiffyDOSEnabled : Boolean = switch_Jiffy
     def setSystem1Mhz(enabled:Boolean) : Unit = {
       switch_1Mhz = enabled
       cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
