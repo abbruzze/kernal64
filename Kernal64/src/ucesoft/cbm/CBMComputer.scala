@@ -3,6 +3,7 @@ package ucesoft.cbm
 import java.awt.Color
 import java.awt.event._
 import java.io._
+import java.util.zip.{GZIPInputStream, GZIPOutputStream}
 import java.util.{Properties, ServiceLoader}
 
 import javax.swing._
@@ -313,14 +314,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       }
 
       fn foreach { fn =>
-        in = new ObjectInputStream(new FileInputStream(fn))
+        in = new ObjectInputStream(new GZIPInputStream(new FileInputStream(fn)))
         reset(false)
         load(in)
       }
     }
     catch {
       case t:Throwable =>
-        showError("State loading error","Can't load state. Unexpected error occurred: " + t)
+        showError(s"State loading error",s"Can't load state: ${t.getMessage}")
         t.printStackTrace
         reset(false)
     }
@@ -353,7 +354,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         case _ =>
           return
       }
-      out = new ObjectOutputStream(new FileOutputStream(fn))
+      out = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(fn)))
       save(out)
       out.close
     }

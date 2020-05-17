@@ -181,7 +181,7 @@ private[formats]class UNGCR {
   
   def gcr2Byte(b:Int) = GCR_TO_NIBBLE((b >> 5) & 0x1F) << 4 | GCR_TO_NIBBLE(b & 0x1F)
   
-  def add(b:Int) {
+  def add(b:Int) : Unit = {
     tmpGCRBuffer(index) = b
     index += 1
     if (index == 5) {
@@ -241,7 +241,7 @@ private[formats]class GCR private {
    */
   def add(bs:Int*) = for(b <- bs) GCRBuffer += b
   
-  def addAndConvertToGCR(bs:Int*) {
+  def addAndConvertToGCR(bs:Int*) : Unit = {
     for(b <- bs) {
       tmpGCRBuffer(tmpGCRIndex) = byte2GCR(b)
       tmpGCRIndex += 1

@@ -7,6 +7,6 @@ object DatassetteState extends Enumeration {
 }
 
 trait DatassetteListener {
-  def datassetteStateChanged(newState:DatassetteState.Value)
-  def datassetteUpdatePosition(perc:Int)
+  def datassetteStateChanged(newState:DatassetteState.Value) : Unit
+  def datassetteUpdatePosition(perc:Int) : Unit
 }

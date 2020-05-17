@@ -6,11 +6,10 @@ import java.util
 import ucesoft.cbm.cpu._
 import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortConfigurationListener, LastByteReadMemory}
 import ucesoft.cbm.misc.TestCart
-import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.sid.SID
 import ucesoft.cbm.peripheral.vic.VIC
-import ucesoft.cbm.{CBMComponentType, ChipID, Clock, Log}
+import ucesoft.cbm.{CBMComponentType, ChipID, Log}
 import ucesoft.cbm.c64._
 
 object SCPUC64MMU {
@@ -175,6 +174,7 @@ object SCPUC64MMU {
     private[this] var reg_opt_mode = 0
     private[this] var cpuEmulationMode = false
     private[this] var mirroringMode = 0
+    private[this] var zeroPageAndStackMirroring = false
     private[this] var SCPU_ROM_MASK = 0
 
     /**
@@ -235,6 +235,13 @@ object SCPUC64MMU {
       properties.setProperty("exrom",exrom.toString)
       properties.setProperty("game",game.toString)
       properties.setProperty("Mirroring range",mirroringArea.mkString("[",",","]"))
+      properties.setProperty("reg_sw_1Mhz",reg_sw_1Mhz.toString)
+      properties.setProperty("reg_sys_1Mhz",reg_sys_1Mhz.toString)
+      properties.setProperty("reg_hw_enabled",reg_hw_enabled.toString)
+      properties.setProperty("reg_dosext_enabled",reg_dosext_enabled.toString)
+      properties.setProperty("reg_ramlink_enabled",reg_ramlink_enabled.toString)
+      properties.setProperty("reg_simm_config",reg_simm_config.toString)
+      properties.setProperty("Zero page and Stack mirroring",zeroPageAndStackMirroring.toString)
       properties
     }
 
@@ -275,7 +282,7 @@ object SCPUC64MMU {
       Log.debug("Initializing static & SIMM ram ...")
       initSIMMMemory(fastram)
       initSIMMMemory(simmram)
-      setSIMMSize(16)
+      //setSIMMSize(16)
     }
 
     private def initSIMMMemory(ram:Array[Int]) : Unit = {
@@ -324,6 +331,7 @@ object SCPUC64MMU {
       mirroringMode = 0
       cpuEmulationMode = false
       mirroringArea = MIRROR_AREAS(MIRROR_NO_OPT)
+      zeroPageAndStackMirroring = true
 
       util.Arrays.fill(simmuseMap,false)
       simmuseBankCount = 0
@@ -340,7 +348,9 @@ object SCPUC64MMU {
       ram.read(address, ChipID.VIC)
     }
 
-    final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
+    final def read(_address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
+      val address = _address & 0xFFFFFF
+
       if (chipID == ChipID.VIC) return readVIC(address)
 
       val bank = address >> 16
@@ -434,7 +444,8 @@ object SCPUC64MMU {
       else fastram(address)
     }
 
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit  = {
+    final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit  = {
+      val address = _address & 0xFFFFFF
       val bank = address >> 16
 
       if (isForwardWrite) forwardWriteTo.write(address,value)
@@ -468,27 +479,34 @@ object SCPUC64MMU {
           check0001
         }
         fastram(address) = value
-      }
-      else if (address < 0x6000) {
-        // ?? don't know if with dosext enabled the writes go to ram
-        if (!reg_dosext_enabled)
-          fastram(address) = value
+        if (address < 0x200) {
+          if (zeroPageAndStackMirroring) writeMirror(address,value)
+        }
+        else writeMirror(address,value)
       }
       else if (address < 0x8000) {
-        // ?? don't know if with alt. kernal enabled the writes go to ram
-        if (!(reg_hw_enabled && c64MemConfig.kernal))
-          fastram(address) = value
+        fastram(address) = value
+        writeMirror(address,value)
       }
       if (address < 0xA000) { // ROML or RAM
         // bootmap ignored ??
         if (c64MemConfig.roml) ROML.write(address, value)
-        else fastram(address) = value
+        else {
+          fastram(address) = value
+          writeMirror(address,value)
+        }
       }
       else if (address < 0xC000) { // BASIC or RAM or ROMH
         if (c64MemConfig.romh) ROMH.write(address,value)
-        else fastram(address) = value
+        else {
+          fastram(address) = value
+          writeMirror(address,value)
+        }
       }
-      else if (address < 0xD000) fastram(address) = value // RAM
+      else if (address < 0xD000) {
+        fastram(address) = value
+        writeMirror(address,value)
+      } // RAM
       else if (address < 0xE000) { // I/O or RAM or CHAR
         if (c64MemConfig.io) {
           if (address < 0xD200) {
@@ -505,11 +523,22 @@ object SCPUC64MMU {
           else if (address < 0xDE00) cia2.write(address,value)
           else expansionPort.write(address,value)
         }
-        else fastram(address) = value
+        else {
+          fastram(address) = value
+          writeMirror(address,value)
+        }
       }
       else if (c64MemConfig.romh) ROMH.write(address,value)
-      else if (!bootMap) fastram(address) = value
+      else if (!bootMap) {
+        fastram(address) = value
+        writeMirror(address,value)
+      }
 
+      // TestCart
+      if (TestCart.enabled) TestCart.write(address,value)
+    }
+
+    @inline private def writeMirror(address:Int,value:Int) : Unit = {
       // mirroring handling
       if (address >= mirroringArea(0) && address <= mirroringArea(1)) ram.write(address,value)
     }
@@ -606,7 +635,6 @@ object SCPUC64MMU {
             if (cpuFastModeListener != null)
               cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz))
             Log.debug("Hw reg enabled")
-            plaConfigChanged
           }
         case 0xD07D|
              0xD07F => // hw register disable
@@ -615,7 +643,6 @@ object SCPUC64MMU {
             Log.debug("Hw reg disabled")
             if (cpuFastModeListener != null)
               cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || switch_1Mhz))
-            plaConfigChanged
           }
         case 0xD0B0|
              0xD0B1 => // do nothing
@@ -625,7 +652,6 @@ object SCPUC64MMU {
             if ((value & 0x80) == 0) {
               reg_hw_enabled = false
               Log.debug("Hw reg disabled")
-              plaConfigChanged
             }
             if (cpuFastModeListener != null)
               cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
@@ -645,13 +671,11 @@ object SCPUC64MMU {
           if (reg_hw_enabled && bootMap) {
             bootMap = false
             Log.debug("Bootmap mode disabled")
-            // plaConfigChanged ??
           }
         case 0xD0B7 => // enable bootmap
           if (reg_hw_enabled && !bootMap) {
             bootMap = true
             Log.debug("Bootmap mode enabled")
-            // plaConfigChanged ??
           }
         case 0xD0B8 => // bit 7: software 1Mhz
           if (reg_hw_enabled) {
@@ -667,20 +691,17 @@ object SCPUC64MMU {
           if (reg_hw_enabled && reg_dosext_enabled != newDosExt) {
             reg_dosext_enabled = newDosExt
             Log.debug(s"DOS ext ${if (newDosExt) "enabled" else "disabled"}")
-            plaConfigChanged
           }
         case 0xD0BE => // dos extension enable
           if (reg_hw_enabled && !reg_dosext_enabled) {
             reg_dosext_enabled = true
             Log.debug("DOS ext enabled")
-            plaConfigChanged
           }
         case 0xD0BD|
              0xD0BF => // dos extension disable
           if (reg_hw_enabled && reg_dosext_enabled) {
             reg_dosext_enabled = false
             Log.debug("DOS ext disabled")
-            plaConfigChanged
           }
         case _ =>
       }
@@ -712,10 +733,6 @@ object SCPUC64MMU {
 
     final def cpuOnNativeMode(native:Boolean) : Unit = {
       cpuEmulationMode = !native
-    }
-
-    private def plaConfigChanged : Unit = {
-      Log.debug("Changing PLA config ...")
     }
 
     def setSIMMSize(mb:Int) : Unit = {
@@ -764,8 +781,9 @@ object SCPUC64MMU {
 
     private def updateMirroringMode : Unit = {
       mirroringMode = (reg_opt_mode & 0xC0) >> 5 | (reg_opt_mode & 0x04) >> 2
+      zeroPageAndStackMirroring = (reg_opt_mode & 1) > 0
       mirroringArea = MIRROR_AREAS(mirroringMode)
-      Log.debug(s"Updating mirroring mode to: reg_opt_mode=$reg_opt_mode mirroring of ${MIRROR_AREAS(mirroringMode).mkString("(",",",")")}")
+      Log.debug(s"Updating mirroring mode to: reg_opt_mode=$reg_opt_mode mirroring of ${MIRROR_AREAS(mirroringMode).mkString("(",",",")")} zeroPageAndStackMirroring=$zeroPageAndStackMirroring")
     }
 
     def setJiffyDOS(enabled:Boolean) : Unit = switch_Jiffy = enabled
@@ -775,25 +793,65 @@ object SCPUC64MMU {
       cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
     }
 
-    override def toString = ram.toString
     // state
     protected def saveState(out:ObjectOutputStream) {
+      out.writeBoolean(bootMap)
       out.writeBoolean(ULTIMAX)
       out.writeInt(ddr)
       out.writeInt(pr)
       out.writeBoolean(exrom)
       out.writeBoolean(game)
       out.writeInt(memConfig)
+      out.writeObject(fastram)
+      out.writeObject(simmram)
+      out.writeObject(simmuseMap)
+      out.writeInt(simmuseBankCount)
+      out.writeBoolean(reg_sw_1Mhz)
+      out.writeBoolean(reg_sys_1Mhz)
+      out.writeBoolean(reg_hw_enabled)
+      out.writeBoolean(reg_dosext_enabled)
+      out.writeBoolean(reg_ramlink_enabled)
+      out.writeInt(reg_simm_config)
+      out.writeInt(mem_conf_page_size)
+      out.writeInt(mem_conf_size)
+      out.writeInt(mem_simm_page_size)
+      out.writeInt(mem_simm_ram_mask)
+      out.writeInt(simm_banks)
+      out.writeInt(reg_opt_mode)
+      out.writeBoolean(cpuEmulationMode)
     }
     protected def loadState(in:ObjectInputStream) {
+      bootMap = in.readBoolean
       ULTIMAX = in.readBoolean
       ddr = in.readInt
       pr = in.readInt
       exrom = in.readBoolean
       game = in.readBoolean
       memConfig = in.readInt
+      c64MemConfig = MEM_CONFIG(memConfig)
       check0001
+      loadMemory[Int](fastram,in)
+      loadMemory[Int](simmram,in)
+      loadMemory[Boolean](simmuseMap,in)
+      simmuseBankCount = in.readInt
+      if (simmUsageListener != null) simmUsageListener(simmuseBankCount.toFloat / simm_banks)
+      reg_sw_1Mhz = in.readBoolean
+      reg_sys_1Mhz = in.readBoolean
+      reg_hw_enabled = in.readBoolean
+      reg_dosext_enabled = in.readBoolean
+      reg_ramlink_enabled = in.readBoolean
+      reg_simm_config = in.readInt
+      mem_conf_page_size = in.readInt
+      mem_conf_size = in.readInt
+      mem_simm_page_size = in.readInt
+      mem_simm_ram_mask = in.readInt
+      simm_banks = in.readInt
+      reg_opt_mode = in.readInt
+      cpuEmulationMode = in.readBoolean
+      updateMirroringMode
+      cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
     }
+
     protected def allowsStateRestoring : Boolean = true
   }
 }

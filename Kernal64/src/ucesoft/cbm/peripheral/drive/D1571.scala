@@ -8,10 +8,9 @@ import ucesoft.cbm.cpu.CPU65xx
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
+import java.io.{IOException, ObjectInputStream, ObjectOutputStream, PrintWriter}
+
 import javax.swing.JFrame
-import java.io.PrintWriter
 import ucesoft.cbm.trace.BreakType
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.cpu.ROM
@@ -585,5 +584,9 @@ class D1571(val driveID: Int,
     CYCLE_ADJ = in.readDouble
   }
   protected def allowsStateRestoring : Boolean = true
+
+  override protected def componentIDMismatchHandling(id:String) : Unit = {
+    throw new IOException(s"This snapshot was done with drive ${driveID + 8} of type $id. Please change drive ${driveID + 8} type")
+  }
 }
   

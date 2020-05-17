@@ -91,7 +91,7 @@ class CIA(val name:String,
     
     case class Time(var h:Int,var m:Int,var s:Int,var ts:Int,var am:Boolean) {
       var freezed = false
-      def reset(hh:Int,mm:Int,ss:Int,tss:Int,amm:Boolean,f:Boolean) {
+      def reset(hh:Int,mm:Int,ss:Int,tss:Int,amm:Boolean,f:Boolean) : Unit = {
         h = hh
         m = mm
         s = ss
@@ -100,7 +100,7 @@ class CIA(val name:String,
         freezed = f
       }
       
-      def setFrom(t:Time) {
+      def setFrom(t:Time) : Unit = {
         h = t.h
         m = t.m
         s = t.s
@@ -108,7 +108,7 @@ class CIA(val name:String,
         am = t.am
       }
       
-      def tick {
+      def tick  : Unit = {
         var sl = s & 0x0F
         var sh = (s & 0xF0) >> 4
         var ml = m & 0x0F
@@ -159,7 +159,7 @@ class CIA(val name:String,
         h = hl | (hh << 4)
       }
       
-      def saveState(out:ObjectOutputStream) {
+      def saveState(out:ObjectOutputStream) : Unit = {
         out.writeBoolean(freezed)
         out.writeInt(h)
         out.writeInt(m)
@@ -167,7 +167,7 @@ class CIA(val name:String,
         out.writeInt(ts)
         out.writeBoolean(am)
       }
-      def loadState(in:ObjectInputStream) {
+      def loadState(in:ObjectInputStream) : Unit = {
         freezed = in.readBoolean
         h = in.readInt
         m = in.readInt
@@ -194,7 +194,7 @@ class CIA(val name:String,
     
     def init = reset
     
-    def reset {
+    def reset  : Unit = {
       actualTime.reset(1,0,0,0,true,true)
       latchTime.reset(1,0,0,0,true,false)
       alarmTime.reset(0,0,0,0,true,false)
@@ -202,7 +202,7 @@ class CIA(val name:String,
       reschedule
     }
     
-    def tick(cycles:Long) { // every 1/10 seconds
+    def tick(cycles:Long) : Unit = { // every 1/10 seconds
       // increment actual time if not freezed
       if (!actualTime.freezed) actualTime.tick
       if (!actualTime.freezed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
@@ -237,7 +237,7 @@ class CIA(val name:String,
         latchTime.ts
       }
     }
-    def writeHour(hour:Int) {
+    def writeHour(hour:Int) : Unit = {
       var changed = false
       if ((timerB.readCR & 0x80) > 0) { // set alarm
         val oldH = alarmTime.h
@@ -258,7 +258,7 @@ class CIA(val name:String,
       if (changed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
       resetSync = true
     }
-    def writeMin(min:Int) {
+    def writeMin(min:Int) : Unit = {
       var changed = false
       if ((timerB.readCR & 0x80) > 0) { // set alarm
         val oldM = alarmTime.m
@@ -272,7 +272,7 @@ class CIA(val name:String,
       }
       if (changed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
     }
-    def writeSec(sec:Int) {
+    def writeSec(sec:Int) : Unit = {
       var changed = false
       if ((timerB.readCR & 0x80) > 0) { // set alarm
         val oldS = alarmTime.s
@@ -286,7 +286,7 @@ class CIA(val name:String,
       }
       if (changed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
     }
-    def writeTenthSec(tsec:Int) {
+    def writeTenthSec(tsec:Int) : Unit = {
       var changed = false
       if ((timerB.readCR & 0x80) > 0) { // set alarm
         val oldTS = alarmTime.ts
@@ -308,13 +308,13 @@ class CIA(val name:String,
       if (changed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
     }
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       actualTime.saveState(out)
       latchTime.saveState(out)
       alarmTime.saveState(out)
       saveClockEvents(out)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       actualTime.loadState(in)
       latchTime.loadState(in)
       alarmTime.loadState(in)
@@ -333,7 +333,7 @@ class CIA(val name:String,
   /**
    * Manual clock
    */
-  final def clock(updateTOD:Boolean) {
+  final def clock(updateTOD:Boolean) : Unit = {
     if (irqOnNextClock) {
       irqOnNextClock = false
       setIRQ(irqSrcOnNextClock)
@@ -346,14 +346,14 @@ class CIA(val name:String,
     if (!timerABRunning(0) && !timerABRunning(1)) idleAction(true)
   }
       
-  def init {
+  def init  : Unit = {
     timerA.setSerialCallBack(Some(sendSerial _))
     add(timerB)
     add(timerA)
     add(tod)
   }
   
-  def reset {
+  def reset  : Unit = {
     icr = 0
     sdr = 0
     icrMask = 0
@@ -372,7 +372,7 @@ class CIA(val name:String,
     idleAction(false)
   }
   
-  final def irqHandling(bit:Int) {
+  final def irqHandling(bit:Int) : Unit = {
     // handle TimerB bug for old cias when reading ICR "near" underflow: the bit is not set
     if (!(ciaModel == CIA_MODEL_6526 && bit == IRQ_SRC_TB && ackCycle)) icr |= bit
     if (bit == IRQ_SRC_ALARM || bit == IRQ_SERIAL) setIRQ(bit) else setIRQOnNextClock(bit)
@@ -503,14 +503,14 @@ class CIA(val name:String,
     case CRB => timerB.writeCR(value)
   }
   
-  @inline private def loadShiftRegister {
+  @inline private def loadShiftRegister  : Unit = {
     shiftRegister = sdr // load the shift register
     sdrLoaded = false
     sdrOut = true
     //println("Shift register loaded with " + sdr + " latch=" + sdrlatch)
   }
   
-  private def sendSerial {
+  private def sendSerial  : Unit = {
     if ((timerA.readCR & 0x40) == 0x40) { // serial out
       if (sdrIndex == 0 && sdrLoaded) loadShiftRegister
       if (sdrOut) {
@@ -538,7 +538,7 @@ class CIA(val name:String,
   /**
    * Used for serial
    */
-  final def serialIN(sp:Boolean) {
+  final def serialIN(sp:Boolean) : Unit = {
     // only on rising edge
     if ((timerA.readCR & 0x40) == 0) { // serial input mode
       SP = sp
@@ -554,12 +554,12 @@ class CIA(val name:String,
     }
   }
   
-  final def setSerialOUT(sot:Boolean => Unit) {
+  final def setSerialOUT(sot:Boolean => Unit) : Unit = {
     serialOUTTrigger = sot
   }
   
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeInt(icr)
     out.writeInt(sdr)
     out.writeInt(sdrIndex)
@@ -573,7 +573,7 @@ class CIA(val name:String,
     out.writeBoolean(irqOnNextClock)
     out.writeInt(irqSrcOnNextClock)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     icr = in.readInt
     sdr = in.readInt
     sdrIndex = in.readInt

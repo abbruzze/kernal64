@@ -14,15 +14,15 @@ class NMISwitcher(nmiHandler:(Boolean) => Unit) extends CBMComponent {
     private var cia2NMILow = false
     private var expPortNMILow = false
 
-    def keyboardNMIAction(low: Boolean) {
+    def keyboardNMIAction(low: Boolean) : Unit = {
       keyboardNMILow = low
       handleNMI
     }
-    def cia2NMIAction(low: Boolean) {
+    def cia2NMIAction(low: Boolean) : Unit = {
       cia2NMILow = low
       handleNMI
     }
-    def expansionPortNMI(low: Boolean) {
+    def expansionPortNMI(low: Boolean) : Unit = {
       expPortNMILow = low
       handleNMI
     }
@@ -36,20 +36,20 @@ class NMISwitcher(nmiHandler:(Boolean) => Unit) extends CBMComponent {
       properties
     }
 
-    def init {}
+    def init  : Unit = {}
 
-    def reset {
+    def reset  : Unit = {
       keyboardNMILow = false
       cia2NMILow = false
       expPortNMILow = false
     }
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeBoolean(keyboardNMILow)
       out.writeBoolean(cia2NMILow)
       out.writeBoolean(expPortNMILow)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       keyboardNMILow = in.readBoolean
       cia2NMILow = in.readBoolean
       expPortNMILow = in.readBoolean

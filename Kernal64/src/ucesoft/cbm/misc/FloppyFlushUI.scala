@@ -5,13 +5,13 @@ import ucesoft.cbm.Clock
 import java.awt.Point
 
 trait FloppyFlushListener {
-  def flushing(file:String,f: => Unit)
-  def update(p:Int)
+  def flushing(file:String,f: => Unit) : Unit
+  def update(p:Int) : Unit
 }
 
 class FloppyFlushUI(parentWindow:JFrame) extends FloppyFlushListener {
   private val progress = new JProgressBar
-  def flushing(file:String,f: => Unit) {
+  def flushing(file:String,f: => Unit) : Unit = {
     val dialog = new JDialog(parentWindow,"Flushing...",true)
     progress.setValue(0)
     progress.setStringPainted(true)
@@ -28,7 +28,7 @@ class FloppyFlushUI(parentWindow:JFrame) extends FloppyFlushListener {
     val pos = new Point(parentPos.x + (parentSize.width - size.width) / 2,parentPos.y + (parentSize.height - size.height) / 2)
     dialog.setLocation(pos)
     val t = new Thread {
-      override def run {        
+      override def run  : Unit = {
         Clock.systemClock.pause        
         try {
           f
@@ -46,7 +46,7 @@ class FloppyFlushUI(parentWindow:JFrame) extends FloppyFlushListener {
     t.start
     dialog.setVisible(true)
   }
-  def update(p:Int) {
+  def update(p:Int) : Unit = {
     progress.setValue(p)
   }
 }

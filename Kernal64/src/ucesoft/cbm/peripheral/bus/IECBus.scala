@@ -12,8 +12,8 @@ trait IECBusListener {
   val busid : String
   private[bus] var bitmap = 0
   
-  def atnChanged(oldValue:Int,newValue:Int) {}
-  def srqTriggered {}
+  def atnChanged(oldValue:Int,newValue:Int) : Unit = {}
+  def srqTriggered  : Unit = {}
 }
 
 object IECBusLine extends Enumeration {
@@ -62,7 +62,7 @@ class IECBus extends CBMComponent {
   
   @inline private def normalize(v:Long) = if (v > 0) GROUND else VOLTAGE
   
-  final def unregisterListener(l:IECBusListener) {
+  final def unregisterListener(l:IECBusListener) : Unit = {
     listeners = listeners filterNot { _.busid == l.busid }
     listenersBitMap &= ~l.bitmap
     ATN &= ~(1 << l.bitmap)
@@ -71,7 +71,7 @@ class IECBus extends CBMComponent {
     SRQ &= ~(1 << l.bitmap)
   }
   
-  final def registerListener(l:IECBusListener) {
+  final def registerListener(l:IECBusListener) : Unit = {
     l.bitmap = findAndSetNextBit
     listeners = l :: listeners
     Log.info(s"IECBus has registerd ${l.busid}(${l.bitmap})(${l.getClass.getName}) as a listener")
@@ -80,7 +80,7 @@ class IECBus extends CBMComponent {
     }
   }
   
-  final def setLine(l:IECBusListener,line:IECBusLine.Line,value:Int) {
+  final def setLine(l:IECBusListener,line:IECBusLine.Line,value:Int) : Unit = {
     line match {
       case IECBusLine.ATN => 
         val preATN = ATN
@@ -96,14 +96,14 @@ class IECBus extends CBMComponent {
     }
   }
   
-  @inline private def notifyATNChange(preATN:Long,ATN:Long) {
+  @inline private def notifyATNChange(preATN:Long,ATN:Long) : Unit = {
     var l = listeners
 	  while (l != Nil) {
 	    l.head.atnChanged(normalize(preATN),normalize(ATN))
 	    l = l .tail
 	  }
   }
-  def triggerSRQ(caller:IECBusListener) {
+  def triggerSRQ(caller:IECBusListener) : Unit = {
     var l = listeners
 	  while (l != Nil) {
 	    if (caller.bitmap != l.head.bitmap) l.head.srqTriggered
@@ -111,7 +111,7 @@ class IECBus extends CBMComponent {
 	  }
   }
   
-  final def setLine(l:IECBusListener,atnValue:Int,dataValue:Int,clockValue:Int) {
+  final def setLine(l:IECBusListener,atnValue:Int,dataValue:Int,clockValue:Int) : Unit = {
     val preATN = ATN
     if (atnValue == GROUND) ATN |= 1 << l.bitmap else ATN &= ~(1 << l.bitmap)
     if (preATN != ATN) notifyATNChange(preATN,ATN)
@@ -119,8 +119,8 @@ class IECBus extends CBMComponent {
     if (clockValue == GROUND) CLK |= 1 << l.bitmap else CLK &= ~(1 << l.bitmap)
   }
   
-  def init {}
-  def reset {
+  def init  : Unit = {}
+  def reset  : Unit = {
     ATN = VOLTAGE
     CLK = VOLTAGE
     DATA = VOLTAGE
@@ -135,7 +135,7 @@ class IECBus extends CBMComponent {
   override def toString = s"IECBus ATN=$ATN CLK=$CLK DATA=$DATA SRQ=$SRQ"  
   
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeInt(listeners.size)
     for(l <- listeners) out.writeObject(l.busid)
     out.writeLong(ATN)
@@ -143,7 +143,7 @@ class IECBus extends CBMComponent {
     out.writeLong(DATA)
     out.writeLong(SRQ)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     val listenerSize = in.readInt
     for(l <- 1 to listenerSize) {
       val id = in.readObject.toString

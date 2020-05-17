@@ -19,18 +19,18 @@ class IRQSwitcher(irqHandler: (Boolean) => Unit) extends CBMComponent {
       irqHandler(ciaIRQLow || vicIRQLow || expPortIRQLow)
     }
     
-    final def ciaIRQ(low:Boolean) {     
+    final def ciaIRQ(low:Boolean) : Unit = {
       //Log.debug("CIA setting IRQ as " + low)
       ciaIRQLow = low
       handleIRQ
     }
-    final def vicIRQ(low:Boolean) {  
+    final def vicIRQ(low:Boolean) : Unit = {
       //Log.debug("VIC setting IRQ as " + low)
       vicIRQLow = low
       handleIRQ
     }
     
-    final def expPortIRQ(low:Boolean) {
+    final def expPortIRQ(low:Boolean) : Unit = {
       expPortIRQLow = low
       handleIRQ
     }
@@ -42,20 +42,20 @@ class IRQSwitcher(irqHandler: (Boolean) => Unit) extends CBMComponent {
       properties
     }
     
-    def init {}
+    def init  : Unit = {}
     
-    def reset {
+    def reset  : Unit = {
       ciaIRQLow = false
       vicIRQLow = false
       expPortIRQLow = false
     }
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeBoolean(ciaIRQLow)
       out.writeBoolean(vicIRQLow)
       out.writeBoolean(expPortIRQLow)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       ciaIRQLow = in.readBoolean
       vicIRQLow = in.readBoolean
       expPortIRQLow = in.readBoolean

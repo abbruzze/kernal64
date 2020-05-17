@@ -100,7 +100,7 @@ class KeyboardEditor(keyboard:Keyboard,keybm:KeyboardMapper,isC64:Boolean) exten
     }
   }
   
-  def actionPerformed(e:ActionEvent) {
+  def actionPerformed(e:ActionEvent) : Unit = {
     if (e.getActionCommand == "SAVE") {
       save
       return
@@ -113,7 +113,7 @@ class KeyboardEditor(keyboard:Keyboard,keybm:KeyboardMapper,isC64:Boolean) exten
     requestFocus
   }
   
-  def keyPressed(e:KeyEvent) {
+  def keyPressed(e:KeyEvent) : Unit = {
     val buttonKey = if (e.getKeyCode != KeyEvent.VK_UNDEFINED) ButtonKey(keys(waitingIndex),Some(e.getKeyCode))
                     else ButtonKey(keys(waitingIndex),Some(e.getExtendedKeyCode))
     keyButtons(waitingIndex) = buttonKey
@@ -141,15 +141,15 @@ class KeyboardEditor(keyboard:Keyboard,keybm:KeyboardMapper,isC64:Boolean) exten
     statusLabel.setText("Press a button to redefine a key...")
     statusLabel.setForeground(Color.BLACK)
   }
-  def keyReleased(e:KeyEvent) {}
-  def keyTyped(e:KeyEvent) {}
+  def keyReleased(e:KeyEvent) : Unit = {}
+  def keyTyped(e:KeyEvent) : Unit = {}
   
   private def makeKeyboardMapper : KeyboardMapper = new KeyboardMapper {
     val map = KeyboardEditor.this.map map { kv => (kv._2,kv._1) } toMap
     val keypad_map = KeyboardEditor.this.keypad_map map { kv => (kv._2,kv._1) } toMap
   }
   
-  private def save {
+  private def save  : Unit = {
     val fc = new JFileChooser
     fc.setDialogTitle("Choose where to save this keyboard configuration")
     val fn = fc.showSaveDialog(this) match {

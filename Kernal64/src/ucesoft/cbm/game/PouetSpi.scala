@@ -160,7 +160,7 @@ abstract class PouetSpi(genre:String) extends GameProvider {
         future flatMap { x => x }
     }
   }
-  def interrupt {
+  def interrupt  : Unit = {
     interrupted = true
   }
   val syncConstraints : List[SyncConstraint] = constraints

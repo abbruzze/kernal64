@@ -12,7 +12,7 @@ class TAP(file:String) extends Iterator[Int] {
   
   private def read = tape.read & 0xFF
   
-  private def loadHeader {
+  private def loadHeader  : Unit = {
     for(i <- MAGIC) {
       if (read.toChar != i) throw new IllegalArgumentException("Bad TAP file")
     }
@@ -41,7 +41,7 @@ class TAP(file:String) extends Iterator[Int] {
     else gap << 3
   }
   
-  def write(_value:Int) {
+  def write(_value:Int) : Unit = {
     var value = _value
     if (value > 0xFF) {
       tape.write(0)

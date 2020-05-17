@@ -43,7 +43,7 @@ class Settings {
                           saveF : => T)(implicit settingConv:SettingConv[T]) {
     var lastValue : T = _
 
-    def load(p:Properties) {
+    def load(p:Properties) : Unit = {
       val value = p.getProperty(key) match {
         case null => settingConv.defValue
         case v => settingConv.convert(v)
@@ -51,12 +51,12 @@ class Settings {
       loadF(value)
     }
 
-    def load(value:String) {
+    def load(value:String) : Unit = {
       lastValue = settingConv.convert(value)
       loadF(lastValue)
     }
     
-    def save(p:Properties) {
+    def save(p:Properties) : Unit = {
       if (saveF != null) p.setProperty(key,saveF.toString)
     }
     
@@ -71,27 +71,27 @@ class Settings {
             description : String,
             key : String,
             loadF : T => Unit,
-            saveF : => T)(implicit settingConv:SettingConv[T]) {
+            saveF : => T)(implicit settingConv:SettingConv[T]) : Unit = {
     settings += new Setting(cmdLine,description,key,loadF,saveF)
   } 
   
   def add[T](cmdLine : String,
             description : String,
-            loadF : T => Unit)(implicit settingConv:SettingConv[T]) {
+            loadF : T => Unit)(implicit settingConv:SettingConv[T]) : Unit = {
     settings += new Setting(cmdLine,description,"",loadF,null.asInstanceOf[T])
   } 
   
-  def load(p:Properties) {
+  def load(p:Properties) : Unit = {
     for(s <- settings) s.load(p)
   }
   
-  def save(p:Properties) {
+  def save(p:Properties) : Unit = {
     for(s <- settings) s.save(p)
   }
   
   def checkForHelp(args:Array[String]) : Boolean = args.length == 1 && (args(0) == "--help" || args(0) == "-h" || args(0) == "-help")
   
-  def printUsage {
+  def printUsage  : Unit = {
     println("Usage: [settings] [file to attach]")
     for(s <- settings) {
       val opt = if (s.cmdLine.length > 20) s.cmdLine else s.cmdLine + (" " * (20 - s.cmdLine.length))

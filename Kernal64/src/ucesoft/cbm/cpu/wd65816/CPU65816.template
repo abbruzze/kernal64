@@ -183,6 +183,7 @@ class CPU65816(mem:Memory) extends CPU65xx {
     nmiLow = in.readBoolean
     irqFirstCycle = in.readLong
     nmiFirstCycle = in.readLong
+    CPU_modeSwitch
   }
 
   protected def allowsStateRestoring : Boolean = true

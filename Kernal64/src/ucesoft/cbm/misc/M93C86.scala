@@ -44,7 +44,7 @@ class M93C86(x16:Boolean) {
   
   def input(b:Int) = in = b
   def output = out
-  def chipSelect(select:Boolean) {
+  def chipSelect(select:Boolean) : Unit = {
     cs = select
     if (!cs) {
       firstRead = true
@@ -54,7 +54,7 @@ class M93C86(x16:Boolean) {
     }
   }
   
-  def load(file:File) {
+  def load(file:File) : Unit = {
     try {
       val f = new DataInputStream(new FileInputStream(file))
       for(i <- 0 until eeprom.length) {
@@ -68,7 +68,7 @@ class M93C86(x16:Boolean) {
     }
   }
   
-  def save(file:File) {
+  def save(file:File) : Unit = {
     try {
       val f = new DataOutputStream(new FileOutputStream(file))
       eeprom foreach { v =>
@@ -82,7 +82,7 @@ class M93C86(x16:Boolean) {
     }
   }
   
-  private def serialIn {
+  private def serialIn  : Unit = {
     serialBus <<= 1
     serialBus |= in
     bitCounter += 1
@@ -91,7 +91,7 @@ class M93C86(x16:Boolean) {
   @inline private def decodeAddress = serialBus & ADDRESS_MASK
   @inline private def decodeData = serialBus & DATA_MASK
   
-  def clock(clk:Boolean) {
+  def clock(clk:Boolean) : Unit = {
     val oldClk = this.clk
     this.clk = clk
     if (cs && !oldClk && clk) { // rising edge

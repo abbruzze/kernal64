@@ -44,5 +44,5 @@ object BusDataIterator {
 trait BusDataIterator extends Iterator[Int] {
   def isLast: Boolean
   def getPerc : Int
-  def goto(pos:Int)
+  def goto(pos:Int) : Unit
 }

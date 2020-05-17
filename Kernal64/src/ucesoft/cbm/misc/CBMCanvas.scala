@@ -132,13 +132,13 @@ class CBMCanvas(charRom: Memory) extends JComponent {
     c
   }
 
-  def checkSize {
+  def checkSize  : Unit = {
     val maxWidth = lines map { _.length } max
 
     setPreferredSize(new Dimension(maxWidth * (if (doubleWidth) 16 else 8),lines.length * (if (doubleHeight) 16 else 8)))
   }
 
-  override def paint(g: Graphics) {
+  override def paint(g: Graphics) : Unit = {
     val size = getSize()
     g.setColor(Palette.VIC_COLORS(backgroundColor))
     g.fillRect(0, 0, size.width - 1, size.height - 1)

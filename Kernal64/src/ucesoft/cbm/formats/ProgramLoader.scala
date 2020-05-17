@@ -46,7 +46,7 @@ object ProgramLoader {
     loadingWithWarp = false
   }
 
-  def updateBASICPointers(mem:Memory,startAddress:Int,endAddress:Int,c64Mode:Boolean,drive:Int) {
+  def updateBASICPointers(mem:Memory,startAddress:Int,endAddress:Int,c64Mode:Boolean,drive:Int) : Unit = {
     c64Mode match {
       case true =>
         val endOfBasic = mem.read(55) | mem.read(56) << 8

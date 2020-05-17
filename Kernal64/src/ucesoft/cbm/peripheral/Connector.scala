@@ -17,15 +17,15 @@ abstract class Connector extends CBMComponent {
     performWrite(data)
   }
   
-  protected def performWrite(data:Int)
-  def ddr_=(dir:Int) = {
+  protected def performWrite(data:Int) : Unit
+  def ddr_=(dir:Int): Unit = {
     this.dir = dir
     write(latch)    
   }
-  def ddr = dir
+  def ddr : Int = dir
   
-  def init {}
-  def reset {
+  def init  : Unit = {}
+  def reset  : Unit = {
     dir = 0
     latch = 0
   }
@@ -37,11 +37,11 @@ abstract class Connector extends CBMComponent {
   }
   
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeInt(dir)
     out.writeInt(latch)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     dir = in.readInt
     latch = in.readInt
   }

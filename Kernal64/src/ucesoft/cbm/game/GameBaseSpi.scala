@@ -192,7 +192,7 @@ class GameBaseSpi extends GameProvider {
         future.flatMap { x => x }
     }
   }
-  def interrupt {
+  def interrupt  : Unit = {
     interrupted = true
   }  
   def syncConstraints : List[SyncConstraint] = constraints

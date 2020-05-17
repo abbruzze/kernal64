@@ -48,7 +48,7 @@ object GameUI {
     }
     setPreferredSize(new Dimension(w,h))
     
-    override def paintComponent(g:Graphics) {      
+    override def paintComponent(g:Graphics) : Unit = {
       g.drawImage(image,0,0,w,h,null)
     }
   } 
@@ -67,7 +67,7 @@ object GameUI {
     override def getColumnName(c:Int) = COL_NAMES(c)
     override def isCellEditable(r:Int,c:Int) = false
     
-    def fillWith(newGames:Array[Game]) {
+    def fillWith(newGames:Array[Game]) : Unit = {
       games = newGames
       fireTableDataChanged
     }
@@ -143,7 +143,7 @@ object GameUI {
     def insertUpdate(e:DocumentEvent) = updateFilter
     def removeUpdate(e:DocumentEvent) = updateFilter
     
-    private def updateFilter {
+    private def updateFilter  : Unit = {
       table.getRowSorter.asInstanceOf[DefaultRowSorter[GameTableModel,Int]].setRowFilter(createTableFilter(this))
     }
     
@@ -170,7 +170,7 @@ object GameUI {
         val im = new ResImage(icon.getImage)
         im.setToolTipText(provider.url.getOrElse("http://notavailable").toString)
         im.addMouseListener(new MouseAdapter {
-          override def mouseClicked(e:MouseEvent) {
+          override def mouseClicked(e:MouseEvent) : Unit = {
             provider.url match {
               case Some(url) => java.awt.Desktop.getDesktop.browse(url.toURI)
               case None =>
@@ -206,10 +206,10 @@ object GameUI {
     
     init
     
-    private def init {
+    private def init  : Unit = {
       setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
       addWindowListener(new WindowAdapter {
-        override def windowClosed(e:WindowEvent) {
+        override def windowClosed(e:WindowEvent) : Unit = {
           menu match {
             case Some(menu) =>
               menu.setState(false)
@@ -254,7 +254,7 @@ object GameUI {
       val gameListPanel = new JPanel(new BorderLayout)
       gameListPanel.add("Center",new JScrollPane(gameList))
       gameList.addListSelectionListener(new ListSelectionListener {
-        def valueChanged(e:ListSelectionEvent) {
+        def valueChanged(e:ListSelectionEvent) : Unit = {
           if (e.getValueIsAdjusting || gameList.getSelectedIndex == -1) {
             playButton.setEnabled(false)
             attachDeviceButton.setEnabled(false)
@@ -302,11 +302,11 @@ object GameUI {
       b
     }
     
-    private def updateGamesCount {
+    private def updateGamesCount  : Unit = {
       scrollPane.setBorder(BorderFactory.createTitledBorder(BorderFactory.createRaisedSoftBevelBorder,s"Games [${tableModel.getRowCount}]"))
     }
     
-    def valueChanged(e:ListSelectionEvent) {
+    def valueChanged(e:ListSelectionEvent) : Unit = {
       var row = table.getSelectedRow
       if (e.getValueIsAdjusting || row == -1) {
         loadButton.setEnabled(false)
@@ -318,7 +318,7 @@ object GameUI {
       updateGameInfo(game)
     }
     
-    private def updateGameInfo(game:Game) {
+    private def updateGameInfo(game:Game) : Unit = {
       import provider.repository._
       
       getIconFor(game) match {
@@ -360,7 +360,7 @@ object GameUI {
       setLocationRelativeTo(GamesDialog.this)     
       setCursor(new Cursor(Cursor.WAIT_CURSOR))
       
-      private def cancelSync(cancelButton:AbstractButton) {
+      private def cancelSync(cancelButton:AbstractButton) : Unit = {
         cancelButton.setEnabled(false)
         msg.setText("Canceling operation ...")
         provider.interrupt
@@ -371,7 +371,7 @@ object GameUI {
       }
     }
     
-    private def clearCache(syncButton:AbstractButton) {
+    private def clearCache(syncButton:AbstractButton) : Unit = {
       JOptionPane.showConfirmDialog(this,s"Are you sure you want to clear the cache ?","Cache",JOptionPane.YES_NO_OPTION,JOptionPane.QUESTION_MESSAGE) match {
         case JOptionPane.YES_OPTION =>
           provider.repository.clearCache
@@ -380,7 +380,7 @@ object GameUI {
       }
     }
     
-    private def sync(syncButton:AbstractButton) {
+    private def sync(syncButton:AbstractButton) : Unit = {
       JOptionPane.showConfirmDialog(this,s"Are you sure you want to delete the current ${provider.name}'s archive and download a new one ?","Synchronization",JOptionPane.YES_NO_OPTION,JOptionPane.WARNING_MESSAGE) match {
         case JOptionPane.YES_OPTION =>          
           val constraint : Option[SyncConstraint]= provider.syncConstraints match {
@@ -425,15 +425,15 @@ object GameUI {
       }
     }
     
-    private def beginDownload {
+    private def beginDownload  : Unit = {
       downloadCount.incrementAndGet
       downloadProgress.setIndeterminate(true)
     }
-    private def endDownload {
+    private def endDownload  : Unit = {
       if (downloadCount.decrementAndGet == 0) downloadProgress.setIndeterminate(false)
     }
     
-    private def loadGame(loadButton:AbstractButton) {
+    private def loadGame(loadButton:AbstractButton) : Unit = {
       val row = table.getRowSorter.convertRowIndexToModel(table.getSelectedRow)
       val game = tableModel.getGame(row)
       Future {
@@ -452,7 +452,7 @@ object GameUI {
       }
     }
     
-    private def playGame(playButton:AbstractButton) {
+    private def playGame(playButton:AbstractButton) : Unit = {
       val game = gameListModel.getElementAt(gameList.getSelectedIndex)
       provider.repository.extractEntry(game) match {
         case Some(file) =>
@@ -461,7 +461,7 @@ object GameUI {
           JOptionPane.showMessageDialog(this,s"Cannot play game ${game.name}",s"Error",JOptionPane.ERROR_MESSAGE)
       }
     }
-    private def attachGame(playButton:AbstractButton) {
+    private def attachGame(playButton:AbstractButton) : Unit = {
       val game = gameListModel.getElementAt(gameList.getSelectedIndex)
       provider.repository.extractEntry(game) match {
         case Some(file) =>
@@ -470,7 +470,7 @@ object GameUI {
           JOptionPane.showMessageDialog(this,s"Cannot attach game ${game.name}",s"Error",JOptionPane.ERROR_MESSAGE)
       }
     }
-    private def random10(randomButton:AbstractButton) { 
+    private def random10(randomButton:AbstractButton) : Unit = {
       val button = randomButton.asInstanceOf[JToggleButton]
       if (button.isSelected) table.getRowSorter.asInstanceOf[DefaultRowSorter[GameTableModel,Int]].setRowFilter(createRandomTableFilter(10,tableModel.games.length))
       else filterPanel.changedUpdate(null)

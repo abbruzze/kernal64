@@ -16,7 +16,7 @@ class RS232StatusPanel extends JPanel with RS232StatusListener {
     
     setPreferredSize(new Dimension(10,10))
     
-    override def paint(g:Graphics) {
+    override def paint(g:Graphics) : Unit = {
       val size = getSize()
       val g2 = g.asInstanceOf[Graphics2D]
       g2.setColor(Color.BLACK)
@@ -25,7 +25,7 @@ class RS232StatusPanel extends JPanel with RS232StatusListener {
       g2.fillRect(1,1,size.width - 1,size.height - 1)
     } 
     
-    def setValue(value:Int) {
+    def setValue(value:Int) : Unit = {
       this.value = value
       repaint()
     }
@@ -73,7 +73,7 @@ class RS232StatusPanel extends JPanel with RS232StatusListener {
     connected =  None
   }
   
-  def update(signal:Int,value:Int) {
+  def update(signal:Int,value:Int) : Unit = {
     signal match {
       case RTS => rtsSignal.setValue(value)
       case DTR => dtrSignal.setValue(value)
@@ -83,9 +83,9 @@ class RS232StatusPanel extends JPanel with RS232StatusListener {
     }
   }
   
-  def setRS232Enabled(enabled:Boolean) {
+  def setRS232Enabled(enabled:Boolean) : Unit = {
     SwingUtilities.invokeLater(new Runnable {
-      def run {
+      def run  : Unit = {
         if (enabled) {
           enabledSignal.setValue(1)
           enabledSignal.setToolTipText("Connected")

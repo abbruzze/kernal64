@@ -44,7 +44,7 @@ class D64Canvas(fc:JFileChooser,charRom:Memory,c64Mode:Boolean) extends CBMCanva
 																												 fileName.toUpperCase.endsWith(".D81") ||
 																												 fileName.toUpperCase.endsWith(".G64")
 
-  def propertyChange(e:PropertyChangeEvent) {
+  def propertyChange(e:PropertyChangeEvent) : Unit = {
     val prop = e.getPropertyName
     if (JFileChooser.SELECTED_FILE_CHANGED_PROPERTY.equals(prop)) {
       val file = e.getNewValue.asInstanceOf[File]
@@ -55,7 +55,7 @@ class D64Canvas(fc:JFileChooser,charRom:Memory,c64Mode:Boolean) extends CBMCanva
     }
   }
   
-  protected def readDir(file:File) {
+  protected def readDir(file:File) : Unit = {
     clear
     try {
     	val d64 = Diskette(file.toString)   

@@ -16,7 +16,7 @@ class T64(file: String) {
   def close = t64.close
   def tapeName = _tapeName
 
-  def loadInMemory(mem: Memory, entry: T64Entry,c64Mode:Boolean=true) {
+  def loadInMemory(mem: Memory, entry: T64Entry,c64Mode:Boolean=true) : Unit = {
     t64.seek(entry.offset)
     for (m <- entry.startAddress until entry.startAddress + entry.length) mem.write(m, read)
     

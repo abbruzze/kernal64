@@ -10,11 +10,10 @@ import ucesoft.cbm.peripheral.Connector
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.bus.IECBusListener
 import ucesoft.cbm.cpu.ROM
-import java.io.PrintWriter
+import java.io.{IOException, ObjectInputStream, ObjectOutputStream, PrintWriter}
+
 import ucesoft.cbm.trace.BreakType
 import ucesoft.cbm.cpu.Memory
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
 import javax.swing.JFrame
 import ucesoft.cbm.Log
 import ucesoft.cbm.peripheral.bus.IECBusLine
@@ -412,4 +411,8 @@ class D1581(val driveID: Int,
     CYCLE_ADJ = in.readDouble
   }
   protected def allowsStateRestoring : Boolean = true
+
+  override protected def componentIDMismatchHandling(id:String) : Unit = {
+    throw new IOException(s"This snapshot was done with drive ${driveID + 8} of type $id. Please change drive ${driveID + 8} type")
+  }
 }

@@ -76,7 +76,7 @@ object MFM {
   /**
    * head,track,sector
    */
-  def physicalTrackToLogical(head:Int,track:Array[Int],writeLogical:(Int,Int,Int,Array[Int]) => Unit) {
+  def physicalTrackToLogical(head:Int,track:Array[Int],writeLogical:(Int,Int,Int,Array[Int]) => Unit) : Unit = {
     var offset = 0
     var sectorsEncountered = 0
     var round = 0
@@ -130,7 +130,7 @@ object MFM {
     }
   }
   
-  def buildPhysicalTrack(side:Int,sectorSize:Int,trackID:Int,track:Array[Int],readLogical512:(Int,Int,Int) => Array[Int]) {
+  def buildPhysicalTrack(side:Int,sectorSize:Int,trackID:Int,track:Array[Int],readLogical512:(Int,Int,Int) => Array[Int]) : Unit = {
     var offset = fill(track,0,FILL_MARK,80) // initial track filler
     offset = fill(track,offset,0x00,12)
     offset = fill(track,offset,SYNC_INDEX_MARK,3)

@@ -6,7 +6,7 @@ object TestCart {
   var screenshotFile : Option[String] = None
   var screeshotHandler : java.io.File => Unit = _
 
-  final def write(address:Int,value:Int) {
+  final def write(address:Int,value:Int) : Unit = {
     if (enabled && address == EXITCODE_LOCATION) exit(value)
   }
 

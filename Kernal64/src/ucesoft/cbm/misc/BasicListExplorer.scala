@@ -246,7 +246,7 @@ object BasicListExplorer {
     }
   }
   
-  def list(ram:Memory,startAddress:Int) {
+  def list(ram:Memory,startAddress:Int) : Unit = {
     val sb = new StringBuilder
     var adr = startAddress
     
@@ -259,7 +259,7 @@ object BasicListExplorer {
         val line = ram.read(adr) | ram.read(adr + 1) << 8
         var stringMode = false
         adr += 2
-        sb.append(line + " ")
+        sb.append(s"$line ")
         var token = ram.read(adr)
         while (token != 0 && adr < 0x10000) {
           if (token == 0x22) stringMode = !stringMode 

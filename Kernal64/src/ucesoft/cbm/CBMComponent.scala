@@ -96,10 +96,15 @@ trait CBMComponent {
   final def load(in:ObjectInputStream) : Unit = {
     Log.info(s"Loading $componentID/$componentType's state ...")
     val id = in.readObject.asInstanceOf[String]
-    if (id != componentID) throw new IOException(s"ID Mismatch: found $id, expected $componentID")
+    if (id != componentID) componentIDMismatchHandling(id)
     loadState(in)
     for(c <- _components) c.load(in)
   }
+
+  protected def componentIDMismatchHandling(id:String) : Unit = {
+    throw new IOException(s"ID Mismatch: found $id, current $componentID")
+  }
+
   final def allowsState : Boolean = {
     if (allowsStateRestoring) {
       _components forall { _.allowsStateRestoring }

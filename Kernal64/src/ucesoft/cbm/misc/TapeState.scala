@@ -19,7 +19,7 @@ class TapeState extends JComponent with DatassetteListener {
     progressBar.setVisible(false)
     setVisible(false)
     
-    override def paint(g:Graphics) {
+    override def paint(g:Graphics) : Unit = {
       val size = getSize()
       val g2 = g.asInstanceOf[Graphics2D]
       import DatassetteState._
@@ -41,13 +41,13 @@ class TapeState extends JComponent with DatassetteListener {
       }
     }
     
-    def datassetteStateChanged(newState:DatassetteState.Value) {
+    def datassetteStateChanged(newState:DatassetteState.Value) : Unit = {
       setVisible(true)
       progressBar.setVisible(true)
       state = newState
       repaint()
     }
-    def datassetteUpdatePosition(perc:Int) {
+    def datassetteUpdatePosition(perc:Int) : Unit = {
       progressBar.setValue(perc)
     }
   }

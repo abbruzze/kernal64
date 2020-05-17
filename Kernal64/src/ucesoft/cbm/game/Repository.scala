@@ -36,7 +36,7 @@ class Repository(provider:GameProvider) {
   
   init
   
-  private def init {
+  private def init  : Unit = {
     if (!home.exists) {
       if (!home.mkdirs) throw new IOException(s"Cannot create repository directory $home")
     }
@@ -64,7 +64,7 @@ class Repository(provider:GameProvider) {
     }
   }
   
-  private def writeVersion {
+  private def writeVersion  : Unit = {
     val v = new PrintWriter(new FileOutputStream(version))
     v.print(provider.version)
     versionID = provider.version
@@ -101,7 +101,7 @@ class Repository(provider:GameProvider) {
     }    
   }
   
-  final def save(games:List[Game]) {
+  final def save(games:List[Game]) : Unit = {
     val out = new PrintWriter(new GZIPOutputStream(new FileOutputStream(repository)))
     try {
       for(g <- games) {
@@ -126,7 +126,7 @@ class Repository(provider:GameProvider) {
     }
   }
   
-  def clearCache {
+  def clearCache  : Unit = {
     for(file <- home.listFiles) {
       if (file.getName != repository.getName) file.delete
     }
@@ -194,7 +194,7 @@ class Repository(provider:GameProvider) {
     }
     (connection.getInputStream,fileName)
   }
-  def saveInCache(game:Game) {
+  def saveInCache(game:Game) : Unit = {
     if (game.downloadPageURL.isDefined) {    
       val (in,fileName) = openDownloadURL(game)
       val copied = Files.copy(in,gameid(game).toPath)
@@ -204,7 +204,7 @@ class Repository(provider:GameProvider) {
     }
     saveGameIconInCache(game)
   }
-  def saveGameIconInCache(game:Game) {    
+  def saveGameIconInCache(game:Game) : Unit = {
     if (game.imageURL.isDefined) {
       getIconFor(game) match {
         case None =>

@@ -16,12 +16,12 @@ final case class Game(name:String,imageURL:Option[URL],var downloadPageURL:Optio
 }
 
 trait GamePlayer {
-  def play(file:File)
-  def attachDevice(file:File)
+  def play(file:File) : Unit
+  def attachDevice(file:File) : Unit
 }
 
 trait GameLoadingProgressListener {
-  def update(perc:Int)
+  def update(perc:Int) : Unit
 }
 
 trait SyncConstraint
@@ -38,8 +38,8 @@ trait GameProvider {
   val repository : Repository
   
   def existsNewerVersion : Boolean
-  def setProgressListener(l:GameLoadingProgressListener)
+  def setProgressListener(l:GameLoadingProgressListener) : Unit
   def games(constraint:Option[SyncConstraint]) : Future[List[Game]]
   def syncConstraints : List[SyncConstraint]
-  def interrupt
+  def interrupt : Unit
 }

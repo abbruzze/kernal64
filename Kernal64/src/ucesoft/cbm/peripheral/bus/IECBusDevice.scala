@@ -57,7 +57,7 @@ object IECBusDevice {
     val fileName = new StringBuilder
     private var opened = false
     
-    def clear {
+    def clear  : Unit = {
       buffer.clear
       fileName.clear
     }
@@ -68,7 +68,7 @@ object IECBusDevice {
       buffer.clear
       fileName.clear
     }
-    def addToBuffer(value:Int) {
+    def addToBuffer(value:Int) : Unit = {
       _buffer += value
     }
     def buffer = _buffer
@@ -108,32 +108,32 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
   private[this] var writeCyclesWait = 0L
   private[this] var initNextByte = true
   
-  protected def setMode(newMode:Mode.Value) {
+  protected def setMode(newMode:Mode.Value) : Unit = {
     if (DEBUG) println(s"${busid} - ${newMode} FROM ${mode}") 
     mode = newMode
   } 
   
   // ABSTRACT or HOOK METHODS
-  protected def clocked(cycles:Long) {}
+  protected def clocked(cycles:Long) : Unit = {}
   protected def isDeviceReady : Boolean
   protected def loadData(fileName:String) : Option[BusDataIterator]
   
-  protected def byteJustRead(byte:Int,isLast:Boolean) {}
-  protected def byteJustWritten(isLast:Boolean) {}
-  protected def fileNameReceived {}
-  protected def dataNotFound {}
-  protected def listen {}
-  protected def unlisten {}
-  protected def open {}
-  protected def open_channel {}
-  protected def talk {}
-  protected def untalk {}
-  protected def close {}
-  protected def onCommand(cmd:Command.Value,secondaryAddress:Int) {}
+  protected def byteJustRead(byte:Int,isLast:Boolean) : Unit = {}
+  protected def byteJustWritten(isLast:Boolean) : Unit = {}
+  protected def fileNameReceived  : Unit = {}
+  protected def dataNotFound  : Unit = {}
+  protected def listen  : Unit = {}
+  protected def unlisten  : Unit = {}
+  protected def open  : Unit = {}
+  protected def open_channel  : Unit = {}
+  protected def talk  : Unit = {}
+  protected def untalk  : Unit = {}
+  protected def close  : Unit = {}
+  protected def onCommand(cmd:Command.Value,secondaryAddress:Int) : Unit = {}
   
   // -------------------------------
   
-  final def clock(cycles: Long) {
+  final def clock(cycles: Long) : Unit = {
     val atn = bus.atn == GROUND
     val clk = bus.clk == GROUND
     val data = bus.data == GROUND
@@ -215,11 +215,11 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     lastAtn = atn
   }
   
-  private def set(line:IECBusLine.Line,value:Int) {    
+  private def set(line:IECBusLine.Line,value:Int) : Unit = {
     bus.setLine(this,line,value)
   }
   
-  protected def resetSignals {
+  protected def resetSignals  : Unit = {
     if (DEBUG) println("resetting...")
     initNextByte = true
     setMode(IDLE)
@@ -229,7 +229,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     set(DATA,VOLTAGE)
   }
   
-  private def decodeATNCommand(cycles:Long,data:Int) {
+  private def decodeATNCommand(cycles:Long,data:Int) : Unit = {
     import Command._
     val (cmd,devOrSecAddr) =
     if (data < LISTEN.id + 31) (LISTEN.id,data - LISTEN.id)
@@ -430,7 +430,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     }
   }
   
-  private def loadByte(cycles:Long) {
+  private def loadByte(cycles:Long) : Unit = {
     channels(channel).dataToSend match {
       case Some(ds) =>
         if (ds.isLast) {
@@ -444,7 +444,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     }
   }
   
-  private def initByteToWrite(cycles:Long) {
+  private def initByteToWrite(cycles:Long) : Unit = {
     initNextByte = false
     writeEOI = false
     dataToSendBitIndex = 0
@@ -452,7 +452,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     writeMode = WAIT_LISTENER_READY    
   }
   
-  protected def load(fileName: String) {
+  protected def load(fileName: String) : Unit = {
     if (DEBUG) println("Loading " + fileName)      
     channels(channel).dataToSend = loadData(fileName)
   }

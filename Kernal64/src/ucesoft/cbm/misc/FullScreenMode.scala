@@ -13,7 +13,7 @@ import javax.swing.ImageIcon
 import java.awt.event.MouseListener
 
 object FullScreenMode {
-  def goFullScreen(frame:JFrame,component:JComponent,width:Int,height:Int,mouseListener:MouseListener,keyListeners:KeyListener*) {
+  def goFullScreen(frame:JFrame,component:JComponent,width:Int,height:Int,mouseListener:MouseListener,keyListeners:KeyListener*) : Unit = {
     val env = GraphicsEnvironment.getLocalGraphicsEnvironment
     val device = env.getScreenDevices()(0)
     val conf = device.getDefaultConfiguration
@@ -40,7 +40,7 @@ object FullScreenMode {
         window.addMouseListener(mouseListener)
         for(kl <- keyListeners) window.addKeyListener(kl)        
         window.addKeyListener(new KeyAdapter {
-          override def keyPressed(e:KeyEvent) {
+          override def keyPressed(e:KeyEvent) : Unit = {
             e.getKeyCode match {
               // mouse
               case java.awt.event.KeyEvent.VK_ENTER if e.isAltDown =>

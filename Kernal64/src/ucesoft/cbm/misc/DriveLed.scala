@@ -29,7 +29,7 @@ class DriveLed extends JComponent with CBMComponent {
     }
     
     setPreferredSize(new Dimension(15,15))
-    override def paint(g:Graphics) {
+    override def paint(g:Graphics) : Unit = {
       if (powerLedMode) {
         val size = getSize()
         g.setColor(Color.GRAY)
@@ -45,7 +45,7 @@ class DriveLed extends JComponent with CBMComponent {
       }
     }   
     
-    private def drawLed(on:Boolean,x:Int,y:Int,g:Graphics,size:Dimension,isPowerLed:Boolean,ledColor:Color) {
+    private def drawLed(on:Boolean,x:Int,y:Int,g:Graphics,size:Dimension,isPowerLed:Boolean,ledColor:Color) : Unit = {
       val size = getSize()
       val g2 = g.asInstanceOf[Graphics2D]
       g2.setColor(Color.BLACK)
@@ -66,16 +66,16 @@ class DriveLed extends JComponent with CBMComponent {
       properties
     }
     
-    def init {}
-    def reset {}
+    def init  : Unit = {}
+    def reset  : Unit = {}
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeBoolean(powerOn)
       out.writeBoolean(driveLedOn)
       out.writeBoolean(driveWriteMode)
       out.writeBoolean(powerLedMode)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       powerOn = in.readBoolean
       driveLedOn = in.readBoolean
       driveWriteMode = in.readBoolean

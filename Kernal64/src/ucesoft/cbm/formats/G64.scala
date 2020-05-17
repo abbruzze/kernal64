@@ -106,7 +106,7 @@ private[formats] class G64(val file:String) extends Diskette {
     dirs.toList
   }
   
-  private def loadTracks {    
+  private def loadTracks  : Unit = {
     val header = Array.ofDim[Byte](0x0C)
     disk.readFully(header)
     val magic = "GCR-1541".toArray
@@ -153,13 +153,13 @@ private[formats] class G64(val file:String) extends Diskette {
     }   
   }
   
-  def reset {
+  def reset  : Unit = {
     bit = 1
     trackIndex = 0
     track = 0
   }
   
-  @inline private def checkSector(b:Int) {
+  @inline private def checkSector(b:Int) : Unit = {
     sectorData <<= 1
     sectorData |= b
     if (headerFound) {
@@ -183,7 +183,7 @@ private[formats] class G64(val file:String) extends Diskette {
     checkSector(b)
     b
   }
-  final def writeNextBit(value:Boolean) {
+  final def writeNextBit(value:Boolean) : Unit = {
     checkSector(if (value) 1 else 0)
     trackIndexModified = true
     val mask = 1 << (8 - bit)
@@ -193,7 +193,7 @@ private[formats] class G64(val file:String) extends Diskette {
   final def nextByte : Int = tracks(track)(trackIndex)
   def writeNextByte(b:Int) = tracks(track)(trackIndex) = b & 0xFF
   
-  @inline private def rotate {
+  @inline private def rotate  : Unit = {
     bit = 1
     if (trackIndexModified && canWriteOnDisk) {
       trackIndexModified = false
@@ -203,12 +203,12 @@ private[formats] class G64(val file:String) extends Diskette {
     trackIndex = (trackIndex + 1) % tracks(track).length
   }
   
-  def notifyTrackSectorChangeListener {
+  def notifyTrackSectorChangeListener  : Unit = {
     if (trackChangeListener != null) trackChangeListener((track >> 1) + 1,(track & 1) == 1,sector)
   }
   def currentTrack = track + 1
   def currentSector = sector
-  def changeTrack(trackSteps:Int) {
+  def changeTrack(trackSteps:Int) : Unit = {
     track = trackSteps - 2
     trackIndex = 0
     bit = 1
@@ -220,13 +220,13 @@ private[formats] class G64(val file:String) extends Diskette {
   
   override def toString = s"G64 $file total tracks=$totalTracks"
   // state
-  def save(out:ObjectOutputStream) {
+  def save(out:ObjectOutputStream) : Unit = {
     out.writeInt(trackIndex)
     out.writeInt(track)
     out.writeInt(bit)
     out.writeBoolean(trackIndexModified)
   }
-  def load(in:ObjectInputStream) {
+  def load(in:ObjectInputStream) : Unit = {
     trackIndex = in.readInt
     track = in.readInt
     bit = in.readInt

@@ -10,10 +10,10 @@ class BusSnoop(bus:IECBus) extends IECBusDevice(bus,0xFF) {
   protected def isDeviceReady = true
   protected def loadData(fileName:String) = None
   
-  override protected def onCommand(cmd:IECBusDevice.Command.Value,secondaryAddress:Int) {
+  override protected def onCommand(cmd:IECBusDevice.Command.Value,secondaryAddress:Int) : Unit = {
     Log.info("Bus Snoop: %10s %d".format(cmd.toString,secondaryAddress))
   }
-  override protected def byteJustRead(byte:Int,isLast:Boolean) {
+  override protected def byteJustRead(byte:Int,isLast:Boolean) : Unit = {
     Log.info(s"Bus Snoop: byte read ${Integer.toHexString(byte)}")
   }
 }

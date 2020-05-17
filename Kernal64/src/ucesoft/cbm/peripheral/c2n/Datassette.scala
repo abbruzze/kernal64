@@ -27,8 +27,8 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
   
   def setTapeListener(tapeListener:DatassetteListener) = this.tapeListener = Some(tapeListener)
   
-  def init {}
-  def reset {
+  def init  : Unit = {}
+  def reset  : Unit = {
     motorOn = false
     playPressed = false
     recordPressed = false
@@ -46,7 +46,7 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
     this.tap = tap
   }
   def isPlayPressed = playPressed
-  def pressPlay {
+  def pressPlay  : Unit = {
     if (!playPressed) {
       playPressed = true
       notifyStateChangedTo(DatassetteState.PLAYING)
@@ -57,19 +57,19 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
       }
     }
   }
-  def pressStop {
+  def pressStop  : Unit = {
     if (playPressed) {
       playPressed = false
       notifyStateChangedTo(DatassetteState.STOPPED)
     }
     recordPressed = false
   }
-  def pressRecordAndPlay {
+  def pressRecordAndPlay  : Unit = {
     playPressed = true
     notifyStateChangedTo(DatassetteState.RECORDING)
     recordPressed = true
   }
-  def pressRewind  {
+  def pressRewind   : Unit = {
     playPressed = false
     recordPressed = false
     tap match {
@@ -77,7 +77,7 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
       case Some(tape) => tape.rewind
     }
   }
-  def setWriteLine(on:Boolean) {
+  def setWriteLine(on:Boolean) : Unit = {
     if (recordPressed && (lastWriteLine != on)) {      
       if (!lastWriteLine && on) { // raising edge
         if (lastWriteLineChangeClock != 0) {
@@ -112,7 +112,7 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
     motorOn = on
   }
   
-  private def notifyStateChangedTo(state:DatassetteState.Value) {
+  private def notifyStateChangedTo(state:DatassetteState.Value) : Unit = {
     tapeListener match {
       case Some(tl) => tl.datassetteStateChanged(state)
       case None =>
@@ -131,7 +131,7 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
     properties
   }
   
-  private def clock(cycles: Long) {    
+  private def clock(cycles: Long) : Unit = {
     if (motorOn && playPressed) {
       tap match {
         case None =>
@@ -158,8 +158,8 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
   }
   
   // state
-  protected def saveState(out:ObjectOutputStream) {}
-  protected def loadState(in:ObjectInputStream) {}
+  protected def saveState(out:ObjectOutputStream) : Unit = {}
+  protected def loadState(in:ObjectInputStream) : Unit = {}
   protected def allowsStateRestoring : Boolean = {
     if (motorOn) showError("State error","Can't load/save state if datassette is playing or recording")
     !motorOn

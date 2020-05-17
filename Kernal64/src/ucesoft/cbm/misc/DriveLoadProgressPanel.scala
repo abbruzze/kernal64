@@ -9,17 +9,17 @@ class DriveLoadProgressPanel extends JProgressBar {
     setString("")
     setVisible(false)
     
-    def beginLoading(msg:String) {
+    def beginLoading(msg:String) : Unit = {
       setVisible(true)
       setValue(0)
       setString(msg)
     }
     
-    def updateValue(perc:Int) {
+    def updateValue(perc:Int) : Unit = {
       setValue(perc)
     }
     
-    def endLoading {
+    def endLoading  : Unit = {
       setVisible(false)
     }
   }

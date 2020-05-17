@@ -9,7 +9,7 @@ class T64Canvas(fc:JFileChooser,charRom:Memory,c64Mode:Boolean) extends D64Canva
   setToolTipText("")
   override protected def isFileExtOK(fileName:String) : Boolean = fileName.toUpperCase.endsWith(".T64")
 
-  override def readDir(file:File) {
+  override def readDir(file:File) : Unit = {
     val t64 = new ucesoft.cbm.formats.T64(file.toString)
     t64.close
 

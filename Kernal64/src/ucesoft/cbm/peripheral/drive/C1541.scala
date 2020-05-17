@@ -9,9 +9,8 @@ import ucesoft.cbm.trace.TraceListener
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.trace.BreakType
-import java.io.PrintWriter
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
+import java.io.{IOException, ObjectInputStream, ObjectOutputStream, PrintWriter}
+
 import javax.swing.JFrame
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.bus.IECBusListener
@@ -459,4 +458,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     canSleep = in.readBoolean
   }
   protected def allowsStateRestoring : Boolean = true
+
+  override protected def componentIDMismatchHandling(id:String) : Unit = {
+    throw new IOException(s"This snapshot was done with drive ${jackID + 8} of type $id. Please change drive ${jackID + 8} type")
+  }
 }

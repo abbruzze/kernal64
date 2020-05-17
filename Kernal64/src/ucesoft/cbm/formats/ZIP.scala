@@ -62,7 +62,7 @@ object ZIP {
         None
     }
   }
-  def createZIPWith(zipArchive:File,files:File*) {
+  def createZIPWith(zipArchive:File,files:File*) : Unit = {
     val out = new ZipOutputStream(new FileOutputStream(zipArchive))
     for(f <- files) {
       val entry = new ZipEntry(f.getName)
