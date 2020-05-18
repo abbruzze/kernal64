@@ -176,6 +176,7 @@ object SCPUC64MMU {
     private[this] var mirroringMode = 0
     private[this] var zeroPageAndStackMirroring = false
     private[this] var SCPU_ROM_MASK = 0
+    private[this] var romlhWriting = false
 
     /**
      * MIRRORING mode
@@ -219,7 +220,7 @@ object SCPUC64MMU {
       this.vic = vic
     }
     
-    def getRAM : Memory = ram
+    def getRAM : Memory = this
 
     def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory) = {
       this.lastByteReadMemory = lastByteReadMemory
@@ -335,6 +336,7 @@ object SCPUC64MMU {
 
       util.Arrays.fill(simmuseMap,false)
       simmuseBankCount = 0
+      romlhWriting = false
     }
 
     @inline private def readVIC(address:Int) : Int = {
@@ -488,16 +490,24 @@ object SCPUC64MMU {
         fastram(address) = value
         writeMirror(address,value)
       }
-      if (address < 0xA000) { // ROML or RAM
+      else if (address < 0xA000) { // ROML or RAM
         // bootmap ignored ??
-        if (c64MemConfig.roml) ROML.write(address, value)
+        if (c64MemConfig.roml && !romlhWriting) {
+          romlhWriting = true
+          ROML.write(address, value)
+          romlhWriting = false
+        }
         else {
           fastram(address) = value
           writeMirror(address,value)
         }
       }
       else if (address < 0xC000) { // BASIC or RAM or ROMH
-        if (c64MemConfig.romh) ROMH.write(address,value)
+        if (c64MemConfig.romh && !romlhWriting) {
+          romlhWriting = true
+          ROMH.write(address,value)
+          romlhWriting = false
+        }
         else {
           fastram(address) = value
           writeMirror(address,value)
@@ -528,7 +538,11 @@ object SCPUC64MMU {
           writeMirror(address,value)
         }
       }
-      else if (c64MemConfig.romh) ROMH.write(address,value)
+      else if (c64MemConfig.romh && !romlhWriting) {
+        romlhWriting = true
+        ROMH.write(address,value)
+        romlhWriting = false
+      }
       else if (!bootMap) {
         fastram(address) = value
         writeMirror(address,value)

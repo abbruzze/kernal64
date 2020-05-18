@@ -231,10 +231,12 @@ object ExpansionPortFactory {
     game = true
     
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
-      reg = value
-      romlBankIndex = value & 0x3F
-      exrom = (value & 0x80) > 0
-      notifyMemoryConfigurationChange
+      if (address < 0xDEFF) {
+        reg = value
+        romlBankIndex = value & 0x3F
+        exrom = (value & 0x80) > 0
+        notifyMemoryConfigurationChange
+      }
     }
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = reg    
   }

@@ -72,7 +72,7 @@ class CPMCartridge(mem:Memory,
   
   final override def read(address: Int, chipID: ChipID.ID) = 0
   final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
-    if ((address & 0xDE00) == 0xDE00) {
+    if ((address & 0xFF00) == 0xDE00) {
       turnZ80((value & 0x01) == 0)  
     }
   }
