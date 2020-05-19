@@ -410,7 +410,7 @@ class VDC extends RAMComponent {
           if (vdc_revision == VDC_REVISION_0) xsmooth = ((regs(22) >> 4) - (value & 0x0F)) & 0x0F
           else xsmooth = value & 0x0F
         }
-        if ((value & 0x80) != (oldValue & 0x80)) updateGeometry // bitmap
+        if ((value & 0x80) != (oldValue & 0x80) || (value & 0x10) != (oldValue & 0x10)) updateGeometry // bitmap & double mode
         if ((value & 0x90) != (oldValue & 0x90)) recalculate_xsync
         if (debug) println(s"VDC: REG 25 xsmooth=$xsmooth Video Mode = ${if ((value & 0x80) > 0) "bitmap" else "text"} Color source ${if ((value & 0x40) > 0) "attribute space" else "REG 26"} Semigraph-mode ${if ((value & 0x20) > 0) "on" else "off"} Double pixel mode ${if ((value & 0x10) > 0) "on" else "off"} rasterLine=$rasterLine vblank=$vblank")
       case 26 => // REG 26 background, foregorund colors
