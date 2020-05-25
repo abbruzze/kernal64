@@ -271,6 +271,9 @@ class C128 extends CBMComputer with MMUChangeListener {
     displayFrame.getContentPane.add("South",infoPanel)
     displayFrame.setTransferHandler(DNDHandler)    
     Log.info(sw.toString)
+
+    // GIF Recorder
+    gifRecorder = GIFPanel.createGIFPanel(displayFrame,Array(display,vdcDisplay),Array("VIC","VDC"))
   }
 
   private def loadSettings(args:Array[String]) : Unit = {
@@ -863,6 +866,11 @@ class C128 extends CBMComputer with MMUChangeListener {
     val vdcSnapshotItem = new JMenuItem("VDC ...")
     vdcSnapshotItem.addActionListener(_ => takeSnapshot(false) )
     snapMenu.add(vdcSnapshotItem)
+
+    val gifRecorderItem = new JMenuItem("GIF recorder...")
+    gifRecorderItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    gifRecorderItem.addActionListener(_ => openGIFRecorder )
+    optionMenu.add(gifRecorderItem)
     
     optionMenu.addSeparator
     

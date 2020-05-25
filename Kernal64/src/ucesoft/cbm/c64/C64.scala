@@ -161,6 +161,9 @@ class C64 extends CBMComputer {
     displayFrame.getContentPane.add("South",infoPanel)
     displayFrame.setTransferHandler(DNDHandler)
     Log.info(sw.toString)
+
+    // GIF Recorder
+    gifRecorder = GIFPanel.createGIFPanel(displayFrame,Array(display),Array("VIC"))
   }
 
   private def loadSettings(args:Array[String]) : Unit = {
@@ -527,11 +530,16 @@ class C64 extends CBMComputer {
     optionMenu.add(mouseEnabledItem)
     
     optionMenu.addSeparator
-    
+
     val snapshotItem = new JMenuItem("Take a snapshot...")
     snapshotItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S,java.awt.event.InputEvent.ALT_DOWN_MASK))
     snapshotItem.addActionListener(_ => takeSnapshot )
     optionMenu.add(snapshotItem)
+
+    val gifRecorderItem = new JMenuItem("GIF recorder...")
+    gifRecorderItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    gifRecorderItem.addActionListener(_ => openGIFRecorder )
+    optionMenu.add(gifRecorderItem)
     
     optionMenu.addSeparator
     

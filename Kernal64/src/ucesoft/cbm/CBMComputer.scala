@@ -96,6 +96,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val cia12Running = Array(true,true)
   protected val sid = new ucesoft.cbm.peripheral.sid.SID
   protected var display : vic.Display = _
+  protected var gifRecorder : JDialog = _
   protected val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
   protected val irqSwitcher = new IRQSwitcher(cpu.irqRequest _)
   protected val keybMapper : keyboard.KeyboardMapper
@@ -1030,6 +1031,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       keypadControlPort,
       keyboardControlPort)
   }
+
+  protected def openGIFRecorder : Unit = gifRecorder.setVisible(true)
 
   // -------------------------------------------------------------------
   protected def setMenu : Unit = {

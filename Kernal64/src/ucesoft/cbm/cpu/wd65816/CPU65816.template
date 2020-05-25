@@ -73,6 +73,8 @@ class CPU65816(mem:Memory) extends CPU65xx {
   private[this] var nativeModeListener : Boolean => Unit = _
   private[this] var interruptVectorMapper : Int => Int = _
 
+  private[this] var clockStretchingRequest = false
+
   def setNativeModeListener(l:Boolean => Unit) : Unit = nativeModeListener = l
   def setInterruptVectorMapper(m:Int => Int) : Unit = interruptVectorMapper = m
 
@@ -202,7 +204,7 @@ class CPU65816(mem:Memory) extends CPU65xx {
     breakCallBack = callback
     this.breakType = breakType
   }
-  def jmpTo(pc:Int) : Unit = {}
+  def jmpTo(pc:Int) : Unit = PC.A = pc & 0xFFFF
   def setCycleMode(cycleMode:Boolean) : Unit = {}
   def disassemble(mem:Memory,address:Int) : (String,Int) = {
     val dinfo = CPU65816Disassembler.disassemble(mem, address,P)
@@ -223,61 +225,66 @@ class CPU65816(mem:Memory) extends CPU65xx {
 
   override def toString = CPU65816Disassembler.formatRegisters(A,X,Y,D,S,DB,PC,P,E)
 
+  def requestClockStretching : Unit = clockStretchingRequest = true
+
   // ================ Fetching ===================================
     final def fetchAndExecute(cycles: Int) : Unit = {
-          var c = cycles - remaining_cpu_cycle_count
-          while (c > 0 && !dma) {
-            fetchAndExecute
-            c -= cpu_cycle_count
-          }
-    	  if (!dma) remaining_cpu_cycle_count = -c
-        }
-        @inline private def fetchAndExecute : Unit = {
-          if (breakType != null && breakType.isBreak(PC.A, false, false)) {
-            breakType = null
-            tracing = true
-            breakCallBack(toString)
-          }
-          if (baLow || dma || cpu_stop) return
-            else {
-                cpu_cycle_count = 0
-                // check NMI first
-                if (nmiOnNegativeEdge) {
-                    if (breakType != null && breakType.isBreak(PC.A, false, true)) {
-                        breakType = null
-                        tracing = true
-                        breakCallBack(toString)
-                        Log.debug("NMI Break")
-                    }
-                    nmiOnNegativeEdge = false
-                    opcode_table_ptr(NMI_INDEX)()
+      var c = cycles - remaining_cpu_cycle_count
+      clockStretchingRequest = false
+      while (c > 0 && ready && !clockStretchingRequest) {
+        fetchAndExecute
+        c -= cpu_cycle_count
+      }
+      if (cycles > 1 && clockStretchingRequest) remaining_cpu_cycle_count = 0
+      else if (ready) remaining_cpu_cycle_count = -c else remaining_cpu_cycle_count = 0
+    }
+
+    @inline private def fetchAndExecute : Unit = {
+      if (breakType != null && breakType.isBreak(PC.A, false, false)) {
+        breakType = null
+        tracing = true
+        breakCallBack(toString)
+      }
+      if (cpu_stop) return
+        else {
+            cpu_cycle_count = 0
+            // check NMI first
+            if (nmiOnNegativeEdge) {
+                if (breakType != null && breakType.isBreak(PC.A, false, true)) {
+                    breakType = null
+                    tracing = true
+                    breakCallBack(toString)
+                    Log.debug("NMI Break")
                 }
-                else if (irqLow && !((P & 0x04) == 0x04)) {
-                    if (breakType != null && breakType.isBreak(PC.A, true, false)) {
-                        breakType = null
-                        tracing = true
-                        breakCallBack(toString)
-                        Log.debug("IRQ Break")
-                    }
-                    opcode_table_ptr(IRQ_INDEX)()
-                }
-                else if (irqLow && cpu_wait) cpu_wait = false
-                else if (!cpu_wait) {
-                    if (tracing) {
-                        Log.debug(formatDebug)
-                        stepCallBack(toString)
-                        syncObject.synchronized {
-                            syncObject.wait
-                        }
-                    }
-                    // fetching
-                    val opcode = mem.read(PC.A)
-                    PC.W.PC_++
-                    opcode_table_ptr(opcode)()
-                }
-                else cpu_cycle_count = 1
+                nmiOnNegativeEdge = false
+                opcode_table_ptr(NMI_INDEX)()
             }
+            else if (irqLow && !((P & 0x04) == 0x04)) {
+                if (breakType != null && breakType.isBreak(PC.A, true, false)) {
+                    breakType = null
+                    tracing = true
+                    breakCallBack(toString)
+                    Log.debug("IRQ Break")
+                }
+                opcode_table_ptr(IRQ_INDEX)()
+            }
+            else if (irqLow && cpu_wait) cpu_wait = false
+            else if (!cpu_wait) {
+                if (tracing) {
+                    Log.debug(formatDebug)
+                    stepCallBack(toString)
+                    syncObject.synchronized {
+                        syncObject.wait
+                    }
+                }
+                // fetching
+                val opcode = mem.read(PC.A)
+                PC.W.PC_++
+                opcode_table_ptr(opcode)()
+            }
+            else cpu_cycle_count = 1
         }
+    }
 
 
   private def CPU_modeSwitch() : Unit = {

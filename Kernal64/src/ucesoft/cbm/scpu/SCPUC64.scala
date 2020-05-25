@@ -63,6 +63,8 @@ class SCPUC64 extends CBMComputer {
     Log.info("Building the system ...")
     cpu.setInterruptVectorMapper(mmu.interruptVectorMapper _)
     cpu.setNativeModeListener(cpuNativeMode _)
+    mmu.setClockStretchingRequestListener(cpu.requestClockStretching _)
+    mmu.setCacheWriteWaitListener(cpu.setBaLow _)
     RS232ConfigPanel.registerAvailableRS232Drivers(displayFrame, AVAILABLE_RS232)
     ExpansionPort.addConfigurationListener(mmu)
     // drive
@@ -167,6 +169,9 @@ class SCPUC64 extends CBMComputer {
     displayFrame.getContentPane.add("South", infoPanel)
     displayFrame.setTransferHandler(DNDHandler)
     Log.info(sw.toString)
+
+    // GIF Recorder
+    gifRecorder = GIFPanel.createGIFPanel(displayFrame,Array(display),Array("VIC"))
   }
 
   private def loadSettings(args: Array[String]): Unit = {
@@ -192,8 +197,6 @@ class SCPUC64 extends CBMComputer {
     // deactivate drive 9
     drives(1).setActive(false)
     driveLeds(1).setVisible(false)
-    //cpu.setTrace(true)
-    //traceDialog.forceTracing(true)
   }
 
   protected def mainLoop(cycles: Long) {
@@ -234,7 +237,8 @@ class SCPUC64 extends CBMComputer {
   }
 
   private def baLow(low: Boolean) {
-    cpu.setBaLow(low)
+    //cpu.setBaLow(low)
+    //mmu.setBALow(low) TODO
     expansionPort.setBaLow(low)
   }
 
@@ -548,6 +552,11 @@ class SCPUC64 extends CBMComputer {
     snapshotItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.ALT_DOWN_MASK))
     snapshotItem.addActionListener(_ => takeSnapshot)
     optionMenu.add(snapshotItem)
+
+    val gifRecorderItem = new JMenuItem("GIF recorder...")
+    gifRecorderItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    gifRecorderItem.addActionListener(_ => openGIFRecorder )
+    optionMenu.add(gifRecorderItem)
 
     optionMenu.addSeparator
 

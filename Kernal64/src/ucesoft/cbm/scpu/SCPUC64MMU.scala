@@ -153,6 +153,9 @@ object SCPUC64MMU {
     private[this] var sid : SID = _
     private[this] var vic : VIC = _
 
+    private[this] var clockStretchingRequest : () => Unit = _
+    private[this] var cacheWriteWaitListener : Boolean => Unit = _
+
     // -------------- SCPU staff ---------------------------------------
     private[this] val fastram = Array.ofDim[Int](2 * 65536) // 128K
     private[this] val simmram = Array.ofDim[Int](0xF6 * 65536)
@@ -177,6 +180,7 @@ object SCPUC64MMU {
     private[this] var zeroPageAndStackMirroring = false
     private[this] var SCPU_ROM_MASK = 0
     private[this] var romlhWriting = false
+    private[this] var baLow = false
 
     /**
      * MIRRORING mode
@@ -212,6 +216,14 @@ object SCPUC64MMU {
 
     private[this] var mirroringArea : Array[Int] = MIRROR_AREAS(MIRROR_NO_OPT)
     // -----------------------------------------------------------------
+
+    def setClockStretchingRequestListener(l:() => Unit) : Unit = clockStretchingRequest = l
+    def setCacheWriteWaitListener(l: Boolean => Unit) : Unit = cacheWriteWaitListener = l
+
+    def setBALow(baLow:Boolean) : Unit = {
+      this.baLow = baLow
+      if (!baLow) cacheWriteWaitListener(false)
+    }
 
     def setIO(cia1:CIA,cia2:CIA,sid:SID,vic:VIC): Unit = {
       this.cia1 = cia1
@@ -337,6 +349,7 @@ object SCPUC64MMU {
       util.Arrays.fill(simmuseMap,false)
       simmuseBankCount = 0
       romlhWriting = false
+      baLow = false
     }
 
     @inline private def readVIC(address:Int) : Int = {
@@ -409,13 +422,13 @@ object SCPUC64MMU {
       // from 0x8000 we have to check bootmap mode
       else if (address < 0xA000) { // ROML or RAM
         if (bootMap) SCPU_ROM.read(0xF80000 | address)
-        else if (c64MemConfig.roml) ROML.read(address)
+        else if (c64MemConfig.roml) { clockStretchingRequest() ; ROML.read(address) }
         else fastram(address)
       }
       else if (address < 0xC000) {
         if (bootMap) SCPU_ROM.read(0xF80000 | address)
         else if (c64MemConfig.basic) fastram(0x010000 | address) // bank 1 mirroring of BASIC
-        else if (c64MemConfig.romh) ROMH.read(address)
+        else if (c64MemConfig.romh) { clockStretchingRequest() ; ROMH.read(address) }
         else fastram(address)
       }
       else if (address < 0xD000) { // RAM
@@ -425,24 +438,31 @@ object SCPUC64MMU {
       else if (address < 0xE000) { // I/O or RAM or CHAR
         if (c64MemConfig.io) {
           if (address < 0xD200) {
+            // not emulated: in this range 2 cycles are needed to access instead of 1
             if ((address >= 0xD071 && address < 0xD080) || (address >= 0xD0B0 && address < 0xD0C0)) readRegisters(address)
-            else vic.read(address)
+            else {
+              clockStretchingRequest()
+              vic.read(address)
+            }
           }
           else if (address < 0xD400) fastram(0x010000 | address) // bank 1 mirroring of EXTRA-RAM I/O
-          else if (address < 0xD800) sid.read(address)
-          else if (address < 0xDC00) COLOR_RAM.read(address)
-          else if (address < 0xDD00) cia1.read(address)
-          else if (address < 0xDE00) cia2.read(address)
-          else expansionPort.read(address)
+          else if (address < 0xD800) { clockStretchingRequest() ; sid.read(address) }
+          else if (address < 0xDC00) { clockStretchingRequest() ; COLOR_RAM.read(address) }
+          else if (address < 0xDD00) { clockStretchingRequest(); cia1.read(address) }
+          else if (address < 0xDE00) { clockStretchingRequest() ; cia2.read(address) }
+          else {
+            clockStretchingRequest()
+            expansionPort.read(address)
+          }
         }
-        else if (c64MemConfig.char) CHAR_ROM.read(address)
-        else if (bootMap) SCPU_ROM.read(0xF80000 | address) // TODO to be checked
+        else if (c64MemConfig.char) { clockStretchingRequest() ; CHAR_ROM.read(address) }
+        else if (bootMap) SCPU_ROM.read(0xF80000 | address)
         else fastram(address)
       }
       else if (bootMap) SCPU_ROM.read(0xF80000 | address)
       else if (c64MemConfig.kernal && !reg_hw_enabled) fastram(0x010000 | address) // bank 1 mirroring of KERNAL
       else if (c64MemConfig.kernal && reg_hw_enabled) fastram(0x016000 + (address - 0xE000)) // bank 1 mirroring of ALT. KERNAL
-      else if (c64MemConfig.romh) ROMH.read(address)
+      else if (c64MemConfig.romh) { clockStretchingRequest() ; ROMH.read(address) }
       else fastram(address)
     }
 
@@ -479,6 +499,7 @@ object SCPUC64MMU {
         else if (address == 1) {
           pr = value & 0x07
           check0001
+          clockStretchingRequest()
         }
         fastram(address) = value
         if (address < 0x200) {
@@ -520,18 +541,22 @@ object SCPUC64MMU {
       else if (address < 0xE000) { // I/O or RAM or CHAR
         if (c64MemConfig.io) {
           if (address < 0xD200) {
+            // not emulated: in this range 2 cycles are needed to access instead of 1
             if ((address >= 0xD071 && address < 0xD080) || (address >= 0xD0B0 && address < 0xD0C0)) writeRegisters(address,value)
-            else vic.write(address,value)
+            else { clockStretchingRequest() ; vic.write(address,value) }
           }
-          else if (reg_hw_enabled && address < 0xD400) fastram(0x010000 | address) = value // bank 1 mirroring of EXTRA-RAM I/O
-          else if (address < 0xD800) sid.write(address,value)
+          else if (address < 0xD400 && (reg_hw_enabled || address == 0xD27E)) fastram(0x010000 | address) = value // bank 1 mirroring of EXTRA-RAM I/O
+          else if (address < 0xD800) { clockStretchingRequest() ; sid.write(address,value) }
           else if (address < 0xDC00) {
             COLOR_RAM.write(address,value)
-            //fastram(0x010000 | address) = value // color ram mirroring ??
+            clockStretchingRequest()
           }
-          else if (address < 0xDD00) cia1.write(address,value)
-          else if (address < 0xDE00) cia2.write(address,value)
-          else expansionPort.write(address,value)
+          else if (address < 0xDD00) { clockStretchingRequest(); cia1.write(address,value) }
+          else if (address < 0xDE00) { clockStretchingRequest(); cia2.write(address,value) }
+          else {
+            expansionPort.write(address,value)
+            clockStretchingRequest()
+          }
         }
         else {
           fastram(address) = value
@@ -553,8 +578,12 @@ object SCPUC64MMU {
     }
 
     @inline private def writeMirror(address:Int,value:Int) : Unit = {
-      // mirroring handling
-      if (address >= mirroringArea(0) && address <= mirroringArea(1)) ram.write(address,value)
+      if (address >= mirroringArea(0) && address <= mirroringArea(1)) {
+        // check BA
+        if (baLow) cacheWriteWaitListener(true)
+        // mirroring handling: cache full not emulated
+        ram.write(address,value)
+      }
     }
 
     @inline private def readRegisters(address:Int) : Int = {
