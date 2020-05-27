@@ -37,6 +37,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   private[this] var vdcEnabled = true // used with --vdc-disabled
   protected val mmu = new C128MMU(this)
   private[this] val z80 = new Z80(mmu,mmu)
+  override protected val irqSwitcher = new IRQSwitcher(irqRequest _)
   private[this] var cpuFrequency = 1
   private[this] var c64Mode = false
   private[this] var z80Active = true
