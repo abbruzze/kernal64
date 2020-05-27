@@ -181,6 +181,7 @@ object SCPUC64MMU {
     private[this] var SCPU_ROM_MASK = 0
     private[this] var romlhWriting = false
     private[this] var baLow = false
+    private[this] var fastMode = false
 
     /**
      * MIRRORING mode
@@ -220,6 +221,11 @@ object SCPUC64MMU {
     def setClockStretchingRequestListener(l:() => Unit) : Unit = clockStretchingRequest = l
     def setCacheWriteWaitListener(l: Boolean => Unit) : Unit = cacheWriteWaitListener = l
 
+    private def localCpuFastModeListener(fastMode:Boolean) : Unit = {
+      this.fastMode = fastMode
+      if (cpuFastModeListener != null) cpuFastModeListener(fastMode)
+    }
+
     def setBALow(baLow:Boolean) : Unit = {
       this.baLow = baLow
       if (!baLow) cacheWriteWaitListener(false)
@@ -255,6 +261,7 @@ object SCPUC64MMU {
       properties.setProperty("reg_ramlink_enabled",reg_ramlink_enabled.toString)
       properties.setProperty("reg_simm_config",reg_simm_config.toString)
       properties.setProperty("Zero page and Stack mirroring",zeroPageAndStackMirroring.toString)
+      properties.setProperty("Fast mode",fastMode.toString)
       properties
     }
 
@@ -580,7 +587,7 @@ object SCPUC64MMU {
     @inline private def writeMirror(address:Int,value:Int) : Unit = {
       if (address >= mirroringArea(0) && address <= mirroringArea(1)) {
         // check BA
-        if (baLow) cacheWriteWaitListener(true)
+        if (baLow && !fastMode && !cpuEmulationMode) cacheWriteWaitListener(true) // not clear how the BA signal is managed
         // mirroring handling: cache full not emulated
         ram.write(address,value)
       }
@@ -622,14 +629,13 @@ object SCPUC64MMU {
         case 0xD072 => // System 1Mhz enable
           if (!reg_sys_1Mhz) {
             reg_sys_1Mhz = true
-            if (cpuFastModeListener != null) cpuFastModeListener(false)
+            localCpuFastModeListener(false)
             Log.debug("Fast mode off")
           }
         case 0xD073 => // System 1Mhz disable
           if (reg_sys_1Mhz) {
             reg_sys_1Mhz = false
-            if (cpuFastModeListener != null)
-              cpuFastModeListener(!(reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
+            localCpuFastModeListener(!(reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
             Log.debug("Slow mode off")
           }
         case 0xD074 => // set optimization mode
@@ -660,23 +666,21 @@ object SCPUC64MMU {
         case 0xD07A => // software 1Mhz enable
           if (!reg_sw_1Mhz) {
             reg_sw_1Mhz = true
-            if (cpuFastModeListener != null) cpuFastModeListener(false)
+            localCpuFastModeListener(false)
             Log.debug("Fast mode off")
           }
         case 0xD079|
              0xD07B => // software 1Mhz disable
           if (reg_sw_1Mhz) {
             reg_sw_1Mhz = false
-            if (cpuFastModeListener != null)
-              cpuFastModeListener(!(reg_sys_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
+            localCpuFastModeListener(!(reg_sys_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
             Log.debug("Slow mode off")
           }
         case 0xD07C => // do nothing
         case 0xD07E => // hw register enable
           if (!reg_hw_enabled) {
             reg_hw_enabled = true
-            if (cpuFastModeListener != null)
-              cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz))
+            localCpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz))
             Log.debug("Hw reg enabled")
           }
         case 0xD07D|
@@ -684,8 +688,7 @@ object SCPUC64MMU {
           if (reg_hw_enabled) {
             reg_hw_enabled = false
             Log.debug("Hw reg disabled")
-            if (cpuFastModeListener != null)
-              cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || switch_1Mhz))
+            localCpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || switch_1Mhz))
           }
         case 0xD0B0|
              0xD0B1 => // do nothing
@@ -696,8 +699,7 @@ object SCPUC64MMU {
               reg_hw_enabled = false
               Log.debug("Hw reg disabled")
             }
-            if (cpuFastModeListener != null)
-              cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
+            localCpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
           }
         case 0xD0B3 => // optimization mode
           if (reg_hw_enabled) {
@@ -723,8 +725,7 @@ object SCPUC64MMU {
         case 0xD0B8 => // bit 7: software 1Mhz
           if (reg_hw_enabled) {
             reg_sw_1Mhz = (value & 0x80) > 0
-            if (cpuFastModeListener != null)
-              cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
+            localCpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
           }
         case 0xD0B9|
              0xD0BA|
@@ -833,7 +834,7 @@ object SCPUC64MMU {
     def isJiffyDOSEnabled : Boolean = switch_Jiffy
     def setSystem1Mhz(enabled:Boolean) : Unit = {
       switch_1Mhz = enabled
-      cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
+      localCpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
     }
 
     // state
@@ -892,7 +893,7 @@ object SCPUC64MMU {
       reg_opt_mode = in.readInt
       cpuEmulationMode = in.readBoolean
       updateMirroringMode
-      cpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
+      localCpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
     }
 
     protected def allowsStateRestoring : Boolean = true

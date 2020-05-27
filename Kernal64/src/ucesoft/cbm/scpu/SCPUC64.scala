@@ -238,7 +238,7 @@ class SCPUC64 extends CBMComputer {
 
   private def baLow(low: Boolean) {
     //cpu.setBaLow(low)
-    //mmu.setBALow(low) TODO
+    mmu.setBALow(low)
     expansionPort.setBaLow(low)
   }
 

@@ -11,7 +11,6 @@ object ProgramLoader {
   private[this] var loadingWithWarp = false
   var loadingWithWarpEnabled = true
   var warpModeListener : (Boolean) => Unit = _
-  private[this] lazy val clk = Clock.systemClock
 
   def checkLoadingInWarpMode(c64Mode:Boolean): Unit = {
     if (c64Mode) {

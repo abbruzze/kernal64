@@ -29,7 +29,7 @@ class GamePadControlPort(configuration:Properties) extends ControlPort {
         xAxisComponent = Option(comp.getComponent(Component.Identifier.Axis.X))
         yAxisComponent = Option(comp.getComponent(Component.Identifier.Axis.Y))
         fireComponent = comp.getComponents find { c => c.getIdentifier.getName == controllerFireName}
-        println("Find controller: " + comp.getName + " " + xAxisComponent + " " + yAxisComponent + " " + fireComponent)
+        //println("Find controller: " + comp.getName + " " + xAxisComponent + " " + yAxisComponent + " " + fireComponent)
     }
   }
   
