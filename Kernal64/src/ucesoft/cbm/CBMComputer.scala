@@ -667,6 +667,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         floppyComponents(id).drive = drives(id)
         c.getFloppy.close
         c.disconnect
+        drivesRunning(id) = true
         drives(id).initComponent
         change(c,drives(id))
         inspectDialog.updateRoot

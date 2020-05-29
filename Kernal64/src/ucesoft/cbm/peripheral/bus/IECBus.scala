@@ -64,7 +64,7 @@ class IECBus extends CBMComponent {
   
   final def unregisterListener(l:IECBusListener) : Unit = {
     listeners = listeners filterNot { _.busid == l.busid }
-    listenersBitMap &= ~l.bitmap
+    listenersBitMap &= ~(1 << l.bitmap)
     ATN &= ~(1 << l.bitmap)
     DATA &= ~(1 << l.bitmap)
     CLK &= ~(1 << l.bitmap)
