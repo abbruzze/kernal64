@@ -1,12 +1,11 @@
 package ucesoft.cbm.misc
 
 import java.awt.event.{WindowAdapter, WindowEvent}
-import java.awt.image.BufferedImage
-import java.awt.{BorderLayout, Container, FlowLayout, GridBagConstraints, GridBagLayout, GridLayout, Insets}
+import java.awt.{Font, GridBagConstraints, GridBagLayout, Insets}
 import java.io.{File, FileOutputStream}
 
 import javax.swing.filechooser.FileFilter
-import javax.swing.{JButton, JCheckBox, JComboBox, JComponent, JDialog, JFileChooser, JFrame, JLabel, JList, JPanel, JTextField, SwingUtilities, WindowConstants}
+import javax.swing._
 import ucesoft.cbm.peripheral.vic.Display
 
 class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel with Runnable {
@@ -105,16 +104,35 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
 
   def run : Unit = {
     val includeFrame = frameCheckbox.isSelected
-    val component = if (includeFrame) SwingUtilities.getRoot(display(selectedDisplayIndex)) else display(selectedDisplayIndex)
-    val image = createImage(component.getSize().width + 1,component.getSize().height + 1).asInstanceOf[BufferedImage]
+    val region = if (includeFrame) {
+      val frame = SwingUtilities.getRoot(display(selectedDisplayIndex)).asInstanceOf[JFrame]
+      frame.requestFocus()
+      val rootPane = frame.getRootPane
+      val wp = frame.getLocationOnScreen
+      val p = rootPane.getLocationOnScreen
+      val delta = p.y - wp.y - 1
+      val rec = rootPane.getBounds()
+      rec.x = p.x
+      rec.y = wp.y + 1
+      rec.height += delta
+      rec
+    }
+    else {
+      val rec = display(selectedDisplayIndex).getBounds()
+      val p = display(selectedDisplayIndex).getLocationOnScreen
+      rec.x = p.x
+      rec.y = p.y
+      rec
+    }
     val writer = new AnimatedGIFWriter(true)
     writer.prepareForWrite(out,-1,-1)
     var frameRecorded = 0
+    val r = new java.awt.Robot
 
     while (recording) {
       val ts = System.currentTimeMillis
       SwingUtilities.invokeAndWait( () => {
-        component.paint(image.getGraphics)
+        val image = r.createScreenCapture(region)
         writer.writeFrame(out, image, delayInMillis)
         frameRecorded += 1
         frameRecordedLabel.setText(frameRecorded.toString)
