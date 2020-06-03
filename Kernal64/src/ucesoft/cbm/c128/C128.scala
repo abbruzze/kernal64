@@ -1224,15 +1224,19 @@ class C128 extends CBMComputer with MMUChangeListener {
     settings.add("ext-rom",
       "External function ROM path",
       (extRom:String) => {
-        configuration.setProperty(ROM.C128_EXTERNAL_ROM_PROP,extRom)
-        checkFunctionROMS
+        if (extRom != null && extRom != "") {
+          configuration.setProperty(ROM.C128_EXTERNAL_ROM_PROP, extRom)
+          checkFunctionROMS
+        }
       }
     )
     settings.add("int-rom",
       "Internal function ROM (<rom path>,NORMAL|MEGABIT)",
       (intRom:String) => {
-        configuration.setProperty(ROM.C128_INTERNAL_ROM_PROP,intRom)
-        checkFunctionROMS
+        if (intRom != null && intRom != "") {
+          configuration.setProperty(ROM.C128_INTERNAL_ROM_PROP, intRom)
+          checkFunctionROMS
+        }
       }
     )
     settings.add("go64",
