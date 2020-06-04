@@ -14,6 +14,7 @@ Go to https://github.com/abbruzze/kernal64/releases/latest and download and unzi
 Be sure to have a jre (1.8 or above) in the path and launch:
 - On Windows: **k64.bat**, **kscpu64.bat** or **k128.bat**. If you want the shell support (for --help command line, for example) you could use the **k64s.bat**, **kscpu64s.bat** or **k128s.bat** scripts.
 - On Linux: **k64.sh**, **kscpu64.sh** or **k128.sh**.
+
 I experienced a boost in performance using Java 9+.
 
 The scripts start java with the -server option for performance reason. It could happen that your Java installation does not support the server option. In this case edit the script and remove the -server option.
