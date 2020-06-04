@@ -271,6 +271,7 @@ object ExpansionPortFactory {
     }
     private[this] val VALID_CRT = crt.kbSize == 128 || crt.kbSize == 256 || crt.kbSize == 512
     private[this] val CRT_16K = crt.kbSize == 128 || crt.kbSize == 256
+    private[this] lazy val T2 = crt.name == "T2"
 
     override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (address == 0xDE00) {
@@ -283,6 +284,8 @@ object ExpansionPortFactory {
         }
       }
     }
+
+    override def convertBankNumber(bank: Int): Int = if (!T2 && bank > 15) bank - 16 else bank
 
     override def ROMH = if (VALID_CRT) super.ROMH else ROMLMirrored
   }
