@@ -3,17 +3,18 @@
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
 
-Kernal64 ver 1.6.0
+Kernal64 ver 1.6.1
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
+![](https://github.com/abbruzze/kernal64/blob/master/images/kernal64_scpu.gif)
 
 ### Installation
 Go to https://github.com/abbruzze/kernal64/releases/latest and download and unzip on your computer the latest version.
-Be sure to have a jre (1.8 or above) in the path and launch the **k64.bat** or **k64.sh** or **k128** equivalent for 128 emulator batch file, depending on your operating system.
+Be sure to have a jre (1.8 or above) in the path and launch:
+- On Windows: **k64.bat**, **kscpu64.bat** or **k128.bat**. If you want the shell support (for --help command line, for example) you could use the **k64s.bat**, **kscpu64s.bat** or **k128s.bat** scripts.
+- On Linux: **k64.sh**, **kscpu64.sh** or **k128.sh**.
 I experienced a boost in performance using Java 9+.
-
-Windows users that want shell support (for --help command line, for example) could use the **k64s.bat** or **k128s.bat** scripts.
 
 The scripts start java with the -server option for performance reason. It could happen that your Java installation does not support the server option. In this case edit the script and remove the -server option.
 
@@ -21,6 +22,31 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.6.1 (Jun 4th 2020)
+- CMD SuperCPU support
+  - Added new kscpu64 scripts to run the emulator with SCPU attached
+  - Emulation of WD65816 is not cycle exact: most of SCPU software run properly except some timing accurate demos
+  - Emulation of BA signal from VIC partially supported
+  - Emulation of SIMM memory: up to 16M
+  - Emulation of 1Mhz mode during I/O access partially supported
+  - Shipped with VICE's SCPU rom. CMD's rom 2.04 also supported
+  - New leds on the bottom: native (65816 in native mode), 20Mhz (turbo mode on), clickable JIFFYDOS (jiffy dos enabled), clickable SPEED (master speed selector), SIMM usage (% of SIMM usage)
+  - Added command line options to configure simm size and jiffydos
+  
+![Metal Dust](https://github.com/abbruzze/kernal64/blob/master/images/scpu_metal.png)
+
+- General
+  - Fixed cartridge type 5 banks handling
+  - Fixed a bug when the user change the drive type 
+  - New GIF Recorder utility: now you can create an animated GIF from what you see on the emulator (ALT-F)
+  - Fixed CP/M cart with SCPU
+  - Fixed cart type 19
+- 128
+  - Fixed internal/external ROM configuration saving
+  - Fixed bug on Z80 IRQ handling introduced during refactoring that prevents CP/M keyboard to work properly
+  - Fixed handling of double char mode. Now Bucket Wars (Dual) 1.3 +2 ONSLAUGHT intro works fine
+
 
 ### What's new in 1.6.0 (Apr 3rd 2020)
 - General
