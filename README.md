@@ -36,6 +36,7 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
   - Added command line options to configure simm size and jiffydos
   
 ![Metal Dust](https://github.com/abbruzze/kernal64/blob/master/images/scpu_metal.png)
+![Wolf3D](https://github.com/abbruzze/kernal64/blob/master/images/scpu_wolf3d.png)
 
 - General
   - Fixed cartridge type 5 banks handling
