@@ -22,7 +22,7 @@ object Floppy {
         out.write(content)
         out.close
         val fileName = file.toUpperCase
-        val floppy : Floppy = Diskette(fileName)
+        val floppy : Floppy = Diskette(tmpFile.toString)
         floppy.load(in)
         Some(floppy)
       case false =>
