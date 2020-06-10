@@ -24,8 +24,8 @@ If you want to load a 16M REU modify the memory settings inside the start script
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
-### What's new in 1.6.1 (Jun 4th 2020)
-- CMD SuperCPU support
+### What's new in 1.6.1 SCPU (Jun 4th 2020)
+- CMD SuperCPU support for C64
   - Added new kscpu64 scripts to run the emulator with SCPU attached
   - Emulation of WD65816 is not cycle exact: most of SCPU software run properly except some timing accurate demos
   - Emulation of BA signal from VIC partially supported
@@ -44,6 +44,7 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
   - New GIF Recorder utility: now you can create an animated GIF from what you see on the emulator (ALT-F)
   - Fixed CP/M cart with SCPU
   - Fixed cart type 19
+  - When user load a saved state, the drivers' type are automatically set according to what it's stored on state.
 - 128
   - Fixed internal/external ROM configuration saving
   - Fixed bug on Z80 IRQ handling introduced during refactoring that prevents CP/M keyboard to work properly
