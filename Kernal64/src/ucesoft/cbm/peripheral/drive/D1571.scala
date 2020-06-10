@@ -586,7 +586,8 @@ class D1571(val driveID: Int,
   protected def allowsStateRestoring : Boolean = true
 
   override protected def componentIDMismatchHandling(id:String) : Unit = {
-    throw new IOException(s"This snapshot was done with drive ${driveID + 8} of type $id. Please change drive ${driveID + 8} type")
+    //throw new IOException(s"This snapshot was done with drive ${driveID + 8} of type $id. Please change drive ${driveID + 8} type")
+    throw new DriveIDMismatch(driveID,id)
   }
 }
   

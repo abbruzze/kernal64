@@ -460,6 +460,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   protected def allowsStateRestoring : Boolean = true
 
   override protected def componentIDMismatchHandling(id:String) : Unit = {
-    throw new IOException(s"This snapshot was done with drive ${jackID + 8} of type $id. Please change drive ${jackID + 8} type")
+    //throw new IOException(s"This snapshot was done with drive ${jackID + 8} of type $id. Please change drive ${jackID + 8} type")
+    throw new DriveIDMismatch(jackID,id)
   }
 }

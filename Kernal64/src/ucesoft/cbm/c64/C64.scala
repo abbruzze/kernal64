@@ -912,28 +912,14 @@ class C64 extends CBMComputer {
   
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
-    out.writeChars("KERNAL64")
-    out.writeObject(ucesoft.cbm.Version.VERSION)
-    out.writeLong(System.currentTimeMillis)
     out.writeBoolean(drivesEnabled(0))
     out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
-    val header = "KERNAL64"
-    for(i <- 0 until header.length) if (in.readChar != header(i)) throw new IOException("Bad header")
-    val ver = in.readObject.asInstanceOf[String]
-    val ts = in.readLong
     drivesEnabled(0) = in.readBoolean
     drivesEnabled(1) = in.readBoolean
     printerEnabled = in.readBoolean
-    if (!loadStateFromOptions) {
-      val msg = s"<html><b>Version:</b> $ver<br><b>Date:</b> ${new java.util.Date(ts)}</html>"
-      JOptionPane.showConfirmDialog(displayFrame, msg, "State loading confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) match {
-        case JOptionPane.YES_OPTION =>
-        case _ => throw new IOException("State loading aborted")
-      }
-    }
   }
   protected def allowsStateRestoring : Boolean = true
   // -----------------------------------------------------------------------------------------

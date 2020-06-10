@@ -26,11 +26,12 @@ object SCPUC64 extends App {
 }
 
 class SCPUC64 extends CBMComputer {
-  val componentID = "Commodore 64"
+  val componentID = "Commodore 64 SCPU"
   val componentType = CBMComponentType.INTERNAL
 
   protected val APPLICATION_NAME = "SCPU Kernal64"
   protected val CONFIGURATION_FILENAME = "SCPUC64.config"
+  override protected val PRG_RUN_DELAY_CYCLES = 220000
 
   protected val keybMapper: keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)), "/resources/default_keyboard_c64", C64KeyboardMapper)
 
@@ -978,9 +979,6 @@ class SCPUC64 extends CBMComputer {
 
   // state
   protected def saveState(out: ObjectOutputStream) {
-    out.writeChars("KERNAL64")
-    out.writeObject(ucesoft.cbm.Version.VERSION)
-    out.writeLong(System.currentTimeMillis)
     out.writeBoolean(drivesEnabled(0))
     out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
@@ -988,21 +986,10 @@ class SCPUC64 extends CBMComputer {
   }
 
   protected def loadState(in: ObjectInputStream) {
-    val header = "KERNAL64"
-    for (i <- 0 until header.length) if (in.readChar != header(i)) throw new IOException("Bad header")
-    val ver = in.readObject.asInstanceOf[String]
-    val ts = in.readLong
     drivesEnabled(0) = in.readBoolean
     drivesEnabled(1) = in.readBoolean
     printerEnabled = in.readBoolean
     cpuClocks = in.readInt
-    if (!loadStateFromOptions) {
-      val msg = s"<html><b>Version:</b> $ver<br><b>Date:</b> ${new java.util.Date(ts)}</html>"
-      JOptionPane.showConfirmDialog(displayFrame, msg, "State loading confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) match {
-        case JOptionPane.YES_OPTION =>
-        case _ => throw new IOException("State loading aborted")
-      }
-    }
   }
 
   protected def allowsStateRestoring: Boolean = true

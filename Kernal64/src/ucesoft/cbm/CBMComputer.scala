@@ -56,6 +56,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val CONFIGURATION_GMOD2_FILE = "gmod2.file"
   protected val CONFIGURATION_AUTOSAVE = "autosave"
 
+  protected val PRG_RUN_DELAY_CYCLES = 2200000
+
   // -------------- MENU ITEMS -----------------
   protected val maxSpeedItem = new JCheckBoxMenuItem("Warp mode")
   protected val loadFileItems = Array(new JMenuItem("Load file from attached disk 8 ..."), new JMenuItem("Load file from attached disk 9 ..."))
@@ -288,6 +290,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def loadState(fileName:Option[String]) : Unit = {
     clock.pause
     var in : ObjectInputStream = null
+
     try {
       val canLoad = allowsState
       if (!canLoad) {
@@ -314,10 +317,42 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
           Some(new File(fn))
       }
 
-      fn foreach { fn =>
-        in = new ObjectInputStream(new GZIPInputStream(new FileInputStream(fn)))
-        reset(false)
-        load(in)
+      var loaded = false
+      var asked = false
+      var aborted = !fn.isDefined
+
+      while (!loaded && !aborted) try {
+        in = new ObjectInputStream(new GZIPInputStream(new FileInputStream(fn.get)))
+        for(i <- 0 until APPLICATION_NAME.length) if (in.readChar != APPLICATION_NAME(i)) throw new IOException(s"Bad header: expected $APPLICATION_NAME")
+        val ver = in.readObject.asInstanceOf[String]
+        val ts = in.readLong
+        if (!loadStateFromOptions && !asked) {
+          val msg = s"<html><b>Version:</b> $ver<br><b>Date:</b> ${new java.util.Date(ts)}</html>"
+          JOptionPane.showConfirmDialog(displayFrame, msg, "State loading confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) match {
+            case JOptionPane.YES_OPTION =>
+              asked = true
+              reset(false)
+              load(in)
+              loaded = true
+            case _ =>
+              aborted = true
+          }
+        }
+        else {
+          reset(false)
+          load(in)
+          loaded = true
+        }
+      }
+      catch {
+        case dm: DriveIDMismatch =>
+          in.close
+          reset(false)
+          val newDriveType = if (dm.expectedDriveComponentID.startsWith("C1541")) DriveType._1541
+          else if (dm.expectedDriveComponentID.startsWith("D1571")) DriveType._1571
+          else if (dm.expectedDriveComponentID.startsWith("D1581")) DriveType._1581
+          else throw new IllegalArgumentException(s"Bad drive component type: ${dm.expectedDriveComponentID}")
+          initDrive(dm.driveID,newDriveType)
       }
     }
     catch {
@@ -356,6 +391,9 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
           return
       }
       out = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(fn)))
+      out.writeChars(APPLICATION_NAME)
+      out.writeObject(ucesoft.cbm.Version.VERSION)
+      out.writeLong(System.currentTimeMillis)
       save(out)
       out.close
     }
@@ -387,7 +425,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     else {
       if (_reset) reset(false)
       if (autorun) {
-        clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => { attachDevice(file,true,None,false) }))
+        clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,(cycles) => { attachDevice(file,true,None,false) }))
         clock.play
       }
       else {
