@@ -12,7 +12,7 @@ abstract class VIA(val name:String,
 				   val startAddress:Int,
 				   irqAction:(Boolean) => Unit) extends Chip with RAMComponent {
   val isRom = false
-  val length = 0x10
+  val length = 0x400
   val isActive = true
   val id = ChipID.VIA
     
