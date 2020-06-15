@@ -88,6 +88,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected var zoomOverride = false // used with --screen-dim
   protected var sidCycleExact = false // used with --sid-cycle-exact
   protected var loadStateFromOptions = false // used with --load-state
+  protected var traceOption = false // used with --trace
+
   // memory & main cpu
   protected val mmu : Memory
   protected lazy val cpu = CPU65xx.make(mmu)
@@ -1167,6 +1169,16 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
           loadState(Some(file))
         }
         finally loadStateFromOptions = false
+      }
+    )
+    settings.add("trace",
+      "Starts the emulator in trace mode",
+      (trace:Boolean) => {
+        this.traceOption = trace
+        if (trace) {
+          traceDialog.forceTracing(true)
+          traceDialog.setVisible(true)
+        }
       }
     )
   }
