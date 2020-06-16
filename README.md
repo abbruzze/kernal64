@@ -45,6 +45,7 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
   - Fixed CP/M cart with SCPU
   - Fixed cart type 19
   - When user load a saved state, the drivers' type are automatically set according to what it's stored on state.
+  - Added --trace option to start emulation in trace mode
 - 128
   - Fixed internal/external ROM configuration saving
   - Fixed bug on Z80 IRQ handling introduced during refactoring that prevents CP/M keyboard to work properly
