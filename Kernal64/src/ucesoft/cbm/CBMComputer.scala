@@ -1171,16 +1171,6 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         finally loadStateFromOptions = false
       }
     )
-    settings.add("trace",
-      "Starts the emulator in trace mode",
-      (trace:Boolean) => {
-        this.traceOption = trace
-        if (trace) {
-          traceDialog.forceTracing(true)
-          traceDialog.setVisible(true)
-        }
-      }
-    )
   }
 
   protected def setFileMenu(fileMenu:JMenu) : Unit = {
@@ -1412,6 +1402,18 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     inspectItem.setSelected(false)
     inspectItem.addActionListener(e => inspectDialog.setVisible(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     traceMenu.add(inspectItem)
+
+    settings.add("trace",
+      "Starts the emulator in trace mode",
+      (trace:Boolean) => {
+        this.traceOption = trace
+        if (trace) {
+          traceDialog.forceTracing(true)
+          traceDialog.setVisible(true)
+          traceItem.setSelected(true)
+        }
+      }
+    )
   }
 
   protected def setGameMenu(gamesMenu: JMenu) : Unit = {
