@@ -487,7 +487,7 @@ object SCPUC64MMU {
         if (mem_simm_page_size != mem_conf_page_size) address2 = ((address2 >> mem_conf_page_size) << mem_simm_page_size) | (address2 & ((1 << mem_simm_page_size) - 1))
         if ((mem_simm_ram_mask & address2) < mem_conf_size) {
           simmram(address2 & mem_simm_ram_mask) = value
-          val bank2 = address2 >> 16
+          val bank2 = (address2 & mem_simm_ram_mask) >> 16
           if (!simmuseMap(bank2)) {
             simmuseMap(bank2) = true
             simmuseBankCount += 1

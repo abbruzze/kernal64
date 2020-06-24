@@ -31,7 +31,7 @@ class SCPUC64 extends CBMComputer {
 
   protected val APPLICATION_NAME = "SCPU Kernal64"
   protected val CONFIGURATION_FILENAME = "SCPUC64.config"
-  override protected val PRG_RUN_DELAY_CYCLES = 220000
+  //override protected val PRG_RUN_DELAY_CYCLES = 220000
 
   protected val keybMapper: keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)), "/resources/default_keyboard_c64", C64KeyboardMapper)
 
