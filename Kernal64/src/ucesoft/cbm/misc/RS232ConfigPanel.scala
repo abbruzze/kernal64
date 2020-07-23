@@ -91,6 +91,7 @@ object RS232ConfigPanel {
     dialog.pack()
     dialog.setResizable(false)
     dialog.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE)
+
     dialog
   }
 

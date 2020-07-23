@@ -7,10 +7,20 @@ import ucesoft.cbm.cpu.RAMComponent
 import ucesoft.cbm.CBMComponentType
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
-import javax.swing.JFrame
-import javax.swing.JOptionPane
+
+object ExpansionPortType extends Enumeration {
+  val EMPTY = Value
+  val CRT = Value
+  val REU = Value
+  val DIGIMAX = Value
+  val SWIFTLINK = Value
+  val DUALSID = Value
+  val CPM = Value
+  val GEORAM = Value
+}
 
 abstract class ExpansionPort extends RAMComponent {
+  def TYPE : ExpansionPortType.Value
   val componentID = "ExpansionPort"
   val componentType = CBMComponentType.MEMORY 
   val startAddress = 0xDE00
@@ -51,11 +61,16 @@ abstract class ExpansionPort extends RAMComponent {
   def isFreezeButtonSupported = false
   
   // state
-  protected def saveState(out:ObjectOutputStream) : Unit = {}
-  protected def loadState(in:ObjectInputStream) : Unit = {}
+  protected def saveState(out:ObjectOutputStream) : Unit = {
+    out.writeBoolean(baLow)
+  }
+  protected def loadState(in:ObjectInputStream) : Unit = {
+    baLow = in.readBoolean
+  }
   protected def allowsStateRestoring : Boolean = {
-    showError("State error",s"Loading/storing of cartridge's state is not supported [$componentID].")
-    false
+    //showError("State error",s"Loading/storing of cartridge's state is not supported [$componentID].")
+    //false
+    true
   }
 }
 
@@ -71,6 +86,7 @@ object ExpansionPort {
       def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = 0
       def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
     }
+    val TYPE = ExpansionPortType.EMPTY
     val name = "Empty Expansion Port"
     val EXROM = true
     val GAME = true
@@ -81,6 +97,7 @@ object ExpansionPort {
     override protected def allowsStateRestoring : Boolean = true
   }
   private val proxyExpansionPort : ExpansionPort = new ExpansionPort {
+    def TYPE : ExpansionPortType.Value = expansionPort.TYPE
     val name = "Proxy Expansion Port"
     def EXROM = expansionPort.EXROM
     def GAME = expansionPort.GAME
@@ -97,14 +114,31 @@ object ExpansionPort {
     final override def eject = expansionPort.eject
     final override def shutdown = expansionPort.shutdown
     // state
-    final override protected def saveState(out:ObjectOutputStream) = expansionPort.saveState(out)
-    final override protected def loadState(in:ObjectInputStream) = expansionPort.loadState(in)
+    final override protected def saveState(out:ObjectOutputStream) = {
+      if (expansionPort.TYPE == ExpansionPortType.EMPTY) out.writeBoolean(false)
+      else {
+        out.writeBoolean(true)
+        out.writeObject(expansionPort.TYPE.toString)
+        expansionPort.saveState(out)
+      }
+    }
+    final override protected def loadState(in:ObjectInputStream) = {
+      if (in.readBoolean) {
+        expansionPortStateHandler(in,ExpansionPortType.withName(in.readObject.toString))
+        expansionPort.loadState(in)
+      }
+      else {
+        expansionPort.eject
+        setExpansionPort(emptyExpansionPort)
+      }
+    }
     final override protected def allowsStateRestoring : Boolean = expansionPort.allowsStateRestoring
   }
 
   private[this] var expansionPort = emptyExpansionPort
   private[this] var listeners: List[ExpansionPortConfigurationListener] = Nil
   private[this] var memoryForEmptyExpansionPort : LastByteReadMemory = _
+  private[this] var expansionPortStateHandler : (ObjectInputStream,ExpansionPortType.Value) => Unit = _
   var currentCartFileName = ""
 
   def addConfigurationListener(l: ExpansionPortConfigurationListener) : Unit = {
@@ -127,4 +161,5 @@ object ExpansionPort {
     Log.info("Setting new expansion port: " + expansionPort.name + " listeners are " + listeners)
     updateListeners(expansionPort.GAME,expansionPort.EXROM)
   }
+  def setExpansionPortStateHandler(expansionPortStateHandler : (ObjectInputStream,ExpansionPortType.Value) => Unit) : Unit = this.expansionPortStateHandler = expansionPortStateHandler
 }

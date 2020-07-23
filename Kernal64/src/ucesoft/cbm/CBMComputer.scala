@@ -10,6 +10,7 @@ import javax.swing._
 import javax.swing.filechooser.FileFilter
 import ucesoft.cbm.cpu.{CPU65xx, Memory, ROM}
 import ucesoft.cbm.expansion._
+import ucesoft.cbm.expansion.cpm.CPMCartridge
 import ucesoft.cbm.formats._
 import ucesoft.cbm.game.{GamePlayer, GameUI}
 import ucesoft.cbm.misc._
@@ -22,6 +23,8 @@ import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.printer.{MPS803, MPS803GFXDriver, MPS803ROM}
 import ucesoft.cbm.peripheral.rs232._
+import ucesoft.cbm.peripheral.vic.Palette
+import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 import ucesoft.cbm.peripheral.{controlport, keyboard, vic}
 import ucesoft.cbm.remote.RemoteC64
 import ucesoft.cbm.trace.{InspectPanelDialog, TraceDialog, TraceListener}
@@ -118,6 +121,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     f.setIconImage(new ImageIcon(getClass.getResource("/resources/commodore.png")).getImage)
     f
   }
+
+  protected var resetSettingsActions : List[() => Unit] = Nil
 
   // ----------------- REMOTE ------------------
   protected var remote : Option[RemoteC64] = None
@@ -218,7 +223,15 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected object DriveLed9Listener extends AbstractDriveLedListener(driveLeds(1),diskProgressPanels(1)) {
     driveLeds(1).setVisible(false)
   }
+  // ------------------- INITIALIZATION ------------------------
+  initComputer
+
+  protected def initComputer : Unit = {
+    ExpansionPort.setExpansionPortStateHandler(expansionPortStateHandler _)
+  }
   // -----------------------------------------------------------
+
+  protected def isC64Mode : Boolean = true
 
   def turnOn(args:Array[String]) : Unit
   def turnOff : Unit
@@ -253,6 +266,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def paste : Unit
 
   protected def setSettingsMenu(optionsMenu:JMenu) : Unit
+
+  protected def setDisplayRendering(hints:java.lang.Object) : Unit
 
   protected def errorHandler(t:Throwable) : Unit = {
     import CPU65xx.CPUJammedException
@@ -333,6 +348,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
           JOptionPane.showConfirmDialog(displayFrame, msg, "State loading confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) match {
             case JOptionPane.YES_OPTION =>
               asked = true
+              resetSettings
               reset(false)
               load(in)
               loaded = true
@@ -367,6 +383,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       if (in != null) in.close
       clock.play
     }
+  }
+
+  protected def resetSettings : Unit = {
+    for(a <- resetSettingsActions) a()
   }
 
   protected def saveState() : Unit = {
@@ -408,6 +428,25 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     finally {
       if (out != null) out.close
       clock.play
+    }
+  }
+
+  def expansionPortStateHandler(in:ObjectInputStream,portType:ExpansionPortType.Value) : Unit = {
+    import ExpansionPortType._
+
+    portType match {
+      case CRT =>
+        val crtFile = Cartridge.createCRTFileFromState(in)
+        loadCartridgeFile(crtFile,true)
+      case CPM =>
+        settings.getLoadF[Boolean]("CPM64").foreach(_(true))
+      case GEORAM =>
+        settings.getLoadF[String]("GEO_RAM").foreach(_(in.readInt.toString))
+      case REU =>
+        settings.getLoadF[String]("REU_TYPE").foreach(_(in.readInt.toString))
+      case DUALSID =>
+        settings.getLoadF[String]("DUAL_SID").foreach(_(in.readObject.toString))
+      case _ =>
     }
   }
 
@@ -478,16 +517,17 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def loadCartridgeFile(file:File) : Unit = {
+  protected def loadCartridgeFile(file:File,stateLoading : Boolean = false) : Unit = {
     try {
-      if (Thread.currentThread != Clock.systemClock) clock.pause
+      if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
+      ExpansionPort.getExpansionPort.eject
       val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.expPortIRQ _,nmiSwitcher.expansionPortNMI _,getRAM,configuration)
       println(ep)
       if (ep.isFreezeButtonSupported) cartMenu.setVisible(true)
       ExpansionPort.setExpansionPort(ep)
       ExpansionPort.currentCartFileName = file.toString
       Log.info(s"Attached cartridge ${ExpansionPort.getExpansionPort.name}")
-      reset(false)
+      if (!stateLoading) reset(false)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
       detachCtrItem.setEnabled(true)
     }
@@ -498,7 +538,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         showError("Cartridge loading error",t.toString)
     }
     finally {
-      clock.play
+      if (!stateLoading) clock.play
     }
   }
 
@@ -991,8 +1031,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   def play(file:File) = {
-    ExpansionPort.getExpansionPort.eject
-    ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+    //ExpansionPort.getExpansionPort.eject
+    //ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
     handleDND(file,true,true)
   }
 
@@ -1420,7 +1460,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])
     var providers = loader.iterator
     try {
-      if (!providers.hasNext) providers = java.util.Arrays.asList((new ucesoft.cbm.game.GameBaseSpi).asInstanceOf[ucesoft.cbm.game.GameProvider],(new ucesoft.cbm.game.PouetDemoSpi).asInstanceOf[ucesoft.cbm.game.GameProvider]).iterator
+      if (!providers.hasNext) providers = java.util.Arrays.asList((new ucesoft.cbm.game.CSDBSpi).asInstanceOf[ucesoft.cbm.game.GameProvider],(new ucesoft.cbm.game.GameBaseSpi).asInstanceOf[ucesoft.cbm.game.GameProvider],(new ucesoft.cbm.game.PouetDemoSpi).asInstanceOf[ucesoft.cbm.game.GameProvider]).iterator
       val names = new collection.mutable.HashSet[String]
       while (providers.hasNext) {
         val provider = providers.next
@@ -1455,5 +1495,525 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     val aboutItem = new JMenuItem("About")
     aboutItem.addActionListener(_ => showAbout )
     helpMenu.add(aboutItem)
+  }
+
+  protected def setDriveMenu(parent:JMenu) : Unit = {
+    val driveMenu = new JMenuItem("Drives ...")
+    driveMenu.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    parent.add(driveMenu)
+    driveMenu.addActionListener(_ => DrivesConfigPanel.getDriveConfigDialog.setVisible(true) )
+  }
+
+  protected def setVolumeSettings(parent:JMenu) : Unit = {
+    val volumeItem = new JMenuItem("Volume settings ...")
+    volumeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    volumeItem.addActionListener(_ => volumeDialog.setVisible(true) )
+    parent.add(volumeItem)
+  }
+
+  protected def setWarpModeSettings(parent:JMenu) : Unit = {
+    maxSpeedItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_W,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    maxSpeedItem.setSelected(clock.maximumSpeed)
+    maxSpeedItem.addActionListener(e => warpMode(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    parent.add(maxSpeedItem)
+  }
+
+  protected def setRenderingSettings(parent:JMenu) : Unit = {
+    val renderingItem = new JMenu("Rendering")
+    parent.add(renderingItem)
+    val groupR = new ButtonGroup
+    val renderingDefault1Item = new JRadioButtonMenuItem("Default")
+    renderingDefault1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR) )
+    renderingItem.add(renderingDefault1Item)
+    groupR.add(renderingDefault1Item)
+    val renderingBilinear1Item = new JRadioButtonMenuItem("Bilinear")
+    renderingBilinear1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR) )
+    renderingItem.add(renderingBilinear1Item)
+    groupR.add(renderingBilinear1Item)
+    val renderingBicubic1Item = new JRadioButtonMenuItem("Bicubic")
+    renderingBicubic1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC) )
+    renderingItem.add(renderingBicubic1Item)
+    groupR.add(renderingBicubic1Item)
+
+    val paletteItem = new JMenu("Palette")
+    parent.add(paletteItem)
+    val groupP = new ButtonGroup
+    val vicePalItem = new JRadioButtonMenuItem("VICE")
+    vicePalItem.addActionListener(_ => Palette.setPalette(PaletteType.VICE) )
+    paletteItem.add(vicePalItem)
+    groupP.add(vicePalItem)
+    val brightPalItem = new JRadioButtonMenuItem("Bright")
+    brightPalItem.addActionListener(_ => Palette.setPalette(PaletteType.BRIGHT) )
+    paletteItem.add(brightPalItem)
+    groupP.add(brightPalItem)
+    val peptoPalItem = new JRadioButtonMenuItem("Pepto")
+    peptoPalItem.addActionListener(_ => Palette.setPalette(PaletteType.PEPTO) )
+    paletteItem.add(peptoPalItem)
+    groupP.add(peptoPalItem)
+    // Setting ---------------------------
+    settings.add("vic-palette",
+      "Set the palette type (bright,vice,pepto)",
+      "PALETTE",
+      (dt:String) => {
+        dt match {
+          case "bright"|"" =>
+            Palette.setPalette(PaletteType.BRIGHT)
+            brightPalItem.setSelected(true)
+          case "vice" =>
+            Palette.setPalette(PaletteType.VICE)
+            vicePalItem.setSelected(true)
+          case "pepto" =>
+            Palette.setPalette(PaletteType.PEPTO)
+            peptoPalItem.setSelected(true)
+          case _ =>
+        }
+      },
+      if (brightPalItem.isSelected) "bright"
+      else
+        if (vicePalItem.isSelected) "vice"
+        else
+          if (peptoPalItem.isSelected) "pepto"
+          else "bright"
+    )
+    settings.add("rendering-type",
+      "Set the rendering type (default,bilinear,bicubic)",
+      "RENDERING_TYPE",
+      (dt:String) => {
+        dt match {
+          case "bilinear"|"" =>
+            setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+            renderingBilinear1Item.setSelected(true)
+          case "bicubic" =>
+            setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+            renderingBicubic1Item.setSelected(true)
+          case "default" =>
+            setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
+            renderingDefault1Item.setSelected(true)
+          case _ =>
+        }
+      },
+      if (renderingDefault1Item.isSelected) "default"
+      else
+        if (renderingBilinear1Item.isSelected) "bilinear"
+        else
+          if (renderingBicubic1Item.isSelected) "bicubic"
+          else "default"
+    )
+  }
+
+  protected def setFullScreenSettings(parent:JMenu) : Unit = {
+    val fullScreenItem = new JMenuItem("Full screen")
+    fullScreenItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, java.awt.event.InputEvent.ALT_DOWN_MASK))
+    fullScreenItem.addActionListener(_ => setVicFullScreen)
+    parent.add(fullScreenItem)
+  }
+
+  protected def setJoysticsSettings(parent:JMenu) : Unit = {
+    val joyAItem = new JMenuItem("Joystick...")
+    joyAItem.addActionListener(_ => joySettings )
+    parent.add(joyAItem)
+
+    val swapJoyAItem = new JMenuItem("Swap joysticks")
+    swapJoyAItem.addActionListener(_ => swapJoysticks )
+    parent.add(swapJoyAItem)
+  }
+
+  protected def setLightPenSettings(parent:JMenu) : Unit = {
+    val lightPenMenu = new JMenu("Light pen")
+    parent.add(lightPenMenu)
+    val group3 = new ButtonGroup
+    val noPenItem = new JRadioButtonMenuItem("No light pen")
+    noPenItem.setSelected(true)
+    noPenItem.addActionListener(_ => setLightPen(LIGHT_PEN_NO_BUTTON) )
+    // reset setting
+    resetSettingsActions = (() => {
+      noPenItem.setSelected(true)
+      setLightPen(LIGHT_PEN_NO_BUTTON)
+    }) :: resetSettingsActions
+    group3.add(noPenItem)
+    lightPenMenu.add(noPenItem)
+    val penUp = new JRadioButtonMenuItem("Light pen with button up on control port 2")
+    penUp.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_UP) )
+    group3.add(penUp)
+    lightPenMenu.add(penUp)
+    val penLeft = new JRadioButtonMenuItem("Light pen with button left on control port 2")
+    penLeft.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_LEFT) )
+    group3.add(penLeft)
+    lightPenMenu.add(penLeft)
+  }
+
+  protected def setMouseSettings(parent:JMenu) : Unit = {
+    val mouseEnabledItem = new JCheckBoxMenuItem("Mouse 1351 enabled on port 1")
+    mouseEnabledItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_M,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    mouseEnabledItem.setSelected(false)
+    mouseEnabledItem.addActionListener(e => enableMouse(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected,display) )
+    parent.add(mouseEnabledItem)
+    // reset setting
+    resetSettingsActions = (() => {
+      mouseEnabledItem.setSelected(false)
+      enableMouse(false,display)
+    }) :: resetSettingsActions
+  }
+
+  protected def setPauseSettings(parent:JMenu) : Unit = {
+    val pauseItem = new JCheckBoxMenuItem("Pause")
+    pauseItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_P,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    pauseItem.addActionListener(e =>
+      if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) {
+        clock.pause
+        display.setPaused
+      } else clock.play )
+    parent.add(pauseItem)
+  }
+
+  protected def setPrinterSettings(parent:JMenu) : Unit = {
+    val printerPreviewItem = new JMenuItem("Printer preview ...")
+    printerPreviewItem.addActionListener(_ => showPrinterPreview )
+    parent.add(printerPreviewItem)
+
+    val printerEnabledItem = new JCheckBoxMenuItem("Printer enabled")
+    printerEnabledItem.setSelected(false)
+    printerEnabledItem.addActionListener(e => { printerEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected ; printer.setActive(printerEnabled) } )
+    parent.add(printerEnabledItem)
+    // Setting ---------------------------
+    settings.add("printer-enabled",
+      "Enable printer",
+      "PRINTER_ENABLED",
+      (pe:Boolean) => {
+        enablePrinter(pe)
+        printerEnabledItem.setSelected(pe)
+      },
+      printerEnabledItem.isSelected
+    )
+    // reset setting
+    resetSettingsActions = (() => {
+      printerEnabledItem.setSelected(false)
+      printerEnabled = false
+      printer.setActive(false)
+    }) :: resetSettingsActions
+  }
+
+  protected def setSIDSettings(parent:JMenu) : Unit = {
+    val sidItem = new JMenu("SID")
+    parent.add(sidItem)
+    val group7 = new ButtonGroup
+    val sidTypeItem = new JMenu("SID Type")
+    sidItem.add(sidTypeItem)
+    val sid6581Item = new JRadioButtonMenuItem("MOS 6581")
+    sid6581Item.setSelected(true)
+    sid6581Item.addActionListener(_ => sid.setModel(true) )
+    sidTypeItem.add(sid6581Item)
+    group7.add(sid6581Item)
+    val sid8580Item = new JRadioButtonMenuItem("MOS 8580")
+    sid8580Item.setSelected(false)
+    sid8580Item.addActionListener(_ => sid.setModel(false) )
+    sidTypeItem.add(sid8580Item)
+    group7.add(sid8580Item)
+    // Setting ---------------------------
+    settings.add("sid-8580",
+      "Enable sid 8580 type",
+      "SID_8580",
+      (sid8580:Boolean) => {
+        sid.setModel(!sid8580)
+        sid8580Item.setSelected(sid8580)
+      },
+      sid8580Item.isSelected
+    )
+    val sid2Item = new JMenu("Dual SID")
+    sidItem.add(sid2Item)
+    val group8 = new ButtonGroup
+    val nosid2Item = new JRadioButtonMenuItem("None")
+    sid2Item.add(nosid2Item)
+    nosid2Item.setSelected(true)
+    nosid2Item.addActionListener(_ => setDualSID(None) )
+    group8.add(nosid2Item)
+    val addressMap = (for(adr <- DualSID.validAddresses(isC64Mode)) yield {
+      val sid2AdrItem = new JRadioButtonMenuItem(adr)
+      sid2Item.add(sid2AdrItem)
+      sid2AdrItem.setSelected(false)
+      sid2AdrItem.addActionListener(_ => setDualSID(Some(Integer.parseInt(adr,16))) )
+      group8.add(sid2AdrItem)
+      adr -> sid2AdrItem
+    }).toMap
+    // Setting ---------------------------
+    settings.add("dual-sid",
+      s"Enable dual sid on the given address. Valid addresses are: ${addressMap.keys.mkString(",")}",
+      "DUAL_SID",
+      (adr:String) => if (adr != null && adr != "") {
+        addressMap get adr match {
+          case Some(item) =>
+            item.setSelected(true)
+            setDualSID(Some(Integer.parseInt(adr,16)))
+          case None =>
+            throw new IllegalArgumentException(s"Invalid dual sid address: $adr")
+        }
+      },
+      if (nosid2Item.isSelected) ""
+      else {
+        addressMap filter { kv => kv._2.isSelected } headOption match {
+          case Some((a,_)) => a
+          case None => ""
+        }
+      }
+    )
+    val sidCycleExactItem = new JCheckBoxMenuItem("SID cycle exact emulation")
+    sidCycleExactItem.setSelected(false)
+    sidCycleExactItem.addActionListener(_ => {
+      sidCycleExact = sidCycleExactItem.isSelected
+      sid.setCycleExact(sidCycleExactItem.isSelected)
+    }
+    )
+    sidItem.add(sidCycleExactItem)
+    // Setting ---------------------------
+    settings.add("sid-cycle-exact",
+      "With this option enabled the SID emulation is more accurate with a decrease of performance",
+      "SID_CYCLE_EXACT",
+      (sce:Boolean) => {
+        clock.pause
+        sidCycleExact = sce
+        sid.setCycleExact(sidCycleExact)
+        sidCycleExactItem.setSelected(sidCycleExact)
+        clock.play
+      },
+      sidCycleExact
+    )
+    // reset setting
+    resetSettingsActions = (() => {
+      sid6581Item.setSelected(true)
+      sid.setModel(true)
+      nosid2Item.setSelected(true)
+      setDualSID(None)
+    }) :: resetSettingsActions
+  }
+
+  protected def setDrivesSettings : Unit = {
+    for(drive <- 0 to 1) {
+      // Setting ---------------------------
+      settings.add(s"drive${drive + 8}-type",
+        "Set the driver's type (1541,1571,1581)",
+        s"DRIVER${drive + 8}_TYPE",
+        (dt: String) => {
+          dt match {
+            case "1541" =>
+              setDriveType(drive,DriveType._1541, true)
+            case "1571" =>
+              setDriveType(drive,DriveType._1571, true)
+            case "1581" =>
+              setDriveType(drive,DriveType._1581, true)
+            case _ =>
+          }
+        },
+        if (drives(drive).driveType == DriveType._1541) "1541"
+        else if (drives(drive).driveType == DriveType._1571) "1571"
+        else if (drives(drive).driveType == DriveType._1581) "1581"
+        else "1571"
+      )
+
+      settings.add(s"drive${drive + 8}-file",
+        s"Attach a file to drive ${drive + 8}",
+        s"DRIVE_${drive + 8}_FILE",
+        (df: String) => {
+          if (df != "") attachDiskFile(drive, new File(df), false, None)
+        },
+        floppyComponents(drive).drive.getFloppy.file
+      )
+    }
+  }
+
+  protected def setRemotingSettings(parent:JMenu) : Unit = {
+    val remoteItem = new JMenu("Remoting")
+    parent.add(remoteItem)
+
+    val group10 = new ButtonGroup
+    val remoteDisabledItem = new JRadioButtonMenuItem("Off")
+    remoteDisabledItem.setSelected(true)
+    remoteDisabledItem.addActionListener(_ => setRemote(None) )
+    group10.add(remoteDisabledItem)
+    remoteItem.add(remoteDisabledItem)
+    val remoteEnabledItem = new JRadioButtonMenuItem("On ...")
+    remoteEnabledItem.addActionListener(e => setRemote(Some(e.getSource.asInstanceOf[JRadioButtonMenuItem])) )
+    group10.add(remoteEnabledItem)
+    remoteItem.add(remoteEnabledItem)
+  }
+
+  protected def setREUSettings(parent:JMenu) : Unit = {
+    val reuItem = new JMenu("REU")
+    val group5 = new ButtonGroup
+    val noReuItem = new JRadioButtonMenuItem("None")
+    noReuItem.setSelected(true)
+    noReuItem.addActionListener(_ => setREU(None,None) )
+    group5.add(noReuItem)
+    reuItem.add(noReuItem)
+    val reu128Item = new JRadioButtonMenuItem("128K")
+    reu128Item.addActionListener(_ => setREU(Some(REU.REU_1700),None) )
+    group5.add(reu128Item)
+    reuItem.add(reu128Item)
+    val reu256Item = new JRadioButtonMenuItem("256K")
+    reu256Item.addActionListener(_ => setREU(Some(REU.REU_1764),None) )
+    group5.add(reu256Item)
+    reuItem.add(reu256Item)
+    val reu512Item = new JRadioButtonMenuItem("512K")
+    reu512Item.addActionListener(_ => setREU(Some(REU.REU_1750),None) )
+    group5.add(reu512Item)
+    reuItem.add(reu512Item)
+    val reu16MItem = new JRadioButtonMenuItem("16M ...")
+    reu16MItem.addActionListener(_ => choose16MREU )
+    group5.add(reu16MItem)
+    reuItem.add(reu16MItem)
+    parent.add(reuItem)
+
+    settings.add("reu-type",
+      "Set the reu type (none,128,256,512,16384)",
+      "REU_TYPE",
+      (reu:String) => {
+        val reuPars = reu.split(",")
+        if (reuPars(0) == "" || reuPars(0) == "none") setREU(None,None)
+        else
+          reuPars(0).toInt match {
+            case REU.REU_1700 =>
+              setREU(Some(REU.REU_1700),None)
+              reu128Item.setSelected(true)
+            case REU.REU_1750 =>
+              setREU(Some(REU.REU_1750),None)
+              reu512Item.setSelected(true)
+            case REU.REU_1764 =>
+              setREU(Some(REU.REU_1764),None)
+              reu256Item.setSelected(true)
+            case REU.REU_16M =>
+              setREU(Some(REU.REU_16M),if (reuPars.length == 2 && reuPars(1) != "null") Some(reuPars(1)) else None)
+              reu16MItem.setSelected(true)
+          }
+      },
+      if (noReuItem.isSelected) "none"
+      else
+        if (reu128Item.isSelected) "128"
+        else
+          if (reu256Item.isSelected) "256"
+          else
+            if (reu512Item.isSelected) "512"
+            else
+              if (reu16MItem.isSelected) "16384," + REU.attached16MFileName
+              else "none"
+    )
+    // reset setting
+    resetSettingsActions = (() => {
+      noReuItem.setSelected(true)
+      setREU(None,None)
+    }) :: resetSettingsActions
+  }
+
+  protected def setGEORamSettings(parent:JMenu) : Unit = {
+    val geoItem = new JMenu("GeoRAM")
+    val groupgeo = new ButtonGroup
+    val noGeoItem = new JRadioButtonMenuItem("None")
+    noGeoItem.setSelected(true)
+    noGeoItem.addActionListener(_ => setGeoRAM(false) )
+    groupgeo.add(noGeoItem)
+    geoItem.add(noGeoItem)
+    val _256kGeoItem = new JRadioButtonMenuItem("256K")
+    _256kGeoItem.addActionListener(_ => setGeoRAM(true,256) )
+    groupgeo.add(_256kGeoItem)
+    geoItem.add(_256kGeoItem)
+    val _512kGeoItem = new JRadioButtonMenuItem("512K")
+    _512kGeoItem.addActionListener(_ => setGeoRAM(true,512) )
+    groupgeo.add(_512kGeoItem)
+    geoItem.add(_512kGeoItem)
+
+    parent.add(geoItem)
+    // Setting ---------------------------
+    settings.add("geo-ram",
+      "Set the georam size (none,256,512)",
+      "GEO_RAM",
+      (geo:String) => {
+        if (geo == "512") {
+          _512kGeoItem.setSelected(true)
+          setGeoRAM(true,512)
+        }
+        else
+          if (geo == "256") {
+            _256kGeoItem.setSelected(true)
+            setGeoRAM(true,256)
+          }
+      },
+      if (_512kGeoItem.isSelected) "512"
+      else
+        if (_256kGeoItem.isSelected) "256"
+        else "none"
+    )
+    // reset setting
+    resetSettingsActions = (() => {
+      noGeoItem.setSelected(true)
+      setGeoRAM(false)
+    }) :: resetSettingsActions
+  }
+
+  protected def setDigiMAXSettings(parent:JMenu) : Unit = {
+    val digimaxItem = new JMenu("DigiMAX")
+    parent.add(digimaxItem)
+    val digiMaxSampleRateItem  = new JMenuItem("DigiMax sample rate ...")
+    digiMaxSampleRateItem.addActionListener(_ => chooseDigiMaxSampleRate )
+    digimaxItem.add(digiMaxSampleRateItem)
+    val group6 = new ButtonGroup
+    val digimaxDisabledItem = new JRadioButtonMenuItem("Disabled")
+    digimaxDisabledItem.setSelected(true)
+    digimaxDisabledItem.addActionListener(_ => setDigiMax(false,None) )
+    digimaxItem.add(digimaxDisabledItem)
+    group6.add(digimaxDisabledItem)
+    val digimaxOnUserPortItem = new JRadioButtonMenuItem("On UserPort")
+    digimaxOnUserPortItem.addActionListener(_ => setDigiMax(true,None) )
+    group6.add(digimaxOnUserPortItem)
+    digimaxItem.add(digimaxOnUserPortItem)
+    val digimaxDE00Item = new JRadioButtonMenuItem("On DE00")
+    digimaxDE00Item.addActionListener(_ => setDigiMax(true,Some(0xDE00)) )
+    group6.add(digimaxDE00Item)
+    digimaxItem.add(digimaxDE00Item)
+    val digimaxDF00Item = new JRadioButtonMenuItem("On DF00")
+    digimaxDF00Item.addActionListener(_ => setDigiMax(true,Some(0xDF00)) )
+    group6.add(digimaxDF00Item)
+    digimaxItem.add(digimaxDF00Item)
+    // reset setting
+    resetSettingsActions = (() => {
+      digimaxDisabledItem.setSelected(true)
+      setDigiMax(false,None)
+    }) :: resetSettingsActions
+  }
+
+  protected def setCPMSettings(parent:JMenu) : Unit = {
+    val cpmItem = new JCheckBoxMenuItem("CP/M Cartridge")
+    cpmItem.addActionListener(e => enableCPMCart(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    parent.add(cpmItem)
+    settings.add("cpm64-enabled",
+      s"Attach the CP/M cart",
+      "CPM64",
+      (cpm: Boolean) => {
+        if (cpm) {
+          enableCPMCart(true)
+          cpmItem.setSelected(true)
+        }
+      },
+      ExpansionPort.getExpansionPort.isInstanceOf[CPMCartridge]
+    )
+    // reset setting
+    resetSettingsActions = (() => {
+      cpmItem.setSelected(false)
+      enableCPMCart(false)
+    }) :: resetSettingsActions
+  }
+
+  protected def setFlyerSettings(parent:JMenu) : Unit = {
+    val flyerItem = new JMenu("Flyer internet modem")
+    parent.add(flyerItem)
+    val fylerEnabledItem = new JCheckBoxMenuItem("Flyer enabled on 7")
+    fylerEnabledItem.setSelected(false)
+    flyerItem.add(fylerEnabledItem)
+    fylerEnabledItem.addActionListener(e => enableFlyer(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    val flyerDirectoryItem = new JMenuItem("Set disks repository ...")
+    flyerItem.add(flyerDirectoryItem)
+    flyerDirectoryItem.addActionListener(_ => chooseFlyerDir )
+    // reset setting
+    resetSettingsActions = (() => {
+      fylerEnabledItem.setSelected(false)
+      enableFlyer(false)
+    }) :: resetSettingsActions
   }
 }

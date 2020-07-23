@@ -1,13 +1,9 @@
 package ucesoft.cbm.misc
 
 import java.util.Arrays
-import java.io.File
-import java.io.IOException
+import java.io.{DataInputStream, DataOutputStream, File, FileInputStream, FileOutputStream, IOException, InputStream, OutputStream}
+
 import ucesoft.cbm.Log
-import java.io.DataInputStream
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.DataOutputStream
 
 /**
  * Programmable EEPROM, x16 or x8 organization
@@ -66,6 +62,16 @@ class M93C86(x16:Boolean) {
       case io:IOException =>
         Log.info("Can't load eeprom file " + file + " " + io)
     }
+  }
+
+  def load(_in:InputStream) : Unit = {
+    val in = new DataInputStream(_in)
+    for(i <- 0 until eeprom.length) { eeprom(i) = in.readInt }
+  }
+
+  def save(_out:OutputStream) : Unit = {
+    val out = new DataOutputStream(_out)
+    eeprom foreach { v => out.writeInt(v) }
   }
   
   def save(file:File) : Unit = {

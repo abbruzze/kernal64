@@ -7,6 +7,7 @@ import javax.sound.sampled.AudioSystem
 import ucesoft.cbm.ChipID
 
 class DigiMaxCart(digiAddress:Int) extends ExpansionPort {
+  val TYPE : ExpansionPortType.Value = ExpansionPortType.DIGIMAX
   val name = "DigiMAX"
   val EXROM = true
   val GAME = true
@@ -82,14 +83,16 @@ object DigiMAX {
     _enabled = on
     if (on && lines == null) setSampleRate(DEFAULT_SAMPLE_RATE)
     this.enabledOnUserPort = enabledOnUserPort
-    for(dl <- lines) { 
-      if (dl != null) on match {        
-        case true =>
-           dl.start
-        case false =>
-          dl.stop
-      }      
-    }    
+    if (lines != null) {
+      for (dl <- lines) {
+        if (dl != null) on match {
+          case true =>
+            dl.start
+          case false =>
+            dl.stop
+        }
+      }
+    }
   }
   
   def write(value:Int) : Unit = {

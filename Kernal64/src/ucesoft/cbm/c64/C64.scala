@@ -243,7 +243,7 @@ class C64 extends CBMComputer {
     adjustRatio
   }
 
-  private def setDisplayRendering(hints:java.lang.Object) : Unit = {
+  protected def setDisplayRendering(hints:java.lang.Object) : Unit = {
     display.setRenderingHints(hints)
   }
 
@@ -353,12 +353,8 @@ class C64 extends CBMComputer {
   }
   
   protected def setSettingsMenu(optionMenu:JMenu) : Unit = {
-    import ucesoft.cbm.misc.Settings._
+    setDriveMenu(optionMenu)
 
-    val driveMenu = new JMenuItem("Drives ...")
-    driveMenu.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    optionMenu.add(driveMenu)
-    driveMenu.addActionListener(_ => DrivesConfigPanel.getDriveConfigDialog.setVisible(true) )
     optionMenu.addSeparator
 
     val keybMenu = new JMenu("Keyboard")
@@ -373,17 +369,11 @@ class C64 extends CBMComputer {
     
     optionMenu.addSeparator
 
-    val volumeItem = new JMenuItem("Volume settings ...")
-    volumeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    volumeItem.addActionListener(_ => volumeDialog.setVisible(true) )
-    optionMenu.add(volumeItem)
+    setVolumeSettings(optionMenu)
     
     optionMenu.addSeparator
 
-    maxSpeedItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_W,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    maxSpeedItem.setSelected(clock.maximumSpeed)
-    maxSpeedItem.addActionListener(e => warpMode(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
-    optionMenu.add(maxSpeedItem)
+    setWarpModeSettings(optionMenu)
     
     optionMenu.addSeparator
     
@@ -408,126 +398,19 @@ class C64 extends CBMComputer {
     }
 
     val vicItem = new JMenu("VIC")
-    val renderingItem = new JMenu("Rendering")
-    vicItem.add(renderingItem)
-    val groupR = new ButtonGroup
     optionMenu.add(vicItem)
-    val renderingDefault1Item = new JRadioButtonMenuItem("Default")
-    renderingDefault1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR) )
-    renderingItem.add(renderingDefault1Item)
-    groupR.add(renderingDefault1Item)
-    val renderingBilinear1Item = new JRadioButtonMenuItem("Bilinear")
-    renderingBilinear1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR) )
-    renderingItem.add(renderingBilinear1Item)
-    groupR.add(renderingBilinear1Item)
-    val renderingBicubic1Item = new JRadioButtonMenuItem("Bicubic")
-    renderingBicubic1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC) )
-    renderingItem.add(renderingBicubic1Item)
-    groupR.add(renderingBicubic1Item)
+    setRenderingSettings(vicItem)
 
-    val paletteItem = new JMenu("Palette")
-    vicItem.add(paletteItem)
-    val groupP = new ButtonGroup
-    val vicePalItem = new JRadioButtonMenuItem("VICE")
-    vicePalItem.addActionListener(_ => Palette.setPalette(PaletteType.VICE) )
-    paletteItem.add(vicePalItem)
-    groupP.add(vicePalItem)
-    val brightPalItem = new JRadioButtonMenuItem("Bright")
-    brightPalItem.addActionListener(_ => Palette.setPalette(PaletteType.BRIGHT) )
-    paletteItem.add(brightPalItem)
-    groupP.add(brightPalItem)
-    val peptoPalItem = new JRadioButtonMenuItem("Pepto")
-    peptoPalItem.addActionListener(_ => Palette.setPalette(PaletteType.PEPTO) )
-    paletteItem.add(peptoPalItem)
-    groupP.add(peptoPalItem)
-    // Setting ---------------------------
-    settings.add("vic-palette",
-      "Set the palette type (bright,vice,pepto)",
-      "PALETTE",
-      (dt:String) => {
-        dt match {
-          case "bright"|"" =>
-            Palette.setPalette(PaletteType.BRIGHT)
-            brightPalItem.setSelected(true)
-          case "vice" =>
-            Palette.setPalette(PaletteType.VICE)
-            vicePalItem.setSelected(true)
-          case "pepto" =>
-            Palette.setPalette(PaletteType.PEPTO)
-            peptoPalItem.setSelected(true)
-          case _ =>
-        }
-      },
-      if (brightPalItem.isSelected) "bright"
-      else
-      if (vicePalItem.isSelected) "vice"
-      else
-      if (peptoPalItem.isSelected) "pepto"
-      else "bright"
-    )
-    settings.add("rendering-type",
-                 "Set the rendering type (default,bilinear,bicubic)",
-                 "RENDERING_TYPE",
-     (dt:String) => {
-       dt match {
-         case "bilinear"|"" =>
-           setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-           renderingBilinear1Item.setSelected(true)
-         case "bicubic" =>
-           setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-           renderingBicubic1Item.setSelected(true)
-         case "default" =>
-           setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
-           renderingDefault1Item.setSelected(true)
-         case _ =>
-       }
-     },
-     if (renderingDefault1Item.isSelected) "default"
-     else
-     if (renderingBilinear1Item.isSelected) "bilinear"
-     else
-     if (renderingBicubic1Item.isSelected) "bicubic"
-     else "default"
-    )
-
-    val fullScreenItem = new JMenuItem("Full screen")
-    fullScreenItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    fullScreenItem.addActionListener(_ => setVicFullScreen )
-    optionMenu.add(fullScreenItem)
+    setFullScreenSettings(optionMenu)
     // -----------------------------------
     
     optionMenu.addSeparator
-        
-    val joyAItem = new JMenuItem("Joystick...")
-    joyAItem.addActionListener(_ => joySettings )
-    optionMenu.add(joyAItem)
-    
-    val swapJoyAItem = new JMenuItem("Swap joysticks")
-    swapJoyAItem.addActionListener(_ => swapJoysticks )
-    optionMenu.add(swapJoyAItem)
-    
-    val lightPenMenu = new JMenu("Light pen")
-    optionMenu.add(lightPenMenu)
-    val group3 = new ButtonGroup
-    val noPenItem = new JRadioButtonMenuItem("No light pen")
-    noPenItem.setSelected(true)
-    noPenItem.addActionListener(_ => setLightPen(LIGHT_PEN_NO_BUTTON) )
-    group3.add(noPenItem)
-    lightPenMenu.add(noPenItem)
-    val penUp = new JRadioButtonMenuItem("Light pen with button up on control port 2")
-    penUp.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_UP) )
-    group3.add(penUp)
-    lightPenMenu.add(penUp)
-    val penLeft = new JRadioButtonMenuItem("Light pen with button left on control port 2")
-    penLeft.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_LEFT) )
-    group3.add(penLeft)
-    lightPenMenu.add(penLeft)
-    
-    val mouseEnabledItem = new JCheckBoxMenuItem("Mouse 1351 enabled on port 1")
-    mouseEnabledItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_M,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    mouseEnabledItem.setSelected(false)
-    mouseEnabledItem.addActionListener(e => enableMouse(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected,display) )
-    optionMenu.add(mouseEnabledItem)
+
+    setJoysticsSettings(optionMenu)
+
+    setLightPenSettings(optionMenu)
+
+    setMouseSettings(optionMenu)
     
     optionMenu.addSeparator
 
@@ -542,158 +425,36 @@ class C64 extends CBMComputer {
     optionMenu.add(gifRecorderItem)
     
     optionMenu.addSeparator
-    
-    val pauseItem = new JCheckBoxMenuItem("Pause")
-    pauseItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_P,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    pauseItem.addActionListener(e =>
-      if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) {
-        clock.pause
-        display.setPaused
-      } else clock.play )
-    optionMenu.add(pauseItem)
+
+    setPauseSettings(optionMenu)
     
     optionMenu.addSeparator
-    
-    val printerPreviewItem = new JMenuItem("Printer preview ...")
-    printerPreviewItem.addActionListener(_ => showPrinterPreview )
-    optionMenu.add(printerPreviewItem)
-    
-    val printerEnabledItem = new JCheckBoxMenuItem("Printer enabled")
-    printerEnabledItem.setSelected(false)
-    printerEnabledItem.addActionListener(e => { printerEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected ; printer.setActive(printerEnabled) } )
-    optionMenu.add(printerEnabledItem)
-    // Setting ---------------------------
-    settings.add("printer-enabled",
-                 "Enable printer",
-                 "PRINTER_ENABLED",
-                 (pe:Boolean) => {
-                   enablePrinter(pe)
-                   printerEnabledItem.setSelected(pe)
-                 },
-                 printerEnabledItem.isSelected
-    )
+
+    setPrinterSettings(optionMenu)
     // -----------------------------------
 
     
     optionMenu.addSeparator
-    
-    val sidItem = new JMenu("SID")
-    optionMenu.add(sidItem)
-    val group7 = new ButtonGroup
-    val sidTypeItem = new JMenu("SID Type")
-    sidItem.add(sidTypeItem)
-    val sid6581Item = new JRadioButtonMenuItem("MOS 6581")
-    sid6581Item.setSelected(true)
-    sid6581Item.addActionListener(_ => sid.setModel(true) )
-    sidTypeItem.add(sid6581Item)
-    group7.add(sid6581Item)
-    val sid8580Item = new JRadioButtonMenuItem("MOS 8580")
-    sid8580Item.setSelected(false)
-    sid8580Item.addActionListener(_ => sid.setModel(false) )
-    sidTypeItem.add(sid8580Item)
-    group7.add(sid8580Item)
-    // Setting ---------------------------
-    settings.add("sid-8580",
-                 "Enable sid 8580 type",
-                 "SID_8580",
-                 (sid8580:Boolean) => {
-                   sid.setModel(!sid8580)
-                   sid8580Item.setSelected(sid8580)
-                 },
-                 sid8580Item.isSelected
-    )
-    // -----------------------------------
-    val sid2Item = new JMenu("Dual SID")
-    sidItem.add(sid2Item)
-    val group8 = new ButtonGroup
-    val nosid2Item = new JRadioButtonMenuItem("None")
-    sid2Item.add(nosid2Item)
-    nosid2Item.setSelected(true)
-    nosid2Item.addActionListener(_ => setDualSID(None) )
-    group8.add(nosid2Item)
-    for(adr <- DualSID.validAddresses(true)) {
-      val sid2AdrItem = new JRadioButtonMenuItem(adr)
-      sid2Item.add(sid2AdrItem)
-      sid2AdrItem.setSelected(false)
-      sid2AdrItem.addActionListener(_ => setDualSID(Some(Integer.parseInt(adr,16))) )
-      group8.add(sid2AdrItem)
-    }
-    val sidCycleExactItem = new JCheckBoxMenuItem("SID cycle exact emulation")
-    sidCycleExactItem.setSelected(false)
-    sidCycleExactItem.addActionListener(_ => {
-        sidCycleExact = sidCycleExactItem.isSelected
-        sid.setCycleExact(sidCycleExactItem.isSelected)
-      }
-    )
-    sidItem.add(sidCycleExactItem)
-    // Setting ---------------------------
-    settings.add("sid-cycle-exact",
-      "With this option enabled the SID emulation is more accurate with a decrease of performance",
-      "SID_CYCLE_EXACT",
-      (sce:Boolean) => {
-        clock.pause
-        sidCycleExact = sce
-        sid.setCycleExact(sidCycleExact)
-        sidCycleExactItem.setSelected(sidCycleExact)
-        clock.play
-      },
-      sidCycleExact
-    )
+
+    setSIDSettings(optionMenu)
     // -----------------------------------
     optionMenu.addSeparator
-    
-    for(drive <- 0 to 1) {
-      // Setting ---------------------------
-      settings.add(s"drive${drive + 8}-type",
-        "Set the driver's type (1541,1571,1581)",
-        s"DRIVER${drive + 8}_TYPE",
-        (dt: String) => {
-          dt match {
-            case "1541" =>
-              setDriveType(drive,DriveType._1541, true)
-            case "1571" =>
-              setDriveType(drive,DriveType._1571, true)
-            case "1581" =>
-              setDriveType(drive,DriveType._1581, true)
-            case _ =>
-          }
-        },
-        if (drives(drive).driveType == DriveType._1541) "1541"
-        else if (drives(drive).driveType == DriveType._1571) "1571"
-        else if (drives(drive).driveType == DriveType._1581) "1581"
-        else "1571"
-      )
 
-      settings.add(s"drive${drive + 8}-file",
-        s"Attach a file to drive ${drive + 8}",
-        s"DRIVE_${drive + 8}_FILE",
-        (df: String) => {
-          if (df != "") attachDiskFile(drive, new File(df), false, None)
-        },
-        floppyComponents(drive).drive.getFloppy.file
-      )
-    }
+    setDrivesSettings
 
     val busSnooperActiveItem = new JCheckBoxMenuItem("Bus snoop active")
     busSnooperActiveItem.setSelected(false)
     busSnooperActiveItem.addActionListener(e => busSnooperActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected )
     optionMenu.add(busSnooperActiveItem)
+    // reset setting
+    resetSettingsActions = (() => {
+      busSnooperActiveItem.setSelected(false)
+      busSnooperActive = false
+    }) :: resetSettingsActions
     
     optionMenu.addSeparator
 
-    val remoteItem = new JMenu("Remoting")
-    optionMenu.add(remoteItem)
-
-    val group10 = new ButtonGroup
-    val remoteDisabledItem = new JRadioButtonMenuItem("Off")
-    remoteDisabledItem.setSelected(true)
-    remoteDisabledItem.addActionListener(_ => setRemote(None) )
-    group10.add(remoteDisabledItem)
-    remoteItem.add(remoteDisabledItem)
-    val remoteEnabledItem = new JRadioButtonMenuItem("On ...")
-    remoteEnabledItem.addActionListener(e => setRemote(Some(e.getSource.asInstanceOf[JRadioButtonMenuItem])) )
-    group10.add(remoteEnabledItem)
-    remoteItem.add(remoteEnabledItem)
+    setRemotingSettings(optionMenu)
     
     optionMenu.addSeparator
     
@@ -707,140 +468,18 @@ class C64 extends CBMComputer {
     IOItem.add(rs232Item)
     
     IOItem.addSeparator
-    
-    val flyerItem = new JMenu("Flyer internet modem")
-    IOItem.add(flyerItem)
 
-    val fylerEnabledItem = new JCheckBoxMenuItem("Flyer enabled on 7")
-    fylerEnabledItem.setSelected(false)
-    flyerItem.add(fylerEnabledItem)
-    fylerEnabledItem.addActionListener(e => enableFlyer(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
-    val flyerDirectoryItem = new JMenuItem("Set disks repository ...")
-    flyerItem.add(flyerDirectoryItem)
-    flyerDirectoryItem.addActionListener(_ => chooseFlyerDir )
+    setFlyerSettings(IOItem)
 
-    val reuItem = new JMenu("REU")
-    val group5 = new ButtonGroup
-    val noReuItem = new JRadioButtonMenuItem("None")
-    noReuItem.setSelected(true)
-    noReuItem.addActionListener(_ => setREU(None,None) )
-    group5.add(noReuItem)
-    reuItem.add(noReuItem)
-    val reu128Item = new JRadioButtonMenuItem("128K")
-    reu128Item.addActionListener(_ => setREU(Some(REU.REU_1700),None) )
-    group5.add(reu128Item)
-    reuItem.add(reu128Item)
-    val reu256Item = new JRadioButtonMenuItem("256K")
-    reu256Item.addActionListener(_ => setREU(Some(REU.REU_1764),None) )
-    group5.add(reu256Item)
-    reuItem.add(reu256Item)
-    val reu512Item = new JRadioButtonMenuItem("512K")
-    reu512Item.addActionListener(_ => setREU(Some(REU.REU_1750),None) )
-    group5.add(reu512Item)
-    reuItem.add(reu512Item)
-    val reu16MItem = new JRadioButtonMenuItem("16M ...")
-    reu16MItem.addActionListener(_ => choose16MREU )
-    group5.add(reu16MItem)
-    reuItem.add(reu16MItem)
-    IOItem.add(reuItem)
+    setREUSettings(IOItem)
 
-    val geoItem = new JMenu("GeoRAM")
-    val groupgeo = new ButtonGroup
-    val noGeoItem = new JRadioButtonMenuItem("None")
-    noGeoItem.setSelected(true)
-    noGeoItem.addActionListener(_ => setGeoRAM(false) )
-    groupgeo.add(noGeoItem)
-    geoItem.add(noGeoItem)
-    val _256kGeoItem = new JRadioButtonMenuItem("256K")
-    _256kGeoItem.addActionListener(_ => setGeoRAM(true,256) )
-    groupgeo.add(_256kGeoItem)
-    geoItem.add(_256kGeoItem)
-    val _512kGeoItem = new JRadioButtonMenuItem("512K")
-    _512kGeoItem.addActionListener(_ => setGeoRAM(true,512) )
-    groupgeo.add(_512kGeoItem)
-    geoItem.add(_512kGeoItem)
+    setGEORamSettings(IOItem)
 
-    IOItem.add(geoItem)
-    // Setting ---------------------------
-    settings.add("geo-ram",
-      "Set the georam size (none,256,512)",
-      "GEO_RAM",
-      (geo:String) => {
-        if (geo == "512") {
-          _512kGeoItem.setSelected(true)
-          setGeoRAM(true,512)
-        }
-        else
-        if (geo == "256") {
-          _256kGeoItem.setSelected(true)
-          setGeoRAM(true,256)
-        }
-      },
-      if (_512kGeoItem.isSelected) "512"
-      else
-      if (_256kGeoItem.isSelected) "256"
-      else "none"
-    )
-    settings.add("reu-type",
-                 "Set the reu type (none,128,256,512,16384)",
-                 "REU_TYPE",
-     (reu:String) => {
-       val reuPars = reu.split(",")
-       if (reuPars(0) == "" || reuPars(0) == "none") setREU(None,None)
-       else
-       reuPars(0).toInt match {
-         case REU.REU_1700 =>
-           setREU(Some(REU.REU_1700),None)
-           reu128Item.setSelected(true)
-         case REU.REU_1750 =>
-           setREU(Some(REU.REU_1750),None)
-           reu512Item.setSelected(true)
-         case REU.REU_1764 =>
-           setREU(Some(REU.REU_1764),None)
-           reu256Item.setSelected(true)
-         case REU.REU_16M =>
-           setREU(Some(REU.REU_16M),if (reuPars.length == 2 && reuPars(1) != "null") Some(reuPars(1)) else None)
-           reu16MItem.setSelected(true)
-       }
-     },
-     if (noReuItem.isSelected) "none"
-     else
-     if (reu128Item.isSelected) "128"
-     else
-     if (reu256Item.isSelected) "256"
-     else
-     if (reu512Item.isSelected) "512"
-     else
-     if (reu16MItem.isSelected) "16384," + REU.attached16MFileName
-     else "none"
-    )
     // -----------------------------------
     
     IOItem.addSeparator
 
-    val digimaxItem = new JMenu("DigiMAX")
-    IOItem.add(digimaxItem)
-    val digiMaxSampleRateItem  = new JMenuItem("DigiMax sample rate ...")
-    digiMaxSampleRateItem.addActionListener(_ => chooseDigiMaxSampleRate )
-    digimaxItem.add(digiMaxSampleRateItem)
-    val group6 = new ButtonGroup
-    val digimaxDisabledItem = new JRadioButtonMenuItem("Disabled")
-    digimaxDisabledItem.setSelected(true)
-    digimaxDisabledItem.addActionListener(_ => setDigiMax(false,None) )
-    digimaxItem.add(digimaxDisabledItem)
-    group6.add(digimaxDisabledItem)
-    val digimaxOnUserPortItem = new JRadioButtonMenuItem("On UserPort")
-    digimaxOnUserPortItem.addActionListener(_ => setDigiMax(true,None) )
-    group6.add(digimaxOnUserPortItem)
-    digimaxItem.add(digimaxOnUserPortItem)
-    val digimaxDE00Item = new JRadioButtonMenuItem("On DE00")
-    digimaxDE00Item.addActionListener(_ => setDigiMax(true,Some(0xDE00)) )
-    group6.add(digimaxDE00Item)
-    digimaxItem.add(digimaxDE00Item)
-    val digimaxDF00Item = new JRadioButtonMenuItem("On DF00")
-    digimaxDF00Item.addActionListener(_ => setDigiMax(true,Some(0xDF00)) )
-    group6.add(digimaxDF00Item)
-    digimaxItem.add(digimaxDF00Item)
+    setDigiMAXSettings(IOItem)
     
     IOItem.addSeparator
     
@@ -849,18 +488,8 @@ class C64 extends CBMComputer {
     IOItem.add(gmod2Item)
     
     IOItem.addSeparator
-    
-    val cpmItem = new JCheckBoxMenuItem("CP/M Cartdrige")
-    cpmItem.addActionListener(e => enableCPMCart(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
-    IOItem.add(cpmItem)
-    settings.add("cpm64-enabled",
-      s"Attach the CP/M cart",
-      "CPM64",
-      (cpm: Boolean) => {
-        if (cpm) enableCPMCart(true)
-      },
-      ExpansionPort.getExpansionPort.isInstanceOf[CPMCartridge]
-    )
+
+    setCPMSettings(IOItem)
 
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)

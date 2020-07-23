@@ -1,8 +1,11 @@
 package ucesoft.cbm.expansion
 
+import java.io.{ObjectInputStream, ObjectOutputStream}
+
 import ucesoft.cbm.ChipID
 
 class GeoRAM(size:Int) extends ExpansionPort {
+  val TYPE : ExpansionPortType.Value = ExpansionPortType.GEORAM
   override val name = "GeoRAM"
   override val componentID = "GeoRAM"
 
@@ -41,5 +44,17 @@ class GeoRAM(size:Int) extends ExpansionPort {
     }
     else
     if ((address & 0xFF00) == 0xDE00) rampage(address & 0xFF) = value
+  }
+
+  override def saveState(out: ObjectOutputStream): Unit = {
+    out.writeInt(size)
+    super.saveState(out)
+    out.writeObject(ram)
+  }
+
+  override def loadState(in: ObjectInputStream): Unit = {
+    // the size is read by the expansion port handler
+    super.loadState(in)
+    loadMemory[Array[Array[Int]]](ram,in)
   }
 }

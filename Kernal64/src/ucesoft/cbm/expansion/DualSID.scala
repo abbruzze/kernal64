@@ -1,9 +1,12 @@
 package ucesoft.cbm.expansion
 
+import java.io.{ObjectInputStream, ObjectOutputStream}
+
 import ucesoft.cbm.peripheral.sid.SID
 import ucesoft.cbm.{ChipID, Clock}
 
 class DualSID(sid:SID,sidAddress:Int) extends ExpansionPort {
+  val TYPE : ExpansionPortType.Value = ExpansionPortType.DUALSID
   override val name = "DualSID"
   override val componentID = "DualSID"
   private[this] final val endAddress = sidAddress + 0x20
@@ -22,6 +25,16 @@ class DualSID(sid:SID,sidAddress:Int) extends ExpansionPort {
   
   final override def eject  : Unit = {
     sid.setStereo(false)
+  }
+
+  override def saveState(out: ObjectOutputStream): Unit = {
+    out.writeObject(sidAddress.toHexString.toUpperCase)
+    super.saveState(out)
+  }
+
+  override def loadState(in: ObjectInputStream): Unit = {
+    // address is handled by expansion port handler
+    super.loadState(in)
   }
 }
 

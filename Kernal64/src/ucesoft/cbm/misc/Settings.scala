@@ -39,7 +39,7 @@ class Settings {
   private class Setting[T](val cmdLine : String,
                           val description : String,
                           val key : String,
-                          loadF : T => Unit,
+                          val loadF : T => Unit,
                           saveF : => T)(implicit settingConv:SettingConv[T]) {
     var lastValue : T = _
 
@@ -66,6 +66,8 @@ class Settings {
   private[this] val settings = new collection.mutable.ListBuffer[Setting[_]]
 
   def get[T](key:String) : Option[T] = settings find { s => s.key == key && s.lastValue != null } map { _.lastValue.asInstanceOf[T] } headOption
+
+  def getLoadF[T](key:String) : Option[T => Unit] = settings find { _.key == key } map { _.loadF.asInstanceOf[T => Unit] } headOption
   
   def add[T](cmdLine : String,
             description : String,

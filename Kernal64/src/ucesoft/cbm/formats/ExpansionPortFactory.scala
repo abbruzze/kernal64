@@ -1,16 +1,20 @@
 package ucesoft.cbm.formats
 
+import java.io.{ObjectInputStream, ObjectOutputStream}
+
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.expansion.ExpansionPort
+import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortType}
 import ucesoft.cbm.Clock
 import ucesoft.cbm.ClockEvent
 import ucesoft.cbm.misc.M93C86
 import java.util.Properties
+
 import ucesoft.cbm.Log
 
 object ExpansionPortFactory {
   private class CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends ExpansionPort {
+    val TYPE : ExpansionPortType.Value = ExpansionPortType.CRT
     class ROM(val name: String, val startAddress: Int, val length: Int, val data: Array[Int]) extends Memory {
       val isRom = true
       def isActive = true
@@ -59,6 +63,25 @@ object ExpansionPortFactory {
     def ROMH = if (romhBanks.size > 0) romhBanks(romhBankIndex) else null
 
     override def toString = s"ExpansionPort{crt=${crt} game=${game} exrom=${exrom} romlBanks=${romlBanks.mkString("<", ",", ">")} romhBanks=${romhBanks.mkString("<", ",", ">")}}"
+
+    override def saveState(out: ObjectOutputStream): Unit = {
+      crt.saveState(out)
+      super.saveState(out)
+      out.writeInt(romlBankIndex)
+      out.writeInt(romhBankIndex)
+      out.writeBoolean(game)
+      out.writeBoolean(exrom)
+    }
+
+    override def loadState(in: ObjectInputStream): Unit = {
+      // the crt state is handled by state handler
+      super.loadState(in)
+      romlBankIndex = in.readInt
+      romhBankIndex = in.readInt
+      game = in.readBoolean
+      exrom = in.readBoolean
+      notifyMemoryConfigurationChange
+    }
   }
   // ================================= CARTRIDGE IMPL ===================================================
   private class GMOD2CartridgeExpansionPort(crt: Cartridge,ram:Memory,config:Properties) extends CartridgeExpansionPort(crt,ram) {
@@ -110,10 +133,21 @@ object ExpansionPortFactory {
           Log.info(s"EEPROM saved to $eeprom")
       }
     }
+
+    override def saveState(out: ObjectOutputStream): Unit = {
+      super.saveState(out)
+      out.writeInt(reg)
+      m93c86.save(out)
+    }
+
+    override def loadState(in: ObjectInputStream): Unit = {
+      super.loadState(in)
+      reg = in.readInt
+      m93c86.load(in)
+    }
   }
   private class SimonsBasicCartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
-      val target = address - startAddress
       game = true
       notifyMemoryConfigurationChange
       0
@@ -222,6 +256,16 @@ object ExpansionPortFactory {
       exrom = false
       notifyMemoryConfigurationChange
     }
+
+    override def saveState(out: ObjectOutputStream): Unit = {
+      super.saveState(out)
+      out.writeBoolean(latch)
+    }
+
+    override def loadState(in: ObjectInputStream): Unit = {
+      super.loadState(in)
+      latch = in.readBoolean
+    }
   }
 
   private class Type19CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
@@ -238,7 +282,17 @@ object ExpansionPortFactory {
         notifyMemoryConfigurationChange
       }
     }
-    override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = reg    
+    override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = reg
+
+    override def saveState(out: ObjectOutputStream): Unit = {
+      super.saveState(out)
+      out.writeInt(reg)
+    }
+
+    override def loadState(in: ObjectInputStream): Unit = {
+      super.loadState(in)
+      reg = in.readInt
+    }
   }
   private class Type18CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     object ROMLMirrored extends Memory {
@@ -290,7 +344,6 @@ object ExpansionPortFactory {
     override def ROMH = if (VALID_CRT) super.ROMH else ROMLMirrored
   }
   private class Type16CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
-    
     override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       val offs = address - startAddress
       romlBanks(0).read(0x9E00 + offs)
@@ -369,6 +422,16 @@ object ExpansionPortFactory {
       romhBankIndex = 0
       notifyMemoryConfigurationChange
     }
+
+    override def saveState(out: ObjectOutputStream): Unit = {
+      super.saveState(out)
+      out.writeObject(io2mem)
+    }
+
+    override def loadState(in: ObjectInputStream): Unit = {
+      super.loadState(in)
+      loadMemory[Int](io2mem,in)
+    }
   }
 
   private class Type3CartridgeExpansionPort(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
@@ -415,6 +478,16 @@ object ExpansionPortFactory {
       romhBankIndex = 0
       game = false//crt.GAME 
       exrom = false//crt.EXROM
+    }
+
+    override def saveState(out: ObjectOutputStream): Unit = {
+      super.saveState(out)
+      out.writeBoolean(controlRegister)
+    }
+
+    override def loadState(in: ObjectInputStream): Unit = {
+      super.loadState(in)
+      controlRegister = in.readBoolean
     }
   }
   
@@ -496,6 +569,20 @@ object ExpansionPortFactory {
       isActive = true
       exportRAM = false
     }
+
+    override def saveState(out: ObjectOutputStream): Unit = {
+      super.saveState(out)
+      out.writeBoolean(isActive)
+      out.writeBoolean(exportRAM)
+      out.writeObject(crtRAM)
+    }
+
+    override def loadState(in: ObjectInputStream): Unit = {
+      super.loadState(in)
+      isActive = in.readBoolean
+      exportRAM = in.readBoolean
+      loadMemory[Int](crtRAM,in)
+    }
   }
   
   private class Type20CartridgeExpansionPort(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
@@ -559,6 +646,20 @@ object ExpansionPortFactory {
       romhBankIndex = 0
       game = false//crt.GAME 
       exrom = false//crt.EXROM
+    }
+
+    override def saveState(out: ObjectOutputStream): Unit = {
+      super.saveState(out)
+      out.writeBoolean(enabled)
+      out.writeBoolean(ramEnabled)
+      out.writeObject(internalRam)
+    }
+
+    override def loadState(in: ObjectInputStream): Unit = {
+      super.loadState(in)
+      enabled = in.readBoolean
+      ramEnabled = in.readBoolean
+      loadMemory[Int](internalRam,in)
     }
   }
   private class Type51CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
@@ -641,6 +742,22 @@ object ExpansionPortFactory {
 
     override def ROML: Memory = roml
     override def ROMH: Memory = romh
+
+    override def saveState(out: ObjectOutputStream): Unit = {
+      super.saveState(out)
+      out.writeBoolean(enabled)
+      out.writeInt(bankSelect)
+      out.writeInt(chipselect)
+      out.writeObject(cart_ram)
+    }
+
+    override def loadState(in: ObjectInputStream): Unit = {
+      super.loadState(in)
+      enabled = in.readBoolean
+      bankSelect = in.readInt
+      chipselect = in.readInt
+      loadMemory[Int](cart_ram,in)
+    }
   }
   // ====================================================================================================
   def loadExpansionPort(crtName: String, irqAction: (Boolean) => Unit, nmiAction: (Boolean) => Unit, ram: Memory,config:Properties): ExpansionPort = {

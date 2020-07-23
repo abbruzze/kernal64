@@ -4,9 +4,8 @@ import ucesoft.cbm.ChipID
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.Clock
 import ucesoft.cbm.ClockEvent
-import java.io.FileInputStream
-import java.io.BufferedInputStream
-import java.io.File
+import java.io.{BufferedInputStream, File, FileInputStream, ObjectInputStream, ObjectOutputStream}
+
 import ucesoft.cbm.Log
 
 object REU {
@@ -35,6 +34,7 @@ object REU {
 		  				mem:Memory,
 		  				setDMA: (Boolean) => Unit,
 		  				setIRQ: (Boolean) => Unit) extends ExpansionPort {
+    val TYPE : ExpansionPortType.Value = ExpansionPortType.REU
     override val name = "REU_" + size
     override val componentID = "REU"
       
@@ -334,6 +334,41 @@ object REU {
     @inline private def incrementAddresses  : Unit = {
       if ((addressControlRegister & 0x80) == 0) c64Address = (c64Address + 1) & 0xFFFF
       if ((addressControlRegister & 0x40) == 0) reuAddress = (reuAddress + 1) & REU_WRAP_ADDRESS
-    }    
-  }      
+    }
+
+    override def saveState(out: ObjectOutputStream): Unit = {
+      out.writeInt(size)
+      super.saveState(out)
+      out.writeInt(statusRegister)
+      out.writeInt(commandRegister)
+      out.writeInt(c64Address)
+      out.writeInt(reuAddress)
+      out.writeInt(transferRegister)
+      out.writeInt(interruptMaskRegister)
+      out.writeInt(addressControlRegister)
+      out.writeInt(currentOperation)
+      out.writeInt(shadowC64Address)
+      out.writeInt(shadowReuAddress)
+      out.writeInt(shadowTransferRegister)
+      out.writeObject(reuMem)
+    }
+
+    override def loadState(in: ObjectInputStream): Unit = {
+      // size is handled by export port handler
+      super.loadState(in)
+      statusRegister = in.readInt
+      commandRegister = in.readInt
+      c64Address = in.readInt
+      reuAddress = in.readInt
+      transferRegister = in.readInt
+      interruptMaskRegister = in.readInt
+      addressControlRegister = in.readInt
+      currentOperation = in.readInt
+      shadowC64Address = in.readInt
+      shadowReuAddress = in.readInt
+      shadowTransferRegister = in.readInt
+      loadMemory[Int](reuMem,in)
+      checkOperation
+    }
+  }
 }

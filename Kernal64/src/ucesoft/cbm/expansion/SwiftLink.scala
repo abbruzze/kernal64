@@ -20,6 +20,7 @@ object SwiftLink {
 }
 
 private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort]) extends ExpansionPort with RS232 with ModemCommandListener {
+  val TYPE : ExpansionPortType.Value = ExpansionPortType.SWIFTLINK
   override val name = "SwiftLink"
   override val componentID = "SwiftLink"
   override val componentType = CBMComponentType.MEMORY
@@ -309,7 +310,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   override protected def saveState(out:ObjectOutputStream) : Unit = {}
   override protected def loadState(in:ObjectInputStream) : Unit = {}
   override protected def allowsStateRestoring : Boolean = {
-    showError("State error","Loading/storing of cartridge's state is not supported [SwiftLink].")
+    showError("State error","Storing SwiftLink's state is not supported.")
     false
   }
 }

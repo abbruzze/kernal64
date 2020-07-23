@@ -1,6 +1,8 @@
 package ucesoft.cbm.expansion.cpm
 
-import ucesoft.cbm.expansion.ExpansionPort
+import java.io.{ObjectInputStream, ObjectOutputStream}
+
+import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortType}
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.Log
@@ -12,6 +14,7 @@ import ucesoft.cbm.cpu.Z80
 class CPMCartridge(mem:Memory,
                    setDMA: (Boolean) => Unit,
                    traceListener: (Option[TraceListener]) => Unit) extends ExpansionPort {
+  val TYPE : ExpansionPortType.Value = ExpansionPortType.CPM
   override val name = "CP/M Cartridge"
   override val componentID = "CP/M"
   val EXROM = true
@@ -82,5 +85,17 @@ class CPMCartridge(mem:Memory,
   private def z80Clock(cycles:Long) : Unit = {
     z80.clock(cycles,2)
     if (z80Active) clk.schedule(new ClockEvent("Z80 clock",clk.nextCycles,z80ClockCallback))
+  }
+
+  override def saveState(out: ObjectOutputStream): Unit = {
+    super.saveState(out)
+    out.writeBoolean(z80Active)
+    z80.save(out)
+  }
+
+  override def loadState(in: ObjectInputStream): Unit = {
+    super.loadState(in)
+    turnZ80(in.readBoolean)
+    z80.load(in)
   }
 }
