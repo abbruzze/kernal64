@@ -112,7 +112,13 @@ abstract class PouetSpi(genre:String) extends GameProvider {
                       }
                     }
                     val gameURL = s"http://www.pouet.net/$location"
-                    buffer += makeGame(name,gameURL,group,date)   
+                    try {
+                      buffer += makeGame(name,gameURL,group,date)
+                    }
+                    catch {
+                      case t:Throwable =>
+                        println(s"Can't download info for game $name and url $gameURL")
+                    }
                     found = true
                   case _ =>                    
                 }  

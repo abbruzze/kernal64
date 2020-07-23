@@ -91,7 +91,10 @@ class Repository(provider:GameProvider) {
         l.split(UN_SEP) match {
           case Array(name,imageURL,downloadPageURL,year,genre,softwareHouse) =>
             Game(name,if (imageURL.isEmpty) None else Some(new URL(imageURL)),if (downloadPageURL.isEmpty) None else Some(new URL(downloadPageURL)),year,genre,softwareHouse)
-          case _ => throw new IOException(s"Repository of ${provider.name} seems to be corrupted on line: $l")
+          case Array(name,imageURL,downloadPageURL,year,genre) =>
+            Game(name,if (imageURL.isEmpty) None else Some(new URL(imageURL)),if (downloadPageURL.isEmpty) None else Some(new URL(downloadPageURL)),year,genre,"N/A")
+          case _ =>
+            throw new IOException(s"Repository of ${provider.name} seems to be corrupted on line: $l")
         }
       }
       games.toList 
