@@ -15,8 +15,9 @@ import javax.swing.JFrame
 final class VIC(mem: VICMemory,
                 colorMem:Memory,
                 irqAction: (Boolean) => Unit,
-                baLow: (Boolean) => Unit) extends Chip with RAMComponent {
-  override lazy val componentID = "VIC 6569"
+                baLow: (Boolean) => Unit,
+                is8565:Boolean = false) extends Chip with RAMComponent {
+  override lazy val componentID = if (is8565) "VICIIe 8565" else "VICII 6569"
   val name = "VIC"
   val isRom = false
   val length = 1024
@@ -231,14 +232,15 @@ final class VIC(mem: VICMemory,
   // see Sprite class
 
   private[this] var dataToDraw,vmliToDraw = 0
+  private[this] var lastColorReg = 0xFF // for grey dot bug
   // sprite
   final private[this] val sprites = Array(new Sprite(0), new Sprite(1), new Sprite(2), new Sprite(3), new Sprite(4), new Sprite(5), new Sprite(6), new Sprite(7))
   private[this] var spritesDisplayedMask = 0
   private[this] var spriteDMAon = 0
 
   // ---------------------------- PIXELS --------------------------------------------------
-  // |doc 1|doc 0|sprite priority|sp 2|sp 1|sp 0|transparent|background/foreground|c3|c2|c1|c0|
-  // |  11 | 10  |       9       | 8  | 7  | 6  |     5     |          4          | 3| 2| 1| 0|
+  //  grey dot gfx info |...|doc 1|doc 0|sprite priority|sp 2|sp 1|sp 0|transparent|background/foreground|c3|c2|c1|c0|
+  //                  20|...|  11 | 10  |       9       | 8  | 7  | 6  |     5     |          4          | 3| 2| 1| 0|
 
   // |doc 1|doc 0|
   // | 0   |  0  | = 'N'
@@ -282,6 +284,7 @@ final class VIC(mem: VICMemory,
     var hasPixels = false
     private[this] val pixels = Array.fill[Int](8)(PIXEL_TRANSPARENT)
     private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
+    private[this] var lastColorSource = -1
 
     def enabled = _enabled
     def enabled_=(enabled:Boolean) = {
@@ -372,6 +375,7 @@ final class VIC(mem: VICMemory,
               }
             }
             pixels(i) = shift(latchedMc)
+            if (is8565 && i == 0 && lastColorReg == lastColorSource) pixels(i) = 0xF
           }
         }
         i += 1
@@ -379,13 +383,14 @@ final class VIC(mem: VICMemory,
     }
 
     @inline final private def shift(mc:Boolean) = {
+      lastColorSource = -1
       var pixel = if (!mc) { // no multicolor
         if (xexp) {
           if (xexpCounter == 0) gdata <<= 1
           xexpCounter ^= 1
         } else gdata <<= 1
         val cbit = (gdata & 0x1000000) == 0x1000000
-        if (cbit) color else PIXEL_TRANSPARENT
+        if (cbit) { lastColorSource = index + 6; color } else PIXEL_TRANSPARENT
       } else { // multicolor
         if (mcCounter == 0) {
           if (xexp) {
@@ -398,9 +403,9 @@ final class VIC(mem: VICMemory,
         val cbit = gdata & 0x3000000
         (cbit : @switch) match {
           case 0x0000000 => PIXEL_TRANSPARENT
-          case 0x1000000 => spriteMulticolor01(0)
-          case 0x2000000 => color
-          case 0x3000000 => spriteMulticolor01(1)
+          case 0x1000000 => lastColorSource = 4 ; spriteMulticolor01(0)
+          case 0x2000000 => lastColorSource = index + 6; color
+          case 0x3000000 => lastColorSource = 5 ; spriteMulticolor01(1)
         }
       }
 
@@ -544,7 +549,7 @@ final class VIC(mem: VICMemory,
       if (!drawBorder) return
       */
       // if we're surely inside the gfx area, the border pixels are the same as previous cycle
-      val inSideGfx = rasterCycle > 17 && rasterCycle < 53 && lastBorderColor == borderColor
+      val inSideGfx = !is8565 && rasterCycle > 17 && rasterCycle < 53 && lastBorderColor == borderColor
       if (!isBlank && !inSideGfx) {
         var xcoord = xCoord(rasterCycle)
         val color = if (traceRasterLineInfo) borderColor | PIXEL_DOX_B else borderColor
@@ -554,7 +559,9 @@ final class VIC(mem: VICMemory,
         var i = 0
         while (i < 8) {
           val hasBorder = checkBorderFF(xcoord)
-          pixels(i) = if (hasBorder) color else PIXEL_TRANSPARENT
+          pixels(i) = if (hasBorder) {
+            if (is8565 && i == 0 && lastColorReg == 0xFA) 0x0F else color
+          } else PIXEL_TRANSPARENT
           i += 1
           xcoord += 1
         }
@@ -665,9 +672,9 @@ final class VIC(mem: VICMemory,
             else
             if (isInDisplayState) {
               val backIndex = if (ecm) (vml_p(vmli) >> 6) & 3 else 0
-              backgroundColor(backIndex)
+              backgroundColor(backIndex) | (backIndex + 1) << 20
             }
-            else backgroundColor(0)
+            else backgroundColor(0) | 1 << 20
           }
         }
         else { // multi color mode
@@ -676,15 +683,15 @@ final class VIC(mem: VICMemory,
           (cbit : @switch) match {
             case 0 => if (ecm) PIXEL_BLACK // invalid text mode (background)
             else
-            if (isInDisplayState) backgroundColor(cbit) // background
+            if (isInDisplayState) backgroundColor(cbit) | (cbit + 1) << 20  // background
             else backgroundColor(0)
             case 1 => if (ecm) PIXEL_BLACK // invalid text mode (background)
             else
-            if (isInDisplayState) backgroundColor(cbit) // background
+            if (isInDisplayState) backgroundColor(cbit) | (cbit + 1) << 20 // background
             else PIXEL_BLACK
             case 2 => if (ecm) PIXEL_BLACK | PIXEL_FOREGROUND // invalid text mode (foreground)
             else
-            if (isInDisplayState) backgroundColor(cbit) | PIXEL_FOREGROUND // foreground
+            if (isInDisplayState) backgroundColor(cbit) | PIXEL_FOREGROUND | (cbit + 1) << 20 // foreground
             else PIXEL_FOREGROUND
             case 3 => if (ecm) PIXEL_BLACK | PIXEL_FOREGROUND // invalid text mode (foreground)
             else
@@ -716,7 +723,7 @@ final class VIC(mem: VICMemory,
           (cbit : @switch) match {
             case 0x00 => if (ecm) PIXEL_BLACK // invalid bitmap mode (background)
             else
-            if (isInDisplayState) backgroundColor(0) // background
+            if (isInDisplayState) backgroundColor(0) | 1 << 20 // background
             else backgroundColor(0)
             case 0x100 => if (ecm) PIXEL_BLACK // invalid bitmap mode (background)
             else
@@ -762,6 +769,11 @@ final class VIC(mem: VICMemory,
       var counter = 0
       while (counter < 8) {
         pixels(counter) = shift(counter)
+        if (is8565) {
+          val greyReg = ((pixels(counter) >> 20) & 7) - 1
+          if (counter == 0 && lastColorReg == greyReg) pixels(counter) = 0x0F
+        }
+
         if (checkLP && baseX + counter == lpx) triggerLightPen
         counter += 1
       }
@@ -1038,16 +1050,20 @@ final class VIC(mem: VICMemory,
         case 30 | 31 => // can't be written
         case 32 =>
           borderColor = value & 0x0F
+          lastColorReg = 0xFA // value for border reg
         //Log.debug("VIC border color set to " + borderColor)
         case 33 | 34 | 35 | 36 =>
           backgroundColor(offset - 33) = value & 0x0F
+          lastColorReg = offset - 33
         //Log.debug("VIC background color #%d set to %d".format(offset - 33,value))
         case 37 | 38 =>
           spriteMulticolor01(offset - 37) = value & 0x0F
+          lastColorReg = offset - 33
         //Log.fine("Sprite multicolor #%d set to %d".format(offset - 37,value))
         case 39 | 40 | 41 | 42 | 43 | 44 | 45 | 46 =>
           val index = offset - 39
           sprites(index).color = value & 0x0F
+          lastColorReg = offset - 33
         //Log.fine("Sprite #%d color set to %d".format(offset - 39,value))
         case _ => // $D02F-$D03F
       }
@@ -1364,6 +1380,8 @@ final class VIC(mem: VICMemory,
         s += 1
       }
     // *************************************************************************
+
+    lastColorReg = 0xFF
   }
 
   @inline private def checkAndSendIRQ {
