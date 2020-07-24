@@ -284,7 +284,6 @@ final class VIC(mem: VICMemory,
     var hasPixels = false
     private[this] val pixels = Array.fill[Int](8)(PIXEL_TRANSPARENT)
     private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
-    private[this] var lastColorSource = -1
 
     def enabled = _enabled
     def enabled_=(enabled:Boolean) = {
@@ -375,7 +374,6 @@ final class VIC(mem: VICMemory,
               }
             }
             pixels(i) = shift(latchedMc)
-            if (is8565 && i == 0 && lastColorReg == lastColorSource) pixels(i) = 0xF
           }
         }
         i += 1
@@ -383,14 +381,13 @@ final class VIC(mem: VICMemory,
     }
 
     @inline final private def shift(mc:Boolean) = {
-      lastColorSource = -1
       var pixel = if (!mc) { // no multicolor
         if (xexp) {
           if (xexpCounter == 0) gdata <<= 1
           xexpCounter ^= 1
         } else gdata <<= 1
         val cbit = (gdata & 0x1000000) == 0x1000000
-        if (cbit) { lastColorSource = index + 6; color } else PIXEL_TRANSPARENT
+        if (cbit) color else PIXEL_TRANSPARENT
       } else { // multicolor
         if (mcCounter == 0) {
           if (xexp) {
@@ -403,9 +400,9 @@ final class VIC(mem: VICMemory,
         val cbit = gdata & 0x3000000
         (cbit : @switch) match {
           case 0x0000000 => PIXEL_TRANSPARENT
-          case 0x1000000 => lastColorSource = 4 ; spriteMulticolor01(0)
-          case 0x2000000 => lastColorSource = index + 6; color
-          case 0x3000000 => lastColorSource = 5 ; spriteMulticolor01(1)
+          case 0x1000000 => spriteMulticolor01(0)
+          case 0x2000000 => color
+          case 0x3000000 => spriteMulticolor01(1)
         }
       }
 
@@ -674,7 +671,7 @@ final class VIC(mem: VICMemory,
               val backIndex = if (ecm) (vml_p(vmli) >> 6) & 3 else 0
               backgroundColor(backIndex) | (backIndex + 1) << 20
             }
-            else backgroundColor(0) | 1 << 20
+            else backgroundColor(0)// | 1 << 20
           }
         }
         else { // multi color mode
