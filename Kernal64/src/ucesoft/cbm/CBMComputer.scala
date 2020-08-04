@@ -556,7 +556,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     })
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-        attachDiskFile(driveID,fc.getSelectedFile,autorun,canvas.selectedFile)
+        attachDiskFile(driveID,fc.getSelectedFile,autorun,canvas.selectedFile,false)
       case _ =>
     }
   }
