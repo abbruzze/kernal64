@@ -12,14 +12,6 @@ import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Font
 
-object KeyboardEditor extends App {
-  val ke = new KeyboardEditor(null,ucesoft.cbm.c128.C128KeyboardMapper,true)
-  val f = new JFrame  
-  f.getContentPane.add("Center",ke)
-  f.pack
-  f.setVisible(true)
-}
-
 class KeyboardEditor(keyboard:Keyboard,keybm:KeyboardMapper,isC64:Boolean) extends JPanel with ActionListener with KeyListener {
   private val map = {
     val m = new collection.mutable.HashMap[CKey.Key,Int]

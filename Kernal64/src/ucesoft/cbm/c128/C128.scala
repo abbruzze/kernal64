@@ -34,7 +34,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   private[this] val CONFIGURATION_VDC_FRAME_DIM = "vdc.frame.dim"
   override protected val PRG_RUN_DELAY_CYCLES = 6000000
 
-  protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c128",C128KeyboardMapper)
+  protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c128")
   private[this] var vdcEnabled = true // used with --vdc-disabled
   protected val mmu = new C128MMU(this)
   private[this] val z80 = new Z80(mmu,mmu)

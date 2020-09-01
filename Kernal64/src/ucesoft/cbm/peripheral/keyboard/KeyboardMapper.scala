@@ -1,11 +1,9 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import java.io.PrintWriter
+import java.io.{BufferedReader, FileInputStream, FileNotFoundException, IOException, InputStreamReader, PrintWriter}
 import java.awt.event.KeyEvent
-import java.io.BufferedReader
-import java.io.InputStreamReader
+
 import ucesoft.cbm.Log
-import java.io.FileInputStream
 
 trait KeyboardMapper {
 	val map : Map[Int,CKey.Key]
@@ -101,12 +99,31 @@ object KeyboardMapperStore {
     val fields = clazz.getDeclaredFields
     fields filter { _.getName.startsWith("VK_") } map { f => (f.get(null).asInstanceOf[Int],f.getName) } toMap
   }
+
+  private def findDefaultKeyboardLayoutForLocale(internalResource:String) : String = {
+    Option(java.awt.im.InputContext.getInstance().getLocale) match {
+      case None =>
+        Log.info("Cannot find any keyboard layout for current locale. Switching to IT")
+        s"${internalResource}_IT"
+      case Some(loc) =>
+        s"${internalResource}_${loc.getLanguage.toUpperCase}"
+    }
+  }
   
-  def loadMapper(externalFile:Option[String],internalResource:String,defaultMapper:KeyboardMapper) : KeyboardMapper = {
+  def loadMapper(externalFile:Option[String],_internalResource:String) : KeyboardMapper = {
     externalFile match {
       case None =>
+        val internalResource = findDefaultKeyboardLayoutForLocale(_internalResource)
         loadFromResource(internalResource) match {
-          case None => defaultMapper
+          case None =>
+            // layout not found, switching to IT
+            loadFromResource(s"_${internalResource}_IT") match {
+              case None =>
+                throw new FileNotFoundException(s"Can't find default keyboard file: $internalResource")
+              case Some(m) =>
+                Log.info(s"Loaded keyboard configuration file from $internalResource")
+                m
+            }
           case Some(m) =>
             Log.info(s"Loaded keyboard configuration file from $internalResource")
             m
@@ -122,12 +139,9 @@ object KeyboardMapperStore {
         catch {
           case t:Throwable =>
             Log.info(s"Cannot load keyboard file $file: " + t)
-            defaultMapper
+            println(s"Cannot load keyboard file $file: " + t)
+            loadMapper(None,_internalResource)
         }
     }
-  }
-  
-  def main(args:Array[String]) {
-    store(ucesoft.cbm.c128.C128KeyboardMapper,new java.io.PrintWriter(System.out,true))
   }
 }

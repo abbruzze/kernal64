@@ -70,6 +70,8 @@ class Keyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) => Un
     _40_80_KEY = keyMapper.map.map(kv => (kv._2,kv._1)).getOrElse(_40_80,KeyEvent.VK_F9)
     CAPS_LOCK_KEY = keyMapper.map.map(kv => (kv._2,kv._1)).getOrElse(CAPS_LOCK,KeyEvent.VK_CAPS_LOCK)
   }
+
+  def getKeyboardMapper : KeyboardMapper = keyMapper
   
   def isCapsLockPressed = c128_CapsLockPressed
   def is4080Pressed = c128_40_80_Pressed

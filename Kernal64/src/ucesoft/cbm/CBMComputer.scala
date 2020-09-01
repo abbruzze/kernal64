@@ -862,9 +862,9 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def showKeyboardEditor(c64Mode:Boolean): Unit = {
-    val source = configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE,"default")
+    val source = configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE,java.awt.im.InputContext.getInstance().getLocale.getLanguage.toUpperCase())
     val kbef = new JFrame(s"Keyboard editor ($source)")
-    val kbe = new KeyboardEditor(keyb,keybMapper,c64Mode)
+    val kbe = new KeyboardEditor(keyb,keyb.getKeyboardMapper,c64Mode)
     kbef.getContentPane.add("Center",kbe)
     kbef.pack
     kbef.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
