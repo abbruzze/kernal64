@@ -112,9 +112,11 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     @inline private def clock_out = if ((regs(DDRB) & regs(PB) & 0x08) > 0) IECBus.GROUND else IECBus.VOLTAGE
     
     @inline private def autoacknwoledgeData {
-      val atna = (regs(DDRB) & regs(PB) & 0x10) > 0
-      val dataOut = (bus.atn == IECBus.GROUND) ^ atna
-      if (dataOut) bus.setLine(this,IECBusLine.DATA,IECBus.GROUND) else bus.setLine(this,IECBusLine.DATA,data_out)
+      if ((regs(DDRB) & 0x10) > 0) {
+        val atna = (regs(DDRB) & regs(PB) & 0x10) > 0
+        val dataOut = (bus.atn == IECBus.GROUND) ^ atna
+        if (dataOut) bus.setLine(this, IECBusLine.DATA, IECBus.GROUND) else bus.setLine(this, IECBusLine.DATA, data_out)
+      }
     }
     // state
     override protected def saveState(out:ObjectOutputStream) {
