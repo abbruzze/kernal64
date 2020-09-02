@@ -3,7 +3,7 @@
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
 
-Kernal64 ver 1.6.1
+Kernal64 ver 1.6.2
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -23,6 +23,17 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.6.2 (Sep 2nd 2020)
+- General
+  - added CSDB service provider. New entry under Games menù ![CSDB](https://github.com/abbruzze/kernal64/blob/master/images/csdb.png)
+  - general keyboard handling improvements: added support for italian, german and english layout. Now the emulator will start with a default keyboard settings according to local layout.
+  - Fixed a bug on keyboard editor: when the user changed a key mapping it takes place immediately, but if the user re-opens the editor the new mapping was lost.
+  - Added state saving support for CRT.
+- 1541/1571 drives
+  - Fixed handling of acknowledge data line when DDR is not set to output. Now NeoHabitat (https://github.com/frandallfarmer/neohabitat/blob/master/README.md) works properly.
+- C128
+  - Added grey dot emulation for 8565 C128 only.
 
 ### What's new in 1.6.1 SCPU (Jun 4th 2020)
 - CMD SuperCPU support for C64
