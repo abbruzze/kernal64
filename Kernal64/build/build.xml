@@ -96,6 +96,7 @@
 		</copy>
 		<jar destfile="${c64.jar}" basedir="${build.dir}">
 			<service type="ucesoft.cbm.game.GameProvider">
+				<provider classname="ucesoft.cbm.game.CSDBSpi"/>
 			    <provider classname="ucesoft.cbm.game.GameBaseSpi"/>
 				<provider classname="ucesoft.cbm.game.PouetDemoSpi"/>
 			</service>
