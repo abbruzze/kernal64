@@ -30,6 +30,8 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
   - general keyboard handling improvements: added support for italian, german and english layout. Now the emulator will start with a default keyboard settings according to local layout.
   - Fixed a bug on keyboard editor: when the user changed a key mapping it takes place immediately, but if the user re-opens the editor the new mapping was lost.
   - Added state saving support for CRT.
+  - Fixed keyboard control port: it didn't recognize key mapping modification. Restart was needed.
+  - Now TCPRS232 has the same configuration string of Telnet one, so it can be possible to specify host:port later in order to use at commands.
 - 1541/1571 drives
   - Fixed handling of acknowledge data line when DDR is not set to output. Now NeoHabitat (https://github.com/frandallfarmer/neohabitat/blob/master/README.md) works properly.
 - C128
