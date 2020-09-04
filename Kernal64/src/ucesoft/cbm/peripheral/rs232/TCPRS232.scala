@@ -15,7 +15,7 @@ class TCPRS232 extends StreamRS232 {
   private[this] var socket : Socket = _
   private[this] var hostAndConf = ""
   
-  def getDescription = "Connects to a tcp server. Connection String syntax: host:port,baud,bits,parity,stops"
+  def getDescription = "<html><b>Connects to a TCP server</b>.<br>Connection String syntax: <i>host:port,baud,bits,parity,stops</i> to connect or<br><i>baud,bits,parity,stops</i> to use 'at' modem commands</html>"
   
   override def connectionInfo = hostAndConf
   
@@ -25,25 +25,40 @@ class TCPRS232 extends StreamRS232 {
   override def setConfiguration(conf:String) {
     hostAndConf = conf
     val parts = conf.split(",")
-    if (parts.length != 5) throw new IllegalArgumentException("Bad TCP RS-232 configuration string. Expected <host>:<port>,<baud>,<bits>,<parity>,<stops>")
-    
-    super.setConfiguration(conf.substring(conf.indexOf(",") + 1))
+    val confString = parts.length match {
+      case 4 =>
+        conf
+      case 5 =>
+        conf.substring(conf.indexOf(",") + 1)
+      case _ =>
+        throw new IllegalArgumentException("Bad Telnet RS-232 configuration string. Expected [<host>:<port>,<baud>,]<bits>,<parity>,<stops>")
+    }
+    super.setConfiguration(confString)
 
-    val pars = parts(0).split(":")
-    if (pars.length != 2) throw new IllegalArgumentException("Bad TCP RS-232 configuration string. Bad host:port parameter")
-    
-    host = pars(0)
-    port = pars(1).toInt
+    if (parts.length == 5) {
+      val pars = parts(0).split(":")
+      if (pars.length != 2) throw new IllegalArgumentException("Bad Telnet RS-232 configuration string. Bad host:port parameter")
+
+      host = pars(0)
+      port = pars(1).toInt
+    }
+    else {
+      host = ""
+    }
   }
   
   override def setEnabled(enabled:Boolean) {
-    if (!enabled) {
-      super.setEnabled(enabled)
+    if ((isEnabled || !enabled) && host != "") {
       Log.info(s"Disconnecting from $host...")
-      try { socket.close } catch { case _:Throwable => }
+      try {
+        if (socket != null) socket.close()
+      } catch {
+        case _: Throwable =>
+      }
       disconnect
+      super.setEnabled(false)
     }
-    else {      
+    if (enabled && host != "") {
       Log.info(s"Connecting to $host:$port ...")
       try {
         socket = new Socket(host, port)
@@ -52,7 +67,7 @@ class TCPRS232 extends StreamRS232 {
       }
       catch {
         case io:IOException =>
-          Log.info(s"Telnet: Cannot connect to $host:$port. " + io)
+          Log.info(s"Cannot connect to $host:$port. " + io)
           disconnect
       }
     }
