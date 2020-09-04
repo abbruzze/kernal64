@@ -33,6 +33,8 @@ abstract class ControlPort extends CBMComponent {
   def readPort = read & (~emulatedBit & 0xFF)
   
   protected def read : Int	// 4 bits
+
+  def updateConfiguration : Unit = {}
   
   def emulateFire = emulatedBit = 16
   def emulateUp = emulatedBit = 1
@@ -130,34 +132,47 @@ object ControlPort {
    * Joystick emulation via user defined keys
    */
   def userDefinedKeyControlPort(conf:Properties) : ControlPort with MouseListener with KeyListener = new AbstractControlPort {
-    private[this] val upKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_UP,"-1").toInt
-    private[this] val downKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_DOWN,"-1").toInt
-    private[this] val leftKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_LEFT,"-1").toInt
-    private[this] val rightKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_RIGHT,"-1").toInt
-    private[this] val upRightKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_UP_RIGHT,"-1").toInt
-    private[this] val upLeftKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_UP_LEFT,"-1").toInt
-    private[this] val downRightKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_DOWN_RIGHT,"-1").toInt
-    private[this] val downLeftKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_DOWN_LEFT,"-1").toInt
-    private[this] val fireKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_FIRE,"-1").toInt
-    
+    private[this] var upKey = 0
+    private[this] var downKey = 0
+    private[this] var leftKey = 0
+    private[this] var rightKey = 0
+    private[this] var upRightKey = 0
+    private[this] var upLeftKey = 0
+    private[this] var downRightKey = 0
+    private[this] var downLeftKey = 0
+    private[this] var fireKey = 0
+
+    updateConfiguration
+
     protected def getKeyMask(e:KeyEvent) = {
       import KeyEvent._
       if (e.getKeyLocation != KEY_LOCATION_NUMPAD) {
-        e.getKeyCode match {
-          case `upKey` => 1         // up
-          case `downKey` => 2       // down
-          case `leftKey` => 4       // left
-          case `rightKey` => 8      // right
-          case `upRightKey` => 9    // up+right
-          case `downRightKey` => 10 // down+right
-          case `upLeftKey` => 5     // up+left
-          case `downLeftKey` => 6   // down+left
-          case `fireKey` => 16	    // fire
-          case _ => 0
-        }
+        val keyCode = e.getKeyCode
+        if (keyCode == upKey)             1 // up
+        else if (keyCode == downKey)      2 // down
+        else if (keyCode == leftKey)      4 // left
+        else if (keyCode == rightKey)     8 // right
+        else if (keyCode == upRightKey)   9 // up+right
+        else if (keyCode == downRightKey) 10// down+right
+        else if (keyCode == upLeftKey)    5 // up+left
+        else if (keyCode == downLeftKey)  6 // down+left
+        else if (keyCode == fireKey)      16// fire
+        else 0
       }
       else 0
-    }    
+    }
+
+    override def updateConfiguration : Unit = {
+      upKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_UP,"-1").toInt
+      downKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_DOWN,"-1").toInt
+      leftKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_LEFT,"-1").toInt
+      rightKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_RIGHT,"-1").toInt
+      upRightKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_UP_RIGHT,"-1").toInt
+      upLeftKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_UP_LEFT,"-1").toInt
+      downRightKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_DOWN_RIGHT,"-1").toInt
+      downLeftKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_DOWN_LEFT,"-1").toInt
+      fireKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_FIRE,"-1").toInt
+    }
   }
 }
   

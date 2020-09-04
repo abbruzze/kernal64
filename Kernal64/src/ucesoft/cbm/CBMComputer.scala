@@ -1080,6 +1080,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
     controlPortA.controlPort = getControlPortFor(CONFIGURATION_JOY_PORT_2)
     controlPortB.controlPort = getControlPortFor(CONFIGURATION_JOY_PORT_1)
+    keyboardControlPort.updateConfiguration
   }
 
   protected def joySettings : Unit = {
