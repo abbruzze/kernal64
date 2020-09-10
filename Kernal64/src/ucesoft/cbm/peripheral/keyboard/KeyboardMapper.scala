@@ -117,9 +117,9 @@ object KeyboardMapperStore {
         loadFromResource(internalResource) match {
           case None =>
             // layout not found, switching to IT
-            loadFromResource(s"_${internalResource}_IT") match {
+            loadFromResource(s"${_internalResource}_IT") match {
               case None =>
-                throw new FileNotFoundException(s"Can't find default keyboard file: $internalResource")
+                throw new FileNotFoundException(s"Can't find default keyboard file: ${_internalResource}")
               case Some(m) =>
                 Log.info(s"Loaded keyboard configuration file from $internalResource")
                 m
