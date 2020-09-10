@@ -24,7 +24,7 @@ If you want to load a 16M REU modify the memory settings inside the start script
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
-### What's new in 1.6.2 (Sep 2nd 2020)
+### What's new in 1.6.2 (Sep 10th 2020) (update)
 - General
   - added CSDB service provider. New entry under Games menù ![CSDB](https://github.com/abbruzze/kernal64/blob/master/images/csdb.png)
   - general keyboard handling improvements: added support for italian, german and english layout. Now the emulator will start with a default keyboard settings according to local layout.
@@ -32,6 +32,7 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
   - Added state saving support for CRT.
   - Fixed keyboard control port: it didn't recognize key mapping modification. Restart was needed.
   - Now TCPRS232 has the same configuration string of Telnet one, so it can be possible to specify host:port later in order to use at commands.
+  - Fixed error when keyboard layout (according to locale) is not found
 - 1541/1571 drives
   - Fixed handling of acknowledge data line when DDR is not set to output. Now NeoHabitat (https://github.com/frandallfarmer/neohabitat/blob/master/README.md) works properly.
 - C128
