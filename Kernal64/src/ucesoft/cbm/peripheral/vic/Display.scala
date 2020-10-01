@@ -190,7 +190,8 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     if (drawRasterLine) {
       g.setColor(Color.RED)
       if (clip == null) g.drawLine(0, rasterLine, dimension.width, rasterLine)
-      else g.drawLine(0, ((rasterLine - clip._1.y) * zoomFactorY).toInt, dimension.width, ((rasterLine - clip._1.y) * zoomFactorY).toInt)
+      else //g.drawLine(0, ((rasterLine - clip._1.y) * zoomFactorY).toInt, dimension.width, ((rasterLine - clip._1.y) * zoomFactorY).toInt)
+      g.fillRect(0, ((rasterLine - clip._1.y) * zoomFactorY).toInt, dimension.width,zoomFactorY.toInt)
     }
     if (mouseZoomEnabled) {
       if ((totalFrameCounter % 10) == 0) mouseZoomColorIndex = (mouseZoomColorIndex + 1) % mouseZoomLineColors.length
