@@ -38,13 +38,15 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   private[this] var badLineIssued,clearBadLine = false
   private[this] var badLineTarget = 0
   private[this] var lastExecuteNow,executeNextNow = false
+  private[this] var rasterLine, rasterCycle = 0
   // ================== SEQUENCER ==================================
   private[this] var seq_bank = 0
   private[this] var seq_active = false
   private[this] var seq_update_mode = 0
   private[this] var seq_swizzle_mode = 0
   private[this] var seq_bitmap_pointer = 0
-  private[this] var seq_cycle_start,seq_cycle_stop = 0
+  private[this] var seq_cycle_start = 15
+  private[this] var seq_cycle_stop = 55
   private[this] var seq_step, seq_padding = 0
   private[this] var seq_xor_value = 0
 
@@ -115,8 +117,8 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
     seq_update_mode = 0
     seq_swizzle_mode = 0
     seq_bitmap_pointer = 0
-    seq_cycle_start = 0
-    seq_cycle_stop = 0
+    seq_cycle_start = 15
+    seq_cycle_stop = 55
     seq_padding = 0
     seq_step = 0
   }
@@ -126,7 +128,6 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   }
 
   private def checkBadLineTarget : Unit = {
-    badLineIssued = true
     if (compareV(badLineTarget)) {
       vicCtx.forceBadLine(1)
       clearMaskv
@@ -138,8 +139,8 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   // INSTRUCTIONS
 
   private def BADLINE : Unit = {
-    badLineTarget = vicCtx.currentRasterLine + (lastOpcode & 7)
-
+    badLineTarget = rasterLine + (lastOpcode & 7)
+    badLineIssued = true
     checkBadLineTarget
   }
 
@@ -160,14 +161,12 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
       pc = (pc + 1) & 0xFFFF
       h_arg = arg & 63
       if (h_arg == 0) h_arg = 1
-      h_arg += vicCtx.currentRasterCycle - 2 // 0-based, 1 cycle already consumed
+      h_arg += rasterCycle - 2 // 0-based, 1 cycle already consumed
       v_arg = (arg >> 6) & 3
-      rasterCounter = vicCtx.currentRasterLine + v_arg
+      rasterCounter = rasterLine + v_arg
     }
 
-    //h_arg -= 1
     if (compareV(rasterCounter) && compareH(h_arg)) {
-    //if (vicCtx.currentRasterLine == rasterCounter && h_arg == 0) {
       fetchOp = true
       clearMaskh
       clearMaskv
@@ -177,15 +176,17 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
 
   private def DELAYV : Unit = {
     if (fetchOp) {
-      fetchOp = false
       val arg = mem(pc)
       pc = (pc + 1) & 0xFFFF
       v_arg = arg | (lastOpcode & 1) << 8
-      rasterCounter = vicCtx.currentRasterLine + v_arg
+
+      if (v_arg == 0) return
+
+      fetchOp = false
+      rasterCounter = rasterLine + v_arg
     }
 
     if (compareH(0) && compareV(rasterCounter)) {
-    //if (vicCtx.currentRasterCycle == 1 && vicCtx.currentRasterLine == rasterCounter) {
       fetchOp = true
       clearMaskh
       clearMaskv
@@ -224,7 +225,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
       else fetchOp = false
     }
 
-    if (!vicCtx.baState) {
+    if (!vicCtx.isAECAvailable) {
       fetchOp = true
       vicMem.write(r_arg,x_arg)
     }
@@ -272,7 +273,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   }
 
   private def WAITBAD : Unit = {
-    fetchOp = vicCtx.currentRasterCycle == 1 && vicCtx.isBadlineOnRaster(vicCtx.currentRasterLine + 1)
+    fetchOp = rasterCycle == 1 && vicCtx.isBadlineOnRaster(rasterLine + 1)
   }
 
   private def WAITREP : Unit = {
@@ -299,7 +300,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
       fetchOp = false
     }
 
-    if (!vicCtx.baState) {
+    if (!vicCtx.isAECAvailable) {
       vicMem.write(r_arg,readPort(p_arg))
       fetchOp = true
     }
@@ -506,25 +507,33 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
 
   private def compareH(targetH:Int,greater:Boolean = false) : Boolean = {
     //println(s"Comparing cycle($greater): ${vicCtx.currentRasterCycle} with ${targetH + 1}")
-    if (greater) (vicCtx.currentRasterCycle & maskh) > ((targetH + 1) & maskh) else (vicCtx.currentRasterCycle & maskh) == ((targetH + 1) & maskh)
+    if (greater) (rasterCycle & maskh) > ((targetH + 1) & maskh) else (rasterCycle & maskh) == ((targetH + 1) & maskh)
   }
 
   private def compareV(targetV:Int,greater:Boolean = false) : Boolean = {
     //println(s"Comparing raster($greater): ${vicCtx.currentRasterLine} with $targetV")
-    if (greater) (vicCtx.currentRasterLine & maskv) > (targetV & maskv) else (vicCtx.currentRasterLine & maskv) == (targetV & maskv)
+    if (greater) (rasterLine & maskv) > (targetV & maskv) else (rasterLine & maskv) == (targetV & maskv)
   }
 
   final def isActive : Boolean = beamRacerActiveState == 2
 
-  final def cycle(rasterLine:Int,rasterCycle:Int) : Unit = {
+  @inline private def adjustCurrentRasterCycle(rasterCycle:Int) : Int = if (rasterCycle == 63) 1 else rasterCycle + 1
+  @inline private def adjustCurrentRasterLine(rasterCycle:Int,rasterLine:Int) : Int = if (rasterCycle == 63) (rasterLine + 1) % 312 else rasterLine
+
+  final def cycle(_rasterLine:Int,_rasterCycle:Int) : Unit = {
+    rasterCycle = adjustCurrentRasterCycle(_rasterCycle)
+    rasterLine = adjustCurrentRasterLine(_rasterCycle,_rasterLine)
+
     if (beamRacerActiveState != 2) return
     // active
     // port 0 & 1 reps
     if (portWriteRepsEnabled(0)) repeatWriteOnPort(0)
     if (portWriteRepsEnabled(1)) repeatWriteOnPort(1)
-
-    // bitmap sequencer
-    if (rasterCycle == 1 && seq_active) seq_bitmap_pointer += seq_padding
+    // sequencer
+    if (seq_active && rasterCycle == seq_cycle_stop + 1) {
+      seq_bitmap_pointer += seq_padding
+      if (seq_update_mode == 1) regs(0x44) = seq_bitmap_pointer & 0xFF // PBS_CONTROL_UPDATE_EOL
+    }
 
     if (rasterLine == 0 && rasterCycle == 1) { // next frame
       // masks reset
@@ -546,7 +555,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
       dlistOnPendingOnNextCycle = false
       activateListExecution
     }
-
+    // BADLINE handling
     if (rasterCycle == 1) {
       if (clearBadLine) {
         badLineIssued = false
@@ -582,6 +591,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
     if (beamRacerActiveState == 2 && seq_active && rasterCycle >= seq_cycle_start + 1 && rasterCycle < seq_cycle_stop + 1) {
       val gdata = banks(seq_bank)(seq_bitmap_pointer)
       seq_bitmap_pointer = (seq_bitmap_pointer + seq_step) & 0xFFFF
+      if (seq_update_mode == 2) regs(0x44) = seq_bitmap_pointer & 0xFF // PBS_CONTROL_UPDATE_ALWAYS
       seq_xor_value ^ (seq_swizzle_mode match {
         case 0 =>
           gdata

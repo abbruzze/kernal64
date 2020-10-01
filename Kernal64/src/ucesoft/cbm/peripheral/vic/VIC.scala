@@ -1102,7 +1102,7 @@ final class VIC(mem: VICMemory,
     }
     refreshCycle = false
 
-    if (coprocessor != null && coprocessor.isActive) coprocessor.cycle(currentRasterLine,currentRasterCycle)
+    if (coprocessor != null && coprocessor.isActive) coprocessor.cycle(rasterLine,rasterCycle)
 
     drawCycle
 
@@ -1651,26 +1651,8 @@ final class VIC(mem: VICMemory,
         true
     }
   }
-  override def currentRasterLine : Int = {
-    //rasterLine
-    if (rasterCycle == 63) (rasterLine + 1) % RASTER_LINES else rasterLine
-    //if (rasterCycle >= 62) (rasterLine + 1) % RASTER_LINES else rasterLine
 
-  }
-  override def currentRasterCycle : Int = {
-    //rasterCycle
-    if (rasterCycle == 63) 1 else rasterCycle + 1
-    /*
-    rasterCycle match {
-      case 62 => 1
-      case 63 => 2
-      case _ => rasterCycle + 2
-    }
-    
-     */
-  }
-
-  override def baState: Boolean = _baLow
+  override def isAECAvailable: Boolean = _baLow && (clk.currentCycles - baLowFirstCycle > 2)
 
   override def forceBadLine(bad:Int) : Unit = {
     forcedBadline = bad
