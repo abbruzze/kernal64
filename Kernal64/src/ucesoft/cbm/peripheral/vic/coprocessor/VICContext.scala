@@ -4,5 +4,4 @@ trait VICContext {
   def turnOnInterruptControlRegisterBits(value:Int) : Unit
   def isBadlineOnRaster(rasterLine:Int) : Boolean
   def isAECAvailable : Boolean
-  def forceBadLine(bad:Int) : Unit
 }

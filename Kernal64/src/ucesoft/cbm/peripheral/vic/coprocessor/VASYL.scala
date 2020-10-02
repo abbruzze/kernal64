@@ -2,8 +2,7 @@ package ucesoft.cbm.peripheral.vic.coprocessor
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
+import ucesoft.cbm.{CBMComponent, CBMComponentType, ChipID}
 import ucesoft.cbm.peripheral.vic.VIC
 
 class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocessor {
@@ -35,8 +34,6 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   private[this] var maskh, maskv = "00111111".b
   private[this] var clearMaskhOnNext,clearMaskvOnNext = false
   private[this] var skipNextWait = false
-  private[this] var badLineIssued,clearBadLine = false
-  private[this] var badLineTarget = 0
   private[this] var lastExecuteNow,executeNextNow = false
   private[this] var rasterLine, rasterCycle = 0
   // ================== SEQUENCER ==================================
@@ -109,8 +106,6 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
     maskv = "00111111".b
     maskh = "00111111".b
     skipNextWait = false
-    badLineIssued = false
-    clearBadLine = false
     executeNextNow = false
     seq_bank = 0
     seq_active = false
@@ -127,21 +122,16 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
 
   }
 
-  private def checkBadLineTarget : Unit = {
-    if (compareV(badLineTarget)) {
-      vicCtx.forceBadLine(1)
-      clearMaskv
-      clearBadLine = true
-    }
-    else vicCtx.forceBadLine(0)
-  }
-
   // INSTRUCTIONS
 
   private def BADLINE : Unit = {
-    badLineTarget = rasterLine + (lastOpcode & 7)
-    badLineIssued = true
-    checkBadLineTarget
+    if (fetchOp) h_arg = lastOpcode & 7
+
+    if (vicCtx.isAECAvailable) {
+      fetchOp = true
+      val c = vicMem.read(0xD011,ChipID.VIC_COP)
+      vicMem.write(0xD011,(c & 0xF8) | ((rasterLine & 0x7) + h_arg) & 0x7,ChipID.VIC_COP)
+    } else fetchOp = false
   }
 
   private def BRA : Unit = {
@@ -225,9 +215,9 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
       else fetchOp = false
     }
 
-    if (!vicCtx.isAECAvailable) {
+    if (vicCtx.isAECAvailable) {
       fetchOp = true
-      vicMem.write(r_arg,x_arg)
+      vicMem.write(r_arg,x_arg,ChipID.VIC_COP)
     }
   }
 
@@ -300,8 +290,8 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
       fetchOp = false
     }
 
-    if (!vicCtx.isAECAvailable) {
-      vicMem.write(r_arg,readPort(p_arg))
+    if (vicCtx.isAECAvailable) {
+      vicMem.write(r_arg,readPort(p_arg),ChipID.VIC_COP)
       fetchOp = true
     }
   }
@@ -554,16 +544,6 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
     if (dlistOnPendingOnNextCycle) {
       dlistOnPendingOnNextCycle = false
       activateListExecution
-    }
-    // BADLINE handling
-    if (rasterCycle == 1) {
-      if (clearBadLine) {
-        badLineIssued = false
-        clearBadLine = false
-        vicCtx.forceBadLine(-1)
-      }
-      else
-      if (badLineIssued) checkBadLineTarget
     }
 
     do {

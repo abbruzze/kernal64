@@ -94,7 +94,6 @@ final class VIC(mem: VICMemory,
   private[this] var _2MhzMode = false
   // ------------------------ COPROCESSOR -----------------------------------------------------------------
   private[this] var coprocessor : VICCoprocessor = new VASYL(this,this)//null
-  private[this] var forcedBadline = -1 // -1 = inactive, 0 = force non-badline, 1 = force badline
   // ------------------------ PUBLIC REGISTERS ------------------------------------------------------------
   /*
    * $D000 - $D00F
@@ -550,7 +549,7 @@ final class VIC(mem: VICMemory,
       if (!drawBorder) return
       */
       // if we're surely inside the gfx area, the border pixels are the same as previous cycle
-      val inSideGfx = !is8565 && rasterCycle > 17 && rasterCycle < 53 && lastBorderColor == borderColor
+      val inSideGfx = false//!is8565 && rasterCycle > 17 && rasterCycle < 53 && lastBorderColor == borderColor
       if (!isBlank && !inSideGfx) {
         var xcoord = xCoord(rasterCycle)
         val color = if (traceRasterLineInfo) borderColor | PIXEL_DOX_B else borderColor
@@ -873,7 +872,6 @@ final class VIC(mem: VICMemory,
     java.util.Arrays.fill(displayMem,0)
     display.showFrame(-1,0, lastModPixelX, RASTER_LINES)
     lastBackground = 0
-    forcedBadline = -1
 
     if (coprocessor != null) coprocessor.reset
   }
@@ -1102,7 +1100,7 @@ final class VIC(mem: VICMemory,
     }
     refreshCycle = false
 
-    if (coprocessor != null && coprocessor.isActive) coprocessor.cycle(rasterLine,rasterCycle)
+    //if (coprocessor != null && coprocessor.isActive) coprocessor.cycle(rasterLine,rasterCycle)
 
     drawCycle
 
@@ -1124,6 +1122,8 @@ final class VIC(mem: VICMemory,
     if (badLine) isInDisplayState = true
 
     if (rasterLine == 0x30) denOn30 |= den
+
+    //if (coprocessor != null && coprocessor.isActive) coprocessor.cycle(rasterLine,rasterCycle)
 
     (rasterCycle: @switch) match {
       case 1 =>
@@ -1273,6 +1273,7 @@ final class VIC(mem: VICMemory,
         }
     }
     internalDataBus = 0xFF
+    if (coprocessor != null && coprocessor.isActive) coprocessor.cycle(rasterLine,rasterCycle)
   }
 
   @inline private def idleAccess : Int = {
@@ -1483,7 +1484,7 @@ final class VIC(mem: VICMemory,
  	<= $f7 and the lower three bits of RASTER are equal to YSCROLL and if the
  	DEN bit was set during an arbitrary cycle of raster line $30.
    */
-  @inline private def isBadLine = isBadlineOnRaster(rasterLine)
+  @inline private def isBadLine = rasterLine >= 0x30 && rasterLine <= 0xF7 && ((rasterLine & 7) == yscroll) && denOn30
 
   def enableTraceRasterLine(enabled: Boolean) = traceRasterLineInfo = enabled
   def setTraceRasterLineAt(traceRasterLine: Int) = this.traceRasterLine = traceRasterLine
@@ -1641,31 +1642,8 @@ final class VIC(mem: VICMemory,
     interruptControlRegister |= value
     checkAndSendIRQ
   }
-  override def isBadlineOnRaster(rasterLine:Int) : Boolean = {
-    forcedBadline match {
-      case -1 =>
-        rasterLine >= 0x30 && rasterLine <= 0xF7 && ((rasterLine & 7) == yscroll) && denOn30
-      case 0 =>
-        false
-      case 1 =>
-        true
-    }
-  }
+  override def isBadlineOnRaster(rasterLine:Int) : Boolean = rasterLine >= 0x30 && rasterLine <= 0xF7 && ((rasterLine & 7) == yscroll) && denOn30
 
-  override def isAECAvailable: Boolean = _baLow && (clk.currentCycles - baLowFirstCycle > 2)
-
-  override def forceBadLine(bad:Int) : Unit = {
-    forcedBadline = bad
-    badLine = bad match {
-      case -1 =>
-        isBadLine
-      case 1 =>
-        true
-      case 0 =>
-        false
-    }
-  }
-
-  // ========================================================================================================
+  override def isAECAvailable: Boolean = !_baLow || (_baLow && (clk.currentCycles - baLowFirstCycle < 3))
 }
 
