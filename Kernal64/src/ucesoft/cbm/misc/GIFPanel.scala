@@ -73,7 +73,8 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
   private def startStop : Unit = {
     try {
       if (!recording) {
-        out = new FileOutputStream(fileTextField.getText)
+        val fileName = if (fileTextField.getText.toUpperCase.endsWith("GIF")) fileTextField.getText else fileTextField.getText + ".gif"
+        out = new FileOutputStream(fileName)
         val thread = new Thread(this,"GIFRecorder")
         recording = true
         checkDelay

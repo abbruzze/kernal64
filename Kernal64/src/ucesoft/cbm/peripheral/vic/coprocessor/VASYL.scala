@@ -9,7 +9,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   override val componentID: String = "VASYL"
   override val componentType: CBMComponentType.Type = CBMComponentType.INTERNAL
 
-  private[this] final val VERSION = "00111110".b // 0-2 PAL, 3-7 version
+  private[this] final val VERSION = "00011110".b // 0-2 PAL, 3-7 version
 
   private[this] val INSTRUCTION_SET : Array[() => Unit] = buildInstructionSet
   private[this] val banks = Array.ofDim[Int](8,65536)
@@ -24,7 +24,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   private[this] val portWriteRepsEnabled = Array.ofDim[Boolean](2)
   private[this] val lastPortWriteValue = Array.ofDim[Int](2)
 
-  private[this] val debug = true
+  private[this] val debug = false
   private[this] var pc = 0
   private[this] var x_arg,v_arg,p_arg,h_arg,r_arg,rasterCounter = 0 // opcode's arguments or counters
   private[this] var fetchOp = false
@@ -116,6 +116,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
     seq_cycle_stop = 55
     seq_padding = 0
     seq_step = 0
+    seq_xor_value = 0
   }
 
   override def init: Unit = {
@@ -263,7 +264,11 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   }
 
   private def WAITBAD : Unit = {
-    fetchOp = rasterCycle == 1 && vicCtx.isBadlineOnRaster(rasterLine + 1)
+    val d011 = vicMem.read(0xD011,ChipID.VIC_COP)
+    val yscroll = d011 & 7
+    val den = (d011 & 16) == 16
+    val targetRaster = rasterLine + 1
+    fetchOp = rasterCycle == 1 && (targetRaster >= 0x30 && targetRaster <= 0xF7 && ((targetRaster & 7) == yscroll) && den)
   }
 
   private def WAITREP : Unit = {
@@ -301,7 +306,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
 
   final def writeReg(_reg:Int,value:Int,isVasylWriting:Boolean) : Unit = {
     val reg = _reg & 0xFF
-    if (debug && reg == 0x2E || (reg > 0x30) && (reg < 0x3F)) println(s"regs(${reg.toHexString}) = ${value.toHexString}")
+    //if (debug && reg == 0x2E || (reg > 0x30) && (reg < 0x3F)) println(s"regs(${reg.toHexString}) = ${value.toHexString}")
     if (reg == 0x31) {
         beamRacerActiveState match {
           case 0 =>

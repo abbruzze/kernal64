@@ -941,7 +941,7 @@ final class VIC(mem: VICMemory,
 
   final def write(address: Int, value: Int, chipID: ChipID.ID) : Unit = {
     internalDataBus = value
-    if (coprocessor != null) coprocessor.writeReg(address,value)
+    if (coprocessor != null && chipID != ChipID.VIC_COP) coprocessor.writeReg(address,value)
 
     val offset = decodeAddress(address)
     if (offset <= 0xF) {
@@ -1642,7 +1642,6 @@ final class VIC(mem: VICMemory,
     interruptControlRegister |= value
     checkAndSendIRQ
   }
-  override def isBadlineOnRaster(rasterLine:Int) : Boolean = rasterLine >= 0x30 && rasterLine <= 0xF7 && ((rasterLine & 7) == yscroll) && denOn30
 
   override def isAECAvailable: Boolean = !_baLow || (_baLow && (clk.currentCycles - baLowFirstCycle < 3))
 }
