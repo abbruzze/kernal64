@@ -93,7 +93,7 @@ final class VIC(mem: VICMemory,
   private[this] var refreshCycle = false
   private[this] var _2MhzMode = false
   // ------------------------ COPROCESSOR -----------------------------------------------------------------
-  private[this] var coprocessor : VICCoprocessor = new VASYL(this,this)//null
+  private[this] var coprocessor : VICCoprocessor = new VASYL(this)//null
   // ------------------------ PUBLIC REGISTERS ------------------------------------------------------------
   /*
    * $D000 - $D00F

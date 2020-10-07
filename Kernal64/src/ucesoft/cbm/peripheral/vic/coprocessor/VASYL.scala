@@ -3,9 +3,8 @@ package ucesoft.cbm.peripheral.vic.coprocessor
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
 import ucesoft.cbm.{CBMComponent, CBMComponentType, ChipID, Log}
-import ucesoft.cbm.peripheral.vic.VIC
 
-class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocessor {
+class VASYL(vicCtx:VICContext) extends CBMComponent with VICCoprocessor {
   override val componentID: String = "VASYL"
   override val componentType: CBMComponentType.Type = CBMComponentType.INTERNAL
 
@@ -140,7 +139,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
 
     if (vicCtx.isAECAvailable) {
       fetchOp = true
-      val c = vicMem.read(0xD011, ChipID.VIC_COP)
+      val c = vicCtx.read(0xD011, ChipID.VIC_COP)
       badLineRequested = true // workaround
       badLineValue = (c & 0xF8) | ((rasterLine & 0x7) + h_arg) & 0x7
     }
@@ -237,7 +236,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
 
     if (vicCtx.isAECAvailable) {
       fetchOp = true
-      vicMem.write(r_arg,x_arg,ChipID.VIC_COP)
+      vicCtx.write(r_arg,x_arg,ChipID.VIC_COP)
     }
   }
 
@@ -293,7 +292,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   }
 
   private def WAITBAD : Unit = {
-    val d011 = vicMem.read(0xD011,ChipID.VIC_COP)
+    val d011 = vicCtx.read(0xD011,ChipID.VIC_COP)
     val yscroll = d011 & 7
     val den = (d011 & 16) == 16
     val targetRaster = rasterLine + 1
@@ -328,7 +327,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
     }
 
     if (vicCtx.isAECAvailable) {
-      vicMem.write(r_arg,readPort(p_arg),ChipID.VIC_COP)
+      vicCtx.write(r_arg,readPort(p_arg),ChipID.VIC_COP)
       fetchOp = true
     }
   }
@@ -371,10 +370,9 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
 
       reg match {
         case 0x2E =>
-          if ((value & 0x10) > 0) {
+          if ((value & 0x40) > 0) { // un-knock
             beamRacerActiveState = 0
-            dlistExecutionActive = false
-            if (debug) println(s"VASYL deactivated")
+            dlistExecutionActive = false // to be checked
           }
         case 0x32 =>
           if (debug) println(s"DLISTL = ${value.toHexString}, execution address = ${(value | regs(0x33) << 8).toHexString}")
@@ -561,7 +559,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
     // check badline request: workaround
     if (badLineRequested) {
       badLineRequested = false
-      vicMem.write(0xD011,badLineValue, ChipID.VIC_COP)
+      vicCtx.write(0xD011,badLineValue, ChipID.VIC_COP)
     }
     //=========================================================
 
