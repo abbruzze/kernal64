@@ -172,18 +172,9 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
       if (trace) tracedInstr = s"DELAYH ${h_arg.toHexString}${if (v_arg != 0) s",${v_arg.toHexString}" else ""}"
     }
 
-    if (h_arg > 0) { // still waiting for cycles
-      if (compareH(h_arg)) {
-        h_arg = 0
-        if (v_arg == 0) { // no additional lines to wait for
-          fetchOp = true
-          clearMaskh
-        }
-      }
-    }
-    else
-    if (compareV(rasterCounter)) {
+    if ((v_arg == 0 || compareV(rasterCounter)) && compareH(h_arg)) {
       fetchOp = true
+      clearMaskh
       clearMaskv
     }
   }
