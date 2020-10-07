@@ -28,6 +28,8 @@ object Log {
   @inline final def fine(msg: => String): Unit = if ((severity & FINE) != 0) log(msg)
   @inline final def debug(msg: => String): Unit = if ((severity & DEBUG) != 0) log(msg)
   @inline final def info(msg: => String) : Unit = if ((severity & INFO) != 0) log(msg)
+
+  def isDebug : Boolean = (severity & DEBUG) > 0
   
   def getLogPanel = new LogPanel
   

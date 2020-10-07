@@ -2,7 +2,7 @@ package ucesoft.cbm.peripheral.vic.coprocessor
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
-import ucesoft.cbm.{CBMComponent, CBMComponentType, ChipID}
+import ucesoft.cbm.{CBMComponent, CBMComponentType, ChipID, Log}
 import ucesoft.cbm.peripheral.vic.VIC
 
 class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocessor {
@@ -23,9 +23,12 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   private[this] val portWriteReps = Array.ofDim[Int](2)
   private[this] val portWriteRepsEnabled = Array.ofDim[Boolean](2)
   private[this] val lastPortWriteValue = Array.ofDim[Int](2)
+  private[this] var portsBind = false
 
   private[this] val debug = false
-  private[this] var pc = 0
+  private[this] val trace = true
+  private[this] var tracedInstr = ""
+  private[this] var pc,oldPC = 0
   private[this] var x_arg,v_arg,p_arg,h_arg,r_arg,rasterCounter = 0 // opcode's arguments or counters
   private[this] var fetchOp = false
   private[this] var lastInstr : () => Unit = _
@@ -36,6 +39,8 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   private[this] var skipNextWait = false
   private[this] var lastExecuteNow,executeNextNow = false
   private[this] var rasterLine, rasterCycle = 0
+  private[this] var badLineRequested = false
+  private[this] var badLineValue = 0
   // ================== SEQUENCER ==================================
   private[this] var seq_bank = 0
   private[this] var seq_active = false
@@ -117,6 +122,8 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
     seq_padding = 0
     seq_step = 0
     seq_xor_value = 0
+    portsBind = false
+    badLineRequested = false
   }
 
   override def init: Unit = {
@@ -126,23 +133,30 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   // INSTRUCTIONS
 
   private def BADLINE : Unit = {
-    if (fetchOp) h_arg = lastOpcode & 7
+    if (fetchOp) {
+      h_arg = lastOpcode & 7
+      if (trace) tracedInstr = s"BADLINE ${h_arg.toHexString}"
+    }
 
     if (vicCtx.isAECAvailable) {
       fetchOp = true
-      val c = vicMem.read(0xD011,ChipID.VIC_COP)
-      vicMem.write(0xD011,(c & 0xF8) | ((rasterLine & 0x7) + h_arg) & 0x7,ChipID.VIC_COP)
-    } else fetchOp = false
+      val c = vicMem.read(0xD011, ChipID.VIC_COP)
+      badLineRequested = true // workaround
+      badLineValue = (c & 0xF8) | ((rasterLine & 0x7) + h_arg) & 0x7
+    }
+    else fetchOp = false
   }
 
   private def BRA : Unit = {
     val offset = mem(pc).toByte
     pc = (pc + 1 + offset) & 0xFFFF
+    if (trace) tracedInstr = s"BRA ${offset.toHexString}"
   }
 
   private def DEC(c:Int)() : Unit = {
     if (counters(c) == 0) pc = (pc + 2) & 0xFFFF
     else counters(c) -= 1
+    if (trace) tracedInstr = s"DEC ${'A' + c}"
   }
 
   private def DELAYH : Unit = {
@@ -152,16 +166,25 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
       pc = (pc + 1) & 0xFFFF
       h_arg = arg & 63
       if (h_arg == 0) h_arg = 1
-      h_arg += rasterCycle - 2 // 0-based, 1 cycle already consumed
+      h_arg = (h_arg + rasterCycle - 2) % 62 // 0-based, 1 cycle already consumed
       v_arg = (arg >> 6) & 3
       rasterCounter = rasterLine + v_arg
+      if (trace) tracedInstr = s"DELAYH ${h_arg.toHexString}${if (v_arg != 0) s",${v_arg.toHexString}" else ""}"
     }
 
-    if (compareV(rasterCounter) && compareH(h_arg)) {
+    if (h_arg > 0) { // still waiting for cycles
+      if (compareH(h_arg)) {
+        h_arg = 0
+        if (v_arg == 0) { // no additional lines to wait for
+          fetchOp = true
+          clearMaskh
+        }
+      }
+    }
+    else
+    if (compareV(rasterCounter)) {
       fetchOp = true
-      clearMaskh
       clearMaskv
-      //executeNextNow = true
     }
   }
 
@@ -175,18 +198,20 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
 
       fetchOp = false
       rasterCounter = rasterLine + v_arg
+      if (trace) tracedInstr = s"DELAYV ${v_arg.toHexString}"
     }
 
     if (compareH(0) && compareV(rasterCounter)) {
       fetchOp = true
       clearMaskh
       clearMaskv
-      //executeNextNow = true
+      executeNextNow = true
     }
   }
 
   private def IRQ : Unit = {
     vicCtx.turnOnInterruptControlRegisterBits(16)
+    if (trace) tracedInstr = "IRQ"
   }
 
   private def MASKH : Unit = {
@@ -194,6 +219,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
     pc = (pc + 1) & 0xFFFF
     maskh = arg & 63
     clearMaskhOnNext = (lastOpcode & 2) == 0
+    if (trace) tracedInstr = s"MASKH ${maskh.toHexString}"
   }
 
   private def MASKV : Unit = {
@@ -201,6 +227,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
     pc = (pc + 1) & 0xFFFF
     maskv = arg & 63
     clearMaskvOnNext = (lastOpcode & 2) == 0
+    if (trace) tracedInstr = s"MASKH ${maskv.toHexString}"
   }
 
   private def MOV(reg_offset:Int)() : Unit = {
@@ -214,6 +241,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
         return
       }
       else fetchOp = false
+      if (trace) tracedInstr = s"MOV ${r_arg.toHexString},${x_arg.toHexString}"
     }
 
     if (vicCtx.isAECAvailable) {
@@ -225,17 +253,26 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   private def SET(counter:Int)() : Unit = {
     counters(counter) = mem(pc)
     pc = (pc + 1) & 0xFFFF
+    if (trace) tracedInstr = s"SET${'A' + counter}"
   }
 
-  private def SKIP : Unit = skipNextWait = true
+  private def SKIP : Unit = {
+    skipNextWait = true
+    if (trace) tracedInstr = "SKIP"
+  }
 
-  private def VNOP : Unit = { /* DO NOTHING */ }
+  private def VNOP : Unit = {
+    /* DO NOTHING */
+    if (trace) tracedInstr = "VNOP"
+  }
 
   private def WAIT : Unit = {
     if (fetchOp) {
       v_arg = mem(pc) | (lastOpcode & 1) << 8
       h_arg = (lastOpcode >> 1) & 63
       pc = (pc + 1) & 0xFFFF
+
+      if (trace) tracedInstr = if (v_arg == 0x1FF && h_arg == 0x3F) "END" else s"WAIT ${v_arg.toHexString},${h_arg.toHexString}"
 
       if (skipNextWait) {
         skipNextWait = false
@@ -250,6 +287,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
       if (compareV(v_arg,true) || (compareV(v_arg) && compareH(h_arg,true))) {
         clearMaskv
         clearMaskh
+        executeNextNow = true
         return
       }
       else fetchOp = false
@@ -269,6 +307,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
     val den = (d011 & 16) == 16
     val targetRaster = rasterLine + 1
     fetchOp = rasterCycle == 1 && (targetRaster >= 0x30 && targetRaster <= 0xF7 && ((targetRaster & 7) == yscroll) && den)
+    if (trace) tracedInstr = "WAITBAD"
   }
 
   private def WAITREP : Unit = {
@@ -277,6 +316,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
       if (!portWriteRepsEnabled(p_arg)) return
 
       fetchOp = false
+      if (trace) tracedInstr = s"WAITREP $p_arg"
     }
 
     if (portWriteReps(p_arg) == 0) fetchOp = true
@@ -293,6 +333,7 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
         return
       }
       fetchOp = false
+      if (trace) tracedInstr = s"XFER ${r_arg.toHexString},$p_arg"
     }
 
     if (vicCtx.isAECAvailable) {
@@ -323,12 +364,14 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
             currentBank = value & 7
             mem = banks(currentBank)
 
+            portsBind = (value & 0x40) > 0
+
             dlistOnPendingOnNextFrame = (value & 8) > 0
             if (!dlistOnPendingOnNextFrame) dlistExecutionActive = false
 
             // TODO: grey dot kill
 
-            if (debug) println(s"Control register: currentBank = $currentBank, dlistOnPendingOnNextFrame = $dlistOnPendingOnNextFrame, dlistExecutionActive = $dlistExecutionActive")
+            if (debug) println(s"Control register: currentBank = $currentBank, dlistOnPendingOnNextFrame = $dlistOnPendingOnNextFrame, dlistExecutionActive = $dlistExecutionActive portsBind = $portsBind")
         }
     }
     else
@@ -467,7 +510,9 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
   }
 
   private def repeatWriteOnPort(port:Int) : Unit = {
-    writePort(port,lastPortWriteValue(port))
+    if (portsBind && port == 1) writePort(1,readPort(0))
+    else writePort(port, lastPortWriteValue(port))
+
     portWriteReps(port) = (portWriteReps(port) - 1) & 0xFF
     if (portWriteReps(port) == 0) portWriteRepsEnabled(port) = false
   }
@@ -521,16 +566,26 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
 
     if (beamRacerActiveState != 2) return
     // active
+
+    // check badline request: workaround
+    if (badLineRequested) {
+      badLineRequested = false
+      vicMem.write(0xD011,badLineValue, ChipID.VIC_COP)
+    }
+    //=========================================================
+
     // port 0 & 1 reps
     if (portWriteRepsEnabled(0)) repeatWriteOnPort(0)
     if (portWriteRepsEnabled(1)) repeatWriteOnPort(1)
-    // sequencer
+    //=========================================================
+    // sequencer stop check
     if (seq_active && rasterCycle == seq_cycle_stop + 1) {
       seq_bitmap_pointer += seq_padding
       if (seq_update_mode == 1) regs(0x44) = seq_bitmap_pointer & 0xFF // PBS_CONTROL_UPDATE_EOL
     }
-
-    if (rasterLine == 0 && rasterCycle == 1) { // next frame
+    //=========================================================
+    // frame begin
+    if (rasterLine == 0 && rasterCycle == 1) {
       // masks reset
       maskh = "00111111".b
       maskv = "111111111".b
@@ -546,16 +601,18 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
         activateListExecution
       }
     }
+    //=========================================================
     if (dlistOnPendingOnNextCycle) {
       dlistOnPendingOnNextCycle = false
       activateListExecution
     }
-
+    // execution
     do {
       lastExecuteNow = executeNextNow
       executeNextNow = false
       if (dlistExecutionActive) {
         if (fetchOp) {
+          oldPC = pc
           lastOpcode = mem(pc)
           pc = (pc + 1) & 0xFFFF
           lastInstr = INSTRUCTION_SET(lastOpcode)
@@ -567,9 +624,14 @@ class VASYL(vicCtx:VICContext,vicMem:VIC) extends CBMComponent with VICCoprocess
           else lastInstr() // execute opcode
         }
         else lastInstr() // execute opcode
+        if (trace && Log.isDebug) {
+          val bytes = s"%02x".format(lastOpcode) + (if (pc - oldPC > 1) s" %02x".format(mem((oldPC + 1) & 0xFFFF)) else "")
+          val disa = s"[VASYL] %04x $bytes $tracedInstr".format(oldPC)
+          Log.debug(disa)
+        }
       }
     } while (executeNextNow && !lastExecuteNow)
-    lastExecuteNow = false
+    //=========================================================
   }
 
   final def g_access(rasterCycle:Int) : Int = {

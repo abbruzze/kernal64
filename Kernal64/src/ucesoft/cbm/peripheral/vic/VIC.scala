@@ -455,6 +455,8 @@ final class VIC(mem: VICMemory,
       }
     }
 
+    final def isReadyForDMA : Boolean = _enabled && y == (rasterLine & 0xFF)
+
     final def check55_56(is55:Boolean) {
       if (is55 && _yexp) expansionFF = !expansionFF
       if (_enabled && y == (rasterLine & 0xFF) && !dma) {
@@ -1643,6 +1645,60 @@ final class VIC(mem: VICMemory,
     checkAndSendIRQ
   }
 
-  override def isAECAvailable: Boolean = !_baLow || (_baLow && (clk.currentCycles - baLowFirstCycle < 3))
+  override def isAECAvailable: Boolean = {
+    val baLowNext = baOnCycle(if (rasterCycle < 63) rasterCycle + 1 else 1)
+    if (!baLowNext) true
+    else {
+      if (!_baLow) true // first cycle ba goes down
+      else clk.currentCycles - baLowFirstCycle < 2
+    }
+  }
+
+  private def baOnCycle(rasterCycle:Int) : Boolean = {
+    rasterCycle match {
+      case 1 =>
+        (spriteDMAon & 0x18) > 0
+      case 2 =>
+        (spriteDMAon & 0x38) > 0
+      case 3 =>
+        (spriteDMAon & 0x30) > 0
+      case 4 =>
+        (spriteDMAon & 0x70) > 0
+      case 5 =>
+        (spriteDMAon & 0x60) > 0
+      case 6 =>
+        (spriteDMAon & 0xE0) > 0
+      case 7 =>
+        (spriteDMAon & 0xC0) > 0
+      case 8 =>
+        _baLow
+      case 9 =>
+        (spriteDMAon & 0x80) > 0
+      case 10 =>
+        (spriteDMAon & 0x80) > 0
+      case 11 =>
+        false
+      case 55 =>
+        !sprites(0).dma && sprites(0).isReadyForDMA
+      case 56 =>
+        !sprites(0).dma && sprites(0).isReadyForDMA
+      case 57 =>
+        (spriteDMAon & 0x03) > 0
+      case 58 =>
+        (spriteDMAon & 0x03) > 0
+      case 59 =>
+        (spriteDMAon & 0x07) > 0
+      case 60 =>
+        (spriteDMAon & 0x06) > 0
+      case 61 =>
+        (spriteDMAon & 0x0E) > 0
+      case 62 =>
+        (spriteDMAon & 0x0C) > 0
+      case 63 =>
+        (spriteDMAon & 0x1C) > 0
+      case _ => // 12 - 54
+        badLine
+    }
+  }
 }
 
