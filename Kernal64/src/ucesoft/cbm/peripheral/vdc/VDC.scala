@@ -601,7 +601,7 @@ class VDC extends RAMComponent {
         }
         else ram_base_ptr += virtualScreenWidth
       }
-      currentCharScanLine = (currentCharScanLine + 1) & 0x1F
+      currentCharScanLine = (currentCharScanLine + 1)// & 0x1F
     }
 
     if (currentCharScanLine > ychars_total) {
@@ -611,7 +611,7 @@ class VDC extends RAMComponent {
       if (videoMode == VideoMode.TEXT) ram_base_ptr += virtualScreenWidth
     }
 
-    rowCounterY = (rowCounterY + 1) & 0x1F
+    rowCounterY = (rowCounterY + 1)// & 0x1F
     if (verticalAdjFlag == 1) {
       if (rowCounterY == (regs(5) & 0x1F)) verticalAdjFlag = 2
     }
@@ -755,7 +755,6 @@ class VDC extends RAMComponent {
     val doublePixFeature = (regs(25) & 0x10) > 0
     val realCharWidth = if (doublePixFeature) regs(22) >> 4 else 1 + (regs(22) >> 4)
     val charWidth = if (doublePixFeature) realCharWidth << 1 else realCharWidth
-    val realCharVisibleWidth = if (doublePixFeature) this.charVisibleWidth - 1 else this.charVisibleWidth
     val rightBorderPix = borderWidth + regs(1) * charWidth
     var colPix = 0
     var char_col = 0
