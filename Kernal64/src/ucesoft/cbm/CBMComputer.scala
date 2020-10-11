@@ -484,7 +484,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     else
     if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun,fileToLoad,emulateInserting)
     else
-    if (tapeAllowed && name.endsWith(".TAP")) attachTapeFile(file,autorun)
+    if (tapeAllowed && name.endsWith(".TAP")) attachTapeFile(file,None,autorun)
     else
     if (name.endsWith(".T64")) attachT64File(file,autorun)
     else
@@ -582,7 +582,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def loadFileFromTape  : Unit = {
     val fc = new JFileChooser
-    val canvas = new T64Canvas(fc,getCharROM,true)
+    val canvas = new T64Canvas(fc,getCharROM,isC64Mode)
     val sp = new javax.swing.JScrollPane(canvas)
     canvas.sp = sp
     fc.setAccessory(sp)
@@ -642,6 +642,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def attachTape  : Unit = {
     val fc = new JFileChooser
+    val canvas = new TAPCanvas(fc,getCharROM,isC64Mode)
+    val sp = new javax.swing.JScrollPane(canvas)
+    canvas.sp = sp
+    fc.setAccessory(sp)
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new FileFilter {
@@ -650,17 +654,25 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     })
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-        attachTapeFile(fc.getSelectedFile,false)
+        val tapFile = canvas.selectedObject.asInstanceOf[Option[TAP.TAPHeader]]
+        attachTapeFile(fc.getSelectedFile,tapFile,tapFile.isDefined)
       case _ =>
     }
   }
 
-  protected def attachTapeFile(file:File,autorun:Boolean) : Unit = {
-    datassette.setTAP(Some(new TAP(file.toString)))
+  protected def attachTapeFile(file:File,tapFile:Option[TAP.TAPHeader],autorun:Boolean) : Unit = {
+    val tap = new TAP(file.toString)
+    tapFile match {
+      case Some(file) =>
+        tap.goTo(file.tapOffset)
+      case None =>
+    }
+    datassette.setTAP(Some(tap))
     tapeMenu.setEnabled(true)
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
     if (autorun) {
-      Keyboard.insertSmallTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar,mmu,true)
+      datassette.pressPlay
+      Keyboard.insertSmallTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar,mmu,isC64Mode)
     }
   }
 
@@ -1262,6 +1274,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       val tapeRewindItem = new JMenuItem("Cassette press rewind")
       tapeRewindItem.addActionListener(_ => datassette.pressRewind)
       tapeMenu.add(tapeRewindItem)
+
+      val tapeResetCounterItem = new JMenuItem("Cassette reset counter")
+      tapeResetCounterItem.addActionListener(_ => datassette.resetCounter)
+      tapeMenu.add(tapeResetCounterItem)
     }
 
     fileMenu.addSeparator

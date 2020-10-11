@@ -11,7 +11,7 @@ import ucesoft.cbm.formats.Diskette
 
 class D64Canvas(fc:JFileChooser,charRom:Memory,c64Mode:Boolean) extends CBMCanvas(charRom) with PropertyChangeListener {
 	var sp : JScrollPane = _
-	protected var validSelectableIndexes : Map[Int,String] = Map.empty
+	protected var validSelectableIndexes : Map[Int,AnyRef] = Map.empty
 
   fc.addPropertyChangeListener(this)
   setPreferredSize(new Dimension(32 * 8,25 * 8))
@@ -37,7 +37,9 @@ class D64Canvas(fc:JFileChooser,charRom:Memory,c64Mode:Boolean) extends CBMCanva
 		}
 	})
 
-	def selectedFile : Option[String] = validSelectableIndexes get selectedRow
+	def selectedFile : Option[String] = validSelectableIndexes get selectedRow map { _.toString }
+
+	def selectedObject : Option[AnyRef] = validSelectableIndexes get selectedRow
 
   protected def isFileExtOK(fileName:String) : Boolean = fileName.toUpperCase.endsWith(".D64") ||
 																												 fileName.toUpperCase.endsWith(".D71") ||

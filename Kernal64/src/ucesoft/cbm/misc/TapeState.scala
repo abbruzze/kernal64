@@ -17,6 +17,7 @@ class TapeState extends JComponent with DatassetteListener {
     setPreferredSize(new Dimension(10,10))
     progressBar.setPreferredSize(new Dimension(100,15))
     progressBar.setVisible(false)
+    progressBar.setStringPainted(true)
     setVisible(false)
     
     override def paint(g:Graphics) : Unit = {
@@ -47,7 +48,12 @@ class TapeState extends JComponent with DatassetteListener {
       state = newState
       repaint()
     }
-    def datassetteUpdatePosition(perc:Int) : Unit = {
+    def datassetteUpdatePosition(perc:Int,counter:Int) : Unit = {
       progressBar.setValue(perc)
+      progressBar.setString("%03d".format(counter))
+    }
+
+    def datassetteUpdateCounter(counter:Int) : Unit = {
+      progressBar.setString("%03d".format(counter))
     }
   }
