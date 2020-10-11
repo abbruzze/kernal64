@@ -26,7 +26,7 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
 ### What's new in 1.6.2_b6 (Oct 11th 2020) (update)
 - C128
- - VDC: Fixed handling of rowCounterY & currentCharScanLine. Removed 0x1F anding. Now Volley For Two https://kollektivet.nu/v42 runs properly.
+  - VDC: Fixed handling of rowCounterY & currentCharScanLine. Removed 0x1F anding. Now Volley For Two https://kollektivet.nu/v42 runs properly.
 
 ### What's new in 1.6.2_b5 (Sep 10th 2020) (update)
 - General
