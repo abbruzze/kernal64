@@ -1,6 +1,7 @@
 package ucesoft.cbm.formats
 
 import java.io._
+import java.nio.file.Files
 
 import scala.collection.mutable.ListBuffer
 
@@ -80,9 +81,7 @@ object TAP {
     var lastTwo = 0x0000
     val files = new ListBuffer[TAPHeader]
 
-    val in = new FileInputStream(tapFile)
-    val tapBuffer = in.readAllBytes()
-    in.close
+    val tapBuffer = Files.readAllBytes(tapFile.toPath)
 
     var inData = false
     var byte = 0
