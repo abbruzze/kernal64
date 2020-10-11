@@ -401,9 +401,11 @@ class VASYL(vicCtx:VICContext) extends CBMComponent with VICCoprocessor {
         case 0x3C =>
           if (debug) println(s"REP0 = ${value.toHexString}")
           portWriteRepsEnabled(0) = true
+          portWriteReps(0) = value
         case 0x3D =>
-          if (debug) println(s"REP1 = ${value.toHexString}")
+          if (debug) println(s"REP1 = ${value.toHexString} ${if (portsBind) s" portsBind enabled from ${addressPort(0).toHexString} to ${addressPort(1).toHexString}" else ""}")
           portWriteRepsEnabled(1) = true
+          portWriteReps(1) = value
         case 0x3E =>
           dlistOnPendingOnNextCycle = true
         // ========================= VASYL WRITE-ONLY REGISTERS ==========================
@@ -456,13 +458,14 @@ class VASYL(vicCtx:VICContext) extends CBMComponent with VICCoprocessor {
 
   private def writePort(port:Int,value:Int) : Unit = {
     mem(addressPort(port)) = value
-    if (debug) println(s"Writing $value to ${addressPort(port)}")
+    if (debug) println(s"Writing $value to ${addressPort(port).toHexString}")
     incPortAddress(port)
     lastPortWriteValue(port) = value
   }
 
   private def readPort(port:Int) : Int = {
     val value = mem(addressPort(port))
+    if (debug) println(s"Reading from ${addressPort(port).toHexString} = $value")
     incPortAddress(port)
     value
   }
@@ -489,6 +492,10 @@ class VASYL(vicCtx:VICContext) extends CBMComponent with VICCoprocessor {
         case 0x3B =>
           if ((regs(0x31) & 0x10) > 0) readPort(1) // PORT_READ_ENABLE
           else 0xFF
+        case 0x3C =>
+          portWriteReps(0)
+        case 0x3D =>
+          portWriteReps(1)
         case 0x3E =>
           VERSION
         case _ =>
@@ -504,6 +511,7 @@ class VASYL(vicCtx:VICContext) extends CBMComponent with VICCoprocessor {
 
     portWriteReps(port) = (portWriteReps(port) - 1) & 0xFF
     if (portWriteReps(port) == 0) portWriteRepsEnabled(port) = false
+    if (debug) println(s"Repeat on write port $port: remaining ${portWriteReps(port)}")
   }
 
   private def reloadPcFromRegs : Unit = {
