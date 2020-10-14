@@ -1,6 +1,8 @@
 package ucesoft.cbm.peripheral.vic.coprocessor
 
-trait VICCoprocessor {
+import ucesoft.cbm.CBMComponent
+
+trait VICCoprocessor extends CBMComponent {
   val readOffset : Int
   val controlRegisterMask : Int
   val interruptMaskRegisterMask : Int

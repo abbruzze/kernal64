@@ -475,6 +475,8 @@ class C64 extends CBMComputer {
 
     setGEORamSettings(IOItem)
 
+    setBeamRacerSettings(IOItem)
+
     // -----------------------------------
     
     IOItem.addSeparator
@@ -544,11 +546,33 @@ class C64 extends CBMComputer {
     out.writeBoolean(drivesEnabled(0))
     out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
+
+    // VIC Coprocessor
+    vicChip.getCoprocessor match {
+      case None =>
+        out.writeBoolean(false)
+      case Some(cop) =>
+        out.writeBoolean(true)
+        out.writeObject(cop.componentID)
+    }
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     drivesEnabled(0) = in.readBoolean
     drivesEnabled(1) = in.readBoolean
     printerEnabled = in.readBoolean
+
+    // VIC Coprocessor
+    in.readBoolean match {
+      case false =>
+      case true =>
+        in.readObject.toString match { // copy factory
+          case "VASYL" =>
+            settings.getLoadF[Boolean]("BEAMRACER").foreach(_(true))
+          case cn =>
+            throw new IllegalArgumentException(s"Coprocessor $cn unknown")
+        }
+
+    }
   }
   protected def allowsStateRestoring : Boolean = true
   // -----------------------------------------------------------------------------------------

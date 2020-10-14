@@ -49,6 +49,10 @@ trait CBMComponent {
       case i => _components(i) = newComponent
     }
   }
+
+  final def remove(c:CBMComponent) : Unit = {
+    _components -= c
+  }
   
   def afterInitHook  : Unit = {}
   

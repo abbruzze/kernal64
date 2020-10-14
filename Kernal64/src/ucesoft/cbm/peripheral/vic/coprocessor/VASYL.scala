@@ -2,9 +2,9 @@ package ucesoft.cbm.peripheral.vic.coprocessor
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
-import ucesoft.cbm.{CBMComponent, CBMComponentType, ChipID, Log}
+import ucesoft.cbm.{CBMComponentType, ChipID, Log}
 
-class VASYL(vicCtx:VICContext) extends CBMComponent with VICCoprocessor {
+class VASYL(vicCtx:VICContext) extends VICCoprocessor {
   override val componentID: String = "VASYL"
   override val componentType: CBMComponentType.Type = CBMComponentType.INTERNAL
 
@@ -102,6 +102,8 @@ class VASYL(vicCtx:VICContext) extends CBMComponent with VICCoprocessor {
     portWriteReps(1) = 0
     portWriteRepsEnabled(0) = false
     portWriteRepsEnabled(1) = false
+    lastPortWriteValue(0) = 0
+    lastPortWriteValue(1) = 0
     pc = 0
     counters(0) = 0
     counters(1) = 0
@@ -653,9 +655,91 @@ class VASYL(vicCtx:VICContext) extends CBMComponent with VICCoprocessor {
   private def rev(i:Int) : Int = (i & 1) << 7 | (i & 2) << 5 | (i & 4) << 3 | (i & 8) << 1 | (i & 16) >> 1 | (i & 32) >> 3 | (i & 64) >> 5 | (i & 128) >> 7
   private def revPairs(i:Int) : Int = (i & 1) << 6 | (i & 2) << 6 | (i & 4) << 2 | (i & 8) << 2 | (i & 16) >> 2 | (i & 32) >> 2 | (i & 64) >> 6 | (i & 128) >> 6
 
-  override protected def saveState(out: ObjectOutputStream): Unit = ???
+  override protected def saveState(out: ObjectOutputStream): Unit = {
+    out.writeInt(currentBank)
+    out.writeObject(banks)
+    out.writeObject(regs)
+    out.writeBoolean(dlistOnPendingOnNextCycle)
+    out.writeBoolean(dlistOnPendingOnNextFrame)
+    out.writeBoolean(dlistExecutionActive)
+    out.writeInt(beamRacerActiveState)
+    out.writeObject(addressPort)
+    out.writeObject(portWriteReps)
+    out.writeObject(portWriteRepsEnabled)
+    out.writeObject(lastPortWriteValue)
+    out.writeInt(pc)
+    out.writeObject(counters)
+    out.writeBoolean(clearMaskvOnNext)
+    out.writeBoolean(clearMaskhOnNext)
+    out.writeInt(maskv)
+    out.writeInt(maskh)
+    out.writeBoolean(skipNextWait)
+    out.writeBoolean(executeNextNow)
+    out.writeInt(seq_bank)
+    out.writeBoolean(seq_active)
+    out.writeInt(seq_update_mode)
+    out.writeInt(seq_swizzle_mode)
+    out.writeInt(seq_bitmap_pointer)
+    out.writeInt(seq_cycle_start)
+    out.writeInt(seq_cycle_stop)
+    out.writeInt(seq_padding)
+    out.writeInt(seq_step)
+    out.writeInt(seq_xor_value)
+    out.writeBoolean(portsBind)
+    out.writeBoolean(badLineRequested)
+    out.writeInt(badLineValue)
+    out.writeBoolean(fetchOp)
+    out.writeInt(lastOpcode)
+    out.writeInt(x_arg)
+    out.writeInt(v_arg)
+    out.writeInt(h_arg)
+    out.writeInt(r_arg)
+    out.writeInt(rasterCounter)
+  }
 
-  override protected def loadState(in: ObjectInputStream): Unit = ???
+  override protected def loadState(in: ObjectInputStream): Unit = {
+    currentBank = in.readInt()
+    loadMemory(banks,in)
+    mem = banks(currentBank)
+    loadMemory(regs,in)
+    dlistOnPendingOnNextCycle = in.readBoolean()
+    dlistOnPendingOnNextFrame = in.readBoolean()
+    dlistExecutionActive = in.readBoolean()
+    beamRacerActiveState = in.readInt()
+    loadMemory(addressPort,in)
+    loadMemory(portWriteReps,in)
+    loadMemory(portWriteRepsEnabled,in)
+    loadMemory(lastPortWriteValue,in)
+    pc = in.readInt()
+    loadMemory(counters,in)
+    clearMaskvOnNext = in.readBoolean()
+    clearMaskhOnNext = in.readBoolean()
+    maskv = in.readInt()
+    maskh = in.readInt()
+    skipNextWait = in.readBoolean()
+    executeNextNow = in.readBoolean()
+    seq_bank = in.readInt()
+    seq_active = in.readBoolean()
+    seq_update_mode = in.readInt()
+    seq_swizzle_mode = in.readInt()
+    seq_bitmap_pointer = in.readInt()
+    seq_cycle_start = in.readInt()
+    seq_cycle_stop = in.readInt()
+    seq_padding = in.readInt()
+    seq_step = in.readInt()
+    seq_xor_value = in.readInt()
+    portsBind = in.readBoolean()
+    badLineRequested = in.readBoolean()
+    badLineValue = in.readInt()
+    fetchOp = in.readBoolean()
+    lastOpcode = in.readInt()
+    lastInstr = INSTRUCTION_SET(lastOpcode)
+    x_arg = in.readInt()
+    v_arg = in.readInt()
+    h_arg = in.readInt()
+    r_arg = in.readInt()
+    rasterCounter = in.readInt()
+  }
 
   override protected def allowsStateRestoring: Boolean = true
 }

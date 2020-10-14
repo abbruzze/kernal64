@@ -25,6 +25,7 @@ import ucesoft.cbm.peripheral.printer.{MPS803, MPS803GFXDriver, MPS803ROM}
 import ucesoft.cbm.peripheral.rs232._
 import ucesoft.cbm.peripheral.vic.Palette
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
+import ucesoft.cbm.peripheral.vic.coprocessor.VASYL
 import ucesoft.cbm.peripheral.{controlport, keyboard, vic}
 import ucesoft.cbm.remote.RemoteC64
 import ucesoft.cbm.trace.{InspectPanelDialog, TraceDialog, TraceListener}
@@ -2032,5 +2033,27 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       fylerEnabledItem.setSelected(false)
       enableFlyer(false)
     }) :: resetSettingsActions
+  }
+
+  protected def setBeamRacerSettings(parent:JMenu) : Unit = {
+    val brItem = new JCheckBoxMenuItem("Beam Racer installed")
+    brItem.setSelected(false)
+    parent.add(brItem)
+    brItem.addActionListener( e => {
+      val selected = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+      vicChip.setCoprocessor(if (selected) new VASYL(vicChip) else null)
+    })
+
+    settings.add("beam-racer-enabled",
+      s"Install Beam Racer VIC's coprocessor",
+      "BEAMRACER",
+      (br: Boolean) => {
+        if (br) {
+          vicChip.setCoprocessor(new VASYL(vicChip))
+          brItem.setSelected(true)
+        }
+      },
+      brItem.isSelected
+    )
   }
 }

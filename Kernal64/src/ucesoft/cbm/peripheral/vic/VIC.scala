@@ -93,7 +93,7 @@ final class VIC(mem: VICMemory,
   private[this] var refreshCycle = false
   private[this] var _2MhzMode = false
   // ------------------------ COPROCESSOR -----------------------------------------------------------------
-  private[this] var coprocessor : VICCoprocessor = new VASYL(this)//null
+  private[this] var coprocessor : VICCoprocessor = null
   // ------------------------ PUBLIC REGISTERS ------------------------------------------------------------
   /*
    * $D000 - $D00F
@@ -877,6 +877,13 @@ final class VIC(mem: VICMemory,
 
     if (coprocessor != null) coprocessor.reset
   }
+
+  def setCoprocessor(cop:VICCoprocessor) : Unit = {
+    this.coprocessor = cop
+    if (cop != null) add(cop) else remove(cop)
+  }
+
+  def getCoprocessor : Option[VICCoprocessor] = Option(coprocessor)
 
   def setDisplay(display: Display) = {
     this.display = display
