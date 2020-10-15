@@ -48,8 +48,22 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   private[this] var interlaced = false
   private[this] var renderingHints = RenderingHints.VALUE_INTERPOLATION_BILINEAR
 
+  private[this] var rotationAngleRad = 0.0
+  private[this] var flipX,flipY = false
+
   addMouseMotionListener(this)
   addMouseListener(this)
+
+  def setRotationAngle(angleInDeg:Double) : Unit = {
+    rotationAngleRad = math.toRadians(angleInDeg)
+    repaint()
+  }
+
+  def setFlipXY(flipX:Boolean,flipY:Boolean) : Unit = {
+    this.flipX = flipX
+    this.flipY = flipY
+    repaint()
+  }
 
   def setNewResolution(height:Int,width:Int) {
     Log.debug(s"New resolution: $width x $height")
@@ -175,7 +189,10 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       zoomFactorY = dimension.height.toDouble / (if (clipArea != null) clipArea._2.y - clipArea._1.y else screen.getHeight(null))
       //println(s"New screen dimension ${dimension.width} x ${dimension.height} width/height=${dimension.width.toDouble/dimension.height}")
     }
+    // interpolation
     g.asInstanceOf[Graphics2D].setRenderingHint(RenderingHints.KEY_INTERPOLATION,renderingHints)
+    // rotation
+    if (rotationAngleRad != 0) g.asInstanceOf[Graphics2D].rotate(rotationAngleRad,dimension.width >> 1,dimension.height >> 1)
     // clipping
     var clip : Tuple2[Point,Point] = null
     if (clipArea != null) clip = clipArea
@@ -184,9 +201,13 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       else 
       clip = (new Point(clip._1.x + zoomArea._1.x,clip._1.y + zoomArea._1.y),new Point(clip._1.x + zoomArea._2.x,clip._1.y + zoomArea._2.y)) 
     }
+    // flipping
+    if (flipX) clip = (new Point(clip._2.x,clip._1.y),new Point(clip._1.x,clip._2.y))
+    if (flipY) clip = (new Point(clip._1.x,clip._2.y),new Point(clip._2.x,clip._1.y))
+
     if (clip == null) g.drawImage(screen, 0, 0, dimension.width, dimension.height, null)
-    else 
-    g.drawImage(screen, 0, 0, dimension.width, dimension.height, clip._1.x, clip._1.y, clip._2.x, clip._2.y, null)
+    else g.drawImage(screen, 0, 0, dimension.width, dimension.height, clip._1.x, clip._1.y, clip._2.x, clip._2.y, null)
+
     if (drawRasterLine) {
       g.setColor(Color.RED)
       if (clip == null) g.drawLine(0, rasterLine, dimension.width, rasterLine)

@@ -400,6 +400,9 @@ class C64 extends CBMComputer {
     val vicItem = new JMenu("VIC")
     optionMenu.add(vicItem)
     setRenderingSettings(vicItem)
+    val vicDisplayEffectsItem = new JMenuItem("VIC's display effects ...")
+    vicItem.add(vicDisplayEffectsItem)
+    vicDisplayEffectsItem.addActionListener(_ => DisplayEffectPanel.createDisplayEffectPanel(displayFrame,display,"VIC").setVisible(true))
 
     setFullScreenSettings(optionMenu)
     // -----------------------------------

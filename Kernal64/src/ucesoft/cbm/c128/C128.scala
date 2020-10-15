@@ -688,31 +688,37 @@ class C128 extends CBMComputer with MMUChangeListener {
     
     optionMenu.addSeparator
     
-    val adjustMenu = new JMenu("Adjust display")
+    val adjustMenu = new JMenu("Display")
     optionMenu.add(adjustMenu)
+    val vicAdjMenu = new JMenu("VIC")
+    val vdcAdjMenu = new JMenu("VDC")
+
+    adjustMenu.add(vicAdjMenu)
+    adjustMenu.add(vdcAdjMenu)
+
     val adjustRatioItem = new JMenuItem("Adjust VIC display ratio")
     adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A,java.awt.event.InputEvent.ALT_DOWN_MASK))
     adjustRatioItem.addActionListener(_ => adjustRatio(true) )
-    adjustMenu.add(adjustRatioItem)
+    vicAdjMenu.add(adjustRatioItem)
     
     val adjustVDCRatioItem = new JMenuItem("Adjust VDC display ratio")
     adjustVDCRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_D,java.awt.event.InputEvent.ALT_DOWN_MASK))
     adjustVDCRatioItem.addActionListener(_ => adjustRatio(false,true) )
-    adjustMenu.add(adjustVDCRatioItem)
+    vdcAdjMenu.add(adjustVDCRatioItem)
     
     val vdcResetSizeItem = new JMenuItem("VDC normal size")
     vdcResetSizeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_1,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK))
     vdcResetSizeItem.addActionListener(_ => adjustRatio(false) )
-    adjustMenu.add(vdcResetSizeItem)
+    vdcAdjMenu.add(vdcResetSizeItem)
 
     val vdcHalfSizeItem = new JMenuItem("VDC smaller size")
     vdcHalfSizeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_2,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK))
     vdcHalfSizeItem.addActionListener(_ => adjustRatio(false,false,true) )
-    adjustMenu.add(vdcHalfSizeItem)
+    vdcAdjMenu.add(vdcHalfSizeItem)
     
     val zoomItem = new JMenu("VIC Zoom")
     val groupZ = new ButtonGroup
-    adjustMenu.add(zoomItem)
+    vicAdjMenu.add(zoomItem)
     for(z <- 1 to 2) {
       val zoom1Item = new JRadioButtonMenuItem(s"Zoom x $z")
       zoom1Item.addActionListener(_ => zoom(z) )
@@ -731,8 +737,15 @@ class C128 extends CBMComputer with MMUChangeListener {
     adjustMenu.add(renderingItem)
     setRenderingSettings(renderingItem)
 
+    val vicDisplayEffectsItem = new JMenuItem("VIC's display effects ...")
+    val vdcDisplayEffectsItem = new JMenuItem("VDC's display effects ...")
+    vicAdjMenu.add(vicDisplayEffectsItem)
+    vdcAdjMenu.add(vdcDisplayEffectsItem)
+    vicDisplayEffectsItem.addActionListener(_ => DisplayEffectPanel.createDisplayEffectPanel(displayFrame,display,"VIC").setVisible(true))
+    vdcDisplayEffectsItem.addActionListener(_ => DisplayEffectPanel.createDisplayEffectPanel(vdcDisplayFrame,vdcDisplay,"VDC").setVisible(true))
+
     val deinterlaceModeItem = new JCheckBox("VDC deinterlace mode enabled")
-    adjustMenu.add(deinterlaceModeItem)
+    vdcAdjMenu.add(deinterlaceModeItem)
     deinterlaceModeItem.setSelected(true)
     deinterlaceModeItem.addActionListener(_ => vdc.setDeinterlaceMode(deinterlaceModeItem.isSelected) )
     // -----------------------------------
