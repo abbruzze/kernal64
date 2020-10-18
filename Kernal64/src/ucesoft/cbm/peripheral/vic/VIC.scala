@@ -879,8 +879,19 @@ final class VIC(mem: VICMemory,
   }
 
   def setCoprocessor(cop:VICCoprocessor) : Unit = {
+    if (cop != null) {
+      if (coprocessor != null) {
+        remove(coprocessor)
+        coprocessor.disinstall
+      }
+      add(cop)
+      cop.install
+    }
+    else if (coprocessor != null) {
+      remove(coprocessor)
+      coprocessor.disinstall
+    }
     this.coprocessor = cop
-    if (cop != null) add(cop) else remove(cop)
   }
 
   def getCoprocessor : Option[VICCoprocessor] = Option(coprocessor)
@@ -1085,6 +1096,7 @@ final class VIC(mem: VICMemory,
   @inline private def setBaLow(low:Boolean) {
     if (low != _baLow) {
       _baLow = low
+
       baLowFirstCycle = clk.currentCycles
       if (!(_2MhzMode && low)) baLow(low)
     }

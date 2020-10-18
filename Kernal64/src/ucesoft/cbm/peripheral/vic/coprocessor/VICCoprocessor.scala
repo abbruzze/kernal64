@@ -13,4 +13,7 @@ trait VICCoprocessor extends CBMComponent {
   def writeReg(reg:Int,value:Int) : Unit
   def reset : Unit
   def g_access(rasterCycle:Int) : Int
+
+  def disinstall : Unit
+  def install : Unit
 }

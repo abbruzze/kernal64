@@ -10,7 +10,7 @@ import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import java.io.PrintWriter
 
-class CPU65816(mem:Memory) extends CPU65xx {
+class CPU65816(private var mem:Memory) extends CPU65xx {
   val id = ChipID.CPU
   override lazy val componentID = "6510_CE"
   private[this] var baLow = false
@@ -59,6 +59,7 @@ class CPU65816(mem:Memory) extends CPU65xx {
   private[this] var cpu_wait : Boolean = false
   private[this] var cpu_cycle_count,remaining_cpu_cycle_count = 0L
 
+  private[this] var opcode = 0
   private[this] var opcode_table_ptr : Array[() => Unit] = _
 
   private[this] val atmp,opaddr = new Address
@@ -278,7 +279,7 @@ class CPU65816(mem:Memory) extends CPU65xx {
                     }
                 }
                 // fetching
-                val opcode = mem.read(PC.A)
+                opcode = mem.read(PC.A)
                 PC.W.PC_++
                 opcode_table_ptr(opcode)()
             }
@@ -286,6 +287,9 @@ class CPU65816(mem:Memory) extends CPU65xx {
         }
     }
 
+  override def getMemory: Memory = mem
+  override def setMemory(m: Memory): Unit = this.mem = m
+  override def getCurrentOpCode: Int = opcode
 
   private def CPU_modeSwitch() : Unit = {
     if (E) {

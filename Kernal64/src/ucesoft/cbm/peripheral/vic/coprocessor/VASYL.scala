@@ -2,13 +2,22 @@ package ucesoft.cbm.peripheral.vic.coprocessor
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
+import ucesoft.cbm.cpu.CPU65xx.CPUPostponeReadException
+import ucesoft.cbm.cpu.{CPU65xx, Memory}
 import ucesoft.cbm.{CBMComponentType, ChipID, Log}
 
-class VASYL(vicCtx:VICContext) extends VICCoprocessor {
+class VASYL(vicCtx:VICContext,cpu:CPU65xx) extends VICCoprocessor with Memory {
+  override val isRom = false
+  override val length = 0x400
+  override val startAddress = 0xD000
+  override val name = "VASYL MEMORY"
+
   override val componentID: String = "VASYL"
   override val componentType: CBMComponentType.Type = CBMComponentType.INTERNAL
 
   private[this] final val VERSION = "00011110".b // 0-2 PAL, 3-7 version
+
+  private[this] val lastCPUMem : Memory = cpu.getMemory
 
   private[this] val INSTRUCTION_SET : Array[() => Unit] = buildInstructionSet
   private[this] val banks = Array.ofDim[Int](8,65536)
@@ -50,6 +59,12 @@ class VASYL(vicCtx:VICContext) extends VICCoprocessor {
   private[this] var seq_cycle_stop = 55
   private[this] var seq_step, seq_padding = 0
   private[this] var seq_xor_value = 0
+  // ================== CPU BUFFERING ==============================
+  private[this] var lastOpAccessingVIC = false
+  private[this] var cpuPostponedWrite,cpuPostponedRead = false
+  private[this] var cpuPostponedAddress = 0
+  private[this] var cpuPostponedValue = 0
+  private[this] var cpuPostponedRMWCounter = 0
 
   override val readOffset = 0xD030
   override val controlRegisterMask = 0x60
@@ -125,10 +140,19 @@ class VASYL(vicCtx:VICContext) extends VICCoprocessor {
     seq_xor_value = 0
     portsBind = false
     badLineRequested = false
+    lastOpAccessingVIC = false
+    cpuPostponedWrite = false
+    cpuPostponedRead = false
+    cpuPostponedRMWCounter = 0
   }
 
-  override def init: Unit = {
+  override def init: Unit = {}
 
+  def disinstall : Unit = {
+    cpu.setMemory(lastCPUMem)
+  }
+  def install : Unit = {
+    cpu.setMemory(this)
   }
 
   // INSTRUCTIONS
@@ -140,6 +164,7 @@ class VASYL(vicCtx:VICContext) extends VICCoprocessor {
     }
 
     if (vicCtx.isAECAvailable) {
+      lastOpAccessingVIC = true
       fetchOp = true
       val c = vicCtx.read(0xD011, ChipID.VIC_COP)
       badLineRequested = true // workaround
@@ -166,11 +191,12 @@ class VASYL(vicCtx:VICContext) extends VICCoprocessor {
       val arg = mem(pc)
       pc = (pc + 1) & 0xFFFF
       h_arg = arg & 63
+      v_arg = (arg >> 6) & 3
+      if (trace) tracedInstr = s"DELAYH ${h_arg.toHexString}${if (v_arg != 0) s",${v_arg.toHexString}" else ""}"
+
       if (h_arg == 0) h_arg = 1
       h_arg = (h_arg + rasterCycle - 2) % 62 // 0-based, 1 cycle already consumed
-      v_arg = (arg >> 6) & 3
       rasterCounter = rasterLine + v_arg
-      if (trace) tracedInstr = s"DELAYH ${h_arg.toHexString}${if (v_arg != 0) s",${v_arg.toHexString}" else ""}"
     }
 
     if ((v_arg == 0 || compareV(rasterCounter)) && compareH(h_arg)) {
@@ -228,15 +254,18 @@ class VASYL(vicCtx:VICContext) extends VICCoprocessor {
       r_arg = (lastOpcode & 63) + reg_offset
       pc = (pc + 1) & 0xFFFF
 
+      if (trace) tracedInstr = s"MOV ${r_arg.toHexString},${x_arg.toHexString}"
+
       if (r_arg > 0x30) { // VASYL registers, only accessible
         writeReg(r_arg,x_arg,true)
         return
       }
-      else fetchOp = false
-      if (trace) tracedInstr = s"MOV ${r_arg.toHexString},${x_arg.toHexString}"
+
+      fetchOp = false
     }
 
     if (vicCtx.isAECAvailable) {
+      lastOpAccessingVIC = true
       fetchOp = true
       vicCtx.write(r_arg,x_arg,ChipID.VIC_COP)
     }
@@ -329,6 +358,7 @@ class VASYL(vicCtx:VICContext) extends VICCoprocessor {
     }
 
     if (vicCtx.isAECAvailable) {
+      lastOpAccessingVIC = true
       vicCtx.write(r_arg,readPort(p_arg),ChipID.VIC_COP)
       fetchOp = true
     }
@@ -612,6 +642,7 @@ class VASYL(vicCtx:VICContext) extends VICCoprocessor {
       if (dlistExecutionActive) {
         if (fetchOp) {
           oldPC = pc
+          lastOpAccessingVIC = false
           lastOpcode = mem(pc)
           pc = (pc + 1) & 0xFFFF
           lastInstr = INSTRUCTION_SET(lastOpcode)
@@ -630,6 +661,18 @@ class VASYL(vicCtx:VICContext) extends VICCoprocessor {
         }
       }
     } while (executeNextNow && !lastExecuteNow)
+
+    // check buffered write
+    if (cpuPostponedWrite && !lastOpAccessingVIC) {
+      cpuPostponedWrite = false
+      lastCPUMem.write(cpuPostponedAddress,cpuPostponedValue)
+      cpu.setDMA(false)
+    }
+    else // check for postponed read
+    if (cpuPostponedRead && !lastOpAccessingVIC) {
+      cpuPostponedRead = false
+      cpu.setDMA(false)
+    }
     //=========================================================
   }
 
@@ -651,6 +694,41 @@ class VASYL(vicCtx:VICContext) extends VICCoprocessor {
     }
     else -1
   }
+
+  // ======================= CPU MEMORY BRIDGE ========================================
+
+  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) : Int = {
+    if (beamRacerActiveState == 2 && lastOpAccessingVIC && address >= 0xD000 && address < 0xD400) { // concurrent VASYL write and CPU read
+      cpu.setDMA(true)
+      cpuPostponedRead = true
+      throw new CPUPostponeReadException // force CPU to block this read as it had received a RDY signal
+    }
+    lastCPUMem.read(address, chipID)
+  }
+
+  override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
+    if (beamRacerActiveState == 2 && lastOpAccessingVIC && address >= 0xD000 && address < 0xD400) { // concurrent VASYL & CPU I/O write
+      val cpuOpCode = cpu.getCurrentOpCode
+      val opRow = cpuOpCode >> 4
+      val opCol = cpuOpCode & 0x0F
+
+      if (debug) println(s"CPU writes to ${address.toHexString} $value [${cpuOpCode.toHexString}] VASYL = $tracedInstr ${lastOpAccessingVIC}")
+
+      if (opCol == 0xE && (opRow < 0x8 || opRow > 0xB)) { // ASL, LSR, DEC, INC, ROL or ROR
+        cpuPostponedRMWCounter += 1
+        if (cpuPostponedRMWCounter == 1) return // ignore first write of RMW
+      }
+
+      cpuPostponedRMWCounter = 0
+      cpuPostponedWrite = true
+      cpuPostponedAddress = address
+      cpuPostponedValue = value
+      cpu.setDMA(true)
+    }
+    else lastCPUMem.write(address,value,chipID)
+  }
+
+  override def byteOnBUS : Int = lastCPUMem.byteOnBUS
 
   private def rev(i:Int) : Int = (i & 1) << 7 | (i & 2) << 5 | (i & 4) << 3 | (i & 8) << 1 | (i & 16) >> 1 | (i & 32) >> 3 | (i & 64) >> 5 | (i & 128) >> 7
   private def revPairs(i:Int) : Int = (i & 1) << 6 | (i & 2) << 6 | (i & 4) << 2 | (i & 8) << 2 | (i & 16) >> 2 | (i & 32) >> 2 | (i & 64) >> 6 | (i & 128) >> 6
@@ -695,6 +773,12 @@ class VASYL(vicCtx:VICContext) extends VICCoprocessor {
     out.writeInt(h_arg)
     out.writeInt(r_arg)
     out.writeInt(rasterCounter)
+    out.writeBoolean(lastOpAccessingVIC)
+    out.writeBoolean(cpuPostponedWrite)
+    out.writeInt(cpuPostponedAddress)
+    out.writeInt(cpuPostponedValue)
+    out.writeInt(cpuPostponedRMWCounter)
+    out.writeBoolean(cpuPostponedRead)
   }
 
   override protected def loadState(in: ObjectInputStream): Unit = {
@@ -739,6 +823,12 @@ class VASYL(vicCtx:VICContext) extends VICCoprocessor {
     h_arg = in.readInt()
     r_arg = in.readInt()
     rasterCounter = in.readInt()
+    lastOpAccessingVIC = in.readBoolean()
+    cpuPostponedWrite = in.readBoolean()
+    cpuPostponedAddress = in.readInt()
+    cpuPostponedValue = in.readInt()
+    cpuPostponedRMWCounter = in.readInt()
+    cpuPostponedRead = in.readBoolean()
   }
 
   override protected def allowsStateRestoring: Boolean = true

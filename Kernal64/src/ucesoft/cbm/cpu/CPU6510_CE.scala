@@ -8,7 +8,9 @@ import java.io.PrintWriter
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 
-class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
+import ucesoft.cbm.cpu.CPU65xx.CPUPostponeReadException
+
+class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   override lazy val componentID = "6510_CE"
   private[this] var baLow = false
   private[this] var dma = false
@@ -2140,6 +2142,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
       if (state == 0) {
         instructionCycle = 0
         tracingCyclePC = PC
+        CURRENT_OP_PC = PC
       }
       else
       if (!baLow) instructionCycle += 1
@@ -2147,7 +2150,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
       val tracingNow = tracing && (state == 0 || state == O_JAM || tracingCycleMode)
       if (tracingNow) Log.debug(formatDebug)
       if (tracingOnFile && (state == 0 || state == O_JAM)) tracingFile.println(formatDebug)
-      CURRENT_OP_PC = PC
+
       if (tracingNow) {
         stepCallBack(toString)
         syncObject.synchronized {
@@ -2160,8 +2163,18 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
     if (!ready) notReadyDuringInstr = true
 
-    states(state)()
+    try {
+      states(state)()
+    }
+    catch {
+      case _:CPUPostponeReadException =>
+        // the caller must have care to set ready line to stop CPU
+    }
   }
+
+  override def getMemory: Memory = mem
+  override def setMemory(m: Memory): Unit = this.mem = m
+  override def getCurrentOpCode: Int = op
 
   def isFetchingInstruction: Boolean = state == 0
 
