@@ -61,6 +61,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val CONFIGURATION_AUTOSAVE = "autosave"
 
   protected val PRG_RUN_DELAY_CYCLES = 2200000
+  protected var lastLoadedPrg : Option[File] = None
 
   // -------------- MENU ITEMS -----------------
   protected val maxSpeedItem = new JCheckBoxMenuItem("Warp mode")
@@ -246,11 +247,15 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def mainLoop(cycles:Long) : Unit
 
-  protected def reset(play:Boolean=true) : Unit = {
+  protected def reset(play:Boolean=true,loadAndRunLastPrg:Boolean = false) : Unit = {
     traceDialog.forceTracing(false)
     diskTraceDialog.forceTracing(false)
     if (Thread.currentThread != Clock.systemClock) clock.pause
     resetComponent
+    if (loadAndRunLastPrg) lastLoadedPrg.foreach( f =>
+      clock.schedule(new ClockEvent("RESET_PRG",clock.currentCycles + PRG_RUN_DELAY_CYCLES,(cycles) => loadPRGFile(f,true)))
+    )
+
     if (play) clock.play
   }
 
@@ -481,7 +486,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def attachDevice(file:File,autorun:Boolean,fileToLoad:Option[String] = None,emulateInserting:Boolean = true) : Unit = {
     val name = file.getName.toUpperCase
 
-    if (name.endsWith(".PRG")) loadPRGFile(file,autorun)
+    if (name.endsWith(".PRG")) {
+      loadPRGFile(file,autorun)
+      lastLoadedPrg = Some(file)
+    }
     else
     if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun,fileToLoad,emulateInserting)
     else
@@ -1386,6 +1394,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     resetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK))
     resetItem.addActionListener(_ => reset(true) )
     fileMenu.add(resetItem)
+    val reset2Item = new JMenuItem("Reset and run last PRG")
+    reset2Item.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.CTRL_DOWN_MASK))
+    reset2Item.addActionListener(_ => reset(true,true) )
+    fileMenu.add(reset2Item)
 
     fileMenu.addSeparator
 
@@ -2041,7 +2053,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     parent.add(brItem)
     brItem.addActionListener( e => {
       val selected = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-      vicChip.setCoprocessor(if (selected) new VASYL(vicChip) else null)
+      vicChip.setCoprocessor(if (selected) new VASYL(vicChip,cpu) else null)
     })
 
     settings.add("beam-racer-enabled",
@@ -2049,7 +2061,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       "BEAMRACER",
       (br: Boolean) => {
         if (br) {
-          vicChip.setCoprocessor(new VASYL(vicChip))
+          vicChip.setCoprocessor(new VASYL(vicChip,cpu))
           brItem.setSelected(true)
         }
       },
