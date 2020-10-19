@@ -3,7 +3,7 @@
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
 
-Kernal64 ver 1.6.2_b6
+Kernal64 ver 1.6.2_b7
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -24,9 +24,11 @@ If you want to load a 16M REU modify the memory settings inside the start script
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
-### What's new in 1.6.2_b6 (Oct 11th 2020) (update)
+### What's new in 1.6.2_b7 (Oct 15th 2020) (update)
 - C128
   - VDC: Fixed handling of rowCounterY & currentCharScanLine. Removed 0x1F anding. Now Volley For Two https://kollektivet.nu/v42 runs properly.
+- General
+  - Fixed problem with disk inserting introduced on 1.6.2_b5. Some demos stop working when it comes to wait disk changing
 
 ### What's new in 1.6.2_b5 (Sep 10th 2020) (update)
 - General
