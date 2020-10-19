@@ -107,7 +107,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
   protected val irqSwitcher = new IRQSwitcher(cpu.irqRequest _)
   protected val keybMapper : keyboard.KeyboardMapper
-  protected lazy val keyb = new keyboard.Keyboard(keybMapper,nmiSwitcher.keyboardNMIAction _)	// key listener
+  protected lazy val keyb = new keyboard.Keyboard(keybMapper,nmiSwitcher.keyboardNMIAction _,!isC64Mode)	// key listener
 
   protected val bus = new IECBus
   protected var dma = false
