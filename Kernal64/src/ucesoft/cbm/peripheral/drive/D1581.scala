@@ -10,11 +10,10 @@ import ucesoft.cbm.peripheral.Connector
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.bus.IECBusListener
 import ucesoft.cbm.cpu.ROM
-import java.io.{IOException, ObjectInputStream, ObjectOutputStream, PrintWriter}
+import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
 
 import ucesoft.cbm.trace.BreakType
 import ucesoft.cbm.cpu.Memory
-import javax.swing.JFrame
 import ucesoft.cbm.Log
 import ucesoft.cbm.peripheral.bus.IECBusLine
 import ucesoft.cbm.formats.MFM

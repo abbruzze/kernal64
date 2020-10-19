@@ -9,9 +9,8 @@ import ucesoft.cbm.trace.TraceListener
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.trace.BreakType
-import java.io.{IOException, ObjectInputStream, ObjectOutputStream, PrintWriter}
+import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
 
-import javax.swing.JFrame
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.bus.IECBusListener
 import ucesoft.cbm.peripheral.bus.IECBusLine

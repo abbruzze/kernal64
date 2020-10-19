@@ -38,7 +38,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   private[this] var vdcEnabled = true // used with --vdc-disabled
   protected val mmu = new C128MMU(this)
   private[this] val z80 = new Z80(mmu,mmu)
-  override protected val irqSwitcher = new IRQSwitcher(irqRequest _)
+  override protected val irqSwitcher = new Switcher("IRQ",irqRequest _)
   private[this] var cpuFrequency = 1
   private[this] var c64Mode = false
   private[this] var z80Active = true
@@ -57,13 +57,11 @@ class C128 extends CBMComputer with MMUChangeListener {
   // ------------- MMU Status Panel ------------
   private[this] val mmuStatusPanel = new MMUStatusPanel
   // -------------------------------------------
-  private[this] var baLow = false
   private[this] var FSDIRasInput = true
 
   override protected def isC64Mode : Boolean = c64Mode
 
   def reset  : Unit = {
-    baLow = false
     dma = false
     z80Active = true
     clockSpeed = 1
@@ -124,7 +122,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     				   0xDC00,
     				   cia1CP1,
     				   cia1CP2,
-    				   irqSwitcher.ciaIRQ _,idle => cia12Running(0) = !idle) with IECBusListener {
+    				   irqSwitcher.setLine(Switcher.CIA,_),idle => cia12Running(0) = !idle) with IECBusListener {
       val busid = name
       
       bus.registerListener(this)
@@ -147,11 +145,11 @@ class C128 extends CBMComputer with MMUChangeListener {
     				   0xDD00,
     				   cia2CP1,
     				   cia2CP2,
-    				   nmiSwitcher.cia2NMIAction _,idle => cia12Running(1) = !idle)
+    				   nmiSwitcher.setLine(Switcher.CIA,_),idle => cia12Running(1) = !idle)
     rs232.setCIA12(cia1,cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
-    vicChip = new vic.VIC(vicMemory,mmu.colorRAM,irqSwitcher.vicIRQ _,baLow _,true)
+    vicChip = new vic.VIC(vicMemory,mmu.colorRAM,irqSwitcher.setLine(Switcher.VIC,_),baLow _,true)
     // I/O set
     mmu.setIO(cia1,cia2,vicChip,sid,vdc)
     // VIC display
@@ -352,8 +350,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   }
   
   private def baLow(low:Boolean) : Unit = {
-    baLow = low
-    if (z80Active) z80.requestBUS(baLow) else cpu.setBaLow(low)
+    if (z80Active) z80.requestBUS(low) else cpu.setBaLow(low)
     expansionPort.setBaLow(low)
   }
   

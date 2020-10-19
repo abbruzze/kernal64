@@ -106,10 +106,11 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val sid = new ucesoft.cbm.peripheral.sid.SID
   protected var display : vic.Display = _
   protected var gifRecorder : JDialog = _
-  protected val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
-  protected val irqSwitcher = new IRQSwitcher(cpu.irqRequest _)
+  protected val nmiSwitcher = new Switcher("NMI",cpu.nmiRequest _)//new NMISwitcher(cpu.nmiRequest _)
+  protected val irqSwitcher = new Switcher("IRQ",cpu.irqRequest _)//new IRQSwitcher(cpu.irqRequest _)
+  protected val dmaSwitcher = new Switcher("DMA",setDMA _)
   protected val keybMapper : keyboard.KeyboardMapper
-  protected lazy val keyb = new keyboard.Keyboard(keybMapper,nmiSwitcher.keyboardNMIAction _)	// key listener
+  protected lazy val keyb = new keyboard.Keyboard(keybMapper,nmiSwitcher.setLine(Switcher.KB,_),!isC64Mode)	// key listener
 
   protected val bus = new IECBus
   protected var dma = false
@@ -154,8 +155,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     TelnetRS232,
     TCPRS232,
     FileRS232,
-    SwiftLink.getSL(nmiSwitcher.expansionPortNMI,None),
-    SwiftLink.getSL(nmiSwitcher.expansionPortNMI _,Some(REU.getREU(REU.REU_1750,mmu,setDMA _,irqSwitcher.expPortIRQ _,None))),
+    SwiftLink.getSL(nmiSwitcher.setLine(Switcher.CRT,_),None),
+    SwiftLink.getSL(nmiSwitcher.setLine(Switcher.CRT,_),Some(REU.getREU(REU.REU_1750,mmu,dmaSwitcher.setLine(Switcher.CRT,_),irqSwitcher.setLine(Switcher.CRT,_),None))),
     ProcessRS232)
   // -------------------- PRINTER --------------
   protected var printerEnabled = false
@@ -530,7 +531,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     try {
       if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
       ExpansionPort.getExpansionPort.eject
-      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.expPortIRQ _,nmiSwitcher.expansionPortNMI _,getRAM,configuration)
+      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.setLine(Switcher.CRT,_),nmiSwitcher.setLine(Switcher.CRT,_),getRAM,configuration)
       println(ep)
       if (ep.isFreezeButtonSupported) cartMenu.setVisible(true)
       ExpansionPort.setExpansionPort(ep)
@@ -871,14 +872,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         ExpansionPort.getExpansionPort.eject
         ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
       case Some(REU.REU_16M) =>
-        val reu = REU.getREU(REU.REU_16M,mmu,setDMA _,irqSwitcher.expPortIRQ _,reu16FileName map { new File(_) } )
+        val reu = REU.getREU(REU.REU_16M,mmu,dmaSwitcher.setLine(Switcher.CRT,_),irqSwitcher.setLine(Switcher.CRT,_),reu16FileName map { new File(_) } )
         ExpansionPort.setExpansionPort(reu)
         reu16FileName match {
           case Some(file) => REU.attached16MFileName = file
           case None =>
         }
       case Some(reuSize) =>
-        ExpansionPort.setExpansionPort(REU.getREU(reuSize,mmu,setDMA _,irqSwitcher.expPortIRQ _,None))
+        ExpansionPort.setExpansionPort(REU.getREU(reuSize,mmu,dmaSwitcher.setLine(Switcher.CRT,_),irqSwitcher.setLine(Switcher.CRT,_),None))
     }
   }
 
@@ -1023,7 +1024,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def enableCPMCart(enabled:Boolean): Unit = {
     ExpansionPort.getExpansionPort.eject
     if (enabled) {
-      ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,setDMA _,setTraceListener _))
+      ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,dmaSwitcher.setLine(Switcher.CRT,_),setTraceListener _))
       detachCtrItem.setEnabled(true)
     }
     else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
@@ -2053,7 +2054,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     parent.add(brItem)
     brItem.addActionListener( e => {
       val selected = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-      vicChip.setCoprocessor(if (selected) new VASYL(vicChip,cpu) else null)
+      vicChip.setCoprocessor(if (selected) new VASYL(vicChip,cpu,dmaSwitcher.setLine(Switcher.EXT,_)) else null)
     })
 
     settings.add("beam-racer-enabled",
@@ -2061,7 +2062,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       "BEAMRACER",
       (br: Boolean) => {
         if (br) {
-          vicChip.setCoprocessor(new VASYL(vicChip,cpu))
+          vicChip.setCoprocessor(new VASYL(vicChip,cpu,dmaSwitcher.setLine(Switcher.EXT,_)))
           brItem.setSelected(true)
         }
       },

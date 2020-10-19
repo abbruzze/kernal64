@@ -8,9 +8,8 @@ import ucesoft.cbm.cpu.CPU65xx
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
-import java.io.{IOException, ObjectInputStream, ObjectOutputStream, PrintWriter}
+import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
 
-import javax.swing.JFrame
 import ucesoft.cbm.trace.BreakType
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.cpu.ROM

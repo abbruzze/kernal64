@@ -6,7 +6,7 @@ import ucesoft.cbm.cpu.CPU65xx.CPUPostponeReadException
 import ucesoft.cbm.cpu.{CPU65xx, Memory}
 import ucesoft.cbm.{CBMComponentType, ChipID, Log}
 
-class VASYL(vicCtx:VICContext,cpu:CPU65xx) extends VICCoprocessor with Memory {
+class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends VICCoprocessor with Memory {
   override val isRom = false
   override val length = 0x400
   override val startAddress = 0xD000
@@ -666,12 +666,12 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx) extends VICCoprocessor with Memory {
     if (cpuPostponedWrite && !lastOpAccessingVIC) {
       cpuPostponedWrite = false
       lastCPUMem.write(cpuPostponedAddress,cpuPostponedValue)
-      cpu.setDMA(false)
+      dmaHandler(false)
     }
     else // check for postponed read
     if (cpuPostponedRead && !lastOpAccessingVIC) {
       cpuPostponedRead = false
-      cpu.setDMA(false)
+      dmaHandler(false)
     }
     //=========================================================
   }
@@ -699,7 +699,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx) extends VICCoprocessor with Memory {
 
   override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) : Int = {
     if (beamRacerActiveState == 2 && lastOpAccessingVIC && address >= 0xD000 && address < 0xD400) { // concurrent VASYL write and CPU read
-      cpu.setDMA(true)
+      dmaHandler(true)
       cpuPostponedRead = true
       throw new CPUPostponeReadException // force CPU to block this read as it had received a RDY signal
     }
@@ -723,7 +723,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx) extends VICCoprocessor with Memory {
       cpuPostponedWrite = true
       cpuPostponedAddress = address
       cpuPostponedValue = value
-      cpu.setDMA(true)
+      dmaHandler(true)
     }
     else lastCPUMem.write(address,value,chipID)
   }

@@ -105,7 +105,7 @@ class SCPUC64 extends CBMComputer {
       0xDC00,
       cia1CP1,
       cia1CP2,
-      irqSwitcher.ciaIRQ _,
+      irqSwitcher.setLine(Switcher.CIA,_),
       idle => cia12Running(0) = !idle)
     val cia2CP1 = new CIA2Connectors.PortAConnector(vicMemory, bus, rs232)
     val cia2CP2 = new CIA2Connectors.PortBConnector(rs232)
@@ -116,12 +116,12 @@ class SCPUC64 extends CBMComputer {
       0xDD00,
       cia2CP1,
       cia2CP2,
-      nmiSwitcher.cia2NMIAction _,
+      nmiSwitcher.setLine(Switcher.CIA,_),
       idle => cia12Running(1) = !idle)
     rs232.setCIA12(cia1, cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
-    vicChip = new vic.VIC(vicMemory, mmu.COLOR_RAM, irqSwitcher.vicIRQ _, baLow _)
+    vicChip = new vic.VIC(vicMemory, mmu.COLOR_RAM, irqSwitcher.setLine(Switcher.VIC,_), baLow _)
     mmu.setLastByteReadMemory(vicMemory)
     // mapping I/O chips in memory
     mmu.setIO(cia1, cia2, sid, vicChip)
