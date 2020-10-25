@@ -4,6 +4,8 @@ object DatassetteState extends Enumeration {
   val PLAYING = Value
   val STOPPED = Value
   val RECORDING = Value
+  val FORWARD = Value
+  val REWIND = Value
 }
 
 trait DatassetteListener {

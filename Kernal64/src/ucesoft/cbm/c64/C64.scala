@@ -149,7 +149,7 @@ class C64 extends CBMComputer {
     val row2Panel = new JPanel(new FlowLayout(FlowLayout.RIGHT))
     rowPanel.add("North",row1Panel)
     rowPanel.add("South",row2Panel)
-    val tapePanel = new TapeState
+    val tapePanel = new TapeState(datassette)
     datassette.setTapeListener(tapePanel)
     row1Panel.add(tapePanel)
     row1Panel.add(tapePanel.progressBar)

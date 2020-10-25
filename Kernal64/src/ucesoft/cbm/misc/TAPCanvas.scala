@@ -12,7 +12,7 @@ class TAPCanvas(fc:JFileChooser, charRom:Memory, c64Mode:Boolean) extends D64Can
   override protected def isFileExtOK(fileName:String) : Boolean = fileName.toUpperCase.endsWith(".TAP")
 
   override def readDir(file:File) : Unit = {
-    val entries = TAP.anaylize(file)
+    val entries = TAP.anaylize(file).header
 
     validSelectableIndexes = entries.zipWithIndex filter { case (d,_) => d.fileType == "PRG" } map { d => (d._2 + 1,d._1) } toMap
 
@@ -30,12 +30,9 @@ class TAPCanvas(fc:JFileChooser, charRom:Memory, c64Mode:Boolean) extends D64Can
     rvsOff
     newLine
     for(e <- entries) {
-      val blanks = if (e.blocks < 10) 4 
-      	else
-        if (e.blocks < 100) 3
-        else 2
+      val blanks = 2
       val endBlanks = 32 - (blanks + 2 + 2 + 18 + 5)
-      add(e.blocks.toString)
+      add("%03d".format(e.counter))
       rep(0x20,blanks)
       add("\"")
       add(e.fileName)
@@ -46,5 +43,6 @@ class TAPCanvas(fc:JFileChooser, charRom:Memory, c64Mode:Boolean) extends D64Can
       rep(0x20,endBlanks)
       newLine
     }
+    end
   }
 }

@@ -672,12 +672,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def attachTapeFile(file:File,tapFile:Option[TAP.TAPHeader],autorun:Boolean) : Unit = {
     val tap = new TAP(file.toString)
-    tapFile match {
-      case Some(file) =>
-        tap.goTo(file.tapOffset)
-      case None =>
-    }
-    datassette.setTAP(Some(tap))
+    datassette.setTAP(Some(tap),tapFile.map(_.tapOffset.toInt))
     tapeMenu.setEnabled(true)
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
     if (autorun) {
@@ -1269,23 +1264,31 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       tapeMenu.setEnabled(false)
       fileMenu.add(tapeMenu)
 
-      val tapePlayItem = new JMenuItem("Cassette press play")
+      val tapePlayItem = new JMenuItem("Press play")
       tapePlayItem.addActionListener(_ => datassette.pressPlay)
       tapeMenu.add(tapePlayItem)
 
-      val tapeStopItem = new JMenuItem("Cassette press stop")
+      val tapeStopItem = new JMenuItem("Press stop")
       tapeStopItem.addActionListener(_ => datassette.pressStop)
       tapeMenu.add(tapeStopItem)
 
-      val tapeRecordItem = new JMenuItem("Cassette press record & play")
+      val tapeRecordItem = new JMenuItem("Press record & play")
       tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay)
       tapeMenu.add(tapeRecordItem)
 
-      val tapeRewindItem = new JMenuItem("Cassette press rewind")
+      val tapeRewindItem = new JMenuItem("Press rewind")
       tapeRewindItem.addActionListener(_ => datassette.pressRewind)
       tapeMenu.add(tapeRewindItem)
 
-      val tapeResetCounterItem = new JMenuItem("Cassette reset counter")
+      val tapeForwardItem = new JMenuItem("Press forward")
+      tapeForwardItem.addActionListener(_ => datassette.pressForward)
+      tapeMenu.add(tapeForwardItem)
+
+      val tapeResetItem = new JMenuItem("Reset")
+      tapeResetItem.addActionListener(_ => datassette.resetToStart)
+      tapeMenu.add(tapeResetItem)
+
+      val tapeResetCounterItem = new JMenuItem("Reset counter")
       tapeResetCounterItem.addActionListener(_ => datassette.resetCounter)
       tapeMenu.add(tapeResetCounterItem)
     }
