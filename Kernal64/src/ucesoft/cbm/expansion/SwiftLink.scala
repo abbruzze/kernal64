@@ -297,7 +297,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     
     val baud = SPEEDS(ctrl & 0x0f)
     modem.setBaud(baud.toInt)
-    clockTicks = math.round(985248.0 / baud * (1 + stopBits + wordLength + parityBit)).toInt
+    clockTicks = math.round(clk.getClockHz / baud * (1 + stopBits + wordLength + parityBit)).toInt
 
     if (baud != lastBaud) {
       lastBaud = baud

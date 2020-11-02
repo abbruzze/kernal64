@@ -59,6 +59,8 @@ class C128 extends CBMComputer with MMUChangeListener {
   // -------------------------------------------
   private[this] var FSDIRasInput = true
 
+  private[this] var z80ScaleFactor = 2000000 / clock.getClockHz
+
   override protected def isC64Mode : Boolean = c64Mode
 
   def reset  : Unit = {
@@ -276,6 +278,8 @@ class C128 extends CBMComputer with MMUChangeListener {
 
     // GIF Recorder
     gifRecorder = GIFPanel.createGIFPanel(displayFrame,Array(display,vdcDisplay),Array("VIC","VDC"))
+    // clock freq change listener
+    clock.addChangeFrequencyListener(f => z80ScaleFactor = 2000000 / f)
   }
 
   private def loadSettings(args:Array[String]) : Unit = {
@@ -293,7 +297,7 @@ class C128 extends CBMComputer with MMUChangeListener {
       case Some(f) =>
         handleDND(new File(f),false,true)
     }
-    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive _,attachDisk(_,_,c64Mode),attachDiskFile(_,_,_,None),drivesEnabled)
+    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,c64Mode),attachDiskFile(_,_,_,None),drivesEnabled)
   }
   
   override def afterInitHook  : Unit = {
@@ -329,7 +333,7 @@ class C128 extends CBMComputer with MMUChangeListener {
       cartButtonRequested = false
       ExpansionPort.getExpansionPort.freezeButton
     }
-    if (z80Active) z80.clock(cycles,2.0299) // 2Mhz / 985248
+    if (z80Active) z80.clock(cycles,z80ScaleFactor) // 2Mhz / 985248 = 2.0299
     else {
       ProgramLoader.checkLoadingInWarpMode(c64Mode)
       cpu.fetchAndExecute(1)
@@ -397,11 +401,11 @@ class C128 extends CBMComputer with MMUChangeListener {
   override def isHeadless = headless
   // ======================================== Settings ==============================================
 
-  protected def enableDrive(id:Int,enabled:Boolean) : Unit = {
+  override protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
     drivesEnabled(id) = enabled
     drives(id).setActive(enabled)
     driveLeds(id).setVisible(enabled)
-    adjustRatio(true)
+    if (updateFrame) adjustRatio()
   }
 
   private def enableVDC80(enabled:Boolean) : Unit = {
@@ -540,18 +544,6 @@ class C128 extends CBMComputer with MMUChangeListener {
         t.printStackTrace
         showError("Disk attaching error",t.toString)
     }
-  }
-  
-  private def zoom(f:Int) : Unit = {
-    val dim = new Dimension(vicChip.VISIBLE_SCREEN_WIDTH * f,vicChip.VISIBLE_SCREEN_HEIGHT * f)
-    updateScreenDimension(dim)
-  }
-
-  private def updateScreenDimension(dim:Dimension): Unit = {
-    display.setPreferredSize(dim)
-    display.invalidate
-    display.repaint()
-    displayFrame.pack
   }
 
   private def updateVDCScreenDimension(dim:Dimension): Unit = {
@@ -716,9 +708,10 @@ class C128 extends CBMComputer with MMUChangeListener {
     val zoomItem = new JMenu("VIC Zoom")
     val groupZ = new ButtonGroup
     vicAdjMenu.add(zoomItem)
+    setVICModel(vicAdjMenu)
     for(z <- 1 to 2) {
       val zoom1Item = new JRadioButtonMenuItem(s"Zoom x $z")
-      zoom1Item.addActionListener(_ => zoom(z) )
+      zoom1Item.addActionListener(_ => vicZoom(z) )
       val kea = z match {
         case 1 => java.awt.event.KeyEvent.VK_1
         case 2 => java.awt.event.KeyEvent.VK_2
@@ -847,13 +840,6 @@ class C128 extends CBMComputer with MMUChangeListener {
   override protected def setGlobalCommandLineOptions : Unit = {
     super.setGlobalCommandLineOptions
 
-    settings.add("screen-dim",
-      "Zoom factor. Valued accepted are 1 and 2",
-      (f:Int) => if (f == 1 || f == 2) {
-        zoom(f)
-        zoomOverride = true
-      }
-    )
     settings.add("vdcscreenshot",
       "Take a screenshot of VDC screen and save it on the given file path. Used with --testcart only.",
       (file:String) => if (file != "") {
@@ -968,7 +954,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     swing { displayFrame.pack }
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
-      swing { updateScreenDimension(new Dimension(dim(0),dim(1))) }
+      swing { updateVICScreenDimension(new Dimension(dim(0),dim(1))) }
     }
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }

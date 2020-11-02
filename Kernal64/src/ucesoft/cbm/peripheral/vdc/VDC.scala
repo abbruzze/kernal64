@@ -78,7 +78,7 @@ class VDC extends RAMComponent {
   final private[this] val X_RIGHT_CLIP_COLS = 8 * 8
   final private[this] val Y_TOP_CLIP_ROWS = 2 * 8//1 * 8
   final private[this] val Y_BOTTOM_CLIP_ROWS = 0 * 8//3 * 8
-  final private[this] val CPU_CLOCK_HZ = 985248.0
+  private[this] var CPU_CLOCK_HZ = Clock.systemClock.getClockHz
   final private[this] val VDC_CLOCK_HZ = 16000000.0
 
   final private[this] val MAX_HEIGHT = 1024
@@ -176,6 +176,12 @@ class VDC extends RAMComponent {
     0xFFAAAAAA,  // 14 Light Gray
     0xFFFFFFFF   // 15 White
   )
+
+  // ============ Constructor ============================
+  clk.addChangeFrequencyListener(f => {
+    CPU_CLOCK_HZ = f
+    recalculate_xsync
+  })
   // Clock management ====================================
   def pause {
     //if (clk != Clock.systemClock) clk.pause

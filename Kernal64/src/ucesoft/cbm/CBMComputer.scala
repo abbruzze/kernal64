@@ -1,6 +1,6 @@
 package ucesoft.cbm
 
-import java.awt.Color
+import java.awt.{Color, Dimension}
 import java.awt.event._
 import java.io._
 import java.util.zip.{GZIPInputStream, GZIPOutputStream}
@@ -23,7 +23,7 @@ import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.printer.{MPS803, MPS803GFXDriver, MPS803ROM}
 import ucesoft.cbm.peripheral.rs232._
-import ucesoft.cbm.peripheral.vic.Palette
+import ucesoft.cbm.peripheral.vic.{Palette, VICType, VIC_NTSC, VIC_PAL}
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 import ucesoft.cbm.peripheral.vic.coprocessor.VASYL
 import ucesoft.cbm.peripheral.{controlport, keyboard, vic}
@@ -101,6 +101,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   // main chips
   protected val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   protected var vicChip : vic.VIC = _
+  protected var vicZoomFactor : Int = 1
   protected var cia1,cia2 : CIA = _
   protected val cia12Running = Array(true,true)
   protected val sid = new ucesoft.cbm.peripheral.sid.SID
@@ -268,7 +269,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def saveSettings(save:Boolean) : Unit
 
-  protected def enableDrive(id:Int,enabled:Boolean) : Unit
+  protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit
 
   protected def paste : Unit
 
@@ -1133,6 +1134,43 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def openGIFRecorder : Unit = gifRecorder.setVisible(true)
 
+  protected def vicZoom(f:Int) : Unit = {
+    val dim = new Dimension(vicChip.VISIBLE_SCREEN_WIDTH * f,vicChip.VISIBLE_SCREEN_HEIGHT * f)
+    vicZoomFactor = f
+    updateVICScreenDimension(dim)
+  }
+
+  protected def updateVICScreenDimension(dim:Dimension): Unit = {
+    display.setPreferredSize(dim)
+    display.invalidate
+    display.repaint()
+    displayFrame.pack
+    if (vicChip.VISIBLE_SCREEN_WIDTH == dim.width && vicChip.VISIBLE_SCREEN_HEIGHT == dim.height) vicZoomFactor = 1
+    else
+    if (vicChip.VISIBLE_SCREEN_WIDTH * 2 == dim.width && vicChip.VISIBLE_SCREEN_HEIGHT * 2 == dim.height) vicZoomFactor = 2
+    else vicZoomFactor = 0 // undefined
+  }
+
+  protected def setVICModel(model:VICType.Value,preserveDisplayDim:Boolean = false) : Unit = {
+    clock.pause
+    val vicType = model match {
+      case VICType.PAL => VIC_PAL
+      case VICType.NTSC => VIC_NTSC
+    }
+    vicChip.setVICModel(vicType)
+    clock.setClockHz(vicType.CPU_FREQ)
+    display.setNewResolution(vicChip.SCREEN_HEIGHT,vicChip.SCREEN_WIDTH)
+    vicChip.setDisplay(display)
+    if (!preserveDisplayDim) {
+      if (vicZoomFactor > 0) vicZoom(vicZoomFactor)
+      display.invalidate()
+      displayFrame.pack
+    }
+
+    reset()
+    clock.play
+  }
+
   // -------------------------------------------------------------------
   protected def setMenu : Unit = {
 
@@ -1227,6 +1265,13 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
           loadState(Some(file))
         }
         finally loadStateFromOptions = false
+      }
+    )
+    settings.add("screen-dim",
+      "Zoom factor. Valued accepted are 1 and 2",
+      (f:Int) => if (f == 1 || f == 2) {
+        vicZoom(f)
+        zoomOverride = true
       }
     )
   }
@@ -1344,7 +1389,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       "Enabled/disable driver 9",
       "DRIVE_9_ENABLED",
       (d9e:Boolean) => {
-        enableDrive(1,d9e)
+        enableDrive(1,d9e,false)
       },
       drivesEnabled(1)
     )
@@ -2070,6 +2115,33 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         }
       },
       brItem.isSelected
+    )
+  }
+
+  protected def setVICModel(parent:JMenu) : Unit = {
+    val vicModelItem = new JMenu("VIC model")
+    val group = new ButtonGroup
+    val palItem = new JRadioButtonMenuItem("PAL (6569)")
+    val ntscItem = new JRadioButtonMenuItem("NTSC (6567R8)")
+    group.add(palItem)
+    group.add(ntscItem)
+    vicModelItem.add(palItem)
+    vicModelItem.add(ntscItem)
+    palItem.addActionListener( _ => setVICModel(VICType.PAL) )
+    palItem.setSelected(true)
+    ntscItem.addActionListener( _ => setVICModel(VICType.NTSC) )
+    parent.add(vicModelItem)
+
+    settings.add("ntsc",
+      s"Set ntsc video standard",
+      "VIDEO_NTSC",
+      (set: Boolean) => {
+        if (set) {
+          setVICModel(VICType.NTSC,true)
+          ntscItem.setSelected(true)
+        }
+      },
+      ntscItem.isSelected
     )
   }
 }

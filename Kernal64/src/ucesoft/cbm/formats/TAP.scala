@@ -3,6 +3,8 @@ package ucesoft.cbm.formats
 import java.io._
 import java.nio.file.Files
 
+import ucesoft.cbm.Clock
+
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 
@@ -74,8 +76,8 @@ object TAP {
   private val END_DATA = N << 8 | Z
   private val TOL = 5
 
-  final val COUNTER_PERIOD = 2.99d * 985248
-  final val FAST_FORWARD_PERIOD = math.round(COUNTER_PERIOD / 12.0)
+  def COUNTER_PERIOD : Double = 2.99d * Clock.systemClock.PAL_CLOCK_HZ
+  def FAST_FORWARD_PERIOD : Long = math.round(COUNTER_PERIOD / 12.0)
 
   case class TAPHeader(fileType:String,fileName:String,tapOffset:Long,counter:Int = 0) {
     override def toString : String = fileName

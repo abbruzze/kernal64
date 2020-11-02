@@ -181,7 +181,7 @@ class C64 extends CBMComputer {
       case Some(f) =>
         handleDND(new File(f),false,true)
     }
-    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive _,attachDisk(_,_,true),attachDiskFile(_,_,_,None),drivesEnabled)
+    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,true),attachDiskFile(_,_,_,None),drivesEnabled)
   }
   
   override def afterInitHook  : Unit = {
@@ -236,11 +236,11 @@ class C64 extends CBMComputer {
   override def isHeadless = headless
 
   // ======================================== Settings ==============================================
-  protected def enableDrive(id:Int,enabled:Boolean) : Unit = {
+  override protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
     drivesEnabled(id) = enabled
     drives(id).setActive(enabled)
     driveLeds(id).setVisible(enabled)
-    adjustRatio
+    if (updateFrame) adjustRatio
   }
 
   protected def setDisplayRendering(hints:java.lang.Object) : Unit = {
@@ -305,18 +305,6 @@ class C64 extends CBMComputer {
     }
   }
   
- private def zoom(f:Int) : Unit = {
-    val dim = new Dimension(vicChip.VISIBLE_SCREEN_WIDTH * f,vicChip.VISIBLE_SCREEN_HEIGHT * f)
-    updateScreenDimension(dim)
-  }
-
-  private def updateScreenDimension(dim:Dimension): Unit = {
-    display.setPreferredSize(dim)
-    display.invalidate
-    display.repaint()
-    displayFrame.pack
-  }
-
   protected def savePrg : Unit = {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
@@ -387,7 +375,7 @@ class C64 extends CBMComputer {
     optionMenu.add(zoomItem)
     for(z <- 1 to 2) {
       val zoom1Item = new JRadioButtonMenuItem(s"Zoom x $z")
-      zoom1Item.addActionListener(_ => zoom(z) )
+      zoom1Item.addActionListener(_ => vicZoom(z) )
       val kea = z match {
         case 1 => java.awt.event.KeyEvent.VK_1
         case 2 => java.awt.event.KeyEvent.VK_2
@@ -403,6 +391,8 @@ class C64 extends CBMComputer {
     val vicDisplayEffectsItem = new JMenuItem("VIC's display effects ...")
     vicItem.add(vicDisplayEffectsItem)
     vicDisplayEffectsItem.addActionListener(_ => DisplayEffectPanel.createDisplayEffectPanel(displayFrame,display,"VIC").setVisible(true))
+
+    setVICModel(vicItem)
 
     setFullScreenSettings(optionMenu)
     // -----------------------------------
@@ -500,18 +490,7 @@ class C64 extends CBMComputer {
     optionMenu.add(romItem)
     romItem.addActionListener( _ => ROMPanel.showROMPanel(displayFrame,configuration,true,false,() => saveSettings(false)) )
   }
-  
-  override protected def setGlobalCommandLineOptions : Unit = {
-    super.setGlobalCommandLineOptions
-    settings.add("screen-dim",
-      "Zoom factor. Valued accepted are 1 and 2",
-      (f:Int) => if (f == 1 || f == 2) {
-        zoom(f)
-        zoomOverride = true
-      }
-    )
-  }
-  
+
   def turnOff  : Unit = {
     if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
     for(d <- drives)
@@ -593,7 +572,7 @@ class C64 extends CBMComputer {
     swing { displayFrame.pack }
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
-      swing { updateScreenDimension(new Dimension(dim(0),dim(1))) }
+      swing { updateVICScreenDimension(new Dimension(dim(0),dim(1))) }
     }
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }

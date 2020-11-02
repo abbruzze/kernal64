@@ -77,7 +77,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     interlacedDisplayImage.setAnimated(true);
     interlacedDisplayImage.setFullBufferUpdates(false)
     interlacedScreen = createImage(interlacedDisplayImage)
-    setInterlaceMode(interlaced)    
+    setInterlaceMode(interlaced)
   }
   
   def setRenderingHints(hints:java.lang.Object) {
@@ -163,7 +163,6 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       case None => this.remote = null
     }    
   }
-  def getDisplayDimension = new Dimension(width,height)
 
   def setClipArea(x1: Int, y1: Int, x2: Int, y2: Int) {
     clipArea = (new Point(x1, y1), new Point(x2, y2))
