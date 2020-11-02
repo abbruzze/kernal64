@@ -55,9 +55,13 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   @volatile private[this] var suspended = true
   @volatile private[this] var suspendedConfim = false
   private[this] val suspendedLock = new Object
+  private[this] var changeFrequencyListenerList : List[Double => Unit] = Nil
+
+  final val PAL_CLOCK_HZ = 985248.0d
+  final val NTSC_CLOCK_HZ = 1022730.0d
 
   // ------ PERFORMANCE MANAGEMENT -------------
-  final private[this] val DEFAULT_CLOCK_HZ = 985248.0
+  final private[this] val DEFAULT_CLOCK_HZ = PAL_CLOCK_HZ
   private[this] var C64_CLOCK_HZ = DEFAULT_CLOCK_HZ
   private[this] var C64_CLOCK_HZ_DIV_1000 = DEFAULT_CLOCK_HZ / 1000
   private[this] var C64_CLOCK_HZ_INV_BY_1000 = 1000 / DEFAULT_CLOCK_HZ
@@ -73,18 +77,25 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   // -------------------------------------------
   private[this] var limitCycles = -1L
 
-  def limitCyclesTo(cycles:Long) = limitCycles = cycles
+  def limitCyclesTo(cycles:Long) : Unit = limitCycles = cycles
 
-  def setDefaultClockHz = setClockHz(DEFAULT_CLOCK_HZ)
+  def setDefaultClockHz : Unit = setClockHz(DEFAULT_CLOCK_HZ)
 
-  def setClockHzSpeedFactor(f:Double) = setClockHz(DEFAULT_CLOCK_HZ * f)
+  def setClockHzSpeedFactor(f:Double) : Unit = setClockHz(DEFAULT_CLOCK_HZ * f)
 
-  def getClockHz = C64_CLOCK_HZ
+  def getClockHz : Double = C64_CLOCK_HZ
 
   def setClockHz(hz:Double) : Unit = {
     C64_CLOCK_HZ = hz
     C64_CLOCK_HZ_DIV_1000 = hz / 1000
     C64_CLOCK_HZ_INV_BY_1000 = 1000 / hz
+
+    // notifies listeners
+    changeFrequencyListenerList foreach { _(hz) }
+  }
+
+  def addChangeFrequencyListener(l: Double => Unit) : Unit = {
+    changeFrequencyListenerList ::= l
   }
 
   private[this] var cycles = 0L

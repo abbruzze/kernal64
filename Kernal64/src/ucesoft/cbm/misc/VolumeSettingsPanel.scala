@@ -33,6 +33,6 @@ class VolumeSettingsPanel(driver:AudioDriverDevice) extends JPanel with ChangeLi
   
   def stateChanged(e:ChangeEvent) = if (!slider.getValueIsAdjusting) {
     if (e.getSource == slider) driver.setMasterVolume(slider.getValue)
-    if (e.getSource == mute) driver.setSoundOn(!mute.isSelected)
+    if (e.getSource == mute) driver.setMuted(mute.isSelected)
   }
 }

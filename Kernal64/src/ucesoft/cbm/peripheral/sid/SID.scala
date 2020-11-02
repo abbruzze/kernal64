@@ -14,9 +14,9 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   override lazy val componentID = "SID_" + sidID
   private[this] final val endAddress = startAddress + 0x20
   private[this] final val SAMPLE_RATE = 44100
-  private[this] final val CPU_FREQ = 985248
-  private[this] final val CLOCKS_PER_SAMPLE = CPU_FREQ / SAMPLE_RATE
-  private[this] final val CLOCKS_PER_SAMPLE_REST = ((CPU_FREQ * 1000L) / SAMPLE_RATE).toInt - CLOCKS_PER_SAMPLE * 1000
+  private[this] var CPU_FREQ = 985248
+  private[this] var CLOCKS_PER_SAMPLE = CPU_FREQ / SAMPLE_RATE
+  private[this] var CLOCKS_PER_SAMPLE_REST = ((CPU_FREQ * 1000L) / SAMPLE_RATE).toInt - CLOCKS_PER_SAMPLE * 1000
   
   val id = ChipID.SID
   val name = "SID"
@@ -28,10 +28,14 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   private[this] val sid = {
     val sid = new RESID
     sid.set_chip_model(ISIDDefs.chip_model.MOS6581)
-    sid.set_sampling_parameters(CPU_FREQ,ISIDDefs.sampling_method.SAMPLE_FAST, SAMPLE_RATE,-1, 0.97)
+    //sid.set_sampling_parameters(CPU_FREQ,ISIDDefs.sampling_method.SAMPLE_FAST, SAMPLE_RATE,-1, 0.97)
     sid.enable_filter(true)
     sid
   }
+
+  setCPUFrequency(Clock.systemClock.getClockHz)
+  Clock.systemClock.addChangeFrequencyListener(setCPUFrequency _)
+
   private[this] val POTX_OFS = 0x19
   private[this] val POTY_OFS = 0x1A
   private[this] var mouseEnabled = false
@@ -51,6 +55,18 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     def addSample(sample:Int) = driver.addSample(sample)
     def reset = driver.reset
     def discard = driver.discard
+    def setMuted(muted: Boolean): Unit = driver.setMuted(muted)
+    def isMuted : Boolean = driver.isMuted
+
+    override def isSoundOn: Boolean = driver.isSoundOn
+  }
+
+  def setCPUFrequency(f:Double) : Unit = {
+    CPU_FREQ = f.toInt
+    CLOCKS_PER_SAMPLE = CPU_FREQ / SAMPLE_RATE
+    CLOCKS_PER_SAMPLE_REST = ((CPU_FREQ * 1000L) / SAMPLE_RATE).toInt - CLOCKS_PER_SAMPLE * 1000
+    sid.set_sampling_parameters(CPU_FREQ,ISIDDefs.sampling_method.SAMPLE_FAST, SAMPLE_RATE,-1, 0.97)
+    if (sid2 != null) sid2.setCPUFrequency(f)
   }
 
   def setCycleExact(ce:Boolean): Unit = {
@@ -182,11 +198,13 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     }
   }
   def start {
-    driver.setSoundOn(true)
-    nextRest = 0
-    nextSample = 0
-    removeSample = false
-    driver.reset
+    if (!driver.isMuted) {
+      driver.setSoundOn(true)
+      nextRest = 0
+      nextSample = 0
+      removeSample = false
+      driver.reset
+    }
     if (!cycleExact) Clock.systemClock.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 5,sidEventCallBack))
     lastCycles = Clock.systemClock.currentCycles
   }
