@@ -35,6 +35,8 @@ final class VIC(mem: VICMemory,
     xCoord = model.XCOORD
   }
 
+  override def getVICModel : VICModel = model
+
   // ----------------------- Constants --------------------------------------------------------------------
   final private[this] val LEFT_RIGHT_FF_COMP = Array(Array(0x1F, 0x14F), Array(0x18, 0x158)) // first index is CSEL's value 0 or 1, second index is 0=left, 1=right
   final private[this] val TOP_BOTTOM_FF_COMP = Array(Array(0x37, 0xF7), Array(0x33, 0xFB)) // first index is RSEL's value 0 or 1, second index is 0=top, 1=bottom
@@ -1266,9 +1268,9 @@ final class VIC(mem: VICMemory,
         val first = (sprInfo & (1 << 16)) > 0
         sprites(sprite - 1).readMemoryData(first)
       }
-      else if (!refreshCycle) idleAccess
+      else if (!refreshCycle && dataToDraw == -1) mem.read(0x3FFF,ChipID.VIC)
       val ba = sprInfo & 0xFF
-      if (ba != 0xFF) setBaLow((spriteDMAon & ba) > 0)
+      setBaLow((spriteDMAon & ba) > 0)
     }
     // ----------------------------------------------
 
@@ -1648,7 +1650,7 @@ final class VIC(mem: VICMemory,
   }
 
   override def isAECAvailable: Boolean = {
-    val baLowNext = baOnCycle(if (rasterCycle < 63) rasterCycle + 1 else 1)
+    val baLowNext = baOnCycle(if (rasterCycle < model.RASTER_CYCLES) rasterCycle + 1 else 1)
     if (!baLowNext) true
     else {
       if (!_baLow) true // first cycle ba goes down
@@ -1657,50 +1659,17 @@ final class VIC(mem: VICMemory,
   }
 
   private def baOnCycle(rasterCycle:Int) : Boolean = {
-    rasterCycle match {
-      case 1 =>
-        (spriteDMAon & 0x18) > 0
-      case 2 =>
-        (spriteDMAon & 0x38) > 0
-      case 3 =>
-        (spriteDMAon & 0x30) > 0
-      case 4 =>
-        (spriteDMAon & 0x70) > 0
-      case 5 =>
-        (spriteDMAon & 0x60) > 0
-      case 6 =>
-        (spriteDMAon & 0xE0) > 0
-      case 7 =>
-        (spriteDMAon & 0xC0) > 0
-      case 8 =>
-        _baLow
-      case 9 =>
-        (spriteDMAon & 0x80) > 0
-      case 10 =>
-        (spriteDMAon & 0x80) > 0
-      case 11 =>
-        false
-      case 55 =>
-        !sprites(0).dma && sprites(0).isReadyForDMA
-      case 56 =>
-        !sprites(0).dma && sprites(0).isReadyForDMA
-      case 57 =>
-        (spriteDMAon & 0x03) > 0
-      case 58 =>
-        (spriteDMAon & 0x03) > 0
-      case 59 =>
-        (spriteDMAon & 0x07) > 0
-      case 60 =>
-        (spriteDMAon & 0x06) > 0
-      case 61 =>
-        (spriteDMAon & 0x0E) > 0
-      case 62 =>
-        (spriteDMAon & 0x0C) > 0
-      case 63 =>
-        (spriteDMAon & 0x1C) > 0
-      case _ => // 12 - 54
-        badLine
+    val sprInfo = model.SPRITE_BA_INFO(rasterCycle)
+    if ((sprInfo & (1 << 17)) == 0) {
+      val ba = sprInfo & 0xFF
+      rasterCycle match {
+        case 55|56 =>
+          ba > 0 && !sprites(ba - 1).dma && sprites(ba - 1).isReadyForDMA
+        case _ =>
+          (spriteDMAon & ba) > 0
+      }
     }
+    else badLine
   }
 }
 

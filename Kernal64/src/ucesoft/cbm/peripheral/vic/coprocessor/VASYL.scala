@@ -4,6 +4,7 @@ import java.io.{ObjectInputStream, ObjectOutputStream}
 
 import ucesoft.cbm.cpu.CPU65xx.CPUPostponeReadException
 import ucesoft.cbm.cpu.{CPU65xx, Memory}
+import ucesoft.cbm.peripheral.vic.VICType
 import ucesoft.cbm.{CBMComponentType, ChipID, Log}
 
 class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends VICCoprocessor with Memory {
@@ -15,7 +16,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   override val componentID: String = "VASYL"
   override val componentType: CBMComponentType.Type = CBMComponentType.INTERNAL
 
-  private[this] final val VERSION = "00011110".b // 0-2 PAL, 3-7 version
+  private[this] final val VERSION = "00011000".b // 0-2 Video System PAL/NTSC to be filled using VIC model, 3-7 version
 
   private[this] val lastCPUMem : Memory = cpu.getMemory
 
@@ -195,7 +196,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
       if (trace) tracedInstr = s"DELAYH ${h_arg.toHexString}${if (v_arg != 0) s",${v_arg.toHexString}" else ""}"
 
       if (h_arg == 0) h_arg = 1
-      h_arg = (h_arg + rasterCycle - 2) % 62 // 0-based, 1 cycle already consumed
+      h_arg = (h_arg + rasterCycle - 2) % (vicCtx.getVICModel.RASTER_CYCLES - 1) // 0-based, 1 cycle already consumed
       rasterCounter = rasterLine + v_arg
     }
 
@@ -529,7 +530,10 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
         case 0x3D =>
           portWriteReps(1)
         case 0x3E =>
-          VERSION
+          VERSION | (vicCtx.getVICModel.VIC_TYPE match {
+            case VICType.PAL => "110".b
+            case VICType.NTSC => "000".b
+          })
         case _ =>
           regs(reg)
       }
@@ -586,8 +590,8 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   final def isActive : Boolean = beamRacerActiveState == 2
 
-  @inline private def adjustCurrentRasterCycle(rasterCycle:Int) : Int = if (rasterCycle == 63) 1 else rasterCycle + 1
-  @inline private def adjustCurrentRasterLine(rasterCycle:Int,rasterLine:Int) : Int = if (rasterCycle == 63) (rasterLine + 1) % 312 else rasterLine
+  @inline private def adjustCurrentRasterCycle(rasterCycle:Int) : Int = if (rasterCycle == vicCtx.getVICModel.RASTER_CYCLES) 1 else rasterCycle + 1
+  @inline private def adjustCurrentRasterLine(rasterCycle:Int,rasterLine:Int) : Int = if (rasterCycle == vicCtx.getVICModel.RASTER_CYCLES) (rasterLine + 1) % vicCtx.getVICModel.RASTER_LINES else rasterLine
 
   final def cycle(_rasterLine:Int,_rasterCycle:Int) : Unit = {
     rasterCycle = adjustCurrentRasterCycle(_rasterCycle)
@@ -675,7 +679,6 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     }
     //=========================================================
   }
-
   final def g_access(rasterCycle:Int) : Int = {
     if (beamRacerActiveState == 2 && seq_active && rasterCycle >= seq_cycle_start + 1 && rasterCycle < seq_cycle_stop + 1) {
       val gdata = banks(seq_bank)(seq_bitmap_pointer)
