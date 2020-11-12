@@ -59,9 +59,9 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
   private def checkDelay : Unit = {
     try {
       delayInMillis = delayTextField.getText.toInt
-      if (delayInMillis < 100) {
-        delayInMillis = 100
-        delayTextField.setText("100")
+      if (delayInMillis < 20) {
+        delayInMillis = 20
+        delayTextField.setText("20")
       }
     }
     catch {
