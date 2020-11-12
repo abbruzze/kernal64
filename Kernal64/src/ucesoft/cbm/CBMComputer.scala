@@ -1630,9 +1630,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     peptoPalItem.addActionListener(_ => Palette.setPalette(PaletteType.PEPTO) )
     paletteItem.add(peptoPalItem)
     groupP.add(peptoPalItem)
+    val colordorePalItem = new JRadioButtonMenuItem("Colodore")
+    colordorePalItem.addActionListener(_ => Palette.setPalette(PaletteType.COLORDORE) )
+    paletteItem.add(colordorePalItem)
+    groupP.add(colordorePalItem)
+
     // Setting ---------------------------
     settings.add("vic-palette",
-      "Set the palette type (bright,vice,pepto)",
+      "Set the palette type (bright,vice,pepto,colodore)",
       "PALETTE",
       (dt:String) => {
         dt match {
@@ -1645,15 +1650,17 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
           case "pepto" =>
             Palette.setPalette(PaletteType.PEPTO)
             peptoPalItem.setSelected(true)
+          case "colodore" =>
+            Palette.setPalette(PaletteType.COLORDORE)
+            colordorePalItem.setSelected(true)
           case _ =>
         }
       },
       if (brightPalItem.isSelected) "bright"
-      else
-        if (vicePalItem.isSelected) "vice"
-        else
-          if (peptoPalItem.isSelected) "pepto"
-          else "bright"
+      else if (vicePalItem.isSelected) "vice"
+      else if (peptoPalItem.isSelected) "pepto"
+      else if (colordorePalItem.isSelected) "colodore"
+      else "bright"
     )
     settings.add("rendering-type",
       "Set the rendering type (default,bilinear,bicubic)",
@@ -2143,6 +2150,26 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         }
       },
       ntscItem.isSelected
+    )
+  }
+
+  protected def setVICBorderMode(parent:JMenu) : Unit = {
+    val borderItem = new JMenu("Border mode")
+    val borderOnItem = new JCheckBoxMenuItem("Draw border")
+    borderOnItem.setSelected(true)
+    borderItem.add(borderOnItem)
+    borderOnItem.addActionListener( _ => vicChip.setDrawBorder(borderOnItem.isSelected) )
+    parent.add(borderItem)
+    borderOnItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_B,java.awt.event.InputEvent.ALT_DOWN_MASK))
+
+    settings.add("vic-border-off",
+      s"Doesn't draw VIC's borders",
+      "VIC_BORDER_MODE",
+      (on: Boolean) => {
+        vicChip.setDrawBorder(!on)
+        borderOnItem.setSelected(!on)
+      },
+      !borderOnItem.isSelected
     )
   }
 }

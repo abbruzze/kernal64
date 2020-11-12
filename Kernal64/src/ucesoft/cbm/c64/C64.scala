@@ -394,6 +394,8 @@ class C64 extends CBMComputer {
 
     setVICModel(vicItem)
 
+    setVICBorderMode(vicItem)
+
     setFullScreenSettings(optionMenu)
     // -----------------------------------
     

@@ -88,6 +88,8 @@ final class VIC(mem: VICMemory,
   private[this] var ref = 0
   private[this] var rasterIRQTriggered = false
   private[this] var xCoord : Array[Int] = _
+  private[this] var drawBorderOpt = true
+  private[this] var pendingDrawBorderModeChange = false
   // --------------------- DEBUG --------------------------------------------------------------------------
   private[this] var traceRasterLineInfo = false
   final private[this] val traceRasterLineBuffer = Array.fill(SCREEN_WIDTH)("")
@@ -541,12 +543,12 @@ final class VIC(mem: VICMemory,
     private[this] var lastBorderColor = -1
     //private[this] var drawBorder = false
 
-    def init {}
+    def init : Unit = {}
     def reset : Unit = {}
 
-    final def getPixels = if (isBlank/* || !drawBorder*/) ALL_TRANSPARENT else pixels
+    final def getPixels : Array[Int] = if (isBlank || !drawBorderOpt/* || !drawBorder*/) ALL_TRANSPARENT else pixels
 
-    final def producePixels {
+    final def producePixels  : Unit = {
       // optimization
       /*
       drawBorder = !den ||
@@ -556,6 +558,9 @@ final class VIC(mem: VICMemory,
       if (!drawBorder) return
       */
       // if we're surely inside the gfx area, the border pixels are the same as previous cycle
+
+      if (!drawBorderOpt) return
+
       val inSideGfx = false//!is8565 && rasterCycle > 17 && rasterCycle < 53 && lastBorderColor == borderColor
       if (!isBlank && !inSideGfx) {
         var xcoord = xCoord(rasterCycle)
@@ -883,6 +888,11 @@ final class VIC(mem: VICMemory,
     lastBackground = 0
 
     if (coprocessor != null) coprocessor.reset
+  }
+
+  def setDrawBorder(on:Boolean) : Unit = {
+    drawBorderOpt = on
+    pendingDrawBorderModeChange = true
   }
 
   def setCoprocessor(cop:VICCoprocessor) : Unit = {
@@ -1304,6 +1314,13 @@ final class VIC(mem: VICMemory,
       ref = 0xFF
       vcbase = 0
       vc = 0
+      if (pendingDrawBorderModeChange) {
+        pendingDrawBorderModeChange = false
+        if (!drawBorderOpt) {
+          mainBorderFF = false
+          verticalBorderFF = false
+        }
+      }
     }
   }
 

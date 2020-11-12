@@ -721,6 +721,8 @@ class C128 extends CBMComputer with MMUChangeListener {
       groupZ.add(zoom1Item)
     }
 
+    setVICBorderMode(vicAdjMenu)
+
     setFullScreenSettings(adjustMenu)
     
     val renderingItem = new JMenu("Rendering")

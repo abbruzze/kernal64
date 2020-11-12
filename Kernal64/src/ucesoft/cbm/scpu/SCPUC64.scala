@@ -413,6 +413,7 @@ class SCPUC64 extends CBMComputer {
     optionMenu.add(vicItem)
     setRenderingSettings(vicItem)
     setVICModel(vicItem)
+    setVICBorderMode(vicItem)
 
     setFullScreenSettings(optionMenu)
     // -----------------------------------
