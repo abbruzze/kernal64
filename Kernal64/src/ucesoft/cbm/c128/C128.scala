@@ -180,8 +180,14 @@ class C128 extends CBMComputer with MMUChangeListener {
     val resRootPanel = new JPanel(new BorderLayout())
     val resPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
     val resLabel = new JLabel("Initializing ...")
+    val adaptResolutionCheck = new JCheckBox("AMSR")
+    adaptResolutionCheck.setToolTipText("Adapt monitor's height to screen resolution")
+    adaptResolutionCheck.setSelected(true)
+    adaptResolutionCheck.setFocusable(false)
+    adaptResolutionCheck.addActionListener( _ => vdc.setAdaptScreenResolution(adaptResolutionCheck.isSelected) )
     resPanel.add(resLabel)
     resRootPanel.add("West",resPanel)
+    resRootPanel.add("East",adaptResolutionCheck)
     vdcDisplayFrame.getContentPane.add("South",resRootPanel)
     vdc.setGeometryUpdateListener { msg =>
       resLabel.setText(msg)
@@ -237,8 +243,8 @@ class C128 extends CBMComputer with MMUChangeListener {
     add(lightPen)
     display.addMouseListener(lightPen)    
     // tracing
-    traceDialog = TraceDialog.getTraceDialog(displayFrame,mmu,z80,display,vicChip)
-    diskTraceDialog = TraceDialog.getTraceDialog(displayFrame,drives(0).getMem,drives(0))    
+    traceDialog = TraceDialog.getTraceDialog("CPU Debugger",displayFrame,mmu,z80,display,vicChip)
+    diskTraceDialog = TraceDialog.getTraceDialog("Disk8 Debugger",displayFrame,drives(0).getMem,drives(0))
     //diskTraceDialog.forceTracing(true)
     // drive leds
     add(driveLeds(0))        
@@ -937,7 +943,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     // check help
     if (settings.checkForHelp(args)) {
       println(s"Kernal64, Commodore 128 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
-      settings.printUsage
+      settings.printUsage("file to attach")
       sys.exit(0)
     }
     swing{ initComponent }

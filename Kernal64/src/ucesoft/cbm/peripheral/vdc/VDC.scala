@@ -140,6 +140,7 @@ class VDC extends RAMComponent {
   private[this] var blankMode = false
   private[this] var rowCounter,rowCounterY = 0
   private[this] var verticalAdjFlag = 0
+  private[this] var adaptScreenResolution = true
   // caches
   private[this] val gfxBuffer = Array.ofDim[Int](256)
   private[this] val attrBuffer = Array.ofDim[Int](256)
@@ -213,6 +214,11 @@ class VDC extends RAMComponent {
   }
 
   // =====================================================
+  def setAdaptScreenResolution(adapt:Boolean) : Unit = {
+    adaptScreenResolution = adapt
+    if (!adapt) adaptScreenTo(SCREEN_HEIGHT)
+  }
+
   def setDeinterlaceMode(on:Boolean) : Unit = {
     deinterlaceMode = on
     writeOnPrevFrame = true
@@ -371,9 +377,9 @@ class VDC extends RAMComponent {
         if (ychars_total == 0) {
           if (ypos == 0) {
             ram_base_offset = 34 * regs(1)
-            attr_offset = regs(1)
+            //attr_offset = regs(1)
           }
-          else attr_offset = 3
+          //else attr_offset = 3
 
           updateGeometry
         }
@@ -528,6 +534,7 @@ class VDC extends RAMComponent {
     attr_adr = regs(20) << 8 | regs(21)
     ram_base_ptr = ram_adr
     attr_base_ptr = attr_adr
+    if (regs(27) > 0) attr_base_ptr += 1
   }
 
   @inline private def vsync : Unit = {
@@ -615,6 +622,7 @@ class VDC extends RAMComponent {
       ypos += 1
       if (videoMode != VideoMode.IDLE) attr_base_ptr += virtualScreenWidth
       if (videoMode == VideoMode.TEXT) ram_base_ptr += virtualScreenWidth
+      if (regs(27) > 0 && videoMode == VideoMode.BITMAP && ypos == 1) attr_base_ptr += regs(27) - 2
     }
 
     rowCounterY = (rowCounterY + 1)// & 0x1F
@@ -709,12 +717,14 @@ class VDC extends RAMComponent {
     if (interlaceMode) newScreenHeight >>= 1
     val currentHeight = if (interlaceMode) screenHeight >> 1 else screenHeight
     // don't know if the screen height must be checked on every frame
-    if (newScreenHeight > MIN_HEIGHT && newScreenHeight < MAX_HEIGHT && newScreenHeight != currentHeight) {
-      setScanLines(newScreenHeight)
-      //println(s"New screen height: $newScreenHeight")
-      if (borderWidth < X_LEFT_CLIP_COLS) display.setClipArea(borderWidth,Y_TOP_CLIP_ROWS,screenWidth,screenHeight - Y_BOTTOM_CLIP_ROWS)
-      else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS * (if (interlaceMode) 2 else 1),screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS * (if (interlaceMode) 2 else 1))
-    }
+    if (adaptScreenResolution && newScreenHeight > MIN_HEIGHT && newScreenHeight < MAX_HEIGHT && newScreenHeight != currentHeight) adaptScreenTo(newScreenHeight)
+  }
+
+  @inline private def adaptScreenTo(newScreenHeight:Int) : Unit = {
+    setScanLines(newScreenHeight)
+    //println(s"New screen height: $newScreenHeight")
+    if (borderWidth < X_LEFT_CLIP_COLS) display.setClipArea(borderWidth,Y_TOP_CLIP_ROWS,screenWidth,screenHeight - Y_BOTTOM_CLIP_ROWS)
+    else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS * (if (interlaceMode) 2 else 1),screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS * (if (interlaceMode) 2 else 1))
   }
 
   @inline private def fetchGFXAndAttrs : Unit = {
