@@ -138,8 +138,8 @@ class SCPUC64 extends CBMComputer {
     val lightPen = new LightPenButtonListener
     add(lightPen)
     display.addMouseListener(lightPen)
-    traceDialog = TraceDialog.getTraceDialog(displayFrame, mmu, cpu, display, vicChip)
-    diskTraceDialog = TraceDialog.getTraceDialog(displayFrame, drives(0).getMem, drives(0))
+    traceDialog = TraceDialog.getTraceDialog("CPU Debugger",displayFrame, mmu, cpu, display, vicChip)
+    diskTraceDialog = TraceDialog.getTraceDialog("Drive 8 Debugger",displayFrame, drives(0).getMem, drives(0))
     // drive leds
     add(driveLeds(0))
     add(driveLeds(1))
@@ -614,7 +614,7 @@ class SCPUC64 extends CBMComputer {
     // check help
     if (settings.checkForHelp(args)) {
       println(s"Kernal64, Commodore 64 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
-      settings.printUsage
+      settings.printUsage("file to attach")
       sys.exit(0)
     }
     swing {
