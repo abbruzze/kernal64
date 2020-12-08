@@ -582,7 +582,7 @@ final class VIC(mem: VICMemory,
     }
 
     @inline private def checkVertical: Unit = {
-      if (rasterCycle == model.RASTER_CYCLES) {
+      //if (rasterCycle == model.RASTER_CYCLES) {
         // 2 If the Y coordinate reaches the bottom comparison value in cycle 63, the
         //   vertical border flip flop is set.
         if (rasterLine == TOP_BOTTOM_FF_COMP(rsel)(1)) verticalBorderFF = true
@@ -591,7 +591,7 @@ final class VIC(mem: VICMemory,
         //   DEN bit in register $d011 is set, the vertical border flip flop is
         //   reset.
         if (rasterLine == TOP_BOTTOM_FF_COMP(rsel)(0) && den) verticalBorderFF = false
-      }
+      //}
     }
 
     @inline private def checkBorderFF(xcoord: Int) = {
