@@ -2,21 +2,29 @@ package ucesoft.cbm.cpu
 
 import util.parsing.combinator._
 import java.io.Reader
+
 import javax.swing.JFrame
 import javax.swing.JTextArea
 import java.awt.Font
+
 import javax.swing.JButton
 import javax.swing.JPanel
 import javax.swing.JDialog
 import java.awt.event.ActionListener
 import java.awt.event.ActionEvent
+
 import javax.swing.JFileChooser
 import java.io.PrintWriter
 import java.io.FileWriter
 import java.io.StringReader
+
 import javax.swing.JOptionPane
 import java.awt.Color
+
 import javax.swing.JScrollPane
+import org.fife.ui.rsyntaxtextarea.{RSyntaxTextArea, SyntaxConstants}
+import org.fife.ui.rtextarea.RTextScrollPane
+
 import scala.language.postfixOps
 
 class AssemblerException(msg: String) extends Exception(msg)
@@ -258,7 +266,8 @@ object Assembler {
   */
   def getAssemblerDialog(parent:JFrame,mem:Memory) = {
     val assembler = new Assembler
-    val textArea = new JTextArea(20,50)
+    val textArea = new RSyntaxTextArea(20,50)
+    textArea.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_ASSEMBLER_6502)
     val al = new ActionListener {
       def actionPerformed(e:ActionEvent) : Unit = {
         e.getActionCommand match {
@@ -311,7 +320,7 @@ object Assembler {
     buttonPanel.add(compile)
     val dialog = new JDialog(parent,"Assembler")
     dialog.getContentPane.add("North",buttonPanel)
-    dialog.getContentPane.add("Center",new JScrollPane(textArea))
+    dialog.getContentPane.add("Center",new RTextScrollPane(textArea))
     dialog.pack
     dialog
   }

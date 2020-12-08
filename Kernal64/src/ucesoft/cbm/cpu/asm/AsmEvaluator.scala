@@ -4,6 +4,7 @@ import scala.collection.mutable.Buffer
 
 object AsmEvaluator {
   import AsmParser._
+  import Formats._
 
   // ====================== EVALUATION ===============================
   sealed trait RuntimeValue {
@@ -27,6 +28,11 @@ object AsmEvaluator {
     )
   }
   case class NumberVal(n: Double) extends RuntimeValue {
+    override protected val fields : Map[(String,Int),List[RuntimeValue] => RuntimeValue] = super.fields ++ Map(
+      ("toHexString",0) -> (_ => StringVal(n.toInt.toHexString)),
+      ("toBinaryString",0) -> (_ => StringVal(n.toInt.toBinaryString) )
+      )
+
     override def toString = if (n.isValidInt) n.toInt.toString else n.toString
   }
   case class StringVal(s: String) extends RuntimeValue {
@@ -36,6 +42,7 @@ object AsmEvaluator {
         ("toInt",0) -> ((l:List[RuntimeValue]) => NumberVal(s.toInt)),
         ("toHexInt",0) -> ((l:List[RuntimeValue]) => NumberVal(Integer.parseInt(s,16))),
         ("at",1) -> ((l:List[RuntimeValue]) => at(l.head)),
+        ("toChar",0) -> ((l:List[RuntimeValue]) => NumberVal(s.charAt(0))),
         ("size",0) -> ((l:List[RuntimeValue]) => NumberVal(s.length))
     )
     private def at(i:RuntimeValue) : RuntimeValue = {
@@ -48,13 +55,15 @@ object AsmEvaluator {
   case class ListVal(list:Buffer[RuntimeValue]) extends RuntimeValue {
     override def toString = list.mkString("[", ",", "]")
     override protected val fields : Map[(String,Int),List[RuntimeValue] => RuntimeValue] = super.fields ++ Map(
-        ("size",0) -> ((l:List[RuntimeValue]) => NumberVal(list.length)),
+        ("size",0) -> ((_:List[RuntimeValue]) => NumberVal(list.length)),
         ("get",1) -> ((l:List[RuntimeValue]) => get(l.head)),
         ("set",2) -> ((l:List[RuntimeValue]) => set(l(0),l(1))),
-        ("head",0) -> ((l:List[RuntimeValue]) => list.head),
-        ("tail",0) -> ((l:List[RuntimeValue]) => ListVal(list.tail)),
-        ("isEmpty",0) -> ((l:List[RuntimeValue]) => NumberVal(if (list.isEmpty) 1 else 0)),
-        ("add",1) -> ((l:List[RuntimeValue]) => ListVal(list ++ Array(l.head)))
+        ("head",0) -> ((_:List[RuntimeValue]) => list.head),
+        ("tail",0) -> ((_:List[RuntimeValue]) => ListVal(list.tail)),
+        ("isEmpty",0) -> ((_:List[RuntimeValue]) => NumberVal(if (list.isEmpty) 1 else 0)),
+        ("add",1) -> ((l:List[RuntimeValue]) => ListVal(list ++ Array(l.head))),
+        // sid
+        ("asSID",0) -> ((args:List[RuntimeValue]) => analyzeSID(this))
     )
     private def get(i:RuntimeValue) : RuntimeValue = {
       i match {
@@ -75,6 +84,28 @@ object AsmEvaluator {
         case _ => throw new EvaluationError(s"Type mismatch on method list::set: expected int")
       }
     }
+  }
+  case class MapVal(list:List[RuntimeValue]) extends RuntimeValue {
+    private val map : collection.mutable.HashMap[RuntimeValue,RuntimeValue] = new collection.mutable.HashMap[RuntimeValue,RuntimeValue]
+
+    map.addAll(list map { case ListVal(l) => (l.head,l.tail.head) })
+
+    override def toString = map.map { kv => s"[${kv._1},${kv._2}]" } mkString("#[", ",", "]")
+    override protected val fields : Map[(String,Int),List[RuntimeValue] => RuntimeValue] = super.fields ++ Map(
+      ("size",0) -> ((l:List[RuntimeValue]) => NumberVal(list.length)),
+      ("get",1) -> ((l:List[RuntimeValue]) => get(l.head)),
+      ("put",2) -> ((l:List[RuntimeValue]) => put(l(0),l(1))),
+      ("keys",0) -> ((l:List[RuntimeValue]) => keys),
+      ("values",0) -> ((l:List[RuntimeValue]) => values),
+      ("isEmpty",0) -> ((l:List[RuntimeValue]) => NumberVal(if (list.isEmpty) 1 else 0)),
+    )
+    private def get(i:RuntimeValue) : RuntimeValue = map.getOrElse(i,NullVal)
+    private def put(k:RuntimeValue,v:RuntimeValue) : RuntimeValue = {
+      map += k -> v
+      this
+    }
+    private def keys : RuntimeValue = ListVal(map.keys.toBuffer)
+    private def values : RuntimeValue = ListVal(map.values.toBuffer)
   }
   case class StructVal(structName: String,module:Option[String],fieldNames:List[String],map:collection.mutable.Map[String,RuntimeValue]) extends RuntimeValue {
     override def toString = structName + fieldNames.flatMap(map.get).mkString("{",",","}")
@@ -130,7 +161,7 @@ object AsmEvaluator {
   trait EvaluationContext {
     def console: String => Unit
     
-    def newStack(name:String,isLocal:Boolean,module:Option[String]) : EvaluationContext
+    def newStack(name:String,isLocal:Boolean,module:Option[String],applyCounter:Boolean) : EvaluationContext
     def pop : EvaluationContext
 
     def findLabel(label:String) : Option[Int]
@@ -163,6 +194,12 @@ object AsmEvaluator {
         case Null => NullVal
         case Value(v) => NumberVal(v)
         case Str(s) => StringVal(s)
+        case MapValue(keyVal) =>
+          for(kv <- keyVal) {
+            if (kv.elements.size != 2) throw new EvaluationError("Each map's element must be a list of size 2")
+          }
+          val elements = keyVal map eval
+          MapVal(elements)
         case ListValue(l, isRange) if !isRange => ListVal((l map eval).toBuffer)
         case ListValue(l, _) =>
           val min = eval(l(0))
@@ -292,7 +329,7 @@ object AsmEvaluator {
             case w@WillBeVal(_,_) => w
             case ListVal(l) =>
               val result = for(v <- l) yield {
-                ctx.newStack("gen",false,None)
+                ctx.newStack("gen",false,None,false)
                 try {
                   ctx.defineVar(x,None,v,true,false)
                   eval(e)
@@ -335,8 +372,8 @@ object AsmEvaluator {
       ("lsb",1) -> lohi(true),
       ("msb",1) -> lohi(false),
       ("if",3) -> ifFun,
-      ("time",0) -> (args => NumberVal(System.currentTimeMillis)),
-      ("rnd",0) -> (args => NumberVal(rnd.nextDouble)),
+      ("time",0) -> (_ => NumberVal(System.currentTimeMillis)),
+      ("rnd",0) -> (_ => NumberVal(rnd.nextDouble)),
       ("rnd",1) -> (args => NumberVal(rnd.nextInt(args2Numbers(args)(0).n.toInt))),
       ("cons",1) -> (args => ListVal(Array(args.head).toBuffer)),
       ("cons",2) -> (args => {
@@ -383,11 +420,11 @@ object AsmEvaluator {
                     in.read(buffer)                        
                   }
                   catch {
-                    case io:IOException =>
+                    case _:IOException =>
                       throw new EvaluationException(s"Error while loading file $fileName of import statement")
                   }
                   finally in.close
-                  ListVal(buffer map { NumberVal(_) } toBuffer)
+                  ListVal(buffer map { b => NumberVal(b.toInt & 0xFF) } toBuffer)
                 case _ =>
                   throw new EvaluationException(s"Cannot determine the size of import statement")
               }
