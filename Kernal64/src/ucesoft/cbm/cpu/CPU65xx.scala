@@ -8,6 +8,7 @@ import ucesoft.cbm.ChipID
 
 object CPU65xx {
   class CPUJammedException(val cpuID:ChipID.ID,val pcError:Int) extends Exception
+  class CPUPostponeReadException extends Exception
 
   object Instruction extends Enumeration {
     type CODE = Value
@@ -144,4 +145,8 @@ trait CPU65xx extends Chip with TraceListener {
   def setBaLow(low:Boolean) : Unit = {}
   def setDMA(dma:Boolean) : Unit = {}
   def isFetchingInstruction : Boolean
+
+  def getCurrentOpCode : Int
+  def getMemory : Memory
+  def setMemory(mem:Memory) : Unit
 }

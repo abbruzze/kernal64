@@ -1,6 +1,6 @@
 package ucesoft.cbm
 
-import java.awt.Color
+import java.awt.{Color, Dimension}
 import java.awt.event._
 import java.io._
 import java.util.zip.{GZIPInputStream, GZIPOutputStream}
@@ -23,8 +23,9 @@ import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.printer.{MPS803, MPS803GFXDriver, MPS803ROM}
 import ucesoft.cbm.peripheral.rs232._
-import ucesoft.cbm.peripheral.vic.Palette
+import ucesoft.cbm.peripheral.vic.{Palette, VICType, VIC_NTSC, VIC_PAL}
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
+import ucesoft.cbm.peripheral.vic.coprocessor.VASYL
 import ucesoft.cbm.peripheral.{controlport, keyboard, vic}
 import ucesoft.cbm.remote.RemoteC64
 import ucesoft.cbm.trace.{InspectPanelDialog, TraceDialog, TraceListener}
@@ -60,6 +61,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val CONFIGURATION_AUTOSAVE = "autosave"
 
   protected val PRG_RUN_DELAY_CYCLES = 2200000
+  protected var lastLoadedPrg : Option[File] = None
 
   // -------------- MENU ITEMS -----------------
   protected val maxSpeedItem = new JCheckBoxMenuItem("Warp mode")
@@ -99,15 +101,17 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   // main chips
   protected val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   protected var vicChip : vic.VIC = _
+  protected var vicZoomFactor : Int = 1
   protected var cia1,cia2 : CIA = _
   protected val cia12Running = Array(true,true)
   protected val sid = new ucesoft.cbm.peripheral.sid.SID
   protected var display : vic.Display = _
   protected var gifRecorder : JDialog = _
-  protected val nmiSwitcher = new NMISwitcher(cpu.nmiRequest _)
-  protected val irqSwitcher = new IRQSwitcher(cpu.irqRequest _)
+  protected val nmiSwitcher = new Switcher("NMI",cpu.nmiRequest _)//new NMISwitcher(cpu.nmiRequest _)
+  protected val irqSwitcher = new Switcher("IRQ",cpu.irqRequest _)//new IRQSwitcher(cpu.irqRequest _)
+  protected val dmaSwitcher = new Switcher("DMA",setDMA _)
   protected val keybMapper : keyboard.KeyboardMapper
-  protected lazy val keyb = new keyboard.Keyboard(keybMapper,nmiSwitcher.keyboardNMIAction _,!isC64Mode)	// key listener
+  protected lazy val keyb = new keyboard.Keyboard(keybMapper,nmiSwitcher.setLine(Switcher.KB,_),!isC64Mode)	// key listener
 
   protected val bus = new IECBus
   protected var dma = false
@@ -152,8 +156,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     TelnetRS232,
     TCPRS232,
     FileRS232,
-    SwiftLink.getSL(nmiSwitcher.expansionPortNMI,None),
-    SwiftLink.getSL(nmiSwitcher.expansionPortNMI _,Some(REU.getREU(REU.REU_1750,mmu,setDMA _,irqSwitcher.expPortIRQ _,None))),
+    SwiftLink.getSL(nmiSwitcher.setLine(Switcher.CRT,_),None),
+    SwiftLink.getSL(nmiSwitcher.setLine(Switcher.CRT,_),Some(REU.getREU(REU.REU_1750,mmu,dmaSwitcher.setLine(Switcher.CRT,_),irqSwitcher.setLine(Switcher.CRT,_),None))),
     ProcessRS232)
   // -------------------- PRINTER --------------
   protected var printerEnabled = false
@@ -245,11 +249,15 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def mainLoop(cycles:Long) : Unit
 
-  protected def reset(play:Boolean=true) : Unit = {
+  protected def reset(play:Boolean=true,loadAndRunLastPrg:Boolean = false) : Unit = {
     traceDialog.forceTracing(false)
     diskTraceDialog.forceTracing(false)
     if (Thread.currentThread != Clock.systemClock) clock.pause
     resetComponent
+    if (loadAndRunLastPrg) lastLoadedPrg.foreach( f =>
+      clock.schedule(new ClockEvent("RESET_PRG",clock.currentCycles + PRG_RUN_DELAY_CYCLES,(cycles) => loadPRGFile(f,true)))
+    )
+
     if (play) clock.play
   }
 
@@ -261,7 +269,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def saveSettings(save:Boolean) : Unit
 
-  protected def enableDrive(id:Int,enabled:Boolean) : Unit
+  protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit
 
   protected def paste : Unit
 
@@ -480,11 +488,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def attachDevice(file:File,autorun:Boolean,fileToLoad:Option[String] = None,emulateInserting:Boolean = true) : Unit = {
     val name = file.getName.toUpperCase
 
-    if (name.endsWith(".PRG")) loadPRGFile(file,autorun)
+    if (name.endsWith(".PRG")) {
+      loadPRGFile(file,autorun)
+      lastLoadedPrg = Some(file)
+    }
     else
     if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun,fileToLoad,emulateInserting)
     else
-    if (tapeAllowed && name.endsWith(".TAP")) attachTapeFile(file,autorun)
+    if (tapeAllowed && name.endsWith(".TAP")) attachTapeFile(file,None,autorun)
     else
     if (name.endsWith(".T64")) attachT64File(file,autorun)
     else
@@ -521,7 +532,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     try {
       if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
       ExpansionPort.getExpansionPort.eject
-      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.expPortIRQ _,nmiSwitcher.expansionPortNMI _,getRAM,configuration)
+      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.setLine(Switcher.CRT,_),nmiSwitcher.setLine(Switcher.CRT,_),getRAM,configuration)
       println(ep)
       if (ep.isFreezeButtonSupported) cartMenu.setVisible(true)
       ExpansionPort.setExpansionPort(ep)
@@ -582,7 +593,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def loadFileFromTape  : Unit = {
     val fc = new JFileChooser
-    val canvas = new T64Canvas(fc,getCharROM,true)
+    val canvas = new T64Canvas(fc,getCharROM,isC64Mode)
     val sp = new javax.swing.JScrollPane(canvas)
     canvas.sp = sp
     fc.setAccessory(sp)
@@ -642,6 +653,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def attachTape  : Unit = {
     val fc = new JFileChooser
+    val canvas = new TAPCanvas(fc,getCharROM,isC64Mode)
+    val sp = new javax.swing.JScrollPane(canvas)
+    canvas.sp = sp
+    fc.setAccessory(sp)
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new FileFilter {
@@ -650,17 +665,20 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     })
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-        attachTapeFile(fc.getSelectedFile,false)
+        val tapFile = canvas.selectedObject.asInstanceOf[Option[TAP.TAPHeader]]
+        attachTapeFile(fc.getSelectedFile,tapFile,tapFile.isDefined)
       case _ =>
     }
   }
 
-  protected def attachTapeFile(file:File,autorun:Boolean) : Unit = {
-    datassette.setTAP(Some(new TAP(file.toString)))
+  protected def attachTapeFile(file:File,tapFile:Option[TAP.TAPHeader],autorun:Boolean) : Unit = {
+    val tap = new TAP(file.toString)
+    datassette.setTAP(Some(tap),tapFile.map(_.tapOffset.toInt))
     tapeMenu.setEnabled(true)
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
     if (autorun) {
-      Keyboard.insertSmallTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar,mmu,true)
+      datassette.pressPlay
+      Keyboard.insertSmallTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar,mmu,isC64Mode)
     }
   }
 
@@ -675,6 +693,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
         loadPRGFile(fc.getSelectedFile,false)
+        lastLoadedPrg = Some(fc.getSelectedFile)
       case _ =>
     }
   }
@@ -850,14 +869,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         ExpansionPort.getExpansionPort.eject
         ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
       case Some(REU.REU_16M) =>
-        val reu = REU.getREU(REU.REU_16M,mmu,setDMA _,irqSwitcher.expPortIRQ _,reu16FileName map { new File(_) } )
+        val reu = REU.getREU(REU.REU_16M,mmu,dmaSwitcher.setLine(Switcher.CRT,_),irqSwitcher.setLine(Switcher.CRT,_),reu16FileName map { new File(_) } )
         ExpansionPort.setExpansionPort(reu)
         reu16FileName match {
           case Some(file) => REU.attached16MFileName = file
           case None =>
         }
       case Some(reuSize) =>
-        ExpansionPort.setExpansionPort(REU.getREU(reuSize,mmu,setDMA _,irqSwitcher.expPortIRQ _,None))
+        ExpansionPort.setExpansionPort(REU.getREU(reuSize,mmu,dmaSwitcher.setLine(Switcher.CRT,_),irqSwitcher.setLine(Switcher.CRT,_),None))
     }
   }
 
@@ -1002,7 +1021,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def enableCPMCart(enabled:Boolean): Unit = {
     ExpansionPort.getExpansionPort.eject
     if (enabled) {
-      ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,setDMA _,setTraceListener _))
+      ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,dmaSwitcher.setLine(Switcher.CRT,_),setTraceListener _))
       detachCtrItem.setEnabled(true)
     }
     else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
@@ -1116,6 +1135,43 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def openGIFRecorder : Unit = gifRecorder.setVisible(true)
 
+  protected def vicZoom(f:Int) : Unit = {
+    val dim = new Dimension(vicChip.VISIBLE_SCREEN_WIDTH * f,vicChip.VISIBLE_SCREEN_HEIGHT * f)
+    vicZoomFactor = f
+    updateVICScreenDimension(dim)
+  }
+
+  protected def updateVICScreenDimension(dim:Dimension): Unit = {
+    display.setPreferredSize(dim)
+    display.invalidate
+    display.repaint()
+    displayFrame.pack
+    if (vicChip.VISIBLE_SCREEN_WIDTH == dim.width && vicChip.VISIBLE_SCREEN_HEIGHT == dim.height) vicZoomFactor = 1
+    else
+    if (vicChip.VISIBLE_SCREEN_WIDTH * 2 == dim.width && vicChip.VISIBLE_SCREEN_HEIGHT * 2 == dim.height) vicZoomFactor = 2
+    else vicZoomFactor = 0 // undefined
+  }
+
+  protected def setVICModel(model:VICType.Value,preserveDisplayDim:Boolean = false) : Unit = {
+    clock.pause
+    val vicType = model match {
+      case VICType.PAL => VIC_PAL
+      case VICType.NTSC => VIC_NTSC
+    }
+    vicChip.setVICModel(vicType)
+    clock.setClockHz(vicType.CPU_FREQ)
+    display.setNewResolution(vicChip.SCREEN_HEIGHT,vicChip.SCREEN_WIDTH)
+    vicChip.setDisplay(display)
+    if (!preserveDisplayDim) {
+      if (vicZoomFactor > 0) vicZoom(vicZoomFactor)
+      display.invalidate()
+      displayFrame.pack
+    }
+
+    reset()
+    clock.play
+  }
+
   // -------------------------------------------------------------------
   protected def setMenu : Unit = {
 
@@ -1212,6 +1268,13 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         finally loadStateFromOptions = false
       }
     )
+    settings.add("screen-dim",
+      "Zoom factor. Valued accepted are 1 and 2",
+      (f:Int) => if (f == 1 || f == 2) {
+        vicZoom(f)
+        zoomOverride = true
+      }
+    )
   }
 
   protected def setFileMenu(fileMenu:JMenu) : Unit = {
@@ -1247,21 +1310,33 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       tapeMenu.setEnabled(false)
       fileMenu.add(tapeMenu)
 
-      val tapePlayItem = new JMenuItem("Cassette press play")
+      val tapePlayItem = new JMenuItem("Press play")
       tapePlayItem.addActionListener(_ => datassette.pressPlay)
       tapeMenu.add(tapePlayItem)
 
-      val tapeStopItem = new JMenuItem("Cassette press stop")
+      val tapeStopItem = new JMenuItem("Press stop")
       tapeStopItem.addActionListener(_ => datassette.pressStop)
       tapeMenu.add(tapeStopItem)
 
-      val tapeRecordItem = new JMenuItem("Cassette press record & play")
+      val tapeRecordItem = new JMenuItem("Press record & play")
       tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay)
       tapeMenu.add(tapeRecordItem)
 
-      val tapeRewindItem = new JMenuItem("Cassette press rewind")
+      val tapeRewindItem = new JMenuItem("Press rewind")
       tapeRewindItem.addActionListener(_ => datassette.pressRewind)
       tapeMenu.add(tapeRewindItem)
+
+      val tapeForwardItem = new JMenuItem("Press forward")
+      tapeForwardItem.addActionListener(_ => datassette.pressForward)
+      tapeMenu.add(tapeForwardItem)
+
+      val tapeResetItem = new JMenuItem("Reset")
+      tapeResetItem.addActionListener(_ => datassette.resetToStart)
+      tapeMenu.add(tapeResetItem)
+
+      val tapeResetCounterItem = new JMenuItem("Reset counter")
+      tapeResetCounterItem.addActionListener(_ => datassette.resetCounter)
+      tapeMenu.add(tapeResetCounterItem)
     }
 
     fileMenu.addSeparator
@@ -1315,7 +1390,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       "Enabled/disable driver 9",
       "DRIVE_9_ENABLED",
       (d9e:Boolean) => {
-        enableDrive(1,d9e)
+        enableDrive(1,d9e,false)
       },
       drivesEnabled(1)
     )
@@ -1369,6 +1444,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     resetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK))
     resetItem.addActionListener(_ => reset(true) )
     fileMenu.add(resetItem)
+    val reset2Item = new JMenuItem("Reset and run last PRG")
+    reset2Item.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.CTRL_DOWN_MASK))
+    reset2Item.addActionListener(_ => reset(true,true) )
+    fileMenu.add(reset2Item)
 
     fileMenu.addSeparator
 
@@ -1551,9 +1630,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     peptoPalItem.addActionListener(_ => Palette.setPalette(PaletteType.PEPTO) )
     paletteItem.add(peptoPalItem)
     groupP.add(peptoPalItem)
+    val colordorePalItem = new JRadioButtonMenuItem("Colodore")
+    colordorePalItem.addActionListener(_ => Palette.setPalette(PaletteType.COLORDORE) )
+    paletteItem.add(colordorePalItem)
+    groupP.add(colordorePalItem)
+
     // Setting ---------------------------
     settings.add("vic-palette",
-      "Set the palette type (bright,vice,pepto)",
+      "Set the palette type (bright,vice,pepto,colodore)",
       "PALETTE",
       (dt:String) => {
         dt match {
@@ -1566,15 +1650,17 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
           case "pepto" =>
             Palette.setPalette(PaletteType.PEPTO)
             peptoPalItem.setSelected(true)
+          case "colodore" =>
+            Palette.setPalette(PaletteType.COLORDORE)
+            colordorePalItem.setSelected(true)
           case _ =>
         }
       },
       if (brightPalItem.isSelected) "bright"
-      else
-        if (vicePalItem.isSelected) "vice"
-        else
-          if (peptoPalItem.isSelected) "pepto"
-          else "bright"
+      else if (vicePalItem.isSelected) "vice"
+      else if (peptoPalItem.isSelected) "pepto"
+      else if (colordorePalItem.isSelected) "colodore"
+      else "bright"
     )
     settings.add("rendering-type",
       "Set the rendering type (default,bilinear,bicubic)",
@@ -2016,5 +2102,74 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       fylerEnabledItem.setSelected(false)
       enableFlyer(false)
     }) :: resetSettingsActions
+  }
+
+  protected def setBeamRacerSettings(parent:JMenu) : Unit = {
+    val brItem = new JCheckBoxMenuItem("Beam Racer installed")
+    brItem.setSelected(false)
+    parent.add(brItem)
+    brItem.addActionListener( e => {
+      val selected = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
+      vicChip.setCoprocessor(if (selected) new VASYL(vicChip,cpu,dmaSwitcher.setLine(Switcher.EXT,_)) else null)
+    })
+
+    settings.add("beam-racer-enabled",
+      s"Install Beam Racer VIC's coprocessor",
+      "BEAMRACER",
+      (br: Boolean) => {
+        if (br) {
+          vicChip.setCoprocessor(new VASYL(vicChip,cpu,dmaSwitcher.setLine(Switcher.EXT,_)))
+          brItem.setSelected(true)
+        }
+      },
+      brItem.isSelected
+    )
+  }
+
+  protected def setVICModel(parent:JMenu) : Unit = {
+    val vicModelItem = new JMenu("VIC model")
+    val group = new ButtonGroup
+    val palItem = new JRadioButtonMenuItem("PAL (6569)")
+    val ntscItem = new JRadioButtonMenuItem("NTSC (6567R8)")
+    group.add(palItem)
+    group.add(ntscItem)
+    vicModelItem.add(palItem)
+    vicModelItem.add(ntscItem)
+    palItem.addActionListener( _ => setVICModel(VICType.PAL) )
+    palItem.setSelected(true)
+    ntscItem.addActionListener( _ => setVICModel(VICType.NTSC) )
+    parent.add(vicModelItem)
+
+    settings.add("ntsc",
+      s"Set ntsc video standard",
+      "VIDEO_NTSC",
+      (set: Boolean) => {
+        if (set) {
+          setVICModel(VICType.NTSC,true)
+          ntscItem.setSelected(true)
+        }
+      },
+      ntscItem.isSelected
+    )
+  }
+
+  protected def setVICBorderMode(parent:JMenu) : Unit = {
+    val borderItem = new JMenu("Border mode")
+    val borderOnItem = new JCheckBoxMenuItem("Draw border")
+    borderOnItem.setSelected(true)
+    borderItem.add(borderOnItem)
+    borderOnItem.addActionListener( _ => vicChip.setDrawBorder(borderOnItem.isSelected) )
+    parent.add(borderItem)
+    borderOnItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_B,java.awt.event.InputEvent.ALT_DOWN_MASK))
+
+    settings.add("vic-border-off",
+      s"Doesn't draw VIC's borders",
+      "VIC_BORDER_MODE",
+      (on: Boolean) => {
+        vicChip.setDrawBorder(!on)
+        borderOnItem.setSelected(!on)
+      },
+      !borderOnItem.isSelected
+    )
   }
 }

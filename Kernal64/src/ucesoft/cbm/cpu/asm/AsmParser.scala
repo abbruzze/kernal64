@@ -1,19 +1,15 @@
 package ucesoft.cbm.cpu.asm
 
 import util.parsing.combinator._
-import scala.util.parsing.input.Positional
+import scala.util.parsing.input.{Position, Positional}
 
 object AsmParser {
   import ucesoft.cbm.cpu.CPU65xx._
   import Mode._
   
-  private val OPCODES = (Instruction.values.map { _.toString.toLowerCase }) ++ (Instruction.values map { _.toString.toUpperCase })
+  private val OPCODES = Instruction.values.map { _.toString.toLowerCase } ++ (Instruction.values map { _.toString.toUpperCase })
   private val BRANCHES = OP_MATRIX flatMap { r => r.filter { o => o._2 == REL } } map { _._1.toString }
-  private val IMP_OPCODES = {
-    val op = (OP_MATRIX flatMap { r => r.filter { o => o._2 == IMP } } map { _._1.toString }).toSet
-    op ++ (op map { _.toLowerCase })
-  }
-  
+
   sealed trait Statement extends Positional {
     var fileName : Option[String] = None
   }
@@ -21,11 +17,14 @@ object AsmParser {
   case class ModuleLabel(label:String,module:Option[String])
   case class EvalTarget(variable:ModuleLabel, fieldSelector: Option[List[String]])
   // Expressions
-  sealed trait Expr extends Positional
+  sealed trait Expr extends Positional {
+    var sizeHint : Option[Int] = None
+  }
   case object Null extends Expr
   case class Str(value: String) extends Expr
   case class Value(value: Double) extends Expr
   case class ListValue(elements: List[Expr], isRange: Boolean = false) extends Expr
+  case class MapValue(keyVals:List[ListValue]) extends Expr
   case class Label(label: String,module:Option[String]) extends Expr
   case class BinOp(op: String, op1: Expr, op2: Expr) extends Expr
   case class UnaryOp(op: String, op1: Expr, isPre: Boolean = true) extends Expr
@@ -53,12 +52,23 @@ object AsmParser {
   case class ERROR(msg:Expr) extends Statement
   case class MODULE(name:String,body:List[Statement]) extends Statement
   case class INCLUDE(file:String) extends Statement
+  case class DISCARDEXPR(expr:Expr) extends Statement
   // ASMStatement  
-  case class ORG(org: Expr, sectionName: Option[String]) extends ASMStatement
+  case class ORG(org: Expr, sectionName: Option[String],virtual:Boolean = false) extends ASMStatement
   case class WORD(values: List[Expr], isByte: Boolean = true) extends ASMStatement
+  case class BYTE_LIST(list: Expr) extends ASMStatement
+  case class FILL(size:Expr,value:Option[Expr]) extends ASMStatement
   case class WORD_GEN(gen: FunOp, isByte: Boolean = true) extends ASMStatement
-  case class TEXT(text: Expr) extends ASMStatement
+  case class TEXT(text: Expr,enc:TEXTEncoding) extends ASMStatement
   case class ASM(opcode: String, var mode: Mode.MODE, operand: Option[Expr]) extends ASMStatement
+  case class TEXTEncoding(upper:Boolean,screenCode:Boolean)
+  case class COMMENTED_ASM(_line:Int) extends ASMStatement {
+    setPos(new Position {
+      override def line: Int = _line
+      override def column: Int = 1
+      override protected def lineContents: String = ""
+    })
+  }
 }
 
 class AsmParser(fileName:String) extends JavaTokenParsers {
@@ -67,13 +77,12 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   import Mode._
   import Instruction._
   
-  private val imp_opcodes: Parser[String] = IMP_OPCODES.drop(1).foldLeft(IMP_OPCODES.head: Parser[String]) { (p, b) => p | b }
   private val other_opcodes: Parser[String] = OPCODES.drop(1).foldLeft(OPCODES.head: Parser[String]) { (p, b) => p | b }
 
   override val whiteSpace = "[ \t]+".r
   // =================================================================
 
-  private def lineComment: Parser[String] = "//.*".r ^^ { _.substring(2) }
+  private def lineComment: Parser[String] = "(//|;).*".r ^^ { s => if (s == ";") s.substring(1) else s.substring(2) }
   private def multilineComment: Parser[String] = """/\*[^\*]*\*(\*|[^\*/][^\*]*\*)*/""".r ^^ { c => c.substring(2, c.length - 2) }
   private def comment: Parser[String] = lineComment | multilineComment
 
@@ -90,9 +99,24 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   private def float: Parser[Double] = floatingPointNumber ^^ { _.toDouble }
   private def number: Parser[Double] = float | (decNumber | hexWord | binWord) ^^ { _.toFloat }
   private def string: Parser[String] = stringLiteral ^^ { s => s.substring(1, s.length - 1) }
+  //===========================================================================
 
-  def expr: Parser[Expr] = positioned {
-    logical ~ rep("==" ~ logical | "!=" ~ logical) ~ opt("?" ~> (expr ~ (":" ~> expr))) ^^ {
+  private def expr: Parser[Expr] = positioned {
+    expr2 ~ opt(":" ~> decNumber) ^^ {
+      case expr ~ None => expr
+      case expr ~ Some(size) =>
+        expr.sizeHint = Some(size)
+        expr
+    }
+  }
+
+  private def expr2: Parser[Expr] =
+    logical ~ rep("^" ~ logical | "&" ~ logical | "|" ~ logical) ^^ {
+      case s ~ l => l.foldLeft(s) { case (acc, op ~ f) => BinOp(op, acc, f) }
+    }
+
+  private def logical: Parser[Expr] = positioned {
+    logical2 ~ rep("==" ~ logical2 | "!=" ~ logical2) ~ opt("?" ~> (expr ~ (":" ~> expr))) ^^ {
       case l1 ~ l ~ ifclause =>
         val cond = l.foldLeft(l1) { case (acc, op ~ f) => BinOp(op, acc, f) }
         ifclause match {
@@ -103,11 +127,6 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
         }
     }
   }
-  private def logical: Parser[Expr] =
-    logical2 ~ rep("^" ~ logical2 | "&" ~ logical2 | "|" ~ logical2 | "^" ~ logical2) ^^ {
-      case s ~ l => l.foldLeft(s) { case (acc, op ~ f) => BinOp(op, acc, f) }
-    }
-        
   private def logical2: Parser[Expr] =
     not ~ rep("<<" ~ not | ">>" ~ not | ">=" ~ not | "<=" ~ not | ">" ~ not | "<" ~ not) ^^ {
       case s ~ l => l.foldLeft(s) { case (acc, op ~ f) => BinOp(op, acc, f) }
@@ -145,6 +164,7 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   private def factor: Parser[Expr] =
     "null" ^^ { n => Null } |
     generate |
+    map |
     list |
     "<" ~> factor ^^ { e => FunOp("lsb",None, e :: Nil) } |
     ">" ~> factor ^^ { e => FunOp("msb",None, e :: Nil) } |
@@ -160,7 +180,11 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
       case l ~ None => Label(l.label,l.module)
       case l ~ Some(op) => UnaryOp(op, Label(l.label,l.module), false)
     }
-  private def list: Parser[Expr] = "[" ~ "[\n\r]*".r ~ "]" ^^ { _ => ListValue(Nil) } |
+
+  private def map : Parser[Expr] = "#[" ~ "[\n\r]*".r ~ "]" ^^ { _ => MapValue(Nil) } |
+    "#[" ~> repsep(list, ("[\n\r]*".r ~ "," ~ "[\n\r]*".r)) <~ "]" ~ "[\n\r]*".r ^^ { MapValue(_) }
+
+  private def list: Parser[ListValue] = "[" ~ "[\n\r]*".r ~ "]" ^^ { _ => ListValue(Nil) } |
     ("[" ~> expr <~ "..") ~ expr ~ opt("," ~> expr) <~ "]" ^^ {
       case (from ~ to) ~ step =>
         ListValue(List(from, to, step.getOrElse(Value(1))), true)
@@ -174,35 +198,48 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   }
 
   // ================ ASM STATEMENT ==================================
-  private def labelOp: Parser[Option[String]] = opt(label <~ ":" <~ "[\n\r]*".r)
-
-  private def org: Parser[ASMStatement] = ((".pc" | "*") ~ "=" | "org") ~> (expr ~ opt(string)) ^^ {
-    case addr ~ l => ORG(addr, l)
+  private def org: Parser[ASMStatement] = ((".pc" | "*") ~ "=" | "org") ~> (expr ~ opt("virtual") ~ opt(string)) ^^ {
+    case addr ~ None ~ l => ORG(addr, l)
+    case addr ~ Some(_) ~ l => ORG(addr, l,true)
   }
-  private def text: Parser[ASMStatement] = (".text" | ".t") ~> expr ^^ { TEXT(_) }
-  private def bytes: Parser[ASMStatement] = (".byte" | ".b") ~> (
-    generate ^^ { g => WORD_GEN(g, true) } |
-    repsep(expr, ",") ^^ { l => WORD(l, true) })
+  private def text: Parser[ASMStatement] = (".text" | ".t" | "!text") ~> opt("ascii"|"screen"|"upper-ascii"|"upper-screen") ~ expr ^^ {
+    case enc~e => enc match {
+      case Some("ascii")|None => TEXT(e,TEXTEncoding(false,false))
+      case Some("screen") => TEXT(e,TEXTEncoding(false,true))
+      case Some("upper-screen") => TEXT(e,TEXTEncoding(true,true))
+      case Some("upper-ascii") => TEXT(e,TEXTEncoding(true,false))
+    }
+  }
+  private def bytes: Parser[ASMStatement] =
+    (".bytelist" | ".bl" | "!bytelist") ~> expr ^^ { BYTE_LIST(_) } |
+    (".byte" | ".b" | "!byte") ~> (
+      generate ^^ { g => WORD_GEN(g, true) } |
+      list ^^ { BYTE_LIST(_) }|
+      repsep(expr, ",") ^^ { l => WORD(l, true) }
+    )
 
-  private def words: Parser[ASMStatement] = (".word" | ".w") ~> (
+
+  private def words: Parser[ASMStatement] = (".word" | ".w" | "!word") ~> (
     generate ^^ { g => WORD_GEN(g, false) } |
     repsep(expr, ",") ^^ { l => WORD(l, false) })
+
+  private def fill: Parser[ASMStatement] = (".fill" | ".f" | "!fill") ~> expr ~ opt("," ~> expr) ^^ {
+    case size ~ None => FILL(size,None)
+    case size ~ (v@Some(_)) => FILL(size,v)
+  }
     
   private def asmMode: Parser[(Mode.MODE, Expr)] =
     "#" ~> expr ^^ { (IMM, _) } |
-      "(" ~> expr <~ ")" <~ (",y" | ",Y") ^^ { (IZY, _) } |
+      "(" ~> expr <~ ")" <~ ("," ~ "y|Y".r) ^^ { (IZY, _) } |
       "(" ~> expr <~ ")" ^^ { (IND, _) } |
-      "(" ~> expr <~ (",x" | ",X") <~ ")" ^^ { (IZX, _) } |
-      expr ~ opt(",x" | ",X" | ",y" | ",Y") ^^ {
+      "(" ~> expr <~ ("," ~ "x|X".r) <~ ")" ^^ { (IZX, _) } |
+      expr ~ opt(("," ~> "x|X".r) | ("," ~> "y|Y".r)) ^^ {
         case e ~ None => (UNKNOWN_ABS_OR_ZP, e) // we will decide later if it's ABS or ZP
         case e ~ Some(index) =>
-          index.toUpperCase match {
-            case ",X" => (UNKNOWN_ABX_OR_ZPX, e)
-            case ",Y" => (UNKNOWN_ABY_OR_ZPY, e)
-          }
+          if (index.toUpperCase.endsWith("X")) (UNKNOWN_ABX_OR_ZPX, e) else (UNKNOWN_ABY_OR_ZPY, e)
       }
 
-  private def asm: Parser[ASMStatement] = other_opcodes ~ opt(".z" | ".a") ~ opt(asmMode) <~ opt(comment) <~ ("\n" | ";") ^^ {
+  private def asm: Parser[ASMStatement] = other_opcodes ~ opt(".z" | ".a") ~ opt(asmMode) <~ opt(comment) <~ ("\n" | "") ^^ {
     case o ~ m ~ None => // m is ignored, IMP forced 
       ASM(o, IMP, None)
     case o ~ m ~ Some(mode) =>
@@ -257,7 +294,7 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   private def singleBlock: Parser[List[Statement]] = (asmStatement | statement) ^^ { List(_) } 
   private def multipleBlock: Parser[List[Statement]] = "{" ~> statements(false,false,false,false) <~ "}"
   private def block: Parser[List[Statement]] = "[\n\r]*".r ~> (multipleBlock | singleBlock) <~ "[\n\r]*".r
-  private def asmBlock: Parser[List[Statement]] = "[\n\r]*".r ~> "{" ~> statements(true,false,false,false) <~ "}" <~ "[\n\r]*".r
+  private def macroBlock: Parser[List[Statement]] = "[\n\r]*".r ~> "{" ~> statements(true,false,false,false) <~ "}" <~ "[\n\r]*".r
   private def funBlock: Parser[List[Statement]] = "[\n\r]*".r ~> "{" ~> statements(false,true,false,false) <~ "}" <~ "[\n\r]*".r
   private def moduleBlock: Parser[List[Statement]] = "[\n\r]*".r ~> "{" ~> statements(false,true,false,true) <~ "}" <~ "[\n\r]*".r
   
@@ -290,7 +327,7 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   } 
   
   private def macroStmt : Parser[Statement] = positioned {
-    ("def" ~ "macro") ~> label ~ ("(" ~> repsep(label,",") <~ ")") ~ asmBlock ^^ {
+    ("def" ~ "macro") ~> label ~ ("(" ~> repsep(label,",") <~ ")") ~ macroBlock ^^ {
       case name~pars~body => MACRO(name,pars,body)
     }
   }
@@ -300,21 +337,25 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
       case pr~(name~pars~body) => FUNCTION(name,pars,body,pr.isDefined)
     }
   }
+
+  private def exprStmt : Parser[Statement] = positioned {
+    expr ^^ { DISCARDEXPR(_) }
+  }
   
   private def moduleStmt : Parser[Statement] = positioned {
     "module" ~> label ~ moduleBlock ^^ { case l~b => MODULE(l,b) }
   }
   
-  private def include : Parser[Statement] = "include" ~> expr ^? ({ case Str(fn) => INCLUDE(fn) }, _ => "Type mismatch: include statement expects a string as filename")
+  private def include : Parser[Statement] = "source" ~> expr ^? ({ case Str(fn) => INCLUDE(fn) }, _ => "Type mismatch: include statement expects a string as filename")
   
-  private def asmStatement: Parser[Statement] = positioned { asm | org | bytes | words | text }
-  private def statement: Parser[Statement] = positioned { include | error | align | dup | break | const | variable | print | eval | ifStmt | struct | enum | whileStmt | forStmt | macroCall | declareLabel | assignment}
+  private def asmStatement: Parser[Statement] = positioned { asm | org | bytes | words | text | fill }
+  private def statement: Parser[Statement] = positioned { include | error | align | dup | break | const | variable | print | eval | ifStmt | struct | enum | whileStmt | forStmt | macroCall | declareLabel | assignment | exprStmt}
   
-  private def statements(asmOnly:Boolean,asmNotAllowed:Boolean,top:Boolean,module:Boolean): Parser[List[Statement]] = allStatements(asmOnly,asmNotAllowed,top,module) ^^ { _.flatten }
+  private def statements(macroMode:Boolean, asmNotAllowed:Boolean, top:Boolean, module:Boolean): Parser[List[Statement]] = allStatements(macroMode,asmNotAllowed,top,module) ^^ { _.flatten }
 
-  private def allStatements(asmOnly:Boolean,asmNotAllowed:Boolean,top:Boolean,module:Boolean) : Parser[List[Option[Statement]]] = {
+  private def allStatements(macroMode:Boolean, asmNotAllowed:Boolean, top:Boolean, module:Boolean) : Parser[List[Option[Statement]]] = {
     rep(
-      "[\n\r]*".r ~>
+      "[\t\n\r]*".r ~>
         (comment ^^ { _ => None } |
          label <~ ":" ^^ { case l => Some(LABELED(l)) } |
           (
@@ -323,16 +364,16 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
               else
               if (top) (moduleStmt | macroStmt | funStmt| asmStatement | statement )
               else
-              if (asmOnly) asmStatement|(statement| macroStmt | funStmt)<~failure("Only assembler statement are allowed here")               
+              if (macroMode) (asmStatement|statement)|(macroStmt | funStmt)<~ err("In macros functions and other macros are not permitted")
               else
               if (asmNotAllowed) statement|asmStatement<~failure("Assembler statement are not allowed here")|macroStmt<~failure("Macros are not allowed here")|funStmt<~failure("Functions are not allowed here")
               else 
-              (asmStatement | statement | macroStmt<~failure("Macros can be declared on outermost scope only")|funStmt<~failure("Functions can be declared on outermost scope only"))
-              ) ^^ { s => s.fileName = Some(fileName) ; s }
+              asmStatement | statement | macroStmt<~failure("Macros can be declared on outermost scope only")|funStmt<~failure("Functions can be declared on outermost scope only")
+              )  ^^ { s => s.fileName = Some(fileName) ; s }
           ) ^^ {
             case s => Some(s)
           }
-        ) <~ "[\n\r]*".r)
+        ) <~ "[\t\n\r]*".r)
   }
   
   def topStatements : Parser[List[Statement]] = statements(false,false,true,false)

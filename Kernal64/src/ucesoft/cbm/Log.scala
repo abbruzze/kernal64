@@ -2,12 +2,13 @@ package ucesoft.cbm
 
 import java.io.PrintWriter
 
-import javax.swing.JPanel
+import javax.swing.{JPanel, JScrollPane, JTextArea, SwingUtilities}
 import java.io.Writer
 import java.awt.{BorderLayout, Color, Font}
 
-import javax.swing.JTextArea
-import javax.swing.JScrollPane
+import javax.swing.text.DefaultCaret
+import org.fife.ui.rsyntaxtextarea.{RSyntaxTextArea, SyntaxConstants}
+import org.fife.ui.rtextarea.RTextScrollPane
 
 object Log {
   private val FINE = 1
@@ -28,23 +29,23 @@ object Log {
   @inline final def fine(msg: => String): Unit = if ((severity & FINE) != 0) log(msg)
   @inline final def debug(msg: => String): Unit = if ((severity & DEBUG) != 0) log(msg)
   @inline final def info(msg: => String) : Unit = if ((severity & INFO) != 0) log(msg)
+
+  def isDebug : Boolean = (severity & DEBUG) > 0
   
   def getLogPanel = new LogPanel
   
   class LogPanel extends JPanel {
-    private val logPanel = new JTextArea(30,50)
+    private val logPanel = new RSyntaxTextArea(30,50)
     setLayout(new BorderLayout)
     logPanel.setEditable(false)
-    add("Center",new JScrollPane(logPanel))
-    logPanel.setFont(new Font(Font.MONOSPACED,Font.BOLD,12))
-    logPanel.setForeground(Color.WHITE)
-    logPanel.setBackground(Color.BLACK)
+    logPanel.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_ASSEMBLER_6502)
+    logPanel.getCaret.asInstanceOf[DefaultCaret].setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE)
+    val scroll = new RTextScrollPane(logPanel)
+    scroll.setLineNumbersEnabled(false)
+    add("Center",scroll)
+
     val writer = new PrintWriter(new Writer {
-      def write(chars:Array[Char],off:Int,len:Int) : Unit = {
-        val str = new String(chars,off,len)        
-        logPanel.append(str)
-        logPanel.setCaretPosition(logPanel.getText.length)
-      }
+      def write(chars:Array[Char],off:Int,len:Int) : Unit = logPanel.append(new String(chars, off, len))
       def flush  : Unit = {}
       def close  : Unit = {}
     },true)

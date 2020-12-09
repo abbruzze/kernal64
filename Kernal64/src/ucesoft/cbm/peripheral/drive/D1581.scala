@@ -2,7 +2,7 @@ package ucesoft.cbm.peripheral.drive
 
 import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.cpu.RAMComponent
-import ucesoft.cbm.trace.TraceListener
+import ucesoft.cbm.trace.{BreakType, CpuStepInfo, TraceListener}
 import ucesoft.cbm.Clock
 import ucesoft.cbm.cpu.CPU65xx
 import ucesoft.cbm.ChipID
@@ -10,11 +10,9 @@ import ucesoft.cbm.peripheral.Connector
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.bus.IECBusListener
 import ucesoft.cbm.cpu.ROM
-import java.io.{IOException, ObjectInputStream, ObjectOutputStream, PrintWriter}
+import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
 
-import ucesoft.cbm.trace.BreakType
 import ucesoft.cbm.cpu.Memory
-import javax.swing.JFrame
 import ucesoft.cbm.Log
 import ucesoft.cbm.peripheral.bus.IECBusLine
 import ucesoft.cbm.formats.MFM
@@ -383,8 +381,8 @@ class D1581(val driveID: Int,
     if (tracing) awake
     cpu.setTrace(traceOn)
   }
-  def step(updateRegisters: (String) => Unit) = cpu.step(updateRegisters)
-  def setBreakAt(breakType:BreakType,callback:(String) => Unit) = cpu.setBreakAt(breakType,callback)
+  def step(updateRegisters: CpuStepInfo => Unit) = cpu.step(updateRegisters)
+  def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) = cpu.setBreakAt(breakType,callback)
   def jmpTo(pc: Int) = cpu.jmpTo(pc)
   def disassemble(mem:Memory,address:Int) = cpu.disassemble(mem, address)
   // ================== State ======================================

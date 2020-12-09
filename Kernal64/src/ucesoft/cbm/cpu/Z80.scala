@@ -2,13 +2,14 @@ package ucesoft.cbm.cpu
 
 import scala.language.implicitConversions
 import ucesoft.cbm.ChipID
-import ucesoft.cbm.trace.TraceListener
+import ucesoft.cbm.trace.{BreakType, CpuStepInfo, NoBreak, TraceListener}
 import java.io.PrintWriter
-import ucesoft.cbm.trace.BreakType
+
 import ucesoft.cbm.Log
 import ucesoft.cbm.Chip
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
+
 import javax.swing.JFrame
 
 object Z80 {
@@ -2201,9 +2202,9 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   private[this] var cpuRestCycles = 0.0
   private[this] var busREQ = false
   private[this] var tracing = false
-  private[this] var stepCallBack : (String) => Unit = _
+  private[this] var stepCallBack : CpuStepInfo => Unit = _
   private[this] val syncObject = new Object
-  private[this] var breakCallBack : (String) => Unit = _
+  private[this] var breakCallBack : CpuStepInfo => Unit = _
   private[this] var breakType : BreakType = _
 
   // =================================== Tracing =============================================================
@@ -2214,16 +2215,19 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
     // TODO
   }
   def setTrace(traceOn:Boolean) = tracing = traceOn
-  def step(updateRegisters: (String) => Unit) : Unit = {
+  def step(updateRegisters: CpuStepInfo => Unit) : Unit = {
     stepCallBack = updateRegisters
     syncObject.synchronized {
       syncObject.notify
     }
   }
-  def setBreakAt(breakType:BreakType,callback:(String) => Unit) : Unit = {
+  def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) : Unit = {
     tracing = false
     breakCallBack = callback
-    this.breakType = breakType
+    this.breakType = breakType match {
+      case NoBreak => null
+      case _ => breakType
+    }
   }
   def jmpTo(pc:Int) : Unit = {
     ctx.PC = pc & 0xFFFF 
@@ -2309,9 +2313,8 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
   
   private def fetchAndExecute : Int = {    
     if (breakType != null && breakType.isBreak(ctx.PC,false,false)) {
-      breakType = null
       tracing = true
-      breakCallBack(ctx.toString)
+      breakCallBack(CpuStepInfo(ctx.PC,ctx.toString))
     }
     
     if ((irqLow || nmiOnNegativeEdge) && !ctx.mustDelayInt) { // any interrupt pending ?      
@@ -2319,9 +2322,8 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
         ctx.push(ctx.PC)
         incR(1)
         if (breakType != null && breakType.isBreak(ctx.PC,false,true)) {
-          breakType = null
           tracing = true
-          breakCallBack(ctx.toString)
+          breakCallBack(CpuStepInfo(ctx.PC,ctx.toString))
           Log.debug("NMI Break")
         }
         nmiOnNegativeEdge = false
@@ -2339,9 +2341,8 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
           ctx.push(ctx.PC)
           incR(1)
           if (breakType != null && breakType.isBreak(ctx.PC,true,false)) {
-            breakType = null
             tracing = true
-            breakCallBack(ctx.toString)
+            breakCallBack(CpuStepInfo(ctx.PC,ctx.toString))
             Log.debug("IRQ Break")
           }
           if (ctx.halted) {
@@ -2371,7 +2372,7 @@ class Z80(mem:Memory,io_memory:Z80.IOMemory = null) extends Chip with Z80.IOMemo
     // tracing
     if (tracing) {
       Log.debug("[Z80] " + opcode.disassemble(mem,ctx.PC))      
-      stepCallBack(ctx.toString)
+      stepCallBack(CpuStepInfo(ctx.PC,ctx.toString))
       syncObject.synchronized { syncObject.wait }
     }
     // execute

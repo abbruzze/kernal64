@@ -92,7 +92,7 @@ class C64 extends CBMComputer {
     				   0xDC00,
     				   cia1CP1,
     				   cia1CP2,
-    				   irqSwitcher.ciaIRQ _,
+    				   irqSwitcher.setLine(Switcher.CIA,_),
                idle => cia12Running(0) = !idle)
     val cia2CP1 = new CIA2Connectors.PortAConnector(vicMemory,bus,rs232)
     val cia2CP2 = new CIA2Connectors.PortBConnector(rs232)    
@@ -103,12 +103,12 @@ class C64 extends CBMComputer {
     				   0xDD00,
     				   cia2CP1,
     				   cia2CP2,
-    				   nmiSwitcher.cia2NMIAction _,
+    				   nmiSwitcher.setLine(Switcher.CIA,_),
                idle => cia12Running(1) = !idle)
     rs232.setCIA12(cia1,cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
-    vicChip = new vic.VIC(vicMemory,mmu.COLOR_RAM,irqSwitcher.vicIRQ _,baLow _)      
+    vicChip = new vic.VIC(vicMemory,mmu.COLOR_RAM,irqSwitcher.setLine(Switcher.VIC,_),baLow _)
     mmu.setLastByteReadMemory(vicMemory)
     // mapping I/O chips in memory
     mmu.setIO(cia1,cia2,sid,vicChip)
@@ -125,8 +125,8 @@ class C64 extends CBMComputer {
     val lightPen = new LightPenButtonListener
     add(lightPen)
     display.addMouseListener(lightPen)
-    traceDialog = TraceDialog.getTraceDialog(displayFrame,mmu,cpu,display,vicChip)
-    diskTraceDialog = TraceDialog.getTraceDialog(displayFrame,drives(0).getMem,drives(0))
+    traceDialog = TraceDialog.getTraceDialog("CPU Debugger",displayFrame,mmu,cpu,display,vicChip)
+    diskTraceDialog = TraceDialog.getTraceDialog("Drive 8 Debugger",displayFrame,drives(0).getMem,drives(0))
     // drive leds
     add(driveLeds(0))        
     add(driveLeds(1))
@@ -149,7 +149,7 @@ class C64 extends CBMComputer {
     val row2Panel = new JPanel(new FlowLayout(FlowLayout.RIGHT))
     rowPanel.add("North",row1Panel)
     rowPanel.add("South",row2Panel)
-    val tapePanel = new TapeState
+    val tapePanel = new TapeState(datassette)
     datassette.setTapeListener(tapePanel)
     row1Panel.add(tapePanel)
     row1Panel.add(tapePanel.progressBar)
@@ -181,7 +181,7 @@ class C64 extends CBMComputer {
       case Some(f) =>
         handleDND(new File(f),false,true)
     }
-    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive _,attachDisk(_,_,true),attachDiskFile(_,_,_,None),drivesEnabled)
+    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,true),attachDiskFile(_,_,_,None),drivesEnabled)
   }
   
   override def afterInitHook  : Unit = {
@@ -236,11 +236,11 @@ class C64 extends CBMComputer {
   override def isHeadless = headless
 
   // ======================================== Settings ==============================================
-  protected def enableDrive(id:Int,enabled:Boolean) : Unit = {
+  override protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
     drivesEnabled(id) = enabled
     drives(id).setActive(enabled)
     driveLeds(id).setVisible(enabled)
-    adjustRatio
+    if (updateFrame) adjustRatio
   }
 
   protected def setDisplayRendering(hints:java.lang.Object) : Unit = {
@@ -305,18 +305,6 @@ class C64 extends CBMComputer {
     }
   }
   
- private def zoom(f:Int) : Unit = {
-    val dim = new Dimension(vicChip.VISIBLE_SCREEN_WIDTH * f,vicChip.VISIBLE_SCREEN_HEIGHT * f)
-    updateScreenDimension(dim)
-  }
-
-  private def updateScreenDimension(dim:Dimension): Unit = {
-    display.setPreferredSize(dim)
-    display.invalidate
-    display.repaint()
-    displayFrame.pack
-  }
-
   protected def savePrg : Unit = {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
@@ -387,7 +375,7 @@ class C64 extends CBMComputer {
     optionMenu.add(zoomItem)
     for(z <- 1 to 2) {
       val zoom1Item = new JRadioButtonMenuItem(s"Zoom x $z")
-      zoom1Item.addActionListener(_ => zoom(z) )
+      zoom1Item.addActionListener(_ => vicZoom(z) )
       val kea = z match {
         case 1 => java.awt.event.KeyEvent.VK_1
         case 2 => java.awt.event.KeyEvent.VK_2
@@ -400,6 +388,13 @@ class C64 extends CBMComputer {
     val vicItem = new JMenu("VIC")
     optionMenu.add(vicItem)
     setRenderingSettings(vicItem)
+    val vicDisplayEffectsItem = new JMenuItem("VIC's display effects ...")
+    vicItem.add(vicDisplayEffectsItem)
+    vicDisplayEffectsItem.addActionListener(_ => DisplayEffectPanel.createDisplayEffectPanel(displayFrame,display,"VIC").setVisible(true))
+
+    setVICModel(vicItem)
+
+    setVICBorderMode(vicItem)
 
     setFullScreenSettings(optionMenu)
     // -----------------------------------
@@ -475,6 +470,8 @@ class C64 extends CBMComputer {
 
     setGEORamSettings(IOItem)
 
+    setBeamRacerSettings(IOItem)
+
     // -----------------------------------
     
     IOItem.addSeparator
@@ -495,18 +492,7 @@ class C64 extends CBMComputer {
     optionMenu.add(romItem)
     romItem.addActionListener( _ => ROMPanel.showROMPanel(displayFrame,configuration,true,false,() => saveSettings(false)) )
   }
-  
-  override protected def setGlobalCommandLineOptions : Unit = {
-    super.setGlobalCommandLineOptions
-    settings.add("screen-dim",
-      "Zoom factor. Valued accepted are 1 and 2",
-      (f:Int) => if (f == 1 || f == 2) {
-        zoom(f)
-        zoomOverride = true
-      }
-    )
-  }
-  
+
   def turnOff  : Unit = {
     if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
     for(d <- drives)
@@ -544,11 +530,33 @@ class C64 extends CBMComputer {
     out.writeBoolean(drivesEnabled(0))
     out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
+
+    // VIC Coprocessor
+    vicChip.getCoprocessor match {
+      case None =>
+        out.writeBoolean(false)
+      case Some(cop) =>
+        out.writeBoolean(true)
+        out.writeObject(cop.componentID)
+    }
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     drivesEnabled(0) = in.readBoolean
     drivesEnabled(1) = in.readBoolean
     printerEnabled = in.readBoolean
+
+    // VIC Coprocessor
+    in.readBoolean match {
+      case false =>
+      case true =>
+        in.readObject.toString match { // copy factory
+          case "VASYL" =>
+            settings.getLoadF[Boolean]("BEAMRACER").foreach(_(true))
+          case cn =>
+            throw new IllegalArgumentException(s"Coprocessor $cn unknown")
+        }
+
+    }
   }
   protected def allowsStateRestoring : Boolean = true
   // -----------------------------------------------------------------------------------------
@@ -558,7 +566,7 @@ class C64 extends CBMComputer {
     // check help
     if (settings.checkForHelp(args)) {
       println(s"Kernal64, Commodore 64 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
-      settings.printUsage
+      settings.printUsage("file to attach")
       sys.exit(0)
     }
     swing { initComponent }
@@ -566,7 +574,7 @@ class C64 extends CBMComputer {
     swing { displayFrame.pack }
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
-      swing { updateScreenDimension(new Dimension(dim(0),dim(1))) }
+      swing { updateVICScreenDimension(new Dimension(dim(0),dim(1))) }
     }
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }

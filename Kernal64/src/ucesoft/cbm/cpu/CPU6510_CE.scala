@@ -3,12 +3,14 @@ package ucesoft.cbm.cpu
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.Log
 import ucesoft.cbm.Clock
-import ucesoft.cbm.trace.BreakType
+import ucesoft.cbm.trace.{BreakType, CpuStepInfo, NoBreak, TraceListener}
 import java.io.PrintWriter
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 
-class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
+import ucesoft.cbm.cpu.CPU65xx.CPUPostponeReadException
+
+class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   override lazy val componentID = "6510_CE"
   private[this] var baLow = false
   private[this] var dma = false
@@ -17,8 +19,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
   private[this] var tracing, tracingOnFile = false
   private[this] var tracingFile: PrintWriter = _
   private[this] var breakType: BreakType = null
-  private[this] var breakCallBack: (String) => Unit = _
-  private[this] var stepCallBack: (String) => Unit = _
+  private[this] var breakCallBack: CpuStepInfo => Unit = _
+  private[this] var stepCallBack: CpuStepInfo => Unit = _
   private[this] val syncObject = new Object
   private[this] var tracingCycleMode = false
   private[this] var instructionCycle = 0
@@ -204,17 +206,20 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   def setTrace(traceOn: Boolean) = tracing = traceOn
 
-  def step(updateRegisters: (String) => Unit) : Unit = {
+  def step(updateRegisters: CpuStepInfo => Unit) : Unit = {
     stepCallBack = updateRegisters
     syncObject.synchronized {
       syncObject.notify
     }
   }
 
-  def setBreakAt(breakType: BreakType, callback: (String) => Unit) : Unit = {
+  def setBreakAt(breakType: BreakType, callback: CpuStepInfo => Unit) : Unit = {
     tracing = false
     breakCallBack = callback
-    this.breakType = breakType
+    this.breakType = breakType match {
+      case NoBreak => null
+      case _ => breakType
+    }
   }
 
   def jmpTo(pc: Int) : Unit = {
@@ -2107,9 +2112,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   @inline private def fetchAndExecute  : Unit = {
     if (breakType != null && state == 0 && breakType.isBreak(PC, false, false)) {
-      breakType = null
       tracing = true
-      breakCallBack(toString)
+      breakCallBack(CpuStepInfo(PC,toString))
     }
 
 
@@ -2118,9 +2122,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
       nmiOnNegativeEdge = false
       state = NMI_STATE
       if (breakType != null && breakType.isBreak(PC, false, true)) {
-        breakType = null
         tracing = true
-        breakCallBack(toString)
+        breakCallBack(CpuStepInfo(PC,toString))
         Log.debug("NMI Break")
       }
     }
@@ -2130,9 +2133,8 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
         state = IRQ_STATE
       }
       if (breakType != null && breakType.isBreak(PC, true, false)) {
-        breakType = null
         tracing = true
-        breakCallBack(toString)
+        breakCallBack(CpuStepInfo(PC,toString))
         Log.debug("IRQ Break")
       }
     }
@@ -2140,6 +2142,7 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
       if (state == 0) {
         instructionCycle = 0
         tracingCyclePC = PC
+        CURRENT_OP_PC = PC
       }
       else
       if (!baLow) instructionCycle += 1
@@ -2147,9 +2150,9 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
       val tracingNow = tracing && (state == 0 || state == O_JAM || tracingCycleMode)
       if (tracingNow) Log.debug(formatDebug)
       if (tracingOnFile && (state == 0 || state == O_JAM)) tracingFile.println(formatDebug)
-      CURRENT_OP_PC = PC
+
       if (tracingNow) {
-        stepCallBack(toString)
+        stepCallBack(CpuStepInfo(PC,toString))
         syncObject.synchronized {
           syncObject.wait
         }
@@ -2160,8 +2163,18 @@ class CPU6510_CE(mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
     if (!ready) notReadyDuringInstr = true
 
-    states(state)()
+    try {
+      states(state)()
+    }
+    catch {
+      case _:CPUPostponeReadException =>
+        // the caller must have care to set ready line to stop CPU
+    }
   }
+
+  override def getMemory: Memory = mem
+  override def setMemory(m: Memory): Unit = this.mem = m
+  override def getCurrentOpCode: Int = op
 
   def isFetchingInstruction: Boolean = state == 0
 

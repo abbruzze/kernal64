@@ -32,13 +32,13 @@ class C128 extends CBMComputer with MMUChangeListener {
   protected val CONFIGURATION_FILENAME = "C128.config"
   private[this] val CONFIGURATION_VDC_FRAME_XY = "vdc.frame.xy"
   private[this] val CONFIGURATION_VDC_FRAME_DIM = "vdc.frame.dim"
-  override protected val PRG_RUN_DELAY_CYCLES = 6000000
+  override protected val PRG_RUN_DELAY_CYCLES = 6500000
 
   protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c128")
   private[this] var vdcEnabled = true // used with --vdc-disabled
   protected val mmu = new C128MMU(this)
   private[this] val z80 = new Z80(mmu,mmu)
-  override protected val irqSwitcher = new IRQSwitcher(irqRequest _)
+  override protected val irqSwitcher = new Switcher("IRQ",irqRequest _)
   private[this] var cpuFrequency = 1
   private[this] var c64Mode = false
   private[this] var z80Active = true
@@ -57,13 +57,13 @@ class C128 extends CBMComputer with MMUChangeListener {
   // ------------- MMU Status Panel ------------
   private[this] val mmuStatusPanel = new MMUStatusPanel
   // -------------------------------------------
-  private[this] var baLow = false
   private[this] var FSDIRasInput = true
+
+  private[this] var z80ScaleFactor = 2000000 / clock.getClockHz
 
   override protected def isC64Mode : Boolean = c64Mode
 
   def reset  : Unit = {
-    baLow = false
     dma = false
     z80Active = true
     clockSpeed = 1
@@ -124,7 +124,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     				   0xDC00,
     				   cia1CP1,
     				   cia1CP2,
-    				   irqSwitcher.ciaIRQ _,idle => cia12Running(0) = !idle) with IECBusListener {
+    				   irqSwitcher.setLine(Switcher.CIA,_),idle => cia12Running(0) = !idle) with IECBusListener {
       val busid = name
       
       bus.registerListener(this)
@@ -147,11 +147,11 @@ class C128 extends CBMComputer with MMUChangeListener {
     				   0xDD00,
     				   cia2CP1,
     				   cia2CP2,
-    				   nmiSwitcher.cia2NMIAction _,idle => cia12Running(1) = !idle)
+    				   nmiSwitcher.setLine(Switcher.CIA,_),idle => cia12Running(1) = !idle)
     rs232.setCIA12(cia1,cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
-    vicChip = new vic.VIC(vicMemory,mmu.colorRAM,irqSwitcher.vicIRQ _,baLow _,true)
+    vicChip = new vic.VIC(vicMemory,mmu.colorRAM,irqSwitcher.setLine(Switcher.VIC,_),baLow _,true)
     // I/O set
     mmu.setIO(cia1,cia2,vicChip,sid,vdc)
     // VIC display
@@ -180,8 +180,14 @@ class C128 extends CBMComputer with MMUChangeListener {
     val resRootPanel = new JPanel(new BorderLayout())
     val resPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
     val resLabel = new JLabel("Initializing ...")
+    val adaptResolutionCheck = new JCheckBox("AMSR")
+    adaptResolutionCheck.setToolTipText("Adapt monitor's height to screen resolution")
+    adaptResolutionCheck.setSelected(true)
+    adaptResolutionCheck.setFocusable(false)
+    adaptResolutionCheck.addActionListener( _ => vdc.setAdaptScreenResolution(adaptResolutionCheck.isSelected) )
     resPanel.add(resLabel)
     resRootPanel.add("West",resPanel)
+    resRootPanel.add("East",adaptResolutionCheck)
     vdcDisplayFrame.getContentPane.add("South",resRootPanel)
     vdc.setGeometryUpdateListener { msg =>
       resLabel.setText(msg)
@@ -237,8 +243,8 @@ class C128 extends CBMComputer with MMUChangeListener {
     add(lightPen)
     display.addMouseListener(lightPen)    
     // tracing
-    traceDialog = TraceDialog.getTraceDialog(displayFrame,mmu,z80,display,vicChip)
-    diskTraceDialog = TraceDialog.getTraceDialog(displayFrame,drives(0).getMem,drives(0))    
+    traceDialog = TraceDialog.getTraceDialog("CPU Debugger",displayFrame,mmu,z80,display,vicChip)
+    diskTraceDialog = TraceDialog.getTraceDialog("Disk8 Debugger",displayFrame,drives(0).getMem,drives(0))
     //diskTraceDialog.forceTracing(true)
     // drive leds
     add(driveLeds(0))        
@@ -261,7 +267,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     val row2Panel = new JPanel(new FlowLayout(FlowLayout.RIGHT))
     rowPanel.add("North",row1Panel)
     rowPanel.add("South",row2Panel)
-    val tapePanel = new TapeState
+    val tapePanel = new TapeState(datassette)
     datassette.setTapeListener(tapePanel)
     row1Panel.add(tapePanel)
     row1Panel.add(tapePanel.progressBar)
@@ -278,6 +284,8 @@ class C128 extends CBMComputer with MMUChangeListener {
 
     // GIF Recorder
     gifRecorder = GIFPanel.createGIFPanel(displayFrame,Array(display,vdcDisplay),Array("VIC","VDC"))
+    // clock freq change listener
+    clock.addChangeFrequencyListener(f => z80ScaleFactor = 2000000 / f)
   }
 
   private def loadSettings(args:Array[String]) : Unit = {
@@ -295,7 +303,7 @@ class C128 extends CBMComputer with MMUChangeListener {
       case Some(f) =>
         handleDND(new File(f),false,true)
     }
-    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive _,attachDisk(_,_,c64Mode),attachDiskFile(_,_,_,None),drivesEnabled)
+    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,c64Mode),attachDiskFile(_,_,_,None),drivesEnabled)
   }
   
   override def afterInitHook  : Unit = {
@@ -331,7 +339,7 @@ class C128 extends CBMComputer with MMUChangeListener {
       cartButtonRequested = false
       ExpansionPort.getExpansionPort.freezeButton
     }
-    if (z80Active) z80.clock(cycles,2.0299) // 2Mhz / 985248
+    if (z80Active) z80.clock(cycles,z80ScaleFactor) // 2Mhz / 985248 = 2.0299
     else {
       ProgramLoader.checkLoadingInWarpMode(c64Mode)
       cpu.fetchAndExecute(1)
@@ -352,8 +360,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   }
   
   private def baLow(low:Boolean) : Unit = {
-    baLow = low
-    if (z80Active) z80.requestBUS(baLow) else cpu.setBaLow(low)
+    if (z80Active) z80.requestBUS(low) else cpu.setBaLow(low)
     expansionPort.setBaLow(low)
   }
   
@@ -400,11 +407,11 @@ class C128 extends CBMComputer with MMUChangeListener {
   override def isHeadless = headless
   // ======================================== Settings ==============================================
 
-  protected def enableDrive(id:Int,enabled:Boolean) : Unit = {
+  override protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
     drivesEnabled(id) = enabled
     drives(id).setActive(enabled)
     driveLeds(id).setVisible(enabled)
-    adjustRatio(true)
+    if (updateFrame) adjustRatio()
   }
 
   private def enableVDC80(enabled:Boolean) : Unit = {
@@ -544,18 +551,6 @@ class C128 extends CBMComputer with MMUChangeListener {
         showError("Disk attaching error",t.toString)
     }
   }
-  
-  private def zoom(f:Int) : Unit = {
-    val dim = new Dimension(vicChip.VISIBLE_SCREEN_WIDTH * f,vicChip.VISIBLE_SCREEN_HEIGHT * f)
-    updateScreenDimension(dim)
-  }
-
-  private def updateScreenDimension(dim:Dimension): Unit = {
-    display.setPreferredSize(dim)
-    display.invalidate
-    display.repaint()
-    displayFrame.pack
-  }
 
   private def updateVDCScreenDimension(dim:Dimension): Unit = {
     vdcDisplay.setPreferredSize(dim)
@@ -688,34 +683,41 @@ class C128 extends CBMComputer with MMUChangeListener {
     
     optionMenu.addSeparator
     
-    val adjustMenu = new JMenu("Adjust display")
+    val adjustMenu = new JMenu("Display")
     optionMenu.add(adjustMenu)
+    val vicAdjMenu = new JMenu("VIC")
+    val vdcAdjMenu = new JMenu("VDC")
+
+    adjustMenu.add(vicAdjMenu)
+    adjustMenu.add(vdcAdjMenu)
+
     val adjustRatioItem = new JMenuItem("Adjust VIC display ratio")
     adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A,java.awt.event.InputEvent.ALT_DOWN_MASK))
     adjustRatioItem.addActionListener(_ => adjustRatio(true) )
-    adjustMenu.add(adjustRatioItem)
+    vicAdjMenu.add(adjustRatioItem)
     
     val adjustVDCRatioItem = new JMenuItem("Adjust VDC display ratio")
     adjustVDCRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_D,java.awt.event.InputEvent.ALT_DOWN_MASK))
     adjustVDCRatioItem.addActionListener(_ => adjustRatio(false,true) )
-    adjustMenu.add(adjustVDCRatioItem)
+    vdcAdjMenu.add(adjustVDCRatioItem)
     
     val vdcResetSizeItem = new JMenuItem("VDC normal size")
     vdcResetSizeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_1,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK))
     vdcResetSizeItem.addActionListener(_ => adjustRatio(false) )
-    adjustMenu.add(vdcResetSizeItem)
+    vdcAdjMenu.add(vdcResetSizeItem)
 
     val vdcHalfSizeItem = new JMenuItem("VDC smaller size")
     vdcHalfSizeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_2,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK))
     vdcHalfSizeItem.addActionListener(_ => adjustRatio(false,false,true) )
-    adjustMenu.add(vdcHalfSizeItem)
+    vdcAdjMenu.add(vdcHalfSizeItem)
     
     val zoomItem = new JMenu("VIC Zoom")
     val groupZ = new ButtonGroup
-    adjustMenu.add(zoomItem)
+    vicAdjMenu.add(zoomItem)
+    setVICModel(vicAdjMenu)
     for(z <- 1 to 2) {
       val zoom1Item = new JRadioButtonMenuItem(s"Zoom x $z")
-      zoom1Item.addActionListener(_ => zoom(z) )
+      zoom1Item.addActionListener(_ => vicZoom(z) )
       val kea = z match {
         case 1 => java.awt.event.KeyEvent.VK_1
         case 2 => java.awt.event.KeyEvent.VK_2
@@ -725,14 +727,23 @@ class C128 extends CBMComputer with MMUChangeListener {
       groupZ.add(zoom1Item)
     }
 
+    setVICBorderMode(vicAdjMenu)
+
     setFullScreenSettings(adjustMenu)
     
     val renderingItem = new JMenu("Rendering")
     adjustMenu.add(renderingItem)
     setRenderingSettings(renderingItem)
 
+    val vicDisplayEffectsItem = new JMenuItem("VIC's display effects ...")
+    val vdcDisplayEffectsItem = new JMenuItem("VDC's display effects ...")
+    vicAdjMenu.add(vicDisplayEffectsItem)
+    vdcAdjMenu.add(vdcDisplayEffectsItem)
+    vicDisplayEffectsItem.addActionListener(_ => DisplayEffectPanel.createDisplayEffectPanel(displayFrame,display,"VIC").setVisible(true))
+    vdcDisplayEffectsItem.addActionListener(_ => DisplayEffectPanel.createDisplayEffectPanel(vdcDisplayFrame,vdcDisplay,"VDC").setVisible(true))
+
     val deinterlaceModeItem = new JCheckBox("VDC deinterlace mode enabled")
-    adjustMenu.add(deinterlaceModeItem)
+    vdcAdjMenu.add(deinterlaceModeItem)
     deinterlaceModeItem.setSelected(true)
     deinterlaceModeItem.addActionListener(_ => vdc.setDeinterlaceMode(deinterlaceModeItem.isSelected) )
     // -----------------------------------
@@ -837,13 +848,6 @@ class C128 extends CBMComputer with MMUChangeListener {
   override protected def setGlobalCommandLineOptions : Unit = {
     super.setGlobalCommandLineOptions
 
-    settings.add("screen-dim",
-      "Zoom factor. Valued accepted are 1 and 2",
-      (f:Int) => if (f == 1 || f == 2) {
-        zoom(f)
-        zoomOverride = true
-      }
-    )
     settings.add("vdcscreenshot",
       "Take a screenshot of VDC screen and save it on the given file path. Used with --testcart only.",
       (file:String) => if (file != "") {
@@ -939,7 +943,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     // check help
     if (settings.checkForHelp(args)) {
       println(s"Kernal64, Commodore 128 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
-      settings.printUsage
+      settings.printUsage("file to attach")
       sys.exit(0)
     }
     swing{ initComponent }
@@ -958,7 +962,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     swing { displayFrame.pack }
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
-      swing { updateScreenDimension(new Dimension(dim(0),dim(1))) }
+      swing { updateVICScreenDimension(new Dimension(dim(0),dim(1))) }
     }
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }

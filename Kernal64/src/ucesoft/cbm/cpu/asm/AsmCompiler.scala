@@ -1,31 +1,34 @@
 package ucesoft.cbm.cpu.asm
 
-import java.io.PrintStream
+import java.io.{File, IOException,PrintWriter}
+
 import AsmParser._
 import ucesoft.cbm.cpu.CPU65xx._
 import Mode._
 import AsmEvaluator._
+
 import scala.util.parsing.input.Position
-import java.io.File
-import java.io.IOException
 
 class CompilerException(val msg:String,val statement:Option[AsmParser.Statement]) extends Exception(msg)
 
 case class ByteCodeStatement(pc:Int,asm:ASMStatement,operandValue:Option[RuntimeValue],source:Position)
   
-class ByteCodeBlock(_org:Int,var name:Option[String]) {
+class ByteCodeBlock(_org:Int,var name:Option[String],private var _virtual:Boolean = false) {
   private val asmList = new collection.mutable.ListBuffer[ByteCodeStatement]
   private var org = _org
   private var PC = _org
   
-  def setNewOrg(newOrg:Int) : Unit = {
+  def setNewOrg(newOrg:Int,virtual:Boolean) : Unit = {
     org = newOrg
     PC = org
+    _virtual = virtual
   }
   
-  def getOrg = org
+  def getOrg : Int = org
   
-  def pc = PC
+  def pc : Int = PC
+
+  def virtual : Boolean = _virtual
   
   def addSizeOf(asm:ASMStatement)(implicit ctx:EvaluationContext) : Unit = {
     PC += sizeAndCheck(asm)
@@ -34,6 +37,12 @@ class ByteCodeBlock(_org:Int,var name:Option[String]) {
   def addAsm(asm:ASMStatement,operandValue:Option[RuntimeValue])(implicit ctx:EvaluationContext) : Unit = {
     asmList += ByteCodeStatement(PC,asm,operandValue,asm.pos)
     PC += sizeAndCheck(asm)             
+  }
+
+  def addCommentedAsm(line:Int,address:Int,fileName:String) : Unit = {
+    val ca = COMMENTED_ASM(line)
+    ca.fileName = Some(fileName)
+    asmList += ByteCodeStatement(address,ca,None,ca.pos)
   }
   
   def alignTo(alignment:Int) : Unit = {
@@ -53,7 +62,7 @@ class ByteCodeBlock(_org:Int,var name:Option[String]) {
   }
   
   private def sizeAndCheck(asm:ASMStatement)(implicit ctx:EvaluationContext) : Int = asm match {
-    case a@ASM(opcode,mode,operand) =>
+    case a@ASM(_,mode,_) =>
       val (mmode,size) = mode match {
         case IMP => 
           (mode,1)
@@ -73,14 +82,19 @@ class ByteCodeBlock(_org:Int,var name:Option[String]) {
       }
       a.mode = mmode
       size
-    case ORG(_,_) => 0
-    case TEXT(e) => 
+    case ORG(_,_,_) => 0
+    case TEXT(e,_) =>
       Evaluator.evalExpr(e) match {
         case StringVal(s) => s.length
-        case WillBeVal(_,e) => throw new CompilerException(s"Cannot determine the length of the text: Missing $e",Some(asm))
+        case WillBeVal(_,s) => e.sizeHint match {
+          case None =>
+            throw new CompilerException(s"Cannot determine the length of the text: Missing $s",Some(asm))
+          case Some(size) =>
+            size
+        }
         case _ => throw new CompilerException(s"Type mismatch: TEXT expected a string",Some(asm))
       }
-    case WORD_GEN(FunOp("gen",None,name :: l :: _ :: Nil),isByte) => 
+    case WORD_GEN(FunOp("gen",None,_ :: l :: _ :: Nil),isByte) =>
       Evaluator.evalExpr(l) match {
         case ListVal(lv) => if (isByte) lv.size else lv.size * 2
         case WillBeVal(_,e) => 
@@ -90,7 +104,22 @@ class ByteCodeBlock(_org:Int,var name:Option[String]) {
       }      
     case WORD(l,true) => l.length
     case WORD(l,false) => l.length * 2
-    case WORD_GEN(f,_) => 0 // cannot happen
+    case WORD_GEN(_,_) => 0 // cannot happen
+    case FILL(e,_) =>
+      Evaluator.evalExpr(e) match {
+        case NumberVal(size) => size.toInt
+        case WillBeVal(_, e) =>
+          throw new CompilerException(s"Cannot determine the length of the fill statement: Missing $e", Some(asm))
+      }
+    case BYTE_LIST(ListValue(l,_)) => l.length
+    case BYTE_LIST(e) =>
+      Evaluator.evalExpr(e) match {
+        case ListVal(l) => l.length
+        case WillBeVal(_, e) =>
+          throw new CompilerException(s"Cannot determine the length of the byte statement: Missing $e", Some(asm))
+        case _ =>
+          throw new CompilerException(s"Bad byte operand, expected list $e", Some(asm))
+      }
   }
   
   override def toString = {
@@ -101,16 +130,18 @@ class ByteCodeBlock(_org:Int,var name:Option[String]) {
   }
 }
 
-class AsmCompiler(console:PrintStream,importDir:String) {  
+class AsmCompiler(console:PrintWriter,importDir:String) {
   private val STD_MODULE_NAME = "std"
   private case class ModuleRef(ref:String,enclosedModule:String,pars:Int = 0) {
     override def toString = s"$enclosedModule::$ref/$pars"
   }
   
   private class Context(val name:String,val isLocal:Boolean,val enclosedModule:String = STD_MODULE_NAME) extends EvaluationContext {
+    private case class MultilabelInfo(label:String,addresses:List[Int])
+
     val console = (s : String) => AsmCompiler.this.console.println(s)
     private val vars = new collection.mutable.HashMap[ModuleRef, Variable]
-    private val labels = new collection.mutable.HashMap[String, Int]
+    private val labels = new collection.mutable.HashMap[String, MultilabelInfo]
     private val structs = new collection.mutable.HashMap[ModuleRef,Struct]
     private var stackCounter = 0
     
@@ -119,12 +150,34 @@ class AsmCompiler(console:PrintStream,importDir:String) {
       stackCounter
     }
     
-    def newStack(name:String,isLocal:Boolean,module:Option[String]) : EvaluationContext = ??? // not implemented
+    def newStack(name:String,isLocal:Boolean,module:Option[String],applyCounter:Boolean) : EvaluationContext = ??? // not implemented
     def pop : EvaluationContext = ??? // not implemented
         
-    def findLabel(label:String) : Option[Int] = labels get label
-    def defineLabel(label:String,address:Int) = labels.put(label,address).isDefined      
-    
+    def findLabel(label:String) : Option[Int] = {
+      labels get label match {
+        case None =>
+          None
+        case Some(MultilabelInfo(_,addresses)) =>
+          if (addresses.size == 1) addresses.headOption
+          else {
+            addresses.map(byteCodeBlock.pc - _).filter(_ > 0) match {
+              case Nil =>
+                None
+              case l =>
+                Some(byteCodeBlock.pc - l.min)
+            }
+          }
+      }
+    }
+    def defineLabel(label:String,address:Int) : Boolean = {
+      labels get label match {
+        case None =>
+          labels += label -> MultilabelInfo(label,List(address))
+        case Some(MultilabelInfo(_,addresses)) =>
+          labels += label -> MultilabelInfo(label,addresses :+ address)
+      }
+      false
+    }
     private def findRef[T <: ModuleAware](refName:String,module:Option[String],map:collection.mutable.Map[ModuleRef,T],forceEnclosingModule:Option[String] = None) : Option[T] = {
       //println(s"Finding $module::$refName on $map")
       val enclosingModule = forceEnclosingModule.getOrElse(enclosedModule)
@@ -206,7 +259,7 @@ class AsmCompiler(console:PrintStream,importDir:String) {
     private val stack = new Stack[Context]
     private val userFunctions = new collection.mutable.HashMap[ModuleRef,FUNCTION]
     private val userMacros = new collection.mutable.HashMap[(String,Int),MACRO]
-    private val top : EvaluationContext = newStack("top",false,Some(STD_MODULE_NAME))
+    private val top : EvaluationContext = newStack("top",false,Some(STD_MODULE_NAME),false)
     private var _linking = false
     
     def linking = _linking
@@ -218,8 +271,8 @@ class AsmCompiler(console:PrintStream,importDir:String) {
     
     def isTop : Boolean = stack.size == 1
     def level : Int = stack.size
-    def newStack(name:String,isLocal:Boolean,module:Option[String]) : EvaluationContext = {
-      val stackName = if (level == 0) name else s"$name(${ctx.incAndGetCounter})"
+    def newStack(name:String,isLocal:Boolean,module:Option[String],applyCounter:Boolean) : EvaluationContext = {
+      val stackName = if (applyCounter) s"$name(${ctx.incAndGetCounter})" else name
       val ns = new Context(stackName,isLocal,module.getOrElse(STD_MODULE_NAME))
       stack.push(ns)
       ns
@@ -255,6 +308,7 @@ class AsmCompiler(console:PrintStream,importDir:String) {
       if (ctx.isLocal) {
         val cp = currentPathOf(stack)
         labelPaths(label) filter { p => p.endsWith(cp) } flatMap top.findLabel headOption
+        //labelPaths(label) flatMap top.findLabel headOption
       }
       else labelPaths(label) flatMap top.findLabel headOption
     }
@@ -374,7 +428,7 @@ class AsmCompiler(console:PrintStream,importDir:String) {
   }
   
   private def runFunction(f:FUNCTION,module:String,actualPars:List[RuntimeValue]) : RuntimeValue = {
-    ctx.newStack(f.name,true,Some(module))
+    ctx.newStack(f.name,true,Some(module),false)
     try {
       for((pn,pv) <- f.parameters.zip(actualPars)) ctx.defineVar(pn,Some(module),pv,true,false)
       var retValue : Option[RuntimeValue] = None
@@ -393,16 +447,16 @@ class AsmCompiler(console:PrintStream,importDir:String) {
     try {
       s match {
         // =============== ASM STATEMENTS ====================
-        case ORG(address,name) =>
+        case ORG(address,name,virtual) =>
           Evaluator.evalExpr(address) match {
             case NumberVal(address) =>
               if (byteCodeBlocks.exists(_.getOrg == address)) throw new CompilerException(s"Invalid org ${Integer.toHexString(address.toInt)}: already defined",Some(s))
               if (byteCodeBlock.size == 0) {
-                byteCodeBlock.setNewOrg(address.toInt)
+                byteCodeBlock.setNewOrg(address.toInt,virtual)
                 byteCodeBlock.name = name
               }
               else {
-                byteCodeBlock = new ByteCodeBlock(address.toInt,name)
+                byteCodeBlock = new ByteCodeBlock(address.toInt,name,virtual)
                 byteCodeBlocks += byteCodeBlock
               }
             case WillBeVal(_,e) => throw new CompilerException(s"Cannot determine the ORG initial address. Missing $e",Some(s))
@@ -421,11 +475,30 @@ class AsmCompiler(console:PrintStream,importDir:String) {
                   case ev =>
                     Some(ev)
                 }
-              case TEXT(e) => 
+              case FILL(size,value) =>
+                Evaluator.evalExpr(size) match {
+                  case NumberVal(size) =>
+                    val fillValue = value match {
+                      case None => 0
+                      case Some(v) =>
+                        Evaluator.evalExpr(v) match {
+                          case NumberVal(n) => n.toInt
+                          case StringVal(s) => s.charAt(0).toInt
+                          case WillBeVal(_,e) => throw new CompilerException(s"Cannot evaluate fill statement $asm. Missing $e",Some(s))
+                          case _ => throw new CompilerException(s"Cannot evaluate fill statement $asm. Missing bad value argument",Some(s))
+                        }
+                    }
+                    val buffer = collection.mutable.Buffer.fill[RuntimeValue](size.toInt)(NumberVal(fillValue))
+                    Some(ListVal(buffer))
+                  case WillBeVal(_,e) => throw new CompilerException(s"Cannot evaluate fill statement $asm. Missing $e",Some(s))
+                  case _ => throw new CompilerException(s"Cannot evaluate fill statement $asm. Expected int argument",Some(s))
+                }
+              case TEXT(e,_) =>
                 Evaluator.evalExpr(e) match {
                   case s@StringVal(_) => 
                     Some(s)
                   case WillBeVal(_,e) => throw new CompilerException(s"Cannot evaluate text statement $asm. Missing $e",Some(s))
+                  case _ => throw new CompilerException(s"Cannot evaluate text statement $asm. Expected string argument",Some(s))
                 }
               case WORD(l,isByte) =>
                 val list = l map { e =>
@@ -441,6 +514,13 @@ class AsmCompiler(console:PrintStream,importDir:String) {
                     case ev => 
                       Some(ev)
                   }
+              case BYTE_LIST(expr) =>
+                Evaluator.evalExpr(expr) match {
+                  case l@ListVal(_) =>
+                    Some(l)
+                  case _ =>
+                    throw new CompilerException(s"Cannot evaluate bytelist statement. Expected list",Some(s))
+                }
               case _ => 
                 None
             }
@@ -518,7 +598,7 @@ class AsmCompiler(console:PrintStream,importDir:String) {
           }
         // =================================================
         case IF(cond,thenStmts,elseStmts) =>
-          ctx.newStack("if",false,Some(ctx.ctx.enclosedModule))
+          ctx.newStack("if",false,Some(ctx.ctx.enclosedModule),false)
           try {
             var last : Option[RuntimeValue] = None
             if (checkCondition(cond,"if",s)) thenStmts foreach { s => last = compile(s) }
@@ -531,7 +611,7 @@ class AsmCompiler(console:PrintStream,importDir:String) {
           var broken = false
           while (!broken && checkCondition(cond,"while",s)) 
           try {
-            ctx.newStack("while",false,Some(ctx.ctx.enclosedModule))
+            ctx.newStack("while",false,Some(ctx.ctx.enclosedModule),true)
             stmts foreach { s => compile(s) }
           }
           catch {
@@ -542,14 +622,14 @@ class AsmCompiler(console:PrintStream,importDir:String) {
           None
         // =================================================
         case FOR(vars,cond,post,stmts) =>
-          ctx.newStack("forVar",false,Some(ctx.ctx.enclosedModule))
+          ctx.newStack("forVar",false,Some(ctx.ctx.enclosedModule),true)
           try {
             // vars
             for(v <- vars) compile(v)
             var broken = false
             while (!broken && checkCondition(cond,"for",s))
             try {
-              ctx.newStack("for",false,Some(ctx.ctx.enclosedModule))
+              ctx.newStack("for",false,Some(ctx.ctx.enclosedModule),true)
               stmts foreach { s => compile(s) }
               // post
               for(p <- post) compile(EVAL(None,p))
@@ -566,10 +646,13 @@ class AsmCompiler(console:PrintStream,importDir:String) {
         case MACRO_CALL(name,pars) =>
           ctx.findMacro(name,pars.size) match {
             case Some(m) =>
-              ctx.newStack("macro",true,Some(ctx.ctx.enclosedModule))
+              val epars = pars map Evaluator.evalExpr
               try {
-                val epars = pars map { Evaluator.evalExpr }
-                for((pn,pv) <- m.parameters.zip(epars)) ctx.defineVar(pn,None,pv,true,false)
+                ctx.newStack(s"macro_$name",true,Some(ctx.ctx.enclosedModule),false)
+
+                for((pn,pv) <- m.parameters.zip(epars)) {
+                  ctx.defineVar(pn,None,pv,true,false)
+                }
                 for(s <- m.body) compile(s)
               }
               finally ctx.pop
@@ -606,7 +689,7 @@ class AsmCompiler(console:PrintStream,importDir:String) {
             case NumberVal(n) => n.toInt
             case _ => throw new CompilerException(s"Cannot evaluate dup declaration",Some(s))
           }
-          ctx.newStack("dup",false,Some(ctx.ctx.enclosedModule))
+          ctx.newStack("dup",false,Some(ctx.ctx.enclosedModule),true)
           try {
             for(i <- 1 to times;s <- body)
               compile(s)
@@ -628,6 +711,12 @@ class AsmCompiler(console:PrintStream,importDir:String) {
             case err => throw new CompilerException(err.toString,Some(s))
           }
           None
+        case DISCARDEXPR(e) =>
+          Evaluator.evalExpr(e) match {
+            case WillBeVal(_,e) =>  throw new CompilerException(s"Cannot evaluate expression",Some(s))
+            case _ =>
+          }
+          None
       }
     }
     catch {
@@ -641,9 +730,9 @@ class AsmCompiler(console:PrintStream,importDir:String) {
     byteCodeBlocks.clear
     byteCodeBlocks += byteCodeBlock
     // constants
-    ctx.defineVar("true",None,new NumberVal(1),true,false)
-    ctx.defineVar("false",None,new NumberVal(0),true,false)
-    ctx.defineVar("nil",None,new ListVal(Nil.toBuffer),true,false)
+    ctx.defineVar("true",None,NumberVal(1),true,false)
+    ctx.defineVar("false",None,NumberVal(0),true,false)
+    ctx.defineVar("nil",None,ListVal(Nil.toBuffer),true,false)
   }
   
   private def include(includeStmt:INCLUDE) : List[Statement] = {
@@ -654,7 +743,7 @@ class AsmCompiler(console:PrintStream,importDir:String) {
     try {
       val txt = source.getLines.mkString("\n") + "\n"
       val in = new java.io.StringReader(txt)
-      println("Including \n" + txt)
+      //println("Including \n" + txt)
       val parser = new AsmParser(includeStmt.file)
       parser.parseAll(parser.topStatements, in) match {
        case parser.Success(parsed, _) =>
@@ -689,7 +778,7 @@ class AsmCompiler(console:PrintStream,importDir:String) {
           List(s)
       }
     }
-    print("Statements after include:\n" + included.mkString("\n"))
+    //print("Statements after include:\n" + included.mkString("\n"))
     // filter user functions & macros
     val filteredSts = included filter { 
       case f@AsmParser.FUNCTION(_,_,_,isPrivate) =>
@@ -720,21 +809,21 @@ class AsmCompiler(console:PrintStream,importDir:String) {
     }
 
     ctx.defineLabel("__",byteCodeBlock.pc)
-    printStack
-    println(s"========= 1st pass completed ============== [${ctx.level}]")
+    console.println(s"========= 1st pass completed ============== [${ctx.level}]")
     ctx.linking = true
     init
     
     for(s <- filteredSts) s match {
       case MODULE(module,stats) =>
         for(s <- stats) s match {
-          case f@AsmParser.FUNCTION(_,_,_,_) =>
+          case AsmParser.FUNCTION(_,_,_,_) =>
           case s =>
             compile(s,Some(module))
         }
       case s =>
         compile(s)
     }
+    console.println(s"========= 2nd pass completed ============== [${ctx.level}]")
     
     byteCodeBlocks.toList
   }

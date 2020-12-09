@@ -1,12 +1,13 @@
 package ucesoft.cbm.cpu.asm
 
-import java.io.PrintStream
+import java.io.PrintWriter
+
 import AsmEvaluator._
 import ucesoft.cbm.cpu.CPU65xx
 
 case class AsmEncoding(org:Int,mem:Array[Byte])
 
-class AsmBytecodeEmitter(console:PrintStream,blocks:List[ByteCodeBlock]) {
+class AsmBytecodeEmitter(console:PrintWriter,blocks:List[ByteCodeBlock]) {
   def encode : AsmEncoding = {
     val ordered = orderAndCheck
     val startEnd = getStartEnd(ordered)
@@ -21,7 +22,7 @@ class AsmBytecodeEmitter(console:PrintStream,blocks:List[ByteCodeBlock]) {
     AsmEncoding(startEnd._1,mem)
   }
   private def orderAndCheck : List[ByteCodeBlock] = {
-    val orderedBlocks = blocks.sortBy { _.getOrg }
+    val orderedBlocks = blocks.filterNot(_.virtual).sortBy { _.getOrg }
     // check for intersections
     var ptr = orderedBlocks
     while (!ptr.isEmpty) {
@@ -44,13 +45,15 @@ class AsmBytecodeEmitter(console:PrintStream,blocks:List[ByteCodeBlock]) {
   
   private def buildInitalMemory(fromEnd:(Int,Int)) : Array[Byte] = Array.ofDim[Byte](fromEnd._2 - fromEnd._1)
   
-  private def getOperand(v:RuntimeValue) : Option[Int] = {
+  private def getOperand(v:RuntimeValue) : List[Int] = {
     v match {
       case NumberVal(n) =>
-        if (n.isValidInt) Some(n.toInt) else None
+        if (n.isValidInt) List(n.toInt) else Nil
       case StringVal(s) if s.length == 1 =>
-        Some(encodeChar(s.charAt(0)))
-      case _ => None
+        List(encodeChar(s.charAt(0)))
+      case ListVal(l) =>
+        l filter { _.isInstanceOf[NumberVal]} map { _.asInstanceOf[NumberVal].n.toInt} toList
+      case _ => Nil
     }
   }
   
@@ -68,39 +71,48 @@ class AsmBytecodeEmitter(console:PrintStream,blocks:List[ByteCodeBlock]) {
     var pc = bcs.pc - startOffset
     
     def emitListOf(isByte:Boolean) : Unit = {
-      for(ListVal(l) <- bcs.operandValue;e <- l) {
+      for(ListVal(l) <- bcs.operandValue;
+          e <- l) {
         getOperand(e) match {
-          case Some(o) =>
-            isByte match {
-              case true =>
-                mem(pc) = (o & 0xFF).toByte
-                pc += 1
-              case false =>
-                mem(pc) = (o & 0xFF).toByte
-                mem(pc + 1) = (o >> 8).toByte
-                pc += 2
+          case Nil =>
+            throw new IllegalArgumentException(s"Error on line ${bcs.source.line}: type mismatch on operand")
+          case list =>
+            for(o <- list) {
+              isByte match {
+                case true =>
+                  mem(pc) = (o & 0xFF).toByte
+                  pc += 1
+                case false =>
+                  mem(pc) = (o & 0xFF).toByte
+                  mem(pc + 1) = (o >> 8).toByte
+                  pc += 2
+              }
             }
-          case None => 
-            throw new IllegalArgumentException("Type mismatch on operand: expected int value")
         }
       }
     }
     
     def operand : Int = getOperand(bcs.operandValue.get) match {
-      case Some(v) => v
-      case None => 
-        throw new IllegalArgumentException("Type mismatch on operand: expected int value")
+      case v :: Nil => v
+      case Nil =>
+        throw new IllegalArgumentException(s"Error on line ${bcs.source.line}: type mismatch on operand")
     }
     
     bcs.asm match {
-      case ORG(_,_) => // ignored
+      case ORG(_,_,_) => // ignored
+      case FILL(_,_) =>
+        emitListOf(true)
       case WORD(_,isByte) =>
         emitListOf(isByte)
       case WORD_GEN(_,isByte) =>
         emitListOf(isByte)
-      case TEXT(_) =>
+      case BYTE_LIST(_) =>
+        emitListOf(true)
+      case TEXT(_,enc) =>
         for(StringVal(s) <- bcs.operandValue;c <- encodeText(s)) {
-          mem(pc) = c
+          val ch = if (enc.upper) c.toChar.toUpper.toByte else c
+          val cc = if (enc.screenCode) ascii2screenCode(ch) else ch
+          mem(pc) = cc.toByte
           pc += 1
         } 
       case ASM(mnemonic,mode,_) =>
@@ -128,5 +140,17 @@ class AsmBytecodeEmitter(console:PrintStream,blocks:List[ByteCodeBlock]) {
           }
         }
     }
-  } 
+  }
+
+  private def ascii2screenCode(c:Int) : Int = {
+    if (c >= 64 && c <= 95) c - 64
+    else if (c >= 96 && c <= 127) c - 32
+    else if (c >= 128 && c <= 159) c + 64
+    else if (c >= 160 && c <= 191) c - 64
+    else if (c >= 192 && c <= 223) c - 128
+    else if (c >= 224 && c <= 254) c - 128
+    else if (c == 255) 94
+    else if (c > 255) c & 0xFF
+    else c
+  }
 }

@@ -5,12 +5,12 @@ import ucesoft.cbm.ChipID
 import ucesoft.cbm.Log
 import ucesoft.cbm.Clock
 import ucesoft.cbm.cpu.CPU65xx
-import ucesoft.cbm.trace.BreakType
+import ucesoft.cbm.trace._
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import java.io.PrintWriter
 
-class CPU65816(mem:Memory) extends CPU65xx {
+class CPU65816(private var mem:Memory) extends CPU65xx {
   val id = ChipID.CPU
   override lazy val componentID = "6510_CE"
   private[this] var baLow = false
@@ -20,8 +20,8 @@ class CPU65816(mem:Memory) extends CPU65xx {
   private[this] var tracing, tracingOnFile = false
   private[this] var tracingFile: PrintWriter = _
   private[this] var breakType: BreakType = null
-  private[this] var breakCallBack: (String) => Unit = _
-  private[this] var stepCallBack: (String) => Unit = _
+  private[this] var breakCallBack: CpuStepInfo => Unit = _
+  private[this] var stepCallBack: CpuStepInfo => Unit = _
   private[this] val syncObject = new Object
   private[this] var nmiOnNegativeEdge = false
   private[this] var irqLow = false
@@ -59,6 +59,7 @@ class CPU65816(mem:Memory) extends CPU65xx {
   private[this] var cpu_wait : Boolean = false
   private[this] var cpu_cycle_count,remaining_cpu_cycle_count = 0L
 
+  private[this] var opcode = 0
   private[this] var opcode_table_ptr : Array[() => Unit] = _
 
   private[this] val atmp,opaddr = new Address
@@ -193,16 +194,19 @@ class CPU65816(mem:Memory) extends CPU65xx {
     // ================== Tracing ==================================
   def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {}
   def setTrace(traceOn:Boolean) : Unit = tracing = traceOn
-  def step(updateRegisters: (String) => Unit) : Unit = {
+  def step(updateRegisters: CpuStepInfo => Unit) : Unit = {
     stepCallBack = updateRegisters
         syncObject.synchronized {
           syncObject.notify
     }
   }
-  def setBreakAt(breakType:BreakType,callback:(String) => Unit) : Unit = {
+  def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) : Unit = {
     tracing = false
     breakCallBack = callback
-    this.breakType = breakType
+    this.breakType = breakType match {
+          case NoBreak => null
+          case _ => breakType
+        }
   }
   def jmpTo(pc:Int) : Unit = PC.A = pc & 0xFFFF
   def setCycleMode(cycleMode:Boolean) : Unit = {}
@@ -241,9 +245,8 @@ class CPU65816(mem:Memory) extends CPU65xx {
 
     @inline private def fetchAndExecute : Unit = {
       if (breakType != null && breakType.isBreak(PC.A, false, false)) {
-        breakType = null
         tracing = true
-        breakCallBack(toString)
+        breakCallBack(CpuStepInfo(PC.A,toString))
       }
       if (cpu_stop) return
         else {
@@ -251,9 +254,8 @@ class CPU65816(mem:Memory) extends CPU65xx {
             // check NMI first
             if (nmiOnNegativeEdge) {
                 if (breakType != null && breakType.isBreak(PC.A, false, true)) {
-                    breakType = null
                     tracing = true
-                    breakCallBack(toString)
+                    breakCallBack(CpuStepInfo(PC.A,toString))
                     Log.debug("NMI Break")
                 }
                 nmiOnNegativeEdge = false
@@ -261,9 +263,8 @@ class CPU65816(mem:Memory) extends CPU65xx {
             }
             else if (irqLow && !((P & 0x04) == 0x04)) {
                 if (breakType != null && breakType.isBreak(PC.A, true, false)) {
-                    breakType = null
                     tracing = true
-                    breakCallBack(toString)
+                    breakCallBack(CpuStepInfo(PC.A,toString))
                     Log.debug("IRQ Break")
                 }
                 opcode_table_ptr(IRQ_INDEX)()
@@ -272,13 +273,13 @@ class CPU65816(mem:Memory) extends CPU65xx {
             else if (!cpu_wait) {
                 if (tracing) {
                     Log.debug(formatDebug)
-                    stepCallBack(toString)
+                    stepCallBack(CpuStepInfo(PC.A,toString))
                     syncObject.synchronized {
                         syncObject.wait
                     }
                 }
                 // fetching
-                val opcode = mem.read(PC.A)
+                opcode = mem.read(PC.A)
                 PC.W.PC_++
                 opcode_table_ptr(opcode)()
             }
@@ -286,6 +287,9 @@ class CPU65816(mem:Memory) extends CPU65xx {
         }
     }
 
+  override def getMemory: Memory = mem
+  override def setMemory(m: Memory): Unit = this.mem = m
+  override def getCurrentOpCode: Int = opcode
 
   private def CPU_modeSwitch() : Unit = {
     if (E) {

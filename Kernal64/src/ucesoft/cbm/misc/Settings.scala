@@ -93,8 +93,8 @@ class Settings {
   
   def checkForHelp(args:Array[String]) : Boolean = args.length == 1 && (args(0) == "--help" || args(0) == "-h" || args(0) == "-help")
   
-  def printUsage  : Unit = {
-    println("Usage: [settings] [file to attach]")
+  def printUsage(fileDescr:String)  : Unit = {
+    println(s"Usage: [settings] [$fileDescr]")
     for(s <- settings) {
       val opt = if (s.cmdLine.length > 20) s.cmdLine else s.cmdLine + (" " * (20 - s.cmdLine.length))
       println("--" + opt + s.description)

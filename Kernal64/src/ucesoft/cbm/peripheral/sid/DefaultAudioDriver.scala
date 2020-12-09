@@ -23,6 +23,8 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
   private[this] var vol = 0
   private[this] val buffer = Array.ofDim[Byte](40)
   private[this] var pos = 0
+  private[this] var muted = false
+  private[this] var soundOn = true
   
   setMasterVolume(100)
   if (dataLine != null) dataLine.start()
@@ -49,6 +51,7 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
   final def reset {
     pos = 0
     if (dataLine != null) dataLine.flush
+    setSoundOn(true)
   }
   def discard {
     if (dataLine != null) {
@@ -57,9 +60,13 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
     }
   }
   def setSoundOn(on:Boolean) {
-    //if (mute != null) mute.setValue(!on)
+    soundOn = on
+    updateLine
+  }
+
+  private def updateLine : Unit = {
     if (dataLine != null) {
-      if (on) dataLine.start
+      if (soundOn && !muted) dataLine.start
       else {
         dataLine.stop
         dataLine.flush
@@ -67,4 +74,13 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
       }
     }
   }
+
+  override def setMuted(muted: Boolean): Unit = {
+    this.muted = muted
+    updateLine
+  }
+
+  override def isMuted: Boolean = muted
+
+  override def isSoundOn: Boolean = soundOn
 }

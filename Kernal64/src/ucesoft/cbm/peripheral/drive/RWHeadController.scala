@@ -15,7 +15,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
   protected var motorOn = false
   protected var byteReady = false
   protected var byteReadySignal = 1
-  protected var track = 1
+  protected var track = 18
   protected var currentFilename = ""
   protected var writeProtect = false
   

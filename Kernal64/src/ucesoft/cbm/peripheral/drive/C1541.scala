@@ -5,13 +5,11 @@ import ucesoft.cbm.Log
 import ucesoft.cbm.cpu.CPU65xx
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.Clock
-import ucesoft.cbm.trace.TraceListener
+import ucesoft.cbm.trace.{BreakType, CpuStepInfo, TraceListener}
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.trace.BreakType
-import java.io.{IOException, ObjectInputStream, ObjectOutputStream, PrintWriter}
+import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
 
-import javax.swing.JFrame
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.bus.IECBusListener
 import ucesoft.cbm.peripheral.bus.IECBusLine
@@ -431,8 +429,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     if (tracing) awake
     cpu.setTrace(traceOn)
   }
-  def step(updateRegisters: (String) => Unit) = cpu.step(updateRegisters)
-  def setBreakAt(breakType:BreakType,callback:(String) => Unit) = cpu.setBreakAt(breakType,callback)
+  def step(updateRegisters: CpuStepInfo => Unit) = cpu.step(updateRegisters)
+  def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) = cpu.setBreakAt(breakType,callback)
   def jmpTo(pc: Int) = cpu.jmpTo(pc)
   def disassemble(mem:Memory,address:Int) = cpu.disassemble(mem, address)
   // state
