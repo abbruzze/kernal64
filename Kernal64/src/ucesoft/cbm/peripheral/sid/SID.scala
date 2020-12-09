@@ -77,7 +77,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     if (!fullSpeed) start
   }
 
-  def setStereo(isStereo:Boolean,sid2:Option[SID] = None) {
+  def setStereo(isStereo:Boolean,sid2:Option[SID] = None) : Unit = {
     if (this.sid2 != null) this.sid2.stop
 
     this.sid2 = sid2.getOrElse(null)
@@ -108,7 +108,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     start
   }
   
-  def setModel(is6581:Boolean) {
+  def setModel(is6581:Boolean) : Unit = {
     if (is6581) {
       sid.set_chip_model(ISIDDefs.chip_model.MOS6581)
       if (sid2 != null) sid2.setModel(true)
@@ -153,7 +153,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
 
   private[this] val sidEventCallBack = sidEvent _
 
-  private def sidEvent(cycles:Long) {
+  private def sidEvent(cycles:Long) : Unit = {
     var nextSample = cycles + CLOCKS_PER_SAMPLE
     nextRest += CLOCKS_PER_SAMPLE_REST
     if (nextRest > 1000) {
@@ -197,7 +197,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
       case _ =>
     }
   }
-  def start {
+  def start : Unit = {
     if (!driver.isMuted) {
       driver.setSoundOn(true)
       nextRest = 0
@@ -208,16 +208,16 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     if (!cycleExact) Clock.systemClock.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 5,sidEventCallBack))
     lastCycles = Clock.systemClock.currentCycles
   }
-  def setFullSpeed(full:Boolean) = {
+  def setFullSpeed(full:Boolean) : Unit ={
     fullSpeed = full
     if (full) stop else start
   }
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeObject(sid.read_state)
     out.writeBoolean(cycleExact)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     sid.write_state(in.readObject.asInstanceOf[ucesoft.cbm.peripheral.sid.resid.SID.State])
     cycleExact = in.readBoolean
     Clock.systemClock.cancel(componentID)

@@ -23,7 +23,7 @@ class FontPanel(mem:Memory) extends JPanel with ActionListener {
   
   init
   
-  private def init {
+  private def init : Unit = {
     setLayout(new BorderLayout)
     val northPanel = new JPanel
     northPanel.add(new JLabel("Address:"))
@@ -44,7 +44,7 @@ class FontPanel(mem:Memory) extends JPanel with ActionListener {
     add("Center",matrixPanel)
   }
   
-  private def updateMatrix {
+  private def updateMatrix : Unit = {
     val address = addressTextField.getText.toInt
     for(r <- 0 to 7) {      
       val ch = mem.read(address + r)
@@ -57,7 +57,7 @@ class FontPanel(mem:Memory) extends JPanel with ActionListener {
     repaint()
   }
   
-  def actionPerformed(e:ActionEvent) {
+  def actionPerformed(e:ActionEvent) : Unit = {
     e.getActionCommand match {
       case "UP" =>
         addressTextField.setText((addressTextField.getText.toInt + 8).toString)

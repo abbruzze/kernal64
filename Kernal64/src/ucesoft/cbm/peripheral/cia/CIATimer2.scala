@@ -49,11 +49,11 @@ class CIATimerA2(ciaName: String,
   def isStartedAndInContinousMode = started && !oneShot
   def isStarted = started
   
-  def init {}
+  def init : Unit = {}
   
   import Clock.systemClock
 
-  def reset {
+  def reset : Unit = {
     latch = 0xFFFF
     counter = 0xFFFF
     cr = 0
@@ -77,14 +77,14 @@ class CIATimerA2(ciaName: String,
     properties
   }  
 
-  final def writeLo(lo: Int) {
+  final def writeLo(lo: Int) : Unit = {
     latch = (latch & 0xFF00) | (lo & 0xFF)
     //if ((cr & 0x10) > 0) counter = (counter & 0xFF00) | lo & 0xFF
     Log.debug(s"${componentID} set counter lo to ${lo} latch=${latch}")
     //println(s"${ciaName}-${id} set counter lo to ${lo} latch=${latch} prev=${prev}")
   }
 
-  final def writeHi(hi: Int) {
+  final def writeHi(hi: Int) : Unit = {
     latch = ((hi & 0xFF) << 8) | (latch & 0x00FF)
     if (!started) counter = latch
     Log.debug(s"${componentID} set counter hi to ${hi} latch=${latch} started=$started")
@@ -105,7 +105,7 @@ class CIATimerA2(ciaName: String,
   }
 
   final def readCR = (cr & 0xEE) | (if (started) 1 else 0) // we mask the reload bit
-  final def writeCR(value: Int) {
+  final def writeCR(value: Int) : Unit = {
     cr = value
     val startTimer = (cr & 1) == 1
     oneShot = (cr & 8) == 8
@@ -138,12 +138,12 @@ class CIATimerA2(ciaName: String,
     Log.debug(s"${componentID} control register set to ${cr}: started=$started latch=${latch} countSystemClock=$countSystemClock reload=$reload onshot=$oneShot countExt=$countExternal")
   }
 
-  protected def handleCR567 {}
+  protected def handleCR567 : Unit = {}
   
   private[this] val underflowCallback = underflow _
   private[this] val toggleToFalse = (cycles:Long) => { toggleValue = false }
   
-  @inline private def reschedule(delay:Int,count:Int) {
+  @inline private def reschedule(delay:Int,count:Int) : Unit = {
     if (countSystemClock) {
       val cycles = systemClock.currentCycles
       startCycle = cycles + delay
@@ -153,7 +153,7 @@ class CIATimerA2(ciaName: String,
     }
   }
 
-  private def enableTimer(enabled: Boolean,reload:Boolean,oldCountExternal:Boolean,startedWithCountSystemClock:Boolean) {
+  private def enableTimer(enabled: Boolean,reload:Boolean,oldCountExternal:Boolean,startedWithCountSystemClock:Boolean) : Unit = {
     // STOPPED AND REQUEST TO START || CNT -> CLK
     if ((!started && enabled) || startedWithCountSystemClock) {
       val toCount = if (reload) latch else counter
@@ -203,7 +203,7 @@ class CIATimerA2(ciaName: String,
     if (counter == 0) underflow(systemClock.currentCycles)
     //else counter -= 1
   }
-  protected def setCountExternal(enabled: Boolean) {
+  protected def setCountExternal(enabled: Boolean) : Unit = {
     countExternal = enabled
     Log.debug(s"${componentID} countExternal=${enabled}")
   }
@@ -211,7 +211,7 @@ class CIATimerA2(ciaName: String,
   /**
    * Manual clock
    */
-  final def clock {
+  final def clock : Unit = {
     if (started) {
       if (startDelayCount > 0) startDelayCount -= 1
       else {
@@ -221,7 +221,7 @@ class CIATimerA2(ciaName: String,
     }
   }
 
-  private def underflow(cycles: Long) {
+  private def underflow(cycles: Long) : Unit = {
     if (!countSystemClock) return // don't manage CNT counting
     
     // check serial callback
@@ -249,7 +249,7 @@ class CIATimerA2(ciaName: String,
     else if (!countExternal && autoClock) reschedule(START_CONT_DELAY,counter)
   }
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeInt(latch)
     out.writeInt(counter)
     out.writeInt(cr)
@@ -265,7 +265,7 @@ class CIATimerA2(ciaName: String,
     out.writeInt(startDelayCount)
     saveClockEvents(out)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     latch = in.readInt
     counter = in.readInt
     cr = in.readInt
@@ -291,7 +291,7 @@ class CIATimerA2(ciaName: String,
 
 class CIATimerB2(ciaName: String, id: Int, irqAction: (Int) => Unit,autoClock:Boolean = true) extends CIATimerA2(ciaName, id, irqAction,autoClock) {
   override val componentID = ciaName + "_TB"
-  override protected def handleCR567 {
+  override protected def handleCR567 : Unit = {
     val bit56 = (cr >> 5) & 0x3
     setCountExternal(bit56 == 2)
     countSystemClock = bit56 == 2 || // Timer counts underflow of timer A, TODO can be removed

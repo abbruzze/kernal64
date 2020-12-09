@@ -56,13 +56,13 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     bus.registerListener(this)
     if (jackID == 0) ParallelCable.pcCallback = onCB1 _
     
-    override def reset {
+    override def reset : Unit = {
       super.reset
     }
     
     def setEnabled(enabled:Boolean) = driveEnabled = enabled
     
-    override def atnChanged(oldValue:Int,newValue:Int) {
+    override def atnChanged(oldValue:Int,newValue:Int) : Unit = {
       if (driveEnabled) {
         if (newValue == IECBus.GROUND) {
           irq_set(IRQ_CA1)
@@ -89,7 +89,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       case ofs => super.read(address,chipID)
     }
     
-    override def write(address: Int, value: Int, chipID: ChipID.ID) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID) : Unit = {
       super.write(address,value,chipID)
       (address & 0x0F) match {
         case PB|DDRB =>        
@@ -109,7 +109,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     @inline private def data_out = if ((regs(DDRB) & regs(PB) & 0x02) > 0) IECBus.GROUND else IECBus.VOLTAGE
     @inline private def clock_out = if ((regs(DDRB) & regs(PB) & 0x08) > 0) IECBus.GROUND else IECBus.VOLTAGE
     
-    @inline private def autoacknwoledgeData {
+    @inline private def autoacknwoledgeData : Unit = {
       if ((regs(DDRB) & 0x10) > 0) {
         val atna = (regs(DDRB) & regs(PB) & 0x10) > 0
         val dataOut = (bus.atn == IECBus.GROUND) ^ atna
@@ -117,12 +117,12 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       }
     }
     // state
-    override protected def saveState(out:ObjectOutputStream) {
+    override protected def saveState(out:ObjectOutputStream) : Unit = {
       super.saveState(out)
       //out.writeInt(data_out)
       out.writeBoolean(driveEnabled)
     }
-    override protected def loadState(in:ObjectInputStream) {
+    override protected def loadState(in:ObjectInputStream) : Unit = {
       super.loadState(in)
       driveEnabled = in.readBoolean
     }
@@ -140,7 +140,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     private[this] var isDiskChanged = true
     private[this] var isDiskChanging = false
       
-    def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) {
+    def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) : Unit = {
       floppy = driveReader
       if (emulateInserting) {
         RW_HEAD.setFloppy(EmptyFloppy)
@@ -180,7 +180,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       case ofs => super.read(address, chipID)
     }
   
-    override def write(address: Int, value: Int, chipID: ChipID.ID) {
+    override def write(address: Int, value: Int, chipID: ChipID.ID) : Unit = {
       (address & 0x0F) match {
         case PA =>
           if ((regs(PCR) & 0x0C) == 0x08) RW_HEAD.canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
@@ -222,7 +222,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       super.write(address, value, chipID)
     }
           
-    final def byteReady {
+    final def byteReady : Unit = {
       cpu.setOverflowFlag
       irq_set(IRQ_CA1)
       
@@ -233,12 +233,12 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     }
     
     // state
-    override protected def saveState(out:ObjectOutputStream) {
+    override protected def saveState(out:ObjectOutputStream) : Unit = {
       super.saveState(out)
       out.writeBoolean(isDiskChanged)
       out.writeBoolean(isDiskChanging)
     }
-    override protected def loadState(in:ObjectInputStream) {
+    override protected def loadState(in:ObjectInputStream) : Unit = {
       super.loadState(in)
       isDiskChanged = in.readBoolean
       isDiskChanging = in.readBoolean
@@ -258,12 +258,12 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     running = active
     runningListener(active)
   }
-  override def canGoSleeping = canSleep
-  override def setCanSleep(canSleep: Boolean) {
+  override def canGoSleeping : Boolean = canSleep
+  override def setCanSleep(canSleep: Boolean) : Unit = {
     this.canSleep = canSleep
     awake
   }
-  private def awake {
+  private def awake : Unit = {
     running = true
     runningListener(true)
     viaBus.setActive(true)
@@ -272,14 +272,14 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     //viaDisk.awake
   }
   
-  override def disconnect {
+  override def disconnect : Unit = {
     bus.unregisterListener(viaBus)
   }
 
   override def isReadOnly: Boolean = RW_HEAD.isWriteProtected
   override def setReadOnly(readOnly:Boolean) = RW_HEAD.setWriteProtected(readOnly)
   
-  override def setSpeedHz(speed:Int) {
+  override def setSpeedHz(speed:Int) : Unit = {
     currentSpeedHz = speed
     CYCLE_ADJ = (speed - MIN_SPEED_HZ) / MIN_SPEED_HZ.toDouble
   }
@@ -298,7 +298,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     properties
   }
 
-  def init {
+  def init : Unit = {
     Log.info("Initializing C1541...")
     add(mem)
     add(cpu)
@@ -309,7 +309,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     if (ledListener != null) ledListener.turnOn
   }
 
-  def reset {
+  def reset : Unit = {
     running = true
     runningListener(true)
     awakeCycles = 0
@@ -337,29 +337,29 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       properties
     }
 
-    final def viaBusIRQ(low: Boolean) {
+    final def viaBusIRQ(low: Boolean) : Unit = {
       Log.debug("VIABus setting IRQ as " + low)
       viaBusIRQLow = low
       handleIRQ
     }
-    final def viaDiskIRQ(low: Boolean) {
+    final def viaDiskIRQ(low: Boolean) : Unit = {
       Log.debug("VIADisk setting IRQ as " + low)
       viaDiskIRQLow = low
       handleIRQ
     }
 
-    def init {}
+    def init : Unit = {}
 
-    def reset {
+    def reset : Unit = {
       viaBusIRQLow = false
       viaDiskIRQLow = false
     }
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeBoolean(viaBusIRQLow)
       out.writeBoolean(viaDiskIRQLow)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       viaBusIRQLow = in.readBoolean
       viaDiskIRQLow = in.readBoolean
     }
@@ -368,7 +368,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
 
   override def getMem = mem
 
-  @inline private def checkPC(cycles: Long) {
+  @inline private def checkPC(cycles: Long) : Unit = {
     val pc = cpu.getPC
     if (pc == LOAD_ROUTINE) setFilename
     else 
@@ -382,7 +382,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     }
   }
 
-  def clock(cycles: Long) {
+  def clock(cycles: Long) : Unit = {
     if (running) {
       checkPC(cycles)
       if (CYCLE_ADJ > 0) {
@@ -407,7 +407,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     }
   }
 
-  private def setFilename {
+  private def setFilename : Unit = {
     var adr = 0x200
     val sb = new StringBuilder
     var c = mem.read(adr)
@@ -423,7 +423,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   def setCycleMode(cycleMode: Boolean): Unit = {
     cpu.setCycleMode(cycleMode)
   }
-  def setTraceOnFile(out:PrintWriter,enabled:Boolean) {/* ignored */}
+  def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {/* ignored */}
   def setTrace(traceOn: Boolean) = {
     tracing = traceOn
     if (tracing) awake
@@ -434,7 +434,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   def jmpTo(pc: Int) = cpu.jmpTo(pc)
   def disassemble(mem:Memory,address:Int) = cpu.disassemble(mem, address)
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     if (ledListener != null) out.writeBoolean(ledListener.isOn)
     out.writeDouble(CYCLE_ADJ)
     out.writeInt(currentSpeedHz)
@@ -444,7 +444,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     out.writeLong(goSleepingCycles)
     out.writeBoolean(canSleep)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     if (ledListener != null) {
       if (in.readBoolean) ledListener.turnOn else ledListener.turnOff
     }

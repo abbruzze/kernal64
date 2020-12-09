@@ -46,7 +46,7 @@ class SCPUC64 extends CBMComputer {
 
   override protected val tapeAllowed = false
 
-  def reset {
+  def reset : Unit = {
     dma = false
     clock.maximumSpeed = false
     maxSpeedItem.setSelected(false)
@@ -56,7 +56,7 @@ class SCPUC64 extends CBMComputer {
     cpuClocks = 1
   }
 
-  def init {
+  def init : Unit = {
     val sw = new StringWriter
     Log.setOutput(new PrintWriter(sw))
     Log.setInfo
@@ -193,14 +193,14 @@ class SCPUC64 extends CBMComputer {
     DrivesConfigPanel.registerDrives(displayFrame, drives, setDriveType(_, _, false), enableDrive(_,_,true), attachDisk(_, _, true), attachDiskFile(_, _, _, None), drivesEnabled)
   }
 
-  override def afterInitHook {
+  override def afterInitHook : Unit = {
     inspectDialog = InspectPanel.getInspectDialog(displayFrame, this)
     // deactivate drive 9
     drives(1).setActive(false)
     driveLeds(1).setVisible(false)
   }
 
-  protected def mainLoop(cycles: Long) {
+  protected def mainLoop(cycles: Long) : Unit = {
     // VIC PHI1
     vicChip.clock
     // CIAs
@@ -237,7 +237,7 @@ class SCPUC64 extends CBMComputer {
     cpu.setDMA(dma)
   }
 
-  private def baLow(low: Boolean) {
+  private def baLow(low: Boolean) : Unit = {
     //cpu.setBaLow(low)
     mmu.setBALow(low)
     expansionPort.setBaLow(low)
@@ -265,19 +265,19 @@ class SCPUC64 extends CBMComputer {
     if (updateFrame) adjustRatio
   }
 
-  protected def setDisplayRendering(hints: java.lang.Object) {
+  protected def setDisplayRendering(hints: java.lang.Object) : Unit = {
     display.setRenderingHints(hints)
   }
 
 
-  private def adjustRatio {
+  private def adjustRatio : Unit = {
     val dim = display.asInstanceOf[java.awt.Component].getSize
     dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).round.toInt
     display.setPreferredSize(dim)
     displayFrame.pack
   }
 
-  protected def loadPRGFile(file: File, autorun: Boolean) {
+  protected def loadPRGFile(file: File, autorun: Boolean) : Unit = {
     val (start, end) = ProgramLoader.loadPRG(mmu, file, true, 8)
     Log.info(s"BASIC program loaded from $start to $end")
     configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
@@ -286,7 +286,7 @@ class SCPUC64 extends CBMComputer {
     }
   }
 
-  protected def attachDiskFile(driveID: Int, file: File, autorun: Boolean, fileToLoad: Option[String], emulateInserting: Boolean = true) {
+  protected def attachDiskFile(driveID: Int, file: File, autorun: Boolean, fileToLoad: Option[String], emulateInserting: Boolean = true) : Unit = {
     try {
       if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
       val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
@@ -343,7 +343,7 @@ class SCPUC64 extends CBMComputer {
     }
   }
 
-  private def takeSnapshot {
+  private def takeSnapshot : Unit = {
     val fc = new JFileChooser
     fc.showSaveDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
@@ -362,7 +362,7 @@ class SCPUC64 extends CBMComputer {
     }
   }
 
-  protected def setSettingsMenu(optionMenu: JMenu) {
+  protected def setSettingsMenu(optionMenu: JMenu) : Unit = {
     val driveMenu = new JMenuItem("Drives ...")
     driveMenu.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L, java.awt.event.InputEvent.ALT_DOWN_MASK))
     optionMenu.add(driveMenu)
@@ -555,7 +555,7 @@ class SCPUC64 extends CBMComputer {
     )
   }
 
-  def turnOff {
+  def turnOff : Unit = {
     if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE, "false").toBoolean)
     for (d <- drives)
       d.getFloppy.close
@@ -589,14 +589,14 @@ class SCPUC64 extends CBMComputer {
   protected def getCharROM = mmu.CHAR_ROM
 
   // state
-  protected def saveState(out: ObjectOutputStream) {
+  protected def saveState(out: ObjectOutputStream) : Unit = {
     out.writeBoolean(drivesEnabled(0))
     out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
     out.writeInt(cpuClocks)
   }
 
-  protected def loadState(in: ObjectInputStream) {
+  protected def loadState(in: ObjectInputStream) : Unit = {
     drivesEnabled(0) = in.readBoolean
     drivesEnabled(1) = in.readBoolean
     printerEnabled = in.readBoolean
@@ -607,7 +607,7 @@ class SCPUC64 extends CBMComputer {
 
   // -----------------------------------------------------------------------------------------
 
-  def turnOn(args: Array[String]) {
+  def turnOn(args: Array[String]) : Unit = {
     swing {
       setMenu
     }

@@ -9,13 +9,13 @@ class GCRRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
   private[this] var trackSteps = track << 1      
   private[this] var last10Bits = 0
   
-  override def reset {
+  override def reset : Unit = {
     super.reset
     trackSteps = 2
     last10Bits = 0
   }
   
-  final def changeSide(side:Int) {
+  final def changeSide(side:Int) : Unit = {
     if (!floppy.singleSide) {
       floppy.side = side
       track = floppy.currentTrack
@@ -24,12 +24,12 @@ class GCRRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
     }
   }
   
-  final override def setFloppy(newFloppy:Floppy) {
+  final override def setFloppy(newFloppy:Floppy) : Unit = {
     super.setFloppy(newFloppy)
     floppy.changeTrack(trackSteps)
   }
   final def isSync : Boolean = !isWriting && motorOn && last10Bits == 0x3FF
-  final def moveHead(moveOut: Boolean) {
+  final def moveHead(moveOut: Boolean) : Unit = {
     var trackMoved = false
     if (moveOut) {
       if (track > floppy.minTrack) {
@@ -48,7 +48,7 @@ class GCRRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
       track = floppy.currentTrack
     }
   }
-  final protected def readNextBit {
+  final protected def readNextBit : Unit = {
     val bit = floppy.nextBit
     last10Bits = ((last10Bits << 1) | bit) & 0x3FF
     if (last10Bits == 0x3FF) {
@@ -63,7 +63,7 @@ class GCRRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
       byteReadySignal = 0
     }
   }
-  final protected def writeNextBit {
+  final protected def writeNextBit : Unit = {
     floppy.writeNextBit((lastWrite & 0x80) > 0)
     lastWrite <<= 1        
     if (bitCounter == 8) {
@@ -75,12 +75,12 @@ class GCRRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
   }
   // ======================================================================
   
-  override final protected def saveState(out:ObjectOutputStream) {
+  override final protected def saveState(out:ObjectOutputStream) : Unit = {
     super.saveState(out)
     out.writeInt(trackSteps)
     out.writeInt(last10Bits)
   }
-  override final protected def loadState(in:ObjectInputStream) {
+  override final protected def loadState(in:ObjectInputStream) : Unit = {
     super.loadState(in)
     trackSteps = in.readInt
     last10Bits = in.readInt

@@ -54,9 +54,9 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
   }
   def setRS232Listener(l:RS232StatusListener) = statusListener = l
   
-  def init {}
+  def init : Unit = {}
   
-  def reset {
+  def reset : Unit = {
     disconnect
     bitreceived = 0
     outbuffer = 0
@@ -72,12 +72,12 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     properties
   }
   
-  def setCIA12(cia1:CIA,cia2:CIA) {
+  def setCIA12(cia1:CIA,cia2:CIA) : Unit = {
     this.cia2 = cia2
     this.cia1 = cia1
   }
   
-  def setTXD(high:Int) {
+  def setTXD(high:Int) : Unit = {
     txd = high
     //println(s"TXD: $txd rts=$rts n=$bitreceived buffer=$outbuffer bits=$bits length=$length")
     if ((!flowControlEnabled || rts) && bitreceived == 0) {
@@ -107,7 +107,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     }
   }
 
-  protected def sendOutByte(byte:Int) {
+  protected def sendOutByte(byte:Int) : Unit = {
     try {
       if (modem.outputStream != null) {
         modem.outputStream.write(byte)
@@ -125,12 +125,12 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
   
   def getTXD : Int = txd
   
-  protected def checkCTS {
+  protected def checkCTS : Unit = {
     // auto set cs
     cts = if (!flowControlEnabled || rts) CTS else 0
   }
 
-  def setOthers(value:Int) {
+  def setOthers(value:Int) : Unit = {
     others = value
     rts = (others & RTS) > 0
     dtr = (others & DTR) > 0
@@ -160,7 +160,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
    * m mark parity
    * s space parity 
    */
-  def setConfiguration(conf:String) {
+  def setConfiguration(conf:String) : Unit = {
     configurationString = conf
     val parts = conf.split(",")
     if (parts.length != 4) throw new IllegalArgumentException("Bad configuration string")
@@ -201,7 +201,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
   protected def isByteAvailable : Boolean = modem.inputStream.available() > 0
   protected def getByte : Int = modem.inputStream.read()
   protected def canSend = !flowControlEnabled || (rts && dtr)
-  protected def sendRXD(rxdHigh:Boolean) {}
+  protected def sendRXD(rxdHigh:Boolean) : Unit = {}
 
   protected def readCycle: Unit = {
     try {
@@ -219,7 +219,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     }
   }
 
-  protected def sendInByte(byte:Int)  {
+  protected def sendInByte(byte:Int) : Unit = {
     totalByteReceived += 1
     byteToSend = byte
     sendState = 0

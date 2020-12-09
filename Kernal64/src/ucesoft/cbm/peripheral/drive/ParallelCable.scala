@@ -30,14 +30,14 @@ object ParallelCable extends CBMComponent {
   var ca2Callback : () => Unit = _
   var enabled = false
   
-  def init {}
-  def reset { cableValue = 0 }
+  def init : Unit = {}
+  def reset : Unit = { cableValue = 0 }
   
   def read = cableValue
-  def write(value:Int) = cableValue = value
+  def write(value:Int) : Unit = cableValue = value
   
-  def onPC = pcCallback()
-  def onCA2 = ca2Callback()
+  def onPC : Unit = pcCallback()
+  def onCA2 : Unit = ca2Callback()
   
   override def getProperties = {
     properties.setProperty("Enabled",enabled.toString)
@@ -46,10 +46,10 @@ object ParallelCable extends CBMComponent {
   }
   
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeInt(cableValue)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     cableValue = in.readInt()
   }
   protected def allowsStateRestoring : Boolean = true

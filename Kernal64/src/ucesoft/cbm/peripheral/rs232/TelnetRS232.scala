@@ -21,7 +21,7 @@ class TelnetRS232 extends StreamRS232 {
   /**
    * Syntax: host:baud,port,bits,parity,stops
    */
-  override def setConfiguration(conf:String) {
+  override def setConfiguration(conf:String) : Unit = {
     val parts = conf.split(",")
     val confString = parts.length match {
       case 4 =>
@@ -48,7 +48,7 @@ class TelnetRS232 extends StreamRS232 {
   
   override def connectionInfo = config
   
-  override def setEnabled(enabled:Boolean) {
+  override def setEnabled(enabled:Boolean) : Unit = {
     val lastEnabled = isEnabled    
     
     if (enabled) {

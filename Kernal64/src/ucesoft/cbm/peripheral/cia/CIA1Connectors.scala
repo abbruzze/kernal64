@@ -25,7 +25,7 @@ object CIA1Connectors {
 	    val reg = kb.readCol & (latch | ~ddr) & port	    
 	    reg
 	  }
-	  final protected def performWrite(data:Int) {
+	  final protected def performWrite(data:Int) : Unit = {
 	    val port = ctrlPort.readPort
 	    val lpPressed = ((data | ~ddr) & 0x10) > 0
 	    if (!lastLPOn && lpPressed) lightPenTriggerHandler()	    

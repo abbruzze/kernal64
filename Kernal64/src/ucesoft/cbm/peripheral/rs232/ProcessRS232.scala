@@ -13,7 +13,7 @@ object ProcessRS232 extends StreamRS232 {
   /**
    * Syntax: external process,bits,parity,stops
    */
-  override def setConfiguration(conf:String) {
+  override def setConfiguration(conf:String) : Unit = {
     val parts = conf.split(",")
     if (parts.length != 5) throw new IllegalArgumentException("Bad Process RS-232 configuration string. Expected <external process>,<baud>,<bits>,<parity>,<stops>")
     
@@ -24,7 +24,7 @@ object ProcessRS232 extends StreamRS232 {
   
   override def connectionInfo = config
   
-  override def setEnabled(enabled:Boolean) {
+  override def setEnabled(enabled:Boolean) : Unit = {
     val lastEnabled = isEnabled
     
     if (enabled) {
@@ -39,7 +39,7 @@ object ProcessRS232 extends StreamRS232 {
     super.setEnabled(enabled)
   }
   
-  override def disconnect {
+  override def disconnect : Unit = {
     try {
       if (process != null) process.destroy
       super.disconnect

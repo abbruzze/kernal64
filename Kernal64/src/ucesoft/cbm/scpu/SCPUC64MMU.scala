@@ -40,7 +40,7 @@ object SCPUC64MMU {
     private[SCPUC64MMU] var lastByteReadMemory : LastByteReadMemory = _
     
     final val isActive = true
-    def init {
+    def init : Unit = {
       Log.info("Initializing RAM memory ...")
       var m = 0
       var v0 = 0xFF
@@ -65,7 +65,7 @@ object SCPUC64MMU {
         }
       }
     }
-    def reset {}
+    def reset : Unit = {}
     
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (ULTIMAX && chipID == ChipID.CPU) {
@@ -73,7 +73,7 @@ object SCPUC64MMU {
       }
       mem(address & 0xFFFF)
     }
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (ULTIMAX && chipID == ChipID.CPU) {
         if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return
       }
@@ -81,11 +81,11 @@ object SCPUC64MMU {
     }
     
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeObject(mem)
       out.writeBoolean(ULTIMAX)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       loadMemory[Int](mem,in)
       ULTIMAX = in.readBoolean
     }
@@ -107,8 +107,8 @@ object SCPUC64MMU {
     final val isActive = true
     private[this] var lastByteReadMemory : LastByteReadMemory = _
 
-    def init {}
-    def reset {}
+    def init : Unit = {}
+    def reset : Unit = {}
     def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory): Unit = {
       this.lastByteReadMemory = lastByteReadMemory
     }
@@ -116,8 +116,8 @@ object SCPUC64MMU {
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(0x010000 | address)
     final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(0x010000 | address) = value & 0x0f
     // state
-    protected def saveState(out:ObjectOutputStream) {}
-    protected def loadState(in:ObjectInputStream) {}
+    protected def saveState(out:ObjectOutputStream) : Unit = {}
+    protected def loadState(in:ObjectInputStream) : Unit = {}
     protected def allowsStateRestoring : Boolean = true
   }
 
@@ -265,13 +265,13 @@ object SCPUC64MMU {
       properties
     }
 
-    @inline private def check0001 {
+    @inline private def check0001 : Unit = {
       val EXROM = expansionPort.EXROM
       val GAME = expansionPort.GAME
       expansionPortConfigurationChanged(GAME,EXROM)
     }
     
-    def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) {
+    def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) : Unit = {
       this.game = game
       this.exrom = exrom
       
@@ -285,7 +285,7 @@ object SCPUC64MMU {
       Log.debug(s"New memory configuration $c64MemConfig")
     }
     
-    def init {
+    def init : Unit = {
       Log.info("Initializing main memory ...")
       add(ram)
       add(CHAR_ROM)
@@ -326,12 +326,12 @@ object SCPUC64MMU {
       }
     }
     
-    override def afterInitHook {
+    override def afterInitHook : Unit = {
       check0001
       SCPU_ROM_MASK = (0xF7 + SCPU_ROM.getDynamicLength / 65536) << 16 | 0xFFFF
     }
     
-    def reset {
+    def reset : Unit = {
       Log.info("Resetting main memory...")
       ddr = 0
       pr = 7
@@ -838,7 +838,7 @@ object SCPUC64MMU {
     }
 
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeBoolean(bootMap)
       out.writeBoolean(ULTIMAX)
       out.writeInt(ddr)
@@ -864,7 +864,7 @@ object SCPUC64MMU {
       out.writeInt(reg_opt_mode)
       out.writeBoolean(cpuEmulationMode)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       bootMap = in.readBoolean
       ULTIMAX = in.readBoolean
       ddr = in.readInt

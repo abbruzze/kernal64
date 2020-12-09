@@ -23,7 +23,7 @@ object InspectPanel {
 class InspectPanelDialog(f: JFrame,root: CBMComponent) extends JDialog(f, "Inspect panel") {
   private[this] var panel = new InspectPanel(root)
   
-  override def setVisible(visible: Boolean) {
+  override def setVisible(visible: Boolean) : Unit = {
     super.setVisible(visible)
     panel.enableUpdating(visible)
   }
@@ -32,7 +32,7 @@ class InspectPanelDialog(f: JFrame,root: CBMComponent) extends JDialog(f, "Inspe
   setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE)
   pack
   
-  def updateRoot {    
+  def updateRoot : Unit = {
     getContentPane.remove(panel)
     panel = new InspectPanel(root)
     getContentPane.add("Center", panel)
@@ -63,7 +63,7 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
   new Thread(this).start
   
   private[this] class MemoryTreeNode(o:Object) extends DefaultMutableTreeNode(o) {
-    override def setUserObject(o:Object) {
+    override def setUserObject(o:Object) : Unit = {
       val addressValue = o.toString split "="
       val node = getUserObject.asInstanceOf[MemoryNode]
       node.address = Integer.parseInt(addressValue(0),16)
@@ -110,7 +110,7 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
     add(valueLabel)
     setOpaque(false)
 
-    def setAddressValue(address: Int, value: Int) {
+    def setAddressValue(address: Int, value: Int) : Unit = {
       addressLabel.setText(Integer.toHexString(address))
       valueLabel.setText(Integer.toHexString(value))
     }
@@ -126,18 +126,18 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
     override def toString = "Insert an hex address [=<new value>]"
   }
 
-  def enableUpdating(enabled: Boolean) {
+  def enableUpdating(enabled: Boolean) : Unit = {
     visible = enabled
     if (enabled) lock.synchronized {
       lock.notify
     }
   }
 
-  def stateChanged(e: ChangeEvent) {
+  def stateChanged(e: ChangeEvent) : Unit = {
     sleepPeriod = spin.getValue.asInstanceOf[Int]
   }
 
-  def run {
+  def run : Unit = {
     while (true) {
       if (!visible) lock.synchronized {
         while (!visible) lock.wait
@@ -164,7 +164,7 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
     treeNode
   }
 
-  private def updateTree(node: DefaultMutableTreeNode) {
+  private def updateTree(node: DefaultMutableTreeNode) : Unit = {
     import scala.jdk.CollectionConverters._
     val props = node.getUserObject.asInstanceOf[ComponentNode].node.getProperties
     node.children.asScala foreach { c =>

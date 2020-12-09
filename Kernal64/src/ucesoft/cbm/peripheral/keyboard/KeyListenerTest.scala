@@ -24,11 +24,11 @@ object QKeyListenerTest extends App with KeyListener {
 
   var lastCode = 0
 	
-	def keyPressed(e:KeyEvent) {
+	def keyPressed(e:KeyEvent) : Unit = {
     printEvent("Pressed",e)
   }
     
-  def keyReleased(e:KeyEvent) {
+  def keyReleased(e:KeyEvent) : Unit = {
     lastCode = 0
     printEvent("Released",e)
     lastCode = 0
@@ -42,5 +42,5 @@ object QKeyListenerTest extends App with KeyListener {
     }
   }
   
-  def keyTyped(e:KeyEvent) {}
+  def keyTyped(e:KeyEvent) : Unit = {}
 }

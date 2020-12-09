@@ -13,7 +13,7 @@ import javax.swing.JFrame
 import ucesoft.cbm.cpu.Memory
 
 object Keyboard {
-  def insertSmallTextIntoKeyboardBuffer(txt:String,mem:Memory,c64Mode:Boolean) {
+  def insertSmallTextIntoKeyboardBuffer(txt:String,mem:Memory,c64Mode:Boolean) : Unit = {
     val bufferAddr = if (c64Mode) 631 else 842
     val lenAddr = if (c64Mode) 198 else 208
     for(i <- 0 until txt.length) {
@@ -27,7 +27,7 @@ object Keyboard {
       val maxLenAddr = if (c64Mode) 649 else 2592
       val bufferAddr = if (c64Mode) 631 else 842
       val lenAddr = if (c64Mode) 198 else 208
-      override def run {
+      override def run : Unit = {
         val len = mem.read(maxLenAddr)
         var strpos = 0
         while (strpos < txt.length) {
@@ -77,8 +77,8 @@ class Keyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) => Un
   def is4080Pressed = c128_40_80_Pressed
   def set4080Pressed(pressed:Boolean) = c128_40_80_Pressed = pressed
   
-  def init {}
-  def reset {
+  def init : Unit = {}
+  def reset : Unit = {
     keysPressed.clear
     for(i <- 0 until rowSelector.length) rowSelector(i) = false
     for(i <- 0 until rowSelector.length) c128ExtendedRowSelector(i) = false
@@ -90,11 +90,11 @@ class Keyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) => Un
     properties
   }
 
-  final def setEnabled(enabled: Boolean) = {
+  final def setEnabled(enabled: Boolean) : Unit ={
     this.enabled = enabled
   }
   
-  final def enableKeypad(enabled:Boolean) {
+  final def enableKeypad(enabled:Boolean) : Unit = {
     keypadEnabled = enabled
   }
 
@@ -153,9 +153,9 @@ class Keyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) => Un
       }
     }
   }
-  final def keyTyped(e: KeyEvent) {}
+  final def keyTyped(e: KeyEvent) : Unit = {}
 
-  private final def select(value: Int,selector:Array[Boolean]) {
+  private final def select(value: Int,selector:Array[Boolean]) : Unit = {
     var mask = 1
     var row = 0
     while (mask != 0x100) {
@@ -190,14 +190,14 @@ class Keyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) => Un
   }  
   
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeObject(c128ExtendedRowSelector)
     out.writeObject(rowSelector)
     out.writeObject(colSelector)
     out.writeBoolean(enabled)
     out.writeBoolean(keypadEnabled)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     loadMemory[Boolean](c128ExtendedRowSelector,in)
     loadMemory[Boolean](rowSelector,in)
     loadMemory[Boolean](colSelector,in)

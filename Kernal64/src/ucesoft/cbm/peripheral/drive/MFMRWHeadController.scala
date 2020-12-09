@@ -10,7 +10,7 @@ class MFMRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
   final override def getTrack : Int = track - 1
   
   final def isSync : Boolean = floppy.nextByte == MFM.SYNC_MARK
-  final def moveHead(moveOut: Boolean) {
+  final def moveHead(moveOut: Boolean) : Unit = {
     var direction = 0
     //println("MoveOut" + moveOut + " track = " + track)
     if (moveOut) {
@@ -25,7 +25,7 @@ class MFMRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
     }
   }
   
-  final def changeSide(side:Int) {
+  final def changeSide(side:Int) : Unit = {
     if (floppy.side != side) {
       //println(s"MFM changed side to $side")
       floppy.side = side
@@ -34,7 +34,7 @@ class MFMRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
     
   }
   
-  final protected def readNextBit {
+  final protected def readNextBit : Unit = {
     if (bitCounter == 8) {
       bitCounter = 0
       byteReady = true
@@ -42,7 +42,7 @@ class MFMRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
     }
   }
   
-  final protected def writeNextBit {
+  final protected def writeNextBit : Unit = {
     if (bitCounter == 8) {
       bitCounter = 0      
       floppy.writeNextByte(nextWrite)      
@@ -51,7 +51,7 @@ class MFMRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
     }
   }
   
-  override def reset {
+  override def reset : Unit = {
     super.reset
     canSetByteReady = true
     track = 1

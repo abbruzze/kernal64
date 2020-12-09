@@ -53,11 +53,11 @@ abstract class VIA(val name:String,
   
   protected var active = true
   
-  def init {
+  def init : Unit = {
     active = true
   }
   
-  def reset = {
+  def reset : Unit = {
     for(i <- 0 until regs.length) regs(i) = 0
     active = true
     paLatch = 0
@@ -73,23 +73,23 @@ abstract class VIA(val name:String,
     acrNew = false
   }
     
-  def setActive(active:Boolean) {
+  def setActive(active:Boolean) : Unit = {
     if (!this.active && active) {
       init
     }
     this.active = active
   }
   
-  final def irq_set(irq:Int) {
+  final def irq_set(irq:Int) : Unit = {
     regs(IFR) |= irq //| 0x80	// enable irq bit + 7th bit
     checkIRQ
   }
-  final def irq_clr(irq:Int) {
+  final def irq_clr(irq:Int) : Unit = {
     regs(IFR) &= ~irq & 0x7F
     //if ((regs(IFR) & 0x7F) == 0) regs(IFR) = 0 // if no more irq are set clear 7th bit
     checkIRQ
   }
-  @inline private def checkIRQ = {
+  @inline private def checkIRQ : Unit ={
     val irq = (regs(IFR) & regs(IER)) > 0
     if (irq) regs(IFR) |= 0x80 else regs(IFR) &= 0x7F
     irqAction(irq)  
@@ -198,7 +198,7 @@ abstract class VIA(val name:String,
       Log.debug(s"${name} writing reg ${ofs} => ${Integer.toBinaryString(value)}")
   }
   
-  def clock(cycles:Long) {
+  def clock(cycles:Long) : Unit = {
     if (active) {
       updateT1
       updateT2
@@ -263,7 +263,7 @@ abstract class VIA(val name:String,
     super.getProperties
   }
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeInt(paLatch)
     out.writeInt(pbLatch)
     out.writeInt(t2ll)
@@ -278,7 +278,7 @@ abstract class VIA(val name:String,
     out.writeBoolean(oneshotBNew)
     out.writeBoolean(acrNew)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     paLatch = in.readInt
     pbLatch = in.readInt
     t2ll = in.readInt

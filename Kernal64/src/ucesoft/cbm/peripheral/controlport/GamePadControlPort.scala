@@ -17,7 +17,7 @@ class GamePadControlPort(configuration:Properties) extends ControlPort {
   
   findController
   
-  def findController {
+  def findController : Unit = {
     System.setProperty("jinput.loglevel","SEVERE")
     controllerName = configuration.getProperty(CONFIG_CONTROLLER_NAME)
     controllerFireName = configuration.getProperty(CONFIG_CONTROLLER_FIRE_BUTTON,"1")
@@ -33,7 +33,7 @@ class GamePadControlPort(configuration:Properties) extends ControlPort {
     }
   }
   
-  protected def read = {
+  protected def read : Int = {
     var mask = 0
     controller match {
       case None =>

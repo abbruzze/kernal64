@@ -41,11 +41,11 @@ object CIA2Connectors {
       }
     }
     // state
-    override protected def saveState(out:ObjectOutputStream) {
+    override protected def saveState(out:ObjectOutputStream) : Unit = {
       super.saveState(out)
       out.writeInt(bank)
     }
-    override protected def loadState(in:ObjectInputStream) {
+    override protected def loadState(in:ObjectInputStream) : Unit = {
       super.loadState(in)
       bank = in.readInt
     }
@@ -60,7 +60,7 @@ object CIA2Connectors {
       }
       else if (rs232.isEnabled) rs232.getOthers else (latch | ~ddr) & 0xFF
     }
-    final protected def performWrite(data:Int) {
+    final protected def performWrite(data:Int) : Unit = {
       if (ParallelCable.enabled) {
         ParallelCable.onPC
         ParallelCable.write(data)

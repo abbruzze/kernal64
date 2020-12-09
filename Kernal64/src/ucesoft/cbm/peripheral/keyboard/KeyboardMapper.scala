@@ -23,7 +23,7 @@ object KeyboardMapperStore {
 
   def isExtendedKey(code:Int) : Boolean = !KEY_EVENT_MAP.contains(code)
   
-  def store(km:KeyboardMapper,out:PrintWriter) {
+  def store(km:KeyboardMapper,out:PrintWriter) : Unit = {
     out.println("[map]")
     for(kv <- km.map) {
       KEY_EVENT_MAP get kv._1 match {

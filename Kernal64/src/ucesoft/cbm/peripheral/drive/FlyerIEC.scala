@@ -26,10 +26,10 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
   
   private class ConnectionDataIterator extends BusDataIterator {
     private val queue = new collection.mutable.Queue[Int]
-    def enqueue(e:Int) { queue.enqueue(e) }
+    def enqueue(e:Int) : Unit = { queue.enqueue(e) }
     def isLast = queue.size == 1
     def getPerc = 0
-    def goto(pos:Int) { throw new IllegalArgumentException }
+    def goto(pos:Int) : Unit = { throw new IllegalArgumentException }
     def hasNext = queue.size > 0
     def next = queue.dequeue
     def queueSize = queue.size
@@ -45,7 +45,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     private[this] var httpFirstPost = true
     
     private class ThreadListener extends Thread(s"Flyer-Thread-$channel") {
-      override def run {
+      override def run : Unit = {
         try {
           var closed = false
           while (!isInterrupted && !closed) {
@@ -76,14 +76,14 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
       }
     }
     
-    private def listen(port:Int) {
+    private def listen(port:Int) : Unit = {
       if (isConnected) close
       
       Log.info(s"Flyer: listening on $port ...")
       try {
         val ss = new ServerSocket(port)
         listener = Some(new Thread {
-          override def run {
+          override def run : Unit = {
             try {
               val socket = ss.accept
               ss.close
@@ -111,7 +111,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
       }
     }
     
-    private def httpLoad(disk:Option[String]) {
+    private def httpLoad(disk:Option[String]) : Unit = {
       val buffer = Array.ofDim[Byte](1024)
       val loadBuffer = new ListBuffer[Int]
       var read = in.get.read(buffer)
@@ -136,7 +136,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
       in = None
     }
     
-    private def http(httpUrl:String) {
+    private def http(httpUrl:String) : Unit = {
       Log.info(s"Flyer: http connecting to $httpUrl ...")
       try {
         val urlAndDisk = httpUrl.split(",")
@@ -159,7 +159,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
       }
     }
     
-    def connect(url:String) {
+    def connect(url:String) : Unit = {
       if (isConnected) close
       
       Log.info(s"Flyer: connecting to ${url} ...")
@@ -211,7 +211,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     }
     
     def isConnected = in.isDefined
-    def close {
+    def close : Unit = {
       in foreach { _.close }
       out foreach { _.close }
       listener foreach { _.interrupt }
@@ -222,7 +222,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
       remoteIPAndPort = None
       httpGenericDataWritten = false
     }
-    def write {
+    def write : Unit = {
       httpConnection match {
         case None =>
           out match {
@@ -257,7 +257,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
           channels(channel).buffer.clear
       }      
     }
-    def netstat {
+    def netstat : Unit = {
       setStatus(STATUS_OK)
       in match {
         case Some(_) =>          
@@ -270,14 +270,14 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
       //println(s"netstat on channel $channel => conn = $status_s avail = $status_t")
       //sendStatus
     }
-    def netavail {
+    def netavail : Unit = {
       setStatus(STATUS_OK)
       status_t = available
       status_s = 0
       //println(s"netavail on channel $channel = $status_t")
       //sendStatus
     }
-    def connectioninfo {
+    def connectioninfo : Unit = {
       setStatus(STATUS_OK)
       remoteIPAndPort match {
         case Some((ip,port)) =>
@@ -290,7 +290,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
           status_s = 0
       }
     }
-    def httptransact {
+    def httptransact : Unit = {
       httpConnection match {
         case Some(hc) =>
           in match {
@@ -319,7 +319,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
           setStatus(STATUS_PROTOCOL_ERROR)
       }
     }
-    def httppost(post:String) {
+    def httppost(post:String) : Unit = {
       httpConnection match {
         case Some(hc) =>
           out match {
@@ -383,7 +383,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
   def setFloppyRepository(repository:File) = floppyRepository = repository
   def getFloppyRepository = floppyRepository
   
-  def reset {
+  def reset : Unit = {
     status_t = 0
     status_s = 0
     statusDescr = None
@@ -391,13 +391,13 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     connections foreach { _.close }
   }
 
-  override protected def sendStatus {
+  override protected def sendStatus : Unit = {
     import BusDataIterator._
     channels(15).dataToSend = Some(new StringDataIterator("%02d,%s,%02d,%02d".format(status,statusDescr.getOrElse(ERROR_CODES(status)), status_t, status_s) + 13.toChar))
     statusDescr = None
   }
   
-  private def sendStatus(code:Int) {
+  private def sendStatus(code:Int) : Unit = {
     setStatus(code)
     sendStatus
   }
@@ -468,7 +468,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     new ArrayIntDataIterator(out.toArray)
   }
   
-  override protected def setStatus(code: Int) {
+  override protected def setStatus(code: Int) : Unit = {
     super.setStatus(code)
     if (code == STATUS_OK) {
       status_t = 0
@@ -476,34 +476,34 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     }
   }
   
-  override def unlisten {}
+  override def unlisten : Unit = {}
   
-  override protected def fileNameReceived {
+  override protected def fileNameReceived : Unit = {
     super.fileNameReceived
     if (channel == 15) handleChannel15 else openChannel
   }
 
-  override protected def untalk {
+  override protected def untalk : Unit = {
     resetSignals
   }
 
-  override def open_channel {
+  override def open_channel : Unit = {
     super.open_channel
     channels(channel).open
     //if (channel == 15 && channels(channel).fileName.length == 0) sendStatus
   }
   
-  override def close {
+  override def close : Unit = {
     super.close
     if (channel > 1 && channel < 15) connections(channel).close
   }
   
-  override def byteJustWritten(isLast: Boolean) {
+  override def byteJustWritten(isLast: Boolean) : Unit = {
     super.byteJustWritten(isLast)    
 //    println(s"WRITE BYTE ON $channel")
   }
   
-  override protected def byteJustRead(byte:Int,isLast:Boolean) {
+  override protected def byteJustRead(byte:Int,isLast:Boolean) : Unit = {
     super.byteJustRead(byte, isLast)
     if (channel == 15 && channels(channel).fileName.length > 0) channels(channel).fileName.clear
     if (isLast) {
@@ -513,7 +513,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
   
   private def matchesWith(cmd:String,cmds:String*) : Boolean = cmds.exists { _ == cmd }  
   
-  protected def handleChannel15 {
+  protected def handleChannel15 : Unit = {
     val cmd = if (channels(channel).fileName.length > 0) channels(channel).fileName.toString else channels(channel).bufferToString
     val command = (if (cmd.charAt(cmd.length - 1) == 13) cmd.substring(0, cmd.length - 1) else cmd).split(":")
     try {
@@ -559,7 +559,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     floppyRepository.listFiles filter { f => f.getName.endsWith(".d64") || f.getName.endsWith(".D64") } map { name => name.getName.substring(0,name.getName.lastIndexOf(".")) }
   }
   
-  private def httppost(ch:String) {
+  private def httppost(ch:String) : Unit = {
     val channelAndPost = ch.split(",")
     if (channelAndPost.length != 2) {
       setStatus(STATUS_SYNTAX_ERROR)
@@ -576,7 +576,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     connections(channel).httppost(channelAndPost(1))
   }
   
-  private def httptransact(ch:String) {
+  private def httptransact(ch:String) : Unit = {
     val channel = try {
       ch.toInt
     }
@@ -588,7 +588,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     connections(channel).httptransact
   }
   
-  private def connectioninfo(ch:String) {
+  private def connectioninfo(ch:String) : Unit = {
     val channel = try {
       ch.toInt
     }
@@ -600,7 +600,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     connections(channel).connectioninfo
   }
   
-  private def netstat(ch:String) {
+  private def netstat(ch:String) : Unit = {
     val channel = try {
       ch.toInt
     }
@@ -612,7 +612,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     connections(channel).netstat
   }
   
-  private def netavail(ch:String) {
+  private def netavail(ch:String) : Unit = {
     val channel = try {
       ch.toInt
     }
@@ -624,7 +624,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     connections(channel).netavail
   }
   
-  private def configure(setting:String) {
+  private def configure(setting:String) : Unit = {
     val setPar = setting.split("=")
     val write = setPar.length == 2
     
@@ -674,12 +674,12 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     }
   }
   
-  private def diskWipe {
+  private def diskWipe : Unit = {
     floppyRepository.listFiles map { _.delete }
     setStatus(STATUS_OK)
   }
   
-  private def diskMount(index:String) {
+  private def diskMount(index:String) : Unit = {
     val idx = try {
       index.toInt
     }
@@ -697,7 +697,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     attachDrive(disks(idx - 1))
   }
   
-  private def diskAdd(disk:String) {
+  private def diskAdd(disk:String) : Unit = {
     val typeName = disk.split(",")
     if (typeName.length != 2) {
       setStatus(STATUS_SYNTAX_ERROR)
@@ -707,7 +707,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     Diskette.makeEmptyDisk(newDisk.toString)
   }
   
-  private def diskRelabel(indexRen:String) {
+  private def diskRelabel(indexRen:String) : Unit = {
     val indexName = indexRen.split("=")
     if (indexName.length != 2) {
       setStatus(STATUS_SYNTAX_ERROR)
@@ -728,7 +728,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     setStatus(STATUS_OK)
   }
   
-  private def diskScratch(index:String) {
+  private def diskScratch(index:String) : Unit = {
     val idx = try {
       index.toInt
     }
@@ -746,7 +746,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     disks(idx - 1).delete
   }
   
-  private def diskQuery(index:String) {
+  private def diskQuery(index:String) : Unit = {
     val idx = try {
       index.toInt
     }
@@ -765,12 +765,12 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     status_t = 0 // d64
   }
   
-  private def diskCountCommand {
+  private def diskCountCommand : Unit = {
     setStatus(STATUS_OK)
     status_t = listDisks.length
   }  
   
-  private def openChannel {
+  private def openChannel : Unit = {
     //println(s"OPEN CHANNEL $channel with ${channels(channel).fileName}")
     channel match {
       //case 0 => load(channels(channel).fileName.toString)
@@ -779,7 +779,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     }
   }
   
-  private def writeOnChannel {
+  private def writeOnChannel : Unit = {
     //println(s"WRITING IN CHANNEL $channel ${channels(channel).bufferToString}")
     connections(channel).write
   }

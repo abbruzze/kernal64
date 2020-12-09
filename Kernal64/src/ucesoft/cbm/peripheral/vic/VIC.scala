@@ -317,7 +317,7 @@ final class VIC(mem: VICMemory,
     final def yexp = _yexp
     final def displayable = display
 
-    final def yexp_=(v: Boolean) {
+    final def yexp_=(v: Boolean) : Unit = {
       if (!v && _yexp) {
         if (rasterCycle == 15) mc = (0x2A & (mcbase & mc)) | (0x15 & (mcbase | mc)) // patch from VIC-Addendum, sprite crunch
         expansionFF = true
@@ -327,7 +327,7 @@ final class VIC(mem: VICMemory,
 
     final def getPixels = pixels
 
-    final def reset {
+    final def reset : Unit = {
       _enabled = false
       x = 0
       y = 0
@@ -350,9 +350,9 @@ final class VIC(mem: VICMemory,
       Array.copy(ALL_TRANSPARENT,0,pixels,0,8)
     }
 
-    def init {}
+    def init : Unit = {}
 
-    @inline final def resetSprite {
+    @inline final def resetSprite : Unit = {
       if (hasPixels) {
         hasPixels = false
         Array.copy(ALL_TRANSPARENT,0,pixels,0,8)
@@ -360,7 +360,7 @@ final class VIC(mem: VICMemory,
       if (!display) spritesDisplayedMask &= ~DMA_INDEX
     }
 
-    final def producePixels {
+    final def producePixels : Unit = {
       var xcoord = xCoord(rasterCycle)
       var i = 0
       var finished = false
@@ -423,7 +423,7 @@ final class VIC(mem: VICMemory,
       pixel
     }
 
-    @inline final def readMemoryData(first:Boolean) {
+    @inline final def readMemoryData(first:Boolean) : Unit = {
       // p-access phi1
       if (first) memoryPointer = mem.read(videoMatrixAddress + 1016 + index,ChipID.VIC) << 6
       if (dma) {
@@ -452,7 +452,7 @@ final class VIC(mem: VICMemory,
       } // idle access
     }
 
-    final def check16 {
+    final def check16 : Unit = {
       if (expansionFF) {
         mcbase = mc
         if (mcbase == 63) {
@@ -464,7 +464,7 @@ final class VIC(mem: VICMemory,
 
     final def isReadyForDMA : Boolean = _enabled && y == (rasterLine & 0xFF)
 
-    final def check55_56(is55:Boolean) {
+    final def check55_56(is55:Boolean) : Unit = {
       if (is55 && _yexp) expansionFF = !expansionFF
       if (_enabled && y == (rasterLine & 0xFF) && !dma) {
         dma = true
@@ -474,7 +474,7 @@ final class VIC(mem: VICMemory,
       }
     }
 
-    final def check58 {
+    final def check58 : Unit = {
       mc = mcbase
       if (dma) {
         if (_enabled && y == (rasterLine & 0xFF)) {
@@ -485,7 +485,7 @@ final class VIC(mem: VICMemory,
       else display = false
     }
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeBoolean(_enabled)
       out.writeInt(x)
       out.writeInt(y)
@@ -507,7 +507,7 @@ final class VIC(mem: VICMemory,
       out.writeInt(mcCounter)
       out.writeObject(pixels)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       _enabled = in.readBoolean
       x = in.readInt
       y = in.readInt
@@ -615,10 +615,10 @@ final class VIC(mem: VICMemory,
     }
 
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeObject(pixels)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       loadMemory[Int](pixels,in)
 
     }
@@ -643,14 +643,14 @@ final class VIC(mem: VICMemory,
 
     final def getPixels = pixels
 
-    final def setData(gdata: Int) {
+    final def setData(gdata: Int) : Unit = {
       this.gdataLatch = gdata
       //this.gdata = gdata
       //mcFlop = 0
     }
 
-    final def init {}
-    final def reset = {
+    final def init : Unit = {}
+    final def reset : Unit = {
       gdata = 0
       gdataLatch = 0
     }
@@ -759,7 +759,7 @@ final class VIC(mem: VICMemory,
       pixel
     }
 
-    final def producePixels {
+    final def producePixels : Unit = {
       isBlank = VIC.this.isBlank
       mcm = VIC.this.mcm
       ecm = VIC.this.ecm
@@ -791,13 +791,13 @@ final class VIC(mem: VICMemory,
       }
     }
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeInt(gdata)
       //out.writeObject(xscrollBuffer)
       out.writeInt(gdataLatch)
       out.writeInt(mcFlop)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       gdata = in.readInt
       //loadMemory[Int](xscrollBuffer,in)
       gdataLatch = in.readInt
@@ -807,7 +807,7 @@ final class VIC(mem: VICMemory,
     protected def allowsStateRestoring : Boolean = true
   }
 
-  def init {
+  def init : Unit = {
     add(borderShifter)
     add(gfxShifter)
     sprites foreach { add _ }
@@ -840,7 +840,7 @@ final class VIC(mem: VICMemory,
     super.getProperties
   }
 
-  def reset {
+  def reset : Unit = {
     videoMatrixAddress = 0
     characterAddress = 0
     bitmapAddress = 0
@@ -922,7 +922,7 @@ final class VIC(mem: VICMemory,
 
   def enableLightPen(enabled: Boolean) = lightPenEnabled = enabled
 
-  def triggerLightPen {
+  def triggerLightPen : Unit = {
     if (canUpdateLightPenCoords) {
       canUpdateLightPenCoords = false
       lightPenXYCoord(0) = (xCoord(rasterCycle) >> 1) & 0xFF
@@ -1110,7 +1110,7 @@ final class VIC(mem: VICMemory,
       }
   }
 
-  @inline private def setBaLow(low:Boolean) {
+  @inline private def setBaLow(low:Boolean) : Unit = {
     if (low != _baLow) {
       _baLow = low
 
@@ -1119,7 +1119,7 @@ final class VIC(mem: VICMemory,
     }
   }
 
-  @inline private def checkRasterIRQ {
+  @inline private def checkRasterIRQ : Unit = {
     if (rasterLine == rasterLatch) {
       if (!rasterIRQTriggered) {
         rasterIRQTriggered = true
@@ -1129,7 +1129,7 @@ final class VIC(mem: VICMemory,
     else rasterIRQTriggered = false
   }
 
-  final def clock {
+  final def clock : Unit = {
     if (c128TestBitEnabled) {
       rasterCycle = 0
       updateRasterLine
@@ -1297,9 +1297,9 @@ final class VIC(mem: VICMemory,
   }
 
   private[this] var showDebug = false
-  def setShowDebug(showDebug:Boolean) = this.showDebug = showDebug
+  def setShowDebug(showDebug:Boolean) : Unit = this.showDebug = showDebug
 
-  @inline private[this] def updateRasterLine {
+  @inline private[this] def updateRasterLine : Unit = {
     displayLine += 1
     if (displayLine == model.RASTER_LINES) displayLine = 0
     rasterLine = displayLine + model.RASTER_OFFSET
@@ -1324,7 +1324,7 @@ final class VIC(mem: VICMemory,
     }
   }
 
-  @inline private[this] def tracePixel(pixel: Int, x: Int) {
+  @inline private[this] def tracePixel(pixel: Int, x: Int) : Unit = {
     val source = (pixel >> 10) & 3 match {
       case 0 => 'N'
       case 1 => 'B'
@@ -1349,7 +1349,7 @@ final class VIC(mem: VICMemory,
     }
   }
 
-  @inline private def drawCycle {
+  @inline private def drawCycle : Unit = {
     val almostOneSprite = spritesDisplayedMask > 0
 
     val outOfYScreen = displayLine <= model.BLANK_TOP_LINE || displayLine >= model.BLANK_BOTTOM_LINE
@@ -1422,7 +1422,7 @@ final class VIC(mem: VICMemory,
     lastColorReg = 0xFF
   }
 
-  @inline private def checkAndSendIRQ {
+  @inline private def checkAndSendIRQ : Unit = {
     if ((interruptControlRegister & interruptMaskRegister) == 0) {
       if ((interruptControlRegister & 0x80) != 0) {
         interruptControlRegister &= 0x7f
@@ -1435,14 +1435,14 @@ final class VIC(mem: VICMemory,
       irqAction(true)
     }
   }
-  @inline private def rasterLineEqualsLatch {
+  @inline private def rasterLineEqualsLatch : Unit = {
     if ((interruptControlRegister & 1) == 0) {
       interruptControlRegister |= 1
       checkAndSendIRQ
     }
   }
 
-  @inline private def spriteSpriteCollision(i: Int, j: Int) {
+  @inline private def spriteSpriteCollision(i: Int, j: Int) : Unit = {
     val mask = (1 << i) | (1 << j)
     val ssCollision = spriteSpriteCollision
     spriteSpriteCollision |= mask
@@ -1451,7 +1451,7 @@ final class VIC(mem: VICMemory,
       checkAndSendIRQ
     }
   }
-  @inline private def spriteDataCollision(i: Int) {
+  @inline private def spriteDataCollision(i: Int) : Unit = {
     val sbc = spriteBackgroundCollision
     spriteBackgroundCollision |= (1 << i)
     if (sbc == 0) {
@@ -1463,7 +1463,7 @@ final class VIC(mem: VICMemory,
   /**
    * To be called on bad lines
    */
-  @inline private def readAndStoreVideoMemory {
+  @inline private def readAndStoreVideoMemory : Unit = {
     if (_baLow) {
       val busAvailable = clk.currentCycles - baLowFirstCycle > 2
       if (busAvailable) {
@@ -1517,7 +1517,7 @@ final class VIC(mem: VICMemory,
 
   def getMemory = mem
 
-  def c128TestBitEnabled(enabled:Boolean) {
+  def c128TestBitEnabled(enabled:Boolean) : Unit = {
     c128TestBitEnabled = enabled
   }
 
@@ -1543,7 +1543,7 @@ final class VIC(mem: VICMemory,
     sb.toString
   }
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeInt(videoMatrixAddress)
     out.writeInt(characterAddress)
     out.writeInt(bitmapAddress)
@@ -1599,7 +1599,7 @@ final class VIC(mem: VICMemory,
     out.writeObject(vml_c)
     out.writeInt(lastBackground)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     videoMatrixAddress = in.readInt
     characterAddress = in.readInt
     bitmapAddress = in.readInt

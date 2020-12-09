@@ -208,6 +208,7 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
       case Some("screen") => TEXT(e,TEXTEncoding(false,true))
       case Some("upper-screen") => TEXT(e,TEXTEncoding(true,true))
       case Some("upper-ascii") => TEXT(e,TEXTEncoding(true,false))
+      case Some(e) => throw new CompilerException(s"Invalid encoding: $e",None)
     }
   }
   private def bytes: Parser[ASMStatement] =

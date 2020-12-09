@@ -65,7 +65,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     repaint()
   }
 
-  def setNewResolution(height:Int,width:Int) {
+  def setNewResolution(height:Int,width:Int) : Unit = {
     Log.debug(s"New resolution: $width x $height")
     normalDisplayMem = Array.fill(width * height)(0xFF000000)
     interlacedDisplayMem = Array.fill(width * height * 2)(0xFF000000)
@@ -80,12 +80,12 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     setInterlaceMode(interlaced)
   }
   
-  def setRenderingHints(hints:java.lang.Object) {
+  def setRenderingHints(hints:java.lang.Object) : Unit = {
     renderingHints = hints
   }
   
   def displayMem : Array[Int] = ptrDisplayMem
-  def setInterlaceMode(enabled:Boolean) {
+  def setInterlaceMode(enabled:Boolean) : Unit = {
     interlaced = enabled
     if (enabled) {
       ptrDisplayMem = interlacedDisplayMem
@@ -99,16 +99,16 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     }
   }
   
-  def init {}
-  def reset {}
+  def init : Unit = {}
+  def reset : Unit = {}
   
   @inline private def isZoomEvent(e:MouseEvent) : Boolean = {
     import java.awt.event.InputEvent._
     val zoomMod = SHIFT_DOWN_MASK | CTRL_DOWN_MASK
     (e.getModifiersEx & zoomMod) == zoomMod
   }
-  def mouseClicked(e:MouseEvent) {}
-  def mousePressed(e:MouseEvent) {
+  def mouseClicked(e:MouseEvent) : Unit = {}
+  def mousePressed(e:MouseEvent) : Unit = {
     if (isZoomEvent(e)) {
       if (SwingUtilities.isRightMouseButton(e)) {
         mouseZoomEnabled = false
@@ -125,7 +125,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       }
     }
   }
-  def mouseReleased(e:MouseEvent) {
+  def mouseReleased(e:MouseEvent) : Unit = {
     if (mouseZoomEnabled) {
       setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR))
       mouseZoomEnabled = false
@@ -135,12 +135,12 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       repaint()
     }
   }
-  def mouseEntered(e:MouseEvent) {}
-  def mouseExited(e:MouseEvent) {}
+  def mouseEntered(e:MouseEvent) : Unit = {}
+  def mouseExited(e:MouseEvent) : Unit = {}
   
   // light pen events
-  def mouseDragged(e:MouseEvent) { mouseMoved(e) }
-  def mouseMoved(e:MouseEvent) {
+  def mouseDragged(e:MouseEvent) : Unit = { mouseMoved(e) }
+  def mouseMoved(e:MouseEvent) : Unit = {
     val mX = (e.getX / zoomFactorX).toInt
     val mY = (e.getY / zoomFactorY).toInt
     lpX =  mX + (if (clipArea != null) clipArea._1.x else 0)
@@ -157,29 +157,29 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   def getFrameCounter = totalFrameCounter
   
   def getClipArea = clipArea
-  def setRemote(remote:Option[ucesoft.cbm.remote.RemoteC64]) {
+  def setRemote(remote:Option[ucesoft.cbm.remote.RemoteC64]) : Unit = {
     remote match {
       case Some(r) => this.remote = r
       case None => this.remote = null
     }    
   }
 
-  def setClipArea(x1: Int, y1: Int, x2: Int, y2: Int) {
+  def setClipArea(x1: Int, y1: Int, x2: Int, y2: Int) : Unit = {
     clipArea = (new Point(x1, y1), new Point(x2, y2))
   }
 
-  final override def update(g: Graphics) {
+  final override def update(g: Graphics) : Unit = {
     paint(g)
   }
 
-  def setDrawRasterLine(drawRasterLine: Boolean) = this.drawRasterLine = drawRasterLine
-  def setRasterLineAt(rasterLine: Int) = {
+  def setDrawRasterLine(drawRasterLine: Boolean) : Unit = this.drawRasterLine = drawRasterLine
+  def setRasterLineAt(rasterLine: Int) : Unit ={
     this.rasterLine = rasterLine
     repaint()
   }
   def getRasterLine = rasterLine
 
-  override final def paint(g: Graphics) {
+  override final def paint(g: Graphics) : Unit = {
     if (dimension.width != getWidth || dimension.height != getHeight) {
       dimension.width = getWidth
       dimension.height = getHeight
@@ -232,7 +232,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     new Rectangle(zx,zy,dx,dy)
   }
   
-  final def showFrame(x1: Int, y1: Int, x2: Int, y2: Int) {
+  final def showFrame(x1: Int, y1: Int, x2: Int, y2: Int) : Unit = {
     if (x1 != -1) {      
       displayImage.newPixels(x1, y1, x2, y2)      
       repaint()
@@ -265,14 +265,14 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
 
   def lastFramePerSecondCounter = framePerSecond
 
-  def saveSnapshot(file: File) {
+  def saveSnapshot(file: File) : Unit = {
     val snap = createImage(getSize().width, getSize().height).asInstanceOf[BufferedImage]
     paint(snap.getGraphics)
     ImageIO.write(snap, "png", file)
   }
   
   // state
-  protected def saveState(out:ObjectOutputStream) {}
-  protected def loadState(in:ObjectInputStream) {}
+  protected def saveState(out:ObjectOutputStream) : Unit = {}
+  protected def loadState(in:ObjectInputStream) : Unit = {}
   protected def allowsStateRestoring : Boolean = true
 }

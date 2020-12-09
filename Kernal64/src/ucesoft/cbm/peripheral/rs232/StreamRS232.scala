@@ -17,7 +17,7 @@ abstract class StreamRS232 extends AbstractRS232 {
     super.disconnect
   }
 
-  def setStreams(in:InputStream,out:OutputStream,address:String) {
+  def setStreams(in:InputStream,out:OutputStream,address:String) : Unit = {
     modem.setStreams(in,out)
     if (in == null) {
       dcd = RS232.DCD

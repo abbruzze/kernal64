@@ -9,7 +9,7 @@ trait VICMemory extends RAMComponent with LastByteReadMemory with ExpansionPortC
   
   final def getBankAddress = getBank << 14
   
-  def setVideoBank(bank: Int)
+  def setVideoBank(bank: Int) : Unit
   
   def readPhi2(address:Int) : Int
 

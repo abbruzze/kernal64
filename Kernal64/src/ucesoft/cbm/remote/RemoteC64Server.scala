@@ -23,7 +23,7 @@ class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[
   private[this] val ss = new ServerSocket(port)
   
   private class KBThread extends Thread {
-    override def run {
+    override def run : Unit = {
       while (!isInterrupted) {
         while (in == null) Thread.sleep(1000)
         
@@ -32,7 +32,7 @@ class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[
             case 'K' =>
               val event = new KeyEvent(dummyComponent,in.readInt,System.currentTimeMillis,in.readInt,in.readInt,in.readChar,in.readInt)
               SwingUtilities.invokeLater(new Runnable {
-                def run {
+                def run : Unit = {
                   event.getID match {
                     case KeyEvent.KEY_PRESSED =>
                       for(kl <- keyListeners) kl.keyPressed(event)
@@ -53,7 +53,7 @@ class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[
     }
   }
   
-  def updateVideo(x1:Int,y1:Int,x2:Int,y2:Int) {
+  def updateVideo(x1:Int,y1:Int,x2:Int,y2:Int) : Unit = {
     if (!sending) {     
       sending = true
       if (fc == 0) {
@@ -74,14 +74,14 @@ class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[
     }
   }  
   
-  def stopRemoting {
+  def stopRemoting : Unit = {
     running = false
-    interrupt;
+    interrupt
   }
   
   def isConnected : Boolean = connected
   
-  override def run {
+  override def run : Unit = {
     running = true
     val keyb = new KBThread
     keyb.start

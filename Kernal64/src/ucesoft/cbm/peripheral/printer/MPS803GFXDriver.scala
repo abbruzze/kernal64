@@ -87,7 +87,7 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
   private[this] var posL,posH,rep = 0
   private[this] var bitmapActive = false
   
-  def clearPages {
+  def clearPages : Unit = {
     operations.clear
     quote = 0
     state = WAITING_CHAR
@@ -96,7 +96,7 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
     repaint()
   }
 
-  def print(ch: Int) {
+  def print(ch: Int) : Unit = {
     state match {
       case POS_WAITING_L =>
         posL = ch
@@ -166,7 +166,7 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
     repaint()      
   }
 
-  def checkSize {
+  def checkSize : Unit = {
     val lines = 1 + (operations count { op => op == CarrigeReturn || op == LineFeed })
     val width = COLUMNS * CHRWIDTH
     setPreferredSize(new Dimension(width, lines * CHRHEIGHT))
@@ -174,7 +174,7 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
 
   @inline private def readChar(code: Int, line: Int) = charRom.read(charRom.startAddress + (code * CHRHEIGHT) + line)
 
-  override def paintComponent(g: Graphics) {
+  override def paintComponent(g: Graphics) : Unit = {
     val size = getPreferredSize
     g.setColor(Palette.VIC_COLORS(1)) // white background
     g.fillRect(0, 0, size.width - 1, size.height - 1)
@@ -272,7 +272,7 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
     g.drawRect(x,y,CHRWIDTH - 1,CHRHEIGHT - 1)    
   }
   
-  def saveAsPNG(file: File) {
+  def saveAsPNG(file: File) : Unit = {
     val snap = createImage(getPreferredSize.width, getPreferredSize.height).asInstanceOf[BufferedImage]
     paint(snap.getGraphics)
     ImageIO.write(snap, "png", file)

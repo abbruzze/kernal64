@@ -32,7 +32,7 @@ trait RS232 extends CBMComponent {
   def flowControlEnabled = flowControl
   def setFlowControlEnabled(enabled:Boolean) = flowControl = enabled
   
-  def setTXD(high:Int)
+  def setTXD(high:Int) : Unit
   def getTXD : Int
   
   /**
@@ -42,7 +42,7 @@ trait RS232 extends CBMComponent {
    * Bit 4: DCD
    * Bit 5: User port pin J
    */
-  def setOthers(value:Int)
+  def setOthers(value:Int) : Unit
   /**
    * Bit 0: RXD
    * Bit 3: RI
@@ -53,21 +53,21 @@ trait RS232 extends CBMComponent {
    */
   def getOthers : Int
   
-  def setConfiguration(conf:String)
+  def setConfiguration(conf:String) : Unit
   def getConfiguration : String
   def connectionInfo:String
   
   def isEnabled : Boolean
-  def setEnabled(enabled:Boolean)
+  def setEnabled(enabled:Boolean) : Unit
   
-  def setCIA12(cia1:CIA,cia2:CIA)
+  def setCIA12(cia1:CIA,cia2:CIA) : Unit
   
   def getDescription : String
   
-  def setRS232Listener(l:RS232StatusListener)
+  def setRS232Listener(l:RS232StatusListener) : Unit
   // state
-  protected def saveState(out:ObjectOutputStream) {}
-  protected def loadState(in:ObjectInputStream) {}
+  protected def saveState(out:ObjectOutputStream) : Unit = {}
+  protected def loadState(in:ObjectInputStream) : Unit = {}
   protected def allowsStateRestoring : Boolean = {
     if (isEnabled) showError("State warning","Warning: an RS-232 device is enabled.")
     true

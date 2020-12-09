@@ -29,7 +29,7 @@ object Floppy {
         None
     }    
   }  
-  def save(out:ObjectOutputStream,floppy:Option[Floppy]) {
+  def save(out:ObjectOutputStream,floppy:Option[Floppy]) : Unit = {
     floppy match {
       case Some(f) =>
         out.writeBoolean(true)
@@ -61,18 +61,18 @@ trait Floppy {
   def maxTrack = totalTracks
   
   def side : Int = 0
-  def side_=(newSide:Int) {}
+  def side_=(newSide:Int) : Unit = {}
   
   def nextBit : Int
-  def writeNextBit(bit:Boolean)
+  def writeNextBit(bit:Boolean) : Unit
   def nextByte : Int
-  def writeNextByte(b:Int)
+  def writeNextByte(b:Int) : Unit
   
   def currentTrack : Int
   def currentSector : Option[Int]
-  def changeTrack(trackSteps:Int)
-  def setTrackChangeListener(l:TrackListener)
-  def notifyTrackSectorChangeListener
+  def changeTrack(trackSteps:Int) : Unit
+  def setTrackChangeListener(l:TrackListener) : Unit
+  def notifyTrackSectorChangeListener : Unit
     
   def defaultZoneFor(track:Int) : Int = {
     if (track <= 17) 0
@@ -81,14 +81,14 @@ trait Floppy {
     else 3
   }
   
-  def flush {}
-  def close
-  def reset
+  def flush : Unit = {}
+  def close : Unit
+  def reset : Unit
   // state
-  def save(out:ObjectOutputStream)
-  def load(in:ObjectInputStream)
+  def save(out:ObjectOutputStream) : Unit
+  def load(in:ObjectInputStream) : Unit
   
-  protected def saveFile(out:ObjectOutputStream) {
+  protected def saveFile(out:ObjectOutputStream) : Unit = {
     flush
     val len = new File(file).length.toInt
     val f = new DataInputStream(new FileInputStream(file))
@@ -115,13 +115,13 @@ class EmptyFloppy extends Floppy {
   private[this] var listener : TrackListener = _
   
   def nextBit = 0
-  def writeNextBit(bit:Boolean) {}
+  def writeNextBit(bit:Boolean) : Unit = {}
   def nextByte = 0
-  def writeNextByte(b:Int) {}
+  def writeNextByte(b:Int) : Unit = {}
   
   def currentTrack = track
   def currentSector = None
-  def changeTrack(trackSteps:Int) {
+  def changeTrack(trackSteps:Int) : Unit = {
     val isOnTrack = (trackSteps & 1) == 0
     if (isOnTrack) {
       track = trackSteps >> 1
@@ -129,16 +129,16 @@ class EmptyFloppy extends Floppy {
     notifyTrackSectorChangeListener
   }
   def setTrackChangeListener(l:TrackListener) = listener = l
-  def notifyTrackSectorChangeListener {
+  def notifyTrackSectorChangeListener : Unit = {
     if (listener != null) listener(track,false,None)
   }
     
-  def close {}
-  def reset {
+  def close : Unit = {}
+  def reset : Unit = {
     track = 1
   }
   // state
-  def save(out:ObjectOutputStream) {}
-  def load(in:ObjectInputStream) {}
+  def save(out:ObjectOutputStream) : Unit = {}
+  def load(in:ObjectInputStream) : Unit = {}
   override def toString = "Empty Floppy"
 }

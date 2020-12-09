@@ -73,7 +73,7 @@ class TraceDialog private (title:String,
     for(t <- tracingListeners) t.stepInto(_regs.pc)
   }
   
-  def forceTracing(on:Boolean) {
+  def forceTracing(on:Boolean) : Unit = {
     tracing = on
     step.setEnabled(on)
     vic match {
@@ -90,7 +90,7 @@ class TraceDialog private (title:String,
     notrace.setText("Tracing " + (if (!tracing) "on" else "off"))    
   }
   
-  private def checkAction(e : => Unit) {
+  private def checkAction(e : => Unit) : Unit = {
     try {
       e
     }

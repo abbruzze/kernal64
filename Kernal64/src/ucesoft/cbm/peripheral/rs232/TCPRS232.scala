@@ -22,7 +22,7 @@ class TCPRS232 extends StreamRS232 {
   /**
    * Syntax: host:port,baud,bits,parity,stops
    */
-  override def setConfiguration(conf:String) {
+  override def setConfiguration(conf:String) : Unit = {
     hostAndConf = conf
     val parts = conf.split(",")
     val confString = parts.length match {
@@ -47,7 +47,7 @@ class TCPRS232 extends StreamRS232 {
     }
   }
   
-  override def setEnabled(enabled:Boolean) {
+  override def setEnabled(enabled:Boolean) : Unit = {
     if ((isEnabled || !enabled) && host != "") {
       Log.info(s"Disconnecting from $host...")
       try {

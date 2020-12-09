@@ -23,27 +23,27 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
   protected def isDeviceReady = active
   protected def loadData(fileName:String) = None
   
-  def init {}
+  def init : Unit = {}
   
-  def reset {}
+  def reset : Unit = {}
   
-  override def open_channel {
+  override def open_channel : Unit = {
     channel match {
       case 7 => driver.print(17) 
       case _ => driver.print(145)
     }
   }
   
-  override protected def byteJustRead(byte:Int,isLast:Boolean) {
+  override protected def byteJustRead(byte:Int,isLast:Boolean) : Unit = {
     //println("MPS803: byte read " + Integer.toHexString(byte) + " " + byte.toChar + " last=" + isLast) 
     channels(channel).clear
     driver.print(byte)
   }
   // state
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeBoolean(active)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     active = in.readBoolean
   }
   protected def allowsStateRestoring : Boolean = true

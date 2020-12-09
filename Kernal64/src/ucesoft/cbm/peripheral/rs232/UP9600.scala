@@ -24,7 +24,7 @@ object UP9600 extends TelnetRS232 {
 
   override protected def stopin = 0
 
-  override def setConfiguration(conf:String) {
+  override def setConfiguration(conf:String) : Unit = {
     super.setConfiguration(conf + ",8,n,1")
   }
 

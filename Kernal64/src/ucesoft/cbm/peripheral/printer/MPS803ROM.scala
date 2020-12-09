@@ -24,8 +24,8 @@ class MPS803ROM extends Memory {
     mem
   }
 
-  def init {}
+  def init : Unit = {}
   val isActive = true
   def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = rom(address - startAddress)
-  def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
+  def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
 }

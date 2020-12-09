@@ -9,8 +9,8 @@ import scala.util.matching.Regex
 
 trait ModemCommandListener {
   def hangUp : Unit
-  def commandMode(on:Boolean)
-  def connectTo(address:String)
+  def commandMode(on:Boolean) : Unit
+  def connectTo(address:String) : Unit
   def ring(ringing:Boolean) : Unit
 }
 

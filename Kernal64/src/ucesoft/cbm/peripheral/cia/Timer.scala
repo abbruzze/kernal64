@@ -47,7 +47,7 @@ abstract class Timer(ciaName: String,
     properties
   }
 
-  def init {}
+  def init : Unit = {}
 
   def reset: Unit = {
     state = 0

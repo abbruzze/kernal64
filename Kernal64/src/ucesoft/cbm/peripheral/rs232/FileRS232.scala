@@ -13,7 +13,7 @@ object FileRS232 extends StreamRS232 {
   /**
    * Syntax: input file path,output file path,bits,parity,stops
    */
-  override def setConfiguration(conf:String) {
+  override def setConfiguration(conf:String) : Unit = {
     val parts = conf.split(",")
     if (parts.length != 6) throw new IllegalArgumentException("Bad File RS-232 configuration string. Expected <input file path>,<output file path>,<baud>,<bits>,<parity>,<stops>")
     
@@ -23,7 +23,7 @@ object FileRS232 extends StreamRS232 {
     super.setConfiguration(parts.drop(2).mkString(","))
   }
   
-  override def setEnabled(enabled:Boolean) {
+  override def setEnabled(enabled:Boolean) : Unit = {
     val lastEnabled = isEnabled    
     
     if (enabled) {

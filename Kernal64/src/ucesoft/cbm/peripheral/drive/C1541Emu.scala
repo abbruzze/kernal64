@@ -70,15 +70,15 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     properties
   }
 
-  def init {}
+  def init : Unit = {}
   
   def getFloppy = driveReader.getOrElse(EmptyFloppy)
 
-  def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) {
+  def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) : Unit = {
     this.driveReader = Some(driveReader.asInstanceOf[Diskette])
   }
 
-  private def blinkLed(cycles: Long) {
+  private def blinkLed(cycles: Long) : Unit = {
     if (errorTimeout == 0) {
       ledListener.turnOn
       errorTimeout = cycles + BLINK_TIMEOUT
@@ -88,27 +88,27 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     }
   }
 
-  override protected def setMode(newMode: IECBusDevice.Mode.Value) {
+  override protected def setMode(newMode: IECBusDevice.Mode.Value) : Unit = {
     super.setMode(newMode)
     if (channels.exists(_.isOpened)) ledListener.turnOn else ledListener.turnOff
   }
 
-  override def clocked(cycles: Long) {
+  override def clocked(cycles: Long) : Unit = {
     super.clocked(cycles)
     if (status != STATUS_OK && status != STATUS_WELCOME) blinkLed(cycles)
   }
 
-  def reset {
+  def reset : Unit = {
     job = EMPTY
   }
 
-  override def unlisten {
+  override def unlisten : Unit = {
     super.unlisten
     if (channel == 15) handleChannel15
     resetSignals
   }
 
-  override def open {
+  override def open : Unit = {
     super.open
     channel match {
       case 0 => // LOADING FILE
@@ -128,7 +128,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     }
   }
 
-  override def open_channel {
+  override def open_channel : Unit = {
     super.open_channel
     if (!channels(channel).isOpened) {
       channels(channel).open
@@ -139,11 +139,11 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     }
   }
 
-  override protected def untalk {
+  override protected def untalk : Unit = {
     resetSignals
   }
 
-  override def close {
+  override def close : Unit = {
     super.close
     job match {
       case SAVE_FILE =>
@@ -156,32 +156,32 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     setStatus(STATUS_OK)
   }
 
-  override def fileNameReceived {
+  override def fileNameReceived : Unit = {
     super.fileNameReceived
     if (channels(channel).fileName.toString.startsWith("#")) channels(channel).open
     if (job == SAVE_FILE) ledListener.beginSavingOf(channels(channel).fileName.toString)
     if (channel == 15 && channels(channel).fileName.length > 0) handleChannel15
   }
 
-  override def dataNotFound {
+  override def dataNotFound : Unit = {
     super.dataNotFound
     setStatus(STATUS_FILE_NOT_FOUND)
     ledListener.endLoading
   }
 
-  override def byteJustWritten(isLast: Boolean) {
+  override def byteJustWritten(isLast: Boolean) : Unit = {
     super.byteJustWritten(isLast)
     ledListener.updateLoading(channels(channel).dataToSend.get.getPerc)
   }
 
-  override protected def load(fileName: String) {
+  override protected def load(fileName: String) : Unit = {
     if (fileName != "#") {
       super.load(fileName)
       ledListener.beginLoadingOf(fileName)
     } else if (DEBUG) println("Loading from #")
   }
 
-  private def handleChannel15 {
+  private def handleChannel15 : Unit = {
     val cmd = if (channels(channel).fileName.length > 0) channels(channel).fileName.toString else channels(channel).bufferToString
     if (cmd.length > 0) {
       executeCommand(cmd)
@@ -190,16 +190,16 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     sendStatus
   }
 
-  private def sendStatus {
+  private def sendStatus : Unit = {
     import BusDataIterator._
     channels(channel).dataToSend = Some(new StringDataIterator("%02d,%s,00,00".format(status, ERROR_CODES(status)) + 13.toChar))
   }
 
-  private def setStatus(code: Int) {
+  private def setStatus(code: Int) : Unit = {
     status = code
   }
 
-  private def executeCommand(cmd: String) {
+  private def executeCommand(cmd: String) : Unit = {
     val command = if (cmd.charAt(cmd.length - 1) == 13) cmd.substring(0, cmd.length - 1) else cmd
     println("Executing command " + command)
     try {
@@ -230,14 +230,14 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     }
   }
 
-  private def m_e(cmd: String) {
+  private def m_e(cmd: String) : Unit = {
     val lo = cmd.charAt(0).toInt
     val hi = cmd.charAt(1).toInt
     val address = hi * 256 + lo
     println("M-E from " + Integer.toHexString(address))
   }
 
-  private def m_w(cmd: String) {
+  private def m_w(cmd: String) : Unit = {
     val lo = cmd.charAt(0).toInt
     val hi = cmd.charAt(1).toInt
     val len = cmd.charAt(2).toInt
@@ -245,7 +245,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     println("M-W to " + Integer.toHexString(address) + " len=" + len)
   }
 
-  private def m_r(cmd: String) {
+  private def m_r(cmd: String) : Unit = {
     if (cmd.length == 2 || cmd.length == 3) {
       val lo = cmd.charAt(0).toInt
       val hi = cmd.charAt(1).toInt
@@ -255,7 +255,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     } else setStatus(STATUS_SYNTAX_ERROR)
   }
 
-  private def initialize {
+  private def initialize : Unit = {
     setStatus(STATUS_OK)
     for (c <- channels) {
       c.close
@@ -264,7 +264,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     if (DEBUG) println("Initialized!!")
   }
 
-  private def bufferPointer(cmd: String) {
+  private def bufferPointer(cmd: String) : Unit = {
     val st = new java.util.StringTokenizer(cmd.trim, " ,")
     if (st.countTokens == 2) {
       try {
@@ -279,7 +279,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     } else setStatus(STATUS_SYNTAX_ERROR)
   }
 
-  private def memoryRead(cmd: String) {
+  private def memoryRead(cmd: String) : Unit = {
     val st = new java.util.StringTokenizer(cmd.trim, " ,")
     if (st.countTokens == 4) {
       try {
@@ -303,8 +303,8 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
   }
   
   // state
-  protected def saveState(out:ObjectOutputStream) {}
-  protected def loadState(in:ObjectInputStream) {}
+  protected def saveState(out:ObjectOutputStream) : Unit = {}
+  protected def loadState(in:ObjectInputStream) : Unit = {}
   protected def allowsStateRestoring : Boolean = {
     driveReader match {
       case Some(d64) =>

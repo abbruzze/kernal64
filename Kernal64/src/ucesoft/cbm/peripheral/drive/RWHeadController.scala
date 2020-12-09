@@ -50,11 +50,9 @@ abstract class RWHeadController(protected var floppy:Floppy,
   protected var lastByteReady = false
   private[this] var lastNotifiedTrack,lastNotifiedSector = 0
   
-  def init {
-    
-  }
+  def init : Unit = {}
   
-  def reset {
+  def reset : Unit = {
     byteReadySignal = 1
     isWriting = false
     motorOn = false
@@ -81,42 +79,42 @@ abstract class RWHeadController(protected var floppy:Floppy,
     lastByteReady = false
     lbr
   }
-  final def setWriting(on:Boolean) {
+  final def setWriting(on:Boolean) : Unit = {
     isWriting = on
     ledListener.writeMode(on)
   }
   final def getLastRead : Int = lastRead
-  final def setSpeedZone(newSpeedZone:Int) {
+  final def setSpeedZone(newSpeedZone:Int) : Unit = {
     if (speedZone != newSpeedZone) {
       speedZone = newSpeedZone
       bitCycleWait = rotationCyclesForBit(speedZone)
       rotationCycleCounter = 0.0
     }
   }
-  def setFloppy(newFloppy:Floppy) {
+  def setFloppy(newFloppy:Floppy) : Unit = {
     floppy = newFloppy
     floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
   }
-  final def setNextToWrite(b:Int) {
+  final def setNextToWrite(b:Int) : Unit = {
     nextWrite = b
     resetByteReadySignal
   }
-  final def setCurrentFileName(fn:String) = currentFilename = fn
+  final def setCurrentFileName(fn:String) : Unit = currentFilename = fn
   def getTrack : Int = track
   final def isMotorOn : Boolean = motorOn
-  final def setMotor(on:Boolean) {
+  final def setMotor(on:Boolean) : Unit = {
     motorOn = on
     if (on && floppy.isEmpty) floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
   }
   @inline private def fmt2(i:Int) : String = if (i < 10) "0" + i else i.toString
-  private def updateTrackSectorLabelProgress(track:Int,halfTrack:Boolean,sector:Option[Int]) {
+  private def updateTrackSectorLabelProgress(track:Int,halfTrack:Boolean,sector:Option[Int]) : Unit = {
     if (ledListener != null) {      
       sector match {
         case None =>
           if (track != lastNotifiedTrack) {
             lastNotifiedTrack = track
             SwingUtilities.invokeLater(new Runnable {
-              def run {
+              def run : Unit = {
                 var trackFormat = fmt2(track)
                 if (halfTrack) trackFormat += "."
                 ledListener.beginLoadingOf(s"$currentFilename $trackFormat",true)
@@ -128,7 +126,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
             lastNotifiedTrack = track
             lastNotifiedSector = sec
             SwingUtilities.invokeLater(new Runnable {
-              def run {
+              def run : Unit = {
                 var trackFormat = fmt2(track)
                 val secFormat = fmt2(sec)
                 if (halfTrack) trackFormat += "."
@@ -139,7 +137,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
       }
     }
   }
-  private def rotateDisk {
+  private def rotateDisk : Unit = {
     rotationCycleCounter += bitCycleWait
     if (rotationCycleCounter >= 1) {
       bitCounter += 1
@@ -164,7 +162,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
     lastByteReady
   }
   
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeBoolean(isWriting)
     out.writeBoolean(motorOn)
     out.writeBoolean(canSetByteReady)
@@ -179,7 +177,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
     out.writeInt(lastWrite)    
     out.writeBoolean(lastByteReady)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     isWriting = in.readBoolean
     motorOn = in.readBoolean
     canSetByteReady = in.readBoolean
@@ -196,11 +194,11 @@ abstract class RWHeadController(protected var floppy:Floppy,
   }
   protected def allowsStateRestoring = true
  // ================== Abstract methods =============================================== 
- def changeSide(side:Int)
+ def changeSide(side:Int) : Unit
  def isSync : Boolean
- def moveHead(moveOut: Boolean)
- protected def readNextBit
- protected def writeNextBit
+ def moveHead(moveOut: Boolean) : Unit
+ protected def readNextBit : Unit
+ protected def writeNextBit : Unit
  // ===================================================================================
   
   override def getProperties = {

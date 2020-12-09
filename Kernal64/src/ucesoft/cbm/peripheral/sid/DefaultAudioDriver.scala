@@ -30,7 +30,7 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
   if (dataLine != null) dataLine.start()
   
   def getMasterVolume = vol
-  def setMasterVolume(v:Int) {
+  def setMasterVolume(v:Int) : Unit = {
     if (volume != null) {
       val max = volume.getMaximum
       val min = volume.getMinimum / 2f
@@ -38,7 +38,7 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
       vol = v
     }
   }
-  final def addSample(sample:Int) {
+  final def addSample(sample:Int) : Unit = {
     buffer(pos) = (sample & 0xff).toByte ; pos += 1
     buffer(pos) = ((sample >> 8)).toByte ; pos += 1
     if (pos == buffer.length) {      
@@ -48,18 +48,18 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
       dataLine.write(buffer, 0, bsize)
     }
   }
-  final def reset {
+  final def reset : Unit = {
     pos = 0
     if (dataLine != null) dataLine.flush
     setSoundOn(true)
   }
-  def discard {
+  def discard : Unit = {
     if (dataLine != null) {
       dataLine.stop
       dataLine.flush
     }
   }
-  def setSoundOn(on:Boolean) {
+  def setSoundOn(on:Boolean) : Unit = {
     soundOn = on
     updateLine
   }

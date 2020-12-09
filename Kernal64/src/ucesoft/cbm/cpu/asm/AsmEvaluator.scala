@@ -5,6 +5,7 @@ import scala.collection.mutable.Buffer
 object AsmEvaluator {
   import AsmParser._
   import Formats._
+  import Ordering.Double.TotalOrdering
 
   // ====================== EVALUATION ===============================
   sealed trait RuntimeValue {

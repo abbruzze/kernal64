@@ -18,23 +18,23 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
   //bus.registerListener(this)
   
   def isDeviceReady = true
-  def init {}
-  def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) {}
+  def init : Unit = {}
+  def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) : Unit = {}
   def getFloppy = EmptyFloppy
   
   protected def setStatus(code: Int) = status = code
-  protected def sendStatus {
+  protected def sendStatus : Unit = {
     import BusDataIterator._
     channels(15).dataToSend = Some(new StringDataIterator("%02d,%s,00,00".format(status, ERROR_CODES(status)) + 13.toChar))
   }
   
-  override def resetSignals {
+  override def resetSignals : Unit = {
     super.resetSignals
   }
   
   protected def getDirectoryEntries(path:String) : List[DirEntry]
   
-  protected def handleChannel15
+  protected def handleChannel15 : Unit
   
   protected def loadDirectory(path:String,pathName:String) : BusDataIterator = {
     val out = new ListBuffer[Int]
@@ -111,18 +111,18 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
     new ArrayIntDataIterator(out.toArray)
   }
   
-  override protected def untalk {
+  override protected def untalk : Unit = {
     resetSignals
   }
   
-  override def unlisten {
+  override def unlisten : Unit = {
     super.unlisten
     if (channel == 15) handleChannel15
     resetSignals
   }
   
   // state
-  protected def saveState(out:ObjectOutputStream) {}
-  protected def loadState(in:ObjectInputStream) {}
+  protected def saveState(out:ObjectOutputStream) : Unit = {}
+  protected def loadState(in:ObjectInputStream) : Unit = {}
   protected def allowsStateRestoring : Boolean = true
 }

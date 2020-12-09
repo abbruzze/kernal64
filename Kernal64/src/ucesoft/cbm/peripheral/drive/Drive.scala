@@ -18,20 +18,20 @@ trait Drive extends CBMComponent {
   val formatExtList : List[String]
   var runningListener : (Boolean) => Unit = _
   
-  def disconnect {}
-  def setActive(active:Boolean) {}
+  def disconnect : Unit = {}
+  def setActive(active:Boolean) : Unit = {}
   def isRunning : Boolean = false
-  def setCanSleep(canSleep:Boolean) {}
+  def setCanSleep(canSleep:Boolean) : Unit = {}
   def canGoSleeping : Boolean = false
-  def setDriveReader(driveReader:Floppy,emulateInserting:Boolean)
-  def clock(cycles:Long)
-  def setReadOnly(readOnly:Boolean) {}
+  def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) : Unit
+  def clock(cycles:Long) : Unit
+  def setReadOnly(readOnly:Boolean) : Unit = {}
   def isReadOnly : Boolean = false
   def getFloppy : Floppy
   def getMem : Memory = Memory.empty
   
   def getSpeedHz = -1  
-  def setSpeedHz(speed:Int) {}
+  def setSpeedHz(speed:Int) : Unit = {}
   val MIN_SPEED_HZ = 0
   val MAX_SPEED_HZ = 0
 }

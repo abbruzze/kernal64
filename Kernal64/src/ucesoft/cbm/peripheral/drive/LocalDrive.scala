@@ -37,7 +37,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   
   status = STATUS_WELCOME
   
-  def reset {}
+  def reset : Unit = {}
   
   def getCurrentDir = currentDir
   def setCurrentDir(dir:File) = currentDir = dir
@@ -71,7 +71,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
     }
   }
   
-  override def open {
+  override def open : Unit = {
     super.open
     channel match {
       case 0 => // LOADING FILE
@@ -87,7 +87,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
     }
   }
   
-  override def open_channel {
+  override def open_channel : Unit = {
     super.open_channel
     if (!channels(channel).isOpened) {
       channels(channel).open
@@ -101,7 +101,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
     }
   }
   
-  override def close {
+  override def close : Unit = {
     super.close
     if (!loading) {
       var out : FileOutputStream = null
@@ -121,12 +121,12 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
     setStatus(STATUS_OK)
   }  
   
-  override def dataNotFound {
+  override def dataNotFound : Unit = {
     super.dataNotFound
     setStatus(STATUS_FILE_NOT_FOUND)
   }
   
-  protected def handleChannel15 {
+  protected def handleChannel15 : Unit = {
     val cmd = if (channels(channel).fileName.length > 0) channels(channel).fileName.toString else channels(channel).bufferToString
     if (cmd.length > 0) {
       executeCommand(cmd)
@@ -135,7 +135,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
     sendStatus
   }
   
-  private def executeCommand(cmd: String) {
+  private def executeCommand(cmd: String) : Unit = {
     println(s"Executing CMD $cmd")
     val command = if (cmd.charAt(cmd.length - 1) == 13) cmd.substring(0, cmd.length - 1) else cmd
     if (command.startsWith("CD")) {

@@ -184,28 +184,28 @@ class VDC extends RAMComponent {
     recalculate_xsync
   })
   // Clock management ====================================
-  def pause {
+  def pause : Unit = {
     //if (clk != Clock.systemClock) clk.pause
     clk.cancel("VDC_TICK")
   }
-  def play {
+  def play : Unit = {
     //if (clk != Clock.systemClock) clk.play
     pause
     reschedule
   }
-  @inline private def reschedule {
+  @inline private def reschedule : Unit = {
     cycles_per_line_accu += cycles_per_line
     val next_clk = cycles_per_line_accu >> 16
     cycles_per_line_accu -= next_clk << 16
     clk.schedule(new ClockEvent("VDC_TICK",clk.currentCycles + next_clk,drawLine _))
   }
-  def setOwnThread {
+  def setOwnThread : Unit = {
     pause
     clk = Clock.makeClock("VDCClock",Some(errorHandler _))((cycles) => {})
     clk.play
     play
   }
-  def stopOwnThread {
+  def stopOwnThread : Unit = {
     if (clk != Clock.systemClock) {
       clk.halt
       clk = Clock.systemClock
@@ -224,16 +224,16 @@ class VDC extends RAMComponent {
     writeOnPrevFrame = true
   }
 
-  def setGeometryUpdateListener(geometryUpdateListener:(String) => Unit) {
+  def setGeometryUpdateListener(geometryUpdateListener:(String) => Unit) : Unit = {
     this.geometryUpdateListener = geometryUpdateListener
   }
 
-  def setDisplay(display:Display) {
+  def setDisplay(display:Display) : Unit = {
     this.display = display
     bitmap = display.displayMem
   }
 
-  final def init {
+  final def init : Unit = {
     reset
     var v = 0xFF
     for(i <- 0 until ram.length) {
@@ -242,7 +242,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  final def reset {
+  final def reset : Unit = {
     busyFlagClearCycle = 0
     charVisibleWidth = 8
     regs(22) = 0x78
@@ -279,7 +279,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+  final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
     address & 1 match {
       case 0 =>
         address_reg = value & 0x3F
@@ -294,7 +294,7 @@ class VDC extends RAMComponent {
     lpFlag | busyFlag | (if (vblank) 0x20 else 0) | vdc_revision
   }
   @inline private[this] def currentMemoryAddress = regs(18) << 8 | regs(19)
-  @inline private[this] def incCurrentMemoryAddress {
+  @inline private[this] def incCurrentMemoryAddress : Unit = {
     regs(19) += 1
     if (regs(19) == 0x100) {
       regs(19) = 0
@@ -450,7 +450,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  private def setInterlaceMode(newInterlaceMode:Boolean) {
+  private def setInterlaceMode(newInterlaceMode:Boolean) : Unit = {
     interlaceMode = newInterlaceMode
     display.setInterlaceMode(interlaceMode)
     bitmap = display.displayMem
@@ -462,7 +462,7 @@ class VDC extends RAMComponent {
   }
 
   // ============================================================================
-  @inline private def recalculate_xsync {
+  @inline private def recalculate_xsync : Unit = {
     val charWidth = if((regs(25) & 0x10) > 0) (regs(22) >> 4) << 1 /* double pixel a.k.a 40column mode */
     else 1 + (regs(22) >> 4)
 
@@ -475,7 +475,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  @inline private[this] def copyorfill {
+  @inline private[this] def copyorfill : Unit = {
     val length = if (regs(30) == 0) 0x100 else regs(30)
     // ------------------------------
     val copy = (regs(24) & 0x80) > 0
@@ -524,7 +524,7 @@ class VDC extends RAMComponent {
 
   // =======================================================================
 
-  private def errorHandler(t:Throwable) {
+  private def errorHandler(t:Throwable) : Unit = {
     t.printStackTrace
   }
 
@@ -542,7 +542,7 @@ class VDC extends RAMComponent {
     nextFrame
   }
 
-  final def drawLine(cycles:Long) {
+  final def drawLine(cycles:Long) : Unit = {
     clkStartLine = cycles
     reschedule
 
@@ -636,7 +636,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  @inline private def updateGeometry {
+  @inline private def updateGeometry : Unit = {
     visibleTextRows = regs(6)
     visibleScreenHeightPix = visibleTextRows * (ychars_total + 1)
     val charWidth = if((regs(25) & 0x10) > 0) (regs(22) >> 4) << 1 /* 40column mode */
@@ -678,7 +678,7 @@ class VDC extends RAMComponent {
     if (debug) println(s"VDC: updated geometry. Text mode=$textMode interlaced=$interlaceMode ${regs(1) * charVisibleWidth}x${visibleScreenHeightPix} new borderWidth=$borderWidth")
   }
 
-  @inline private def nextFrame {
+  @inline private def nextFrame : Unit = {
     blankMode = false
     frameBit = (frameBit + 1) & 1
     if (oneLineDrawn) display.showFrame(0,0,screenWidth,screenHeight)
@@ -756,7 +756,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  @inline private def drawTextLine(vsync:Boolean) {
+  @inline private def drawTextLine(vsync:Boolean) : Unit = {
     val backgroundColor = PALETTE(regs(26) & 0x0F)
     val bitmapOffset = rasterLine * screenWidth
     val blankColOffset = xchars_total - regs(2) + 4 - 7
@@ -863,7 +863,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  @inline private def drawBitmapLine {
+  @inline private def drawBitmapLine : Unit = {
     val doublePixFeature = (regs(25) & 0x10) > 0
     val realCharWidth = if (doublePixFeature) regs(22) >> 4 else 1 + (regs(22) >> 4)
     val charWidth = if (doublePixFeature) realCharWidth << 1 else realCharWidth
@@ -964,7 +964,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  private def setScanLines(lines:Int) {
+  private def setScanLines(lines:Int) : Unit = {
     display.setNewResolution(lines,screenWidth)
     bitmap = display.displayMem
     currentScreenHeight = lines
@@ -973,7 +973,7 @@ class VDC extends RAMComponent {
     writeOnPrevFrame = true
   }
 
-  def triggerLightPen {
+  def triggerLightPen : Unit = {
     lpFlag = 0x40
     regs(16) = ypos
     val delta = clk.currentCycles - clkStartLine
@@ -993,7 +993,7 @@ class VDC extends RAMComponent {
   }
 
   // state -----------------------------------------------
-  protected def saveState(out:ObjectOutputStream) {
+  protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeInt(address_reg)
     out.writeBoolean(vblank)
     out.writeObject(ram)
@@ -1031,7 +1031,7 @@ class VDC extends RAMComponent {
     out.writeObject(gfxBuffer)
     out.writeObject(attrBuffer)
   }
-  protected def loadState(in:ObjectInputStream) {
+  protected def loadState(in:ObjectInputStream) : Unit = {
     address_reg = in.readInt
     vblank = in.readBoolean
     loadMemory[Int](ram,in)

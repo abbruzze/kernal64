@@ -20,8 +20,8 @@ abstract class ControlPort extends CBMComponent {
   private[this] var lightPenEmulationEnabled = false
   private[this] var mouse1351EmulationEnabled = false
   
-  def init {}
-  def reset {
+  def init : Unit = {}
+  def reset : Unit = {
     emulatedBit = 0
   }
   
@@ -48,8 +48,8 @@ abstract class ControlPort extends CBMComponent {
   def setMouse1351Emulation(enabled:Boolean) = mouse1351EmulationEnabled = enabled
   def isMouse1351EmulationEnabled = mouse1351EmulationEnabled
   // state
-  protected def saveState(out:ObjectOutputStream) {}
-  protected def loadState(in:ObjectInputStream) {}
+  protected def saveState(out:ObjectOutputStream) : Unit = {}
+  protected def loadState(in:ObjectInputStream) : Unit = {}
   protected def allowsStateRestoring : Boolean = true
 }
 
@@ -67,10 +67,10 @@ object ControlPort {
   private abstract class AbstractControlPort extends ControlPort with MouseListener with KeyListener {
     private[this] var mask = 0
     protected def getKeyMask(e:KeyEvent) : Int
-    def mouseClicked(e:MouseEvent) {}
-    def mouseEntered(e:MouseEvent) {}
-    def mouseExited(e:MouseEvent) {}
-    def mousePressed(e:MouseEvent) {
+    def mouseClicked(e:MouseEvent) : Unit = {}
+    def mouseEntered(e:MouseEvent) : Unit = {}
+    def mouseExited(e:MouseEvent) : Unit = {}
+    def mousePressed(e:MouseEvent) : Unit = {
       if (isMouse1351EmulationEnabled) {
         if (SwingUtilities.isRightMouseButton(e)) mask |= 1 // 1351 right button emulates joy-UP
         else mask |= 16 // 1351 right button emulates joy-FIRE
@@ -78,7 +78,7 @@ object ControlPort {
       else
       if (!isLightPenEmulationEnabled) mask |= 16
     }
-    def mouseReleased(e:MouseEvent) {
+    def mouseReleased(e:MouseEvent) : Unit = {
       if (isMouse1351EmulationEnabled) {
         if (SwingUtilities.isRightMouseButton(e)) mask &= ~1 // 1351 right button emulates joy-UP
         else mask &= ~16 // 1351 right button emulates joy-FIRE
@@ -90,7 +90,7 @@ object ControlPort {
     def keyPressed(e: KeyEvent) = mask |= getKeyMask(e)
     
     def keyReleased(e: KeyEvent) = mask &= ~getKeyMask(e)
-    def keyTyped(e: KeyEvent) {}
+    def keyTyped(e: KeyEvent) : Unit = {}
    
     protected def read = ~mask & 0xFF
   }

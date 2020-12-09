@@ -18,7 +18,7 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
   private[this] var joystickDialog : JDialog = null
   private[this] var keyboardDialog : JDialog = null
   private[this] val fireButtonLabel = new JLabel("...")
-  private def setCombo(c:JComboBox[String],port:String) {
+  private def setCombo(c:JComboBox[String],port:String) : Unit = {
     configuration.getProperty(port) match {
       case CONFIGURATION_KEYPAD_VALUE => c.setSelectedIndex(0)
       case CONFIGURATION_JOYSTICK_VALUE => c.setSelectedIndex(1)
@@ -69,7 +69,7 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
   private var keyCmd = ""
   
   private val keybListener : KeyListener = new KeyAdapter{
-    override def keyPressed(e:KeyEvent) {
+    override def keyPressed(e:KeyEvent) : Unit = {
       if (e.getKeyLocation == KeyEvent.KEY_LOCATION_NUMPAD) {
         JOptionPane.showMessageDialog(keyboardDialog,"Invalid key location", "Bad key location",JOptionPane.ERROR_MESSAGE)
       }
@@ -132,7 +132,7 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
     }
   }
 
-  def actionPerformed(e: ActionEvent) {
+  def actionPerformed(e: ActionEvent) : Unit = {
     import ControlPort._
     e.getActionCommand match {
       case "OK" =>
@@ -164,7 +164,7 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
     
   }
   
-  private def listenKey(cmd:String,index:Int) {
+  private def listenKey(cmd:String,index:Int) : Unit = {
     keyCmd = cmd
     keyIndex = index
     keyboardDialog.requestFocus
@@ -172,7 +172,7 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
     for(i <- 0 until 9) keybButtons(i).setEnabled(false)
   }  
   
-  private def keyboardConfig {        
+  private def keyboardConfig : Unit = {
     keyboardDialog = new JDialog(parent,"Keyboard keys selection",true)
     val buttonPanel = new JPanel(new GridLayout(9,2,5,5))
     for(i <- 0 until 9) {
@@ -187,7 +187,7 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
     keyboardDialog.setVisible(true)
   }
   
-  private def gamePadConfig {
+  private def gamePadConfig : Unit = {
     try {
       val controllers = ControllerEnvironment.getDefaultEnvironment.getControllers map { _.asInstanceOf[Object] }
       val controller = JOptionPane.showInputDialog(this,"Select Joystick","GamePad configuration",JOptionPane.QUESTION_MESSAGE,null,controllers,controllers(0)).asInstanceOf[Controller]      
@@ -208,7 +208,7 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
         buttonPanel.add(cancelButton)
         joystickDialog.getContentPane.add("South",buttonPanel)
         val pollingThread = new Thread {
-          override def run {
+          override def run : Unit = {
             while (!isInterrupted) {
               controller.poll
               for(b <- buttons) if (b.getPollData != 0.0f) {

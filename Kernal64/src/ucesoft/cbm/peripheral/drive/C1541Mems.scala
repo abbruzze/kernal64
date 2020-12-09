@@ -29,7 +29,7 @@ object C1541Mems {
     override val startAddress = startAndLen._1
     override val length = startAndLen._2
      
-    final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {}
+    final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
   }
   
   private class RAM extends RAMComponent {
@@ -48,25 +48,25 @@ object C1541Mems {
     def isChannelActive = channelActive != 0
     def getChannelsState = channelActive
     
-    def init {
+    def init : Unit = {
       Log.info("Initialaizing C1541 RAM memory ...")
     }
-    def reset {
+    def reset : Unit = {
       for(i <- 0 until mem.length) mem(i) = 0
     }
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address & 0xFFFF)
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       mem(address & 0xFFFF) = value & 0xff
       if (address >= 0x22B && address <= 0x239) {
         val channel = address - 0x22B
         if (value != 0xFF) channelActive |= 1 << channel else channelActive &= ~(1 << channel)
       }
     }
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeObject(mem)
       out.writeInt(channelActive)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       loadMemory[Int](mem,in)
       channelActive = in.readInt
     }
@@ -85,24 +85,24 @@ object C1541Mems {
     private[this] val mem = Array.fill(length)(0)
     var isActive = false
     
-    def init {
+    def init : Unit = {
       Log.info(s"Initialaizing C1541 Extended RAM ${Integer.toHexString(baseAddress)} memory ...")
     }
-    def reset {
+    def reset : Unit = {
       for(i <- 0 until mem.length) mem(i) = 0xFF
     }
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = if (isActive) mem(address - baseAddress) else {
       if (baseAddress < KERNEL.startAddress) 0 else KERNEL.read(address)
     }
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) {
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       if (isActive) mem(address - baseAddress) = value & 0xff
     }
     // state
-    protected def saveState(out:ObjectOutputStream) {
+    protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeObject(mem)
       out.writeBoolean(isActive)
     }
-    protected def loadState(in:ObjectInputStream) {
+    protected def loadState(in:ObjectInputStream) : Unit = {
       loadMemory[Int](mem,in)
       isActive = in.readBoolean
     }
@@ -128,7 +128,7 @@ object C1541Mems {
         
     private[this] val RAM = new RAM
     
-    def init {
+    def init : Unit = {
       addBridge(KERNEL)
       addBridge(RAM)
       addBridge(RAM_EXP_2000)
@@ -138,15 +138,15 @@ object C1541Mems {
       addBridge(RAM_EXP_A000)
     }
     
-    def reset {}
+    def reset : Unit = {}
     
     def isChannelActive = RAM.isChannelActive
     def getChannelsState = RAM.getChannelsState
     
     override def defaultValue(address:Int) = Some(address >> 8)
     // state
-    protected def saveState(out:ObjectOutputStream) {}
-    protected def loadState(in:ObjectInputStream) {}
+    protected def saveState(out:ObjectOutputStream) : Unit = {}
+    protected def loadState(in:ObjectInputStream) : Unit = {}
     protected def allowsStateRestoring : Boolean = true
   }
 }

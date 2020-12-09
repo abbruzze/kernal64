@@ -37,7 +37,7 @@ class RemoteC64Client(host:String,port:Int,video:RemoteC64Frame) extends KeyList
   
   video.addKeyListener(this)
   
-  private def sendKey(e:KeyEvent) {
+  private def sendKey(e:KeyEvent) : Unit = {
     out.writeChar('K')
     out.writeInt(e.getID)
     out.writeInt(e.getModifiers)
@@ -47,15 +47,15 @@ class RemoteC64Client(host:String,port:Int,video:RemoteC64Frame) extends KeyList
     out.flush
   }
   
-  def keyPressed(e:KeyEvent) {
+  def keyPressed(e:KeyEvent) : Unit = {
     if (out != null) sendKey(e)    
   }
-  def keyReleased(e:KeyEvent) {
+  def keyReleased(e:KeyEvent) : Unit = {
     if (out != null) sendKey(e)
   }
-  def keyTyped(e:KeyEvent) {}
+  def keyTyped(e:KeyEvent) : Unit = {}
   
-  def listen {        
+  def listen : Unit = {
     println("Connection established ...")
     try {
       val in = new DataInputStream(new BufferedInputStream(socket.getInputStream))
@@ -113,7 +113,7 @@ class RemoteC64Frame(title:String) extends JFrame(title) {
   
   getContentPane.add("Center",panel)
   
-  def initImage(w:Int,h:Int,imageBuffer:Array[Int]) {
+  def initImage(w:Int,h:Int,imageBuffer:Array[Int]) : Unit = {
     if (imageSource == null) {
       imageSource = new MemoryImageSource(w, h, imageBuffer, 0, w)
       imageSource.setAnimated(true);
@@ -124,13 +124,13 @@ class RemoteC64Frame(title:String) extends JFrame(title) {
     }
   }
   
-  def updateScreen(x1:Int,y1:Int,x2:Int,y2:Int) {
+  def updateScreen(x1:Int,y1:Int,x2:Int,y2:Int) : Unit = {
     imageSource.newPixels(x1,y1,x2,y2)
     repaint()
   }
   
   private class ImagePanel extends JComponent {
-    override def paint(g:Graphics) {    
+    override def paint(g:Graphics) : Unit = {
       if (screen != null) {
         g.drawImage(screen,0,0,getWidth,getHeight,null)
         fc += 1
