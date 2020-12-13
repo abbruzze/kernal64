@@ -1,9 +1,9 @@
 package ucesoft.cbm.cpu.asm
 
 import java.io.PrintWriter
-
 import AsmEvaluator._
 import ucesoft.cbm.cpu.CPU65xx
+import ucesoft.cbm.cpu.asm.AsmParser.{Patch, Virtual}
 
 case class AsmEncoding(org:Int,mem:Array[Byte])
 
@@ -22,14 +22,14 @@ class AsmBytecodeEmitter(console:PrintWriter,blocks:List[ByteCodeBlock]) {
     AsmEncoding(startEnd._1,mem)
   }
   private def orderAndCheck : List[ByteCodeBlock] = {
-    val orderedBlocks = blocks.filterNot(_.virtual).sortBy { _.getOrg }
+    val orderedBlocks = blocks.filterNot(_.orgType == Virtual).sortBy { _.getOrg }
     // check for intersections
     var ptr = orderedBlocks
     while (!ptr.isEmpty) {
       if (!ptr.tail.isEmpty) {
         val next = ptr.tail.head
         val current = ptr.head
-        if (current.getOrg + current.size > next.getOrg) 
+        if (next.orgType != Patch && current.getOrg + current.size > next.getOrg)
           throw new CompilerException(s"Invalid code block starting at ${Integer.toHexString(next.getOrg)}: it overlaps with code block [${Integer.toHexString(current.getOrg)} - ${Integer.toHexString(current.getOrg + current.size)}]",None)      
       }
       ptr = ptr.tail

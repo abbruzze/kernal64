@@ -44,12 +44,20 @@ object AsmEvaluator {
         ("toHexInt",0) -> ((l:List[RuntimeValue]) => NumberVal(Integer.parseInt(s,16))),
         ("at",1) -> ((l:List[RuntimeValue]) => at(l.head)),
         ("toChar",0) -> ((l:List[RuntimeValue]) => NumberVal(s.charAt(0))),
+        ("substring",2) -> ((l:List[RuntimeValue]) => StringVal(s.substring(asInt(l,0),asInt(l,1)))),
         ("size",0) -> ((l:List[RuntimeValue]) => NumberVal(s.length))
     )
     private def at(i:RuntimeValue) : RuntimeValue = {
       i match {
         case NumberVal(index) => StringVal(s.charAt(index.toInt).toString)
         case _ => throw new EvaluationError(s"Type mismatch on method string::at: expected int")
+      }
+    }
+    private def asInt(l:List[RuntimeValue],pos:Int) : Int = {
+      if (pos >= l.size) throw new EvaluationError(s"Invalid index on $pos on string $s")
+      l(pos) match {
+        case NumberVal(n) => n.toInt
+        case _ => throw new EvaluationError(s"Invalid index on $pos on string $s. Expected an int.")
       }
     }
   }
@@ -386,13 +394,15 @@ object AsmEvaluator {
       }),
       // math
       ("rad",1) -> (args => NumberVal(args2Numbers(args)(0).n * 2 * math.Pi / 360)),
-      ("cos",1) -> (args => NumberVal(math.cos(args2Numbers(args)(0).n).toDouble)),
-      ("sin",1) -> (args => NumberVal(math.sin(args2Numbers(args)(0).n).toDouble)),
-      ("floor",1) -> (args => NumberVal(math.floor(args2Numbers(args)(0).n).toDouble)),
-      ("ceil",1) -> (args => NumberVal(math.ceil(args2Numbers(args)(0).n).toDouble)),
+      ("cos",1) -> (args => NumberVal(math.cos(args2Numbers(args)(0).n))),
+      ("sin",1) -> (args => NumberVal(math.sin(args2Numbers(args)(0).n))),
+      ("floor",1) -> (args => NumberVal(math.floor(args2Numbers(args)(0).n))),
+      ("ceil",1) -> (args => NumberVal(math.ceil(args2Numbers(args)(0).n))),
       ("max",-1) -> (args => NumberVal(args2Numbers(args) map { _.n } max)),
       ("min",-1) -> (args => NumberVal(args2Numbers(args) map { _.n } min)),
       ("round",1) -> (args => NumberVal(math.round(args2Numbers(args)(0).n).toDouble)),
+      ("pow",2) -> (args => NumberVal(math.pow(args2Numbers(args)(0).n,args2Numbers(args)(1).n))),
+      ("sqrt",1) -> (args => NumberVal(math.sqrt(args2Numbers(args)(0).n))),
       //
       ("import",2) -> (args => importFile(args)),
       ("import",3) -> (args => importFile(args)),

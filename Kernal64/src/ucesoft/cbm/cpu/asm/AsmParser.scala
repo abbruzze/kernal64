@@ -53,8 +53,12 @@ object AsmParser {
   case class MODULE(name:String,body:List[Statement]) extends Statement
   case class INCLUDE(file:String) extends Statement
   case class DISCARDEXPR(expr:Expr) extends Statement
-  // ASMStatement  
-  case class ORG(org: Expr, sectionName: Option[String],virtual:Boolean = false) extends ASMStatement
+  // ASMStatement
+  sealed trait ORGType
+  case object Default extends ORGType
+  case object Virtual extends ORGType
+  case object Patch extends ORGType
+  case class ORG(org: Expr, sectionName: Option[Expr],virtual:ORGType = Default) extends ASMStatement
   case class WORD(values: List[Expr], isByte: Boolean = true) extends ASMStatement
   case class BYTE_LIST(list: Expr) extends ASMStatement
   case class FILL(size:Expr,value:Option[Expr]) extends ASMStatement
@@ -198,9 +202,10 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   }
 
   // ================ ASM STATEMENT ==================================
-  private def org: Parser[ASMStatement] = ((".pc" | "*") ~ "=" | "org") ~> (expr ~ opt("virtual") ~ opt(string)) ^^ {
+  private def org: Parser[ASMStatement] = ((".pc" | "*") ~ "=" | "org") ~> (expr ~ opt("virtual" | "patch") ~ opt(expr)) ^^ {
     case addr ~ None ~ l => ORG(addr, l)
-    case addr ~ Some(_) ~ l => ORG(addr, l,true)
+    case addr ~ Some("virtual") ~ l => ORG(addr, l,Virtual)
+    case addr ~ Some("patch") ~ l => ORG(addr, l,Patch)
   }
   private def text: Parser[ASMStatement] = (".text" | ".t" | "!text") ~> opt("ascii"|"screen"|"upper-ascii"|"upper-screen") ~ expr ^^ {
     case enc~e => enc match {
@@ -241,7 +246,7 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
       }
 
   private def asm: Parser[ASMStatement] = other_opcodes ~ opt(".z" | ".a") ~ opt(asmMode) <~ opt(comment) <~ ("\n" | "") ^^ {
-    case o ~ m ~ None => // m is ignored, IMP forced 
+    case o ~ _ ~ None => // m is ignored, IMP forced
       ASM(o, IMP, None)
     case o ~ m ~ Some(mode) =>
       var mm = m match {
@@ -299,12 +304,12 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   private def funBlock: Parser[List[Statement]] = "[\n\r]*".r ~> "{" ~> statements(false,true,false,false) <~ "}" <~ "[\n\r]*".r
   private def moduleBlock: Parser[List[Statement]] = "[\n\r]*".r ~> "{" ~> statements(false,true,false,true) <~ "}" <~ "[\n\r]*".r
   
-  private def ifStmt: Parser[Statement] = (("if" ~ "(") ~> expr <~ ")") ~ block ~ opt("else" ~> block) ^^ {
+  private def ifStmt: Parser[Statement] = (("if" ~ "(") ~> expr <~ ")" <~ opt(comment)) ~ block ~ opt("else" ~> opt(comment) ~> block) ^^ {
     case cond ~ t ~ None => IF(cond, t, Nil)
     case cond ~ t ~ Some(e) => IF(cond, t, e)
   }
-  private def whileStmt: Parser[Statement] = (("while" ~ "(") ~> expr <~ ")") ~ block ^^ { case c ~ b => WHILE(c, b) }
-  private def forStmt: Parser[Statement] = ("for" ~ "(") ~> repsep((label <~ "=") ~ expr, ",") ~ (";" ~> expr <~ ";") ~ repsep(expr, ",") ~ (")" ~> block) ^^ {
+  private def whileStmt: Parser[Statement] = (("while" ~ "(") ~> expr <~ ")" <~ opt(comment)) ~ block ^^ { case c ~ b => WHILE(c, b) }
+  private def forStmt: Parser[Statement] = ("for" ~ "(") ~> repsep((label <~ "=") ~ expr, ",") ~ (";" ~> expr <~ ";") ~ repsep(expr, ",") ~ (")" ~> opt(comment) ~> block) ^^ {
     case vars ~ cond ~ post ~ body =>
       val vs = vars map { case n ~ e => VAR(n,e,false) }
       FOR(vs, cond, post, body)
@@ -350,7 +355,9 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   private def include : Parser[Statement] = "source" ~> expr ^? ({ case Str(fn) => INCLUDE(fn) }, _ => "Type mismatch: include statement expects a string as filename")
   
   private def asmStatement: Parser[Statement] = positioned { asm | org | bytes | words | text | fill }
-  private def statement: Parser[Statement] = positioned { include | error | align | dup | break | const | variable | print | eval | ifStmt | struct | enum | whileStmt | forStmt | macroCall | declareLabel | assignment | exprStmt}
+  private def statement: Parser[Statement] = positioned {
+    include | error | align | dup | break | const | variable | print | eval | ifStmt | struct | enum | whileStmt | forStmt | macroCall | declareLabel | assignment | exprStmt
+  }
   
   private def statements(macroMode:Boolean, asmNotAllowed:Boolean, top:Boolean, module:Boolean): Parser[List[Statement]] = allStatements(macroMode,asmNotAllowed,top,module) ^^ { _.flatten }
 

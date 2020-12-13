@@ -13,7 +13,7 @@ import org.fife.ui.rsyntaxtextarea.{RSyntaxTextArea, SyntaxConstants}
 import org.fife.ui.rtextarea.{RTextScrollPane, SearchContext, SearchEngine}
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.cpu.asm.AsmEvaluator.Evaluator
-import ucesoft.cbm.cpu.asm.AsmParser.Statement
+import ucesoft.cbm.cpu.asm.AsmParser.{Patch, Statement, Virtual}
 import ucesoft.cbm.trace.{BreakSet, NoBreak, TraceDialog, TracingListener}
 
 import javax.swing.event.{DocumentEvent, DocumentListener}
@@ -25,6 +25,9 @@ import scala.util.parsing.input.Position
 object Assembler {
   private[asm] val symbolTable = new mutable.LinkedHashMap[String,String]()
   private[asm] var importDir = System.getProperty("user.dir")
+
+  private[asm] val FORMAT_BINARY = 0
+  private[asm] val FORMAT_PRG = 1
 
   private[asm] case class CompilationResult(blocks:List[ByteCodeBlock],asmEncoding:AsmEncoding)
 
@@ -110,7 +113,7 @@ object Assembler {
 
                 log("Code blocks found:\n")
                 log(s"${"=" * 50}\n")
-                for ((b, i) <- lastByteCodeBlocks.zipWithIndex) log(f"#$i%03d ${b.name.getOrElse("Unnamed")}%30s ${b.getOrg}%04X ${b.getOrg + b.size - 1}%04X${if (b.virtual) " virtual" else ""}\n")
+                for ((b, i) <- lastByteCodeBlocks.zipWithIndex) log(f"#$i%03d ${b.name.getOrElse("Unnamed")}%30s ${b.getOrg}%04X ${b.getOrg + b.size - 1}%04X${if (b.orgType == Virtual) " virtual" else if (b.orgType == Patch) " patch" else ""}\n")
 
                 val emitter = new AsmBytecodeEmitter(new PrintWriter(sw), lastByteCodeBlocks)
                 val asmEncoding = emitter.encode
@@ -145,10 +148,12 @@ object Assembler {
     }
   }
 
-  private[asm] def savePRG(asmEncoding:AsmEncoding,fileName:String) : Unit = {
+  private[asm] def saveAs(asmEncoding:AsmEncoding, fileName:String, format:Int) : Unit = {
     val out = new java.io.FileOutputStream(fileName)
-    out.write(asmEncoding.org & 0xFF)
-    out.write(asmEncoding.org >> 8)
+    if (format == FORMAT_PRG) {
+      out.write(asmEncoding.org & 0xFF)
+      out.write(asmEncoding.org >> 8)
+    }
     out.write(asmEncoding.mem)
     out.close
   }
@@ -161,6 +166,7 @@ object Assembler {
     var out : Option[String] = None
     var in : InputStream = System.in
     var fileName : Option[String] = None
+    var outFormat = FORMAT_BINARY
 
     settings.add("include-dir",
       "Sets the directory where the include files will be searched in",
@@ -177,7 +183,19 @@ object Assembler {
     settings.add("prg",
       "Writes to the given PRG file",
       "PRG",
-      (prg:String) => out = Some(prg),
+      (prg:String) => {
+        out = Some(prg)
+        outFormat = FORMAT_PRG
+      },
+      ""
+    )
+    settings.add("bin",
+      "Writes to the given raw file",
+      "BIN",
+      (bin:String) => {
+        out = Some(bin)
+        outFormat = FORMAT_BINARY
+      },
       ""
     )
     settings.add("D",
@@ -218,7 +236,7 @@ object Assembler {
       case Some(CompilationResult(_,enc)) =>
         out match {
           case Some(target) =>
-            savePRG(enc,target)
+            saveAs(enc,target,outFormat)
             log(s"Output binary to $target")
           case None =>
         }
@@ -298,6 +316,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
   private case class Break(address:Int,id:AnyRef)
 
   private val saveAsPRGItem = new JMenuItem("Save as PRG")
+  private val saveAsBINItem = new JMenuItem("Save as raw bin file")
   private val uploadInMemoryItem = new JMenuItem("Upload in memory")
   private val compileItem = new JMenuItem("Compile")
 
@@ -351,13 +370,16 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     val saveAs = new JMenuItem("Save as")
     saveAs.addActionListener( _ => this.save(true) )
 
-    saveAsPRGItem.addActionListener( _ => saveAsPRG )
+    saveAsPRGItem.addActionListener( _ => saveAsFormat(FORMAT_PRG) )
     saveAsPRGItem.setEnabled(false)
+    saveAsBINItem.addActionListener( _ => saveAsFormat(FORMAT_BINARY) )
+    saveAsBINItem.setEnabled(false)
 
     file.add(load)
     file.add(save)
     file.add(saveAs)
     file.add(saveAsPRGItem)
+    file.add(saveAsBINItem)
 
     val gotoItem = new JMenuItem("Go to line ...")
     gotoItem.addActionListener( _ => gotoLine )
@@ -705,12 +727,12 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     setFileChanged(false)
   }
 
-  private def saveAsPRG : Unit = {
+  private def saveAsFormat(format:Int) : Unit = {
     val fc = new JFileChooser(importDir)
-    fc.setDialogTitle("Choose a file where to save PRG")
+    fc.setDialogTitle("Choose a file where to save compiled code")
     fc.showSaveDialog(this) match {
       case JFileChooser.APPROVE_OPTION =>
-        savePRG(asmEncoding,fc.getSelectedFile.toString)
+        saveAs(asmEncoding,fc.getSelectedFile.toString,format)
       case _ =>
     }
   }
@@ -738,6 +760,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     setCursor(new java.awt.Cursor(Cursor.WAIT_CURSOR))
     uploadInMemoryItem.setEnabled(false)
     saveAsPRGItem.setEnabled(false)
+    saveAsBINItem.setEnabled(false)
     compileItem.setEnabled(false)
 
     new Thread {
@@ -749,6 +772,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
               asmEncoding = enc
               uploadInMemoryItem.setEnabled(true)
               saveAsPRGItem.setEnabled(true)
+              saveAsBINItem.setEnabled(true)
             case None =>
           }
         }

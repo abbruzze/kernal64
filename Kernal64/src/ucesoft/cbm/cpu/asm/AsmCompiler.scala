@@ -13,22 +13,22 @@ class CompilerException(val msg:String,val statement:Option[AsmParser.Statement]
 
 case class ByteCodeStatement(pc:Int,asm:ASMStatement,operandValue:Option[RuntimeValue],source:Position)
   
-class ByteCodeBlock(_org:Int,var name:Option[String],private var _virtual:Boolean = false) {
+class ByteCodeBlock(_org:Int,var name:Option[String],private var _orgType:ORGType = Default) {
   private val asmList = new collection.mutable.ListBuffer[ByteCodeStatement]
   private var org = _org
   private var PC = _org
   
-  def setNewOrg(newOrg:Int,virtual:Boolean) : Unit = {
+  def setNewOrg(newOrg:Int,orgType:ORGType) : Unit = {
     org = newOrg
     PC = org
-    _virtual = virtual
+    _orgType = orgType
   }
   
   def getOrg : Int = org
   
   def pc : Int = PC
 
-  def virtual : Boolean = _virtual
+  def orgType : ORGType = _orgType
   
   def addSizeOf(asm:ASMStatement)(implicit ctx:EvaluationContext) : Unit = {
     PC += sizeAndCheck(asm)
@@ -448,15 +448,22 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
       s match {
         // =============== ASM STATEMENTS ====================
         case ORG(address,name,virtual) =>
+          val orgName = name match {
+            case None => None
+            case Some(n) => Evaluator.evalExpr(n) match {
+              case StringVal(s) => Some(s)
+              case _ => throw new CompilerException(s"ORG's name section must be a string", Some(s))
+            }
+          }
           Evaluator.evalExpr(address) match {
             case NumberVal(address) =>
               if (byteCodeBlocks.exists(_.getOrg == address)) throw new CompilerException(s"Invalid org ${Integer.toHexString(address.toInt)}: already defined",Some(s))
               if (byteCodeBlock.size == 0) {
                 byteCodeBlock.setNewOrg(address.toInt,virtual)
-                byteCodeBlock.name = name
+                byteCodeBlock.name = orgName
               }
               else {
-                byteCodeBlock = new ByteCodeBlock(address.toInt,name,virtual)
+                byteCodeBlock = new ByteCodeBlock(address.toInt,orgName,virtual)
                 byteCodeBlocks += byteCodeBlock
               }
             case WillBeVal(_,e) => throw new CompilerException(s"Cannot determine the ORG initial address. Missing $e",Some(s))
