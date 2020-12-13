@@ -51,8 +51,22 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   private[this] var rotationAngleRad = 0.0
   private[this] var flipX,flipY = false
 
+  private[this] var singleFrameMode = false
+  private[this] var singleFrameCounter = 0
+  private[this] val singleFrameModeMonitor = new Object
+
   addMouseMotionListener(this)
   addMouseListener(this)
+
+  def setSingleFrameMode(sfm:Boolean) : Unit = {
+    singleFrameMode = sfm
+    singleFrameCounter = 0
+    if (!singleFrameMode) advanceOneFrame
+  }
+
+  def advanceOneFrame : Unit = singleFrameModeMonitor.synchronized {
+    singleFrameModeMonitor.notifyAll
+  }
 
   def setRotationAngle(angleInDeg:Double) : Unit = {
     rotationAngleRad = math.toRadians(angleInDeg)
@@ -243,19 +257,27 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     
     frameCounter += 1
     totalFrameCounter += 1
-    val now = System.currentTimeMillis
-    if (ts == 0 || now - ts > 1000) {
-      framePerSecond = math.round(frameCounter / ((now - ts) / 1000.0)).toInt
-      ts = now
-      frameCounter = 0
-      val remoting = if (remote == null) "" 
-                     else 
-                     if (remote.isConnected) { 
-                        showRemotingLabel = !showRemotingLabel
-                        if (showRemotingLabel) "(R) " else "    "
-                     }
-                     else "(?) "
-      frame.setTitle(title + " - " + remoting + framePerSecond + "fps - " + clk.getLastPerformancePerc + "%")
+    if (singleFrameMode) {
+      singleFrameCounter += 1
+      frame.setTitle(s"$title - single frame mode ($singleFrameCounter)")
+      singleFrameModeMonitor.synchronized {
+        singleFrameModeMonitor.wait
+      }
+    }
+    else {
+      val now = System.currentTimeMillis
+      if (ts == 0 || now - ts > 1000) {
+        framePerSecond = math.round(frameCounter / ((now - ts) / 1000.0)).toInt
+        ts = now
+        frameCounter = 0
+        val remoting = if (remote == null) ""
+        else if (remote.isConnected) {
+          showRemotingLabel = !showRemotingLabel
+          if (showRemotingLabel) "(R) " else "    "
+        }
+        else "(?) "
+        frame.setTitle(s"$title - $remoting${framePerSecond}fps - ${clk.getLastPerformancePerc}%")
+      }
     }
   }
 

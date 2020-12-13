@@ -233,6 +233,8 @@ class C128 extends CBMComputer with MMUChangeListener {
                                                          keyb,
                                                          keypadControlPort,
                                                          keyboardControlPort)
+          case java.awt.event.KeyEvent.VK_N if e.isAltDown && e.isShiftDown =>
+            vdcDisplay.advanceOneFrame
           case _ =>
         }
       }
@@ -746,6 +748,9 @@ class C128 extends CBMComputer with MMUChangeListener {
     vdcAdjMenu.add(deinterlaceModeItem)
     deinterlaceModeItem.setSelected(true)
     deinterlaceModeItem.addActionListener(_ => vdc.setDeinterlaceMode(deinterlaceModeItem.isSelected) )
+
+    setOneFrameMode(vicAdjMenu,display,java.awt.event.KeyEvent.VK_N)
+    setOneFrameMode(vdcAdjMenu,vdcDisplay,java.awt.event.KeyEvent.VK_N,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK)
     // -----------------------------------
     
     optionMenu.addSeparator

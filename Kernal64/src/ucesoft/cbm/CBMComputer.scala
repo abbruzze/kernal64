@@ -5,7 +5,6 @@ import java.awt.event._
 import java.io._
 import java.util.zip.{GZIPInputStream, GZIPOutputStream}
 import java.util.{Properties, ServiceLoader}
-
 import javax.swing._
 import javax.swing.filechooser.FileFilter
 import ucesoft.cbm.cpu.{CPU65xx, Memory, ROM}
@@ -23,7 +22,7 @@ import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.printer.{MPS803, MPS803GFXDriver, MPS803ROM}
 import ucesoft.cbm.peripheral.rs232._
-import ucesoft.cbm.peripheral.vic.{Palette, VICType, VIC_NTSC, VIC_PAL}
+import ucesoft.cbm.peripheral.vic.{Display, Palette, VICType, VIC_NTSC, VIC_PAL}
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 import ucesoft.cbm.peripheral.vic.coprocessor.VASYL
 import ucesoft.cbm.peripheral.{controlport, keyboard, vic}
@@ -2171,5 +2170,22 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       },
       !borderOnItem.isSelected
     )
+  }
+
+  protected def setOneFrameMode(parent:JMenu,display: => Display,shortKey:Int,maskKey:Int = java.awt.event.InputEvent.ALT_DOWN_MASK) : Unit = {
+    val sfmItem = new JMenu("Single frame mode")
+    val sfmEnableItem = new JCheckBoxMenuItem("Enabled")
+    val sfmNextFrameItem = new JMenuItem("Advance to next frame")
+    sfmNextFrameItem.setEnabled(false)
+    sfmItem.add(sfmEnableItem)
+    sfmEnableItem.addActionListener(_ => {
+      display.setSingleFrameMode(sfmEnableItem.isSelected)
+      sfmNextFrameItem.setEnabled(sfmEnableItem.isSelected)
+    }
+    )
+    sfmNextFrameItem.setAccelerator(KeyStroke.getKeyStroke(shortKey,maskKey))
+    sfmNextFrameItem.addActionListener(_ => display.advanceOneFrame )
+    sfmItem.add(sfmNextFrameItem)
+    parent.add(sfmItem)
   }
 }

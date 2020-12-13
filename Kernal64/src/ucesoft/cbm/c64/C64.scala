@@ -397,6 +397,7 @@ class C64 extends CBMComputer {
     setVICBorderMode(vicItem)
 
     setFullScreenSettings(optionMenu)
+    setOneFrameMode(vicItem,display,java.awt.event.KeyEvent.VK_N)
     // -----------------------------------
     
     optionMenu.addSeparator
