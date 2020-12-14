@@ -584,7 +584,10 @@ class C64 extends CBMComputer {
     // SETTINGS
     loadSettings(args)
     // VIEW
-    swing { displayFrame.setVisible(!headless) }
+    swing {
+      displayFrame.setVisible(!headless)
+      if (fullScreenAtBoot) setVicFullScreen
+    }
     // PLAY
     clock.play
   }

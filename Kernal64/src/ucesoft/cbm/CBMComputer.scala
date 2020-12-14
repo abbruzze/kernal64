@@ -93,6 +93,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected var sidCycleExact = false // used with --sid-cycle-exact
   protected var loadStateFromOptions = false // used with --load-state
   protected var traceOption = false // used with --trace
+  protected var fullScreenAtBoot = false // used with --fullscreen
 
   // memory & main cpu
   protected val mmu : Memory
@@ -1273,6 +1274,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         vicZoom(f)
         zoomOverride = true
       }
+    )
+    settings.add("fullscreen",
+      "Starts the emulator in full screen mode",
+      (fs:Boolean) => if (fs) fullScreenAtBoot = true
     )
   }
 

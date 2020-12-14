@@ -645,6 +645,7 @@ class SCPUC64 extends CBMComputer {
     // VIEW
     swing {
       displayFrame.setVisible(!headless)
+      if (fullScreenAtBoot) setVicFullScreen
     }
     // PLAY
     clock.play

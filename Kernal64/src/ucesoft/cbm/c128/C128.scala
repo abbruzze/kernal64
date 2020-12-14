@@ -34,6 +34,8 @@ class C128 extends CBMComputer with MMUChangeListener {
   private[this] val CONFIGURATION_VDC_FRAME_DIM = "vdc.frame.dim"
   override protected val PRG_RUN_DELAY_CYCLES = 6500000
 
+  protected var vdcFullScreenAtBoot = false // used with --vdc-full-screen
+
   protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c128")
   private[this] var vdcEnabled = true // used with --vdc-disabled
   protected val mmu = new C128MMU(this)
@@ -225,14 +227,7 @@ class C128 extends CBMComputer with MMUChangeListener {
           case java.awt.event.KeyEvent.VK_2 if e.isAltDown && e.isShiftDown =>
             adjustRatio(false,false,true)
           case java.awt.event.KeyEvent.VK_ENTER if e.isAltDown =>
-            ucesoft.cbm.misc.FullScreenMode.goFullScreen(vdcDisplayFrame,
-                                                         vdcDisplay,
-                                                         VDC.SCREEN_WIDTH,
-                                                         VDC.SCREEN_WIDTH,
-                                                         keypadControlPort,
-                                                         keyb,
-                                                         keypadControlPort,
-                                                         keyboardControlPort)
+            setVDCFullScreen
           case java.awt.event.KeyEvent.VK_N if e.isAltDown && e.isShiftDown =>
             vdcDisplay.advanceOneFrame
           case _ =>
@@ -850,6 +845,17 @@ class C128 extends CBMComputer with MMUChangeListener {
     }) )
   }
 
+  private def setVDCFullScreen : Unit = {
+    ucesoft.cbm.misc.FullScreenMode.goFullScreen(vdcDisplayFrame,
+      vdcDisplay,
+      VDC.SCREEN_WIDTH,
+      VDC.SCREEN_WIDTH,
+      keypadControlPort,
+      keyb,
+      keypadControlPort,
+      keyboardControlPort)
+  }
+
   override protected def setGlobalCommandLineOptions : Unit = {
     super.setGlobalCommandLineOptions
 
@@ -882,6 +888,10 @@ class C128 extends CBMComputer with MMUChangeListener {
       "Run in 64 mode",
       (go64:Boolean) => if (go64) mmu.go64
     )
+    settings.add("vdc-fullscreen",
+      "Starts the emulator with VDC in full screen mode",
+      (fs:Boolean) => if (fs) vdcFullScreenAtBoot = true
+    )
   }
   
   def turnOff  : Unit = {
@@ -913,7 +923,7 @@ class C128 extends CBMComputer with MMUChangeListener {
       out.close
     }
     catch {
-      case io:IOException =>
+      case _:IOException =>
     }
   }
   
@@ -976,8 +986,16 @@ class C128 extends CBMComputer with MMUChangeListener {
     // SETTINGS
     loadSettings(args)
     // VIEW
-    vdcDisplayFrame.setVisible(!headless && vdcEnabled)
-    swing { displayFrame.setVisible(!headless) }
+    swing {
+      vdcDisplayFrame.setVisible(!headless && vdcEnabled)
+      displayFrame.setVisible(!headless)
+    }
+    // FULL SCREEN
+    swing {
+      if (fullScreenAtBoot) setVicFullScreen
+      else
+      if (vdcFullScreenAtBoot) setVDCFullScreen
+    }
     // PLAY    
     vdc.play
     clock.play
