@@ -53,7 +53,7 @@ object Assembler {
   private def compileAutoImport(implicit log : String => Unit,error : String => Unit) : List[Statement] = {
     val file = new File(new File(importDir),"autoimport.asm")
     val in : Option[(InputStream,String)] = if (file.exists()) Some((new FileInputStream(file),file.getParent)) else {
-      val in = ClassLoader.getSystemClassLoader.getResourceAsStream("/resources/autoimport.asm")
+      val in = ClassLoader.getSystemClassLoader.getResourceAsStream("resources/autoimport.asm")
       if (in != null) Some((in,"jar library")) else None
     }
 
