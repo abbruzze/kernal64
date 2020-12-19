@@ -9,44 +9,57 @@ object AsmEvaluator {
 
   // ====================== EVALUATION ===============================
   sealed trait RuntimeValue {
-    protected def fields : Map[(String,Int),List[RuntimeValue] => RuntimeValue] = Map(
-      ("isnull",0) -> (l => NumberVal(0)),
-      ("toString",0) -> (l => StringVal(toString)),
-      ("size",0) -> (l => NumberVal(0))
-    )
-    
-    def handleFieldOrMethod(name:String,pars:List[RuntimeValue]) : Option[RuntimeValue] = {
-      fields get (name,pars.size) match {
-        case Some(f) => Some(f(pars))
-        case None => None
-      } 
+
+    protected def fieldsOrMethods(f:(String,Int)) : Option[List[RuntimeValue] => RuntimeValue] = {
+      val matched : List[RuntimeValue] => RuntimeValue = f match {
+        case ("isnull",0) => _ => NumberVal(if (this != NullVal) 1 else 0)
+        case ("toString",0) => _ => StringVal(toString)
+        case _ => null
+      }
+
+      Option(matched)
     }
+    
+    def handleFieldOrMethod(name:String,pars:List[RuntimeValue]) : Option[RuntimeValue] = fieldsOrMethods((name,pars.size)) map { _(pars) }
   }
   case object NullVal extends RuntimeValue {
     override def toString = "null"
-    override protected val fields : Map[(String,Int),List[RuntimeValue] => RuntimeValue] = super.fields ++ Map(
-        ("isnull",0) -> ((l:List[RuntimeValue]) => NumberVal(1))
-    )
   }
-  case class NumberVal(n: Double) extends RuntimeValue {
-    override protected val fields : Map[(String,Int),List[RuntimeValue] => RuntimeValue] = super.fields ++ Map(
-      ("toHexString",0) -> (_ => StringVal(n.toInt.toHexString)),
-      ("toBinaryString",0) -> (_ => StringVal(n.toInt.toBinaryString) )
-      )
 
+  case class NumberVal(n: Double) extends RuntimeValue {
+    override protected def fieldsOrMethods(f:(String,Int)) : Option[List[RuntimeValue] => RuntimeValue] = {
+      super.fieldsOrMethods(f) match {
+        case None =>
+          val matched : List[RuntimeValue] => RuntimeValue = f match {
+            case ("toHexString",0) => _ => StringVal(n.toInt.toHexString)
+            case ("toBinaryString",0) => _ => StringVal(n.toInt.toBinaryString)
+            case _ => null
+          }
+          Option(matched)
+        case s@Some(_) => s
+      }
+    }
     override def toString = if (n.isValidInt) n.toInt.toString else n.toString
   }
   case class StringVal(s: String) extends RuntimeValue {
     override def toString = s
-    override protected val fields : Map[(String,Int),List[RuntimeValue] => RuntimeValue] = super.fields ++ Map(
-        ("length",0) -> ((l:List[RuntimeValue]) => NumberVal(s.length)),
-        ("toInt",0) -> ((l:List[RuntimeValue]) => NumberVal(s.toInt)),
-        ("toHexInt",0) -> ((l:List[RuntimeValue]) => NumberVal(Integer.parseInt(s,16))),
-        ("at",1) -> ((l:List[RuntimeValue]) => at(l.head)),
-        ("toChar",0) -> ((l:List[RuntimeValue]) => NumberVal(s.charAt(0))),
-        ("substring",2) -> ((l:List[RuntimeValue]) => StringVal(s.substring(asInt(l,0),asInt(l,1)))),
-        ("size",0) -> ((l:List[RuntimeValue]) => NumberVal(s.length))
-    )
+    override protected def fieldsOrMethods(f:(String,Int)) : Option[List[RuntimeValue] => RuntimeValue] = {
+      super.fieldsOrMethods(f) match {
+        case None =>
+          val matched: List[RuntimeValue] => RuntimeValue = f match {
+            case ("length",0) => _ => NumberVal(s.length)
+            case ("toInt",0) => _ => NumberVal(s.toInt)
+            case ("toHexInt",0) => _ => NumberVal(Integer.parseInt(s,16))
+            case ("at",1) => l => at(l.head)
+            case ("toChar",0) => _ => NumberVal(s.charAt(0))
+            case ("substring",2) => l => StringVal(s.substring(asInt(l,0),asInt(l,1)))
+            case ("size",0) => _ => NumberVal(s.length)
+            case _ => null
+          }
+          Option(matched)
+        case s@Some(_) => s
+      }
+    }
     private def at(i:RuntimeValue) : RuntimeValue = {
       i match {
         case NumberVal(index) => StringVal(s.charAt(index.toInt).toString)
@@ -63,17 +76,25 @@ object AsmEvaluator {
   }
   case class ListVal(list:Buffer[RuntimeValue]) extends RuntimeValue {
     override def toString = list.mkString("[", ",", "]")
-    override protected val fields : Map[(String,Int),List[RuntimeValue] => RuntimeValue] = super.fields ++ Map(
-        ("size",0) -> ((_:List[RuntimeValue]) => NumberVal(list.length)),
-        ("get",1) -> ((l:List[RuntimeValue]) => get(l.head)),
-        ("set",2) -> ((l:List[RuntimeValue]) => set(l(0),l(1))),
-        ("head",0) -> ((_:List[RuntimeValue]) => list.head),
-        ("tail",0) -> ((_:List[RuntimeValue]) => ListVal(list.tail)),
-        ("isEmpty",0) -> ((_:List[RuntimeValue]) => NumberVal(if (list.isEmpty) 1 else 0)),
-        ("add",1) -> ((l:List[RuntimeValue]) => ListVal(list ++ Array(l.head))),
-        // sid
-        ("asSID",0) -> ((args:List[RuntimeValue]) => analyzeSID(this))
-    )
+    override protected def fieldsOrMethods(f:(String,Int)) : Option[List[RuntimeValue] => RuntimeValue] = {
+      super.fieldsOrMethods(f) match {
+        case None =>
+          val matched: List[RuntimeValue] => RuntimeValue = f match {
+            case ("get",1) => l => get(l.head)
+            case ("set",2) => l => set(l(0),l(1))
+            case ("head",0) => _ => list.head
+            case ("tail",0) => l => ListVal(list.tail)
+            case ("isEmpty",0) => _ => NumberVal(if (list.isEmpty) 1 else 0)
+            case ("add",1) => l => ListVal(list.addOne(l.head))
+            case ("size",0) => _ => NumberVal(list.length)
+            // sid
+            case ("asSID",0) => _ => analyzeSID(this)
+            case _ => null
+          }
+          Option(matched)
+        case s@Some(_) => s
+      }
+    }
     private def get(i:RuntimeValue) : RuntimeValue = {
       i match {
         case NumberVal(index) =>
@@ -100,14 +121,22 @@ object AsmEvaluator {
     map.addAll(list map { case ListVal(l) => (l.head,l.tail.head) })
 
     override def toString = map.map { kv => s"[${kv._1},${kv._2}]" } mkString("#[", ",", "]")
-    override protected val fields : Map[(String,Int),List[RuntimeValue] => RuntimeValue] = super.fields ++ Map(
-      ("size",0) -> ((l:List[RuntimeValue]) => NumberVal(list.length)),
-      ("get",1) -> ((l:List[RuntimeValue]) => get(l.head)),
-      ("put",2) -> ((l:List[RuntimeValue]) => put(l(0),l(1))),
-      ("keys",0) -> ((l:List[RuntimeValue]) => keys),
-      ("values",0) -> ((l:List[RuntimeValue]) => values),
-      ("isEmpty",0) -> ((l:List[RuntimeValue]) => NumberVal(if (list.isEmpty) 1 else 0)),
-    )
+    override protected def fieldsOrMethods(f:(String,Int)) : Option[List[RuntimeValue] => RuntimeValue] = {
+      super.fieldsOrMethods(f) match {
+        case None =>
+          val matched: List[RuntimeValue] => RuntimeValue = f match {
+            case ("get",1) => l => get(l.head)
+            case ("put",2) => l => put(l(0),l(1))
+            case ("keys",0) => _ => keys
+            case ("values",0) => _ => values
+            case ("isEmpty",0) => _ => NumberVal(if (list.isEmpty) 1 else 0)
+            case ("size",0) => _ => NumberVal(list.length)
+            case _ => null
+          }
+          Option(matched)
+        case s@Some(_) => s
+      }
+    }
     private def get(i:RuntimeValue) : RuntimeValue = map.getOrElse(i,NullVal)
     private def put(k:RuntimeValue,v:RuntimeValue) : RuntimeValue = {
       map += k -> v
@@ -118,14 +147,21 @@ object AsmEvaluator {
   }
   case class StructVal(structName: String,module:Option[String],fieldNames:List[String],map:collection.mutable.Map[String,RuntimeValue]) extends RuntimeValue {
     override def toString = structName + fieldNames.flatMap(map.get).mkString("{",",","}")
-    
-    override protected val fields : Map[(String,Int),List[RuntimeValue] => RuntimeValue] = (super.fields ++ Map(
-        ("get",1) -> ((l:List[RuntimeValue]) => get(l.head)),
-        ("length",0) -> ((l:List[RuntimeValue]) => NumberVal(fieldNames.size)),
-        ("set",2) -> ((l:List[RuntimeValue]) => set(l(0),l(1))),
-        ("fields",0)-> ((l:List[RuntimeValue]) => ListVal(fieldNames map StringVal toBuffer))) ++
-        (for(f <- fieldNames) yield (f,0) -> ((l:List[RuntimeValue]) => map.getOrElse(f,NullVal))).toMap
-    )
+
+    override protected def fieldsOrMethods(f:(String,Int)) : Option[List[RuntimeValue] => RuntimeValue] = {
+      super.fieldsOrMethods(f) match {
+        case None =>
+          val matched: List[RuntimeValue] => RuntimeValue = f match {
+            case ("get",1) => l => get(l.head)
+            case ("length",0) => _ => NumberVal(fieldNames.size)
+            case ("set",2) => l => set(l(0),l(1))
+            case ("fields",0) => _ => ListVal(fieldNames map StringVal toBuffer) //(for (f <- fieldNames) yield (f, 0) -> ((l: List[RuntimeValue]) => map.getOrElse(f, NullVal))).toMap
+            case _ => null
+          }
+          Option(matched)
+        case s@Some(_) => s
+      }
+    }
     private def get(i:RuntimeValue) : RuntimeValue = {
       i match {
         case NumberVal(index) =>
