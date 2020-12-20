@@ -553,7 +553,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
               case Some(cid) =>
                 cid
             }
-            if (ctx.defineVar(name,Some(ctx.ctx.enclosedModule),new NumberVal(eid),true,false)) throw new CompilerException(s"Enum $name cannot be defined, label already exists",Some(s))    
+            if (ctx.defineVar(name,Some(ctx.ctx.enclosedModule),NumberVal(eid),true,false)) throw new CompilerException(s"Enum $name cannot be defined, label already exists",Some(s))
           }
           None
         // =================================================
@@ -714,13 +714,13 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
         // =================================================
         case ERROR(msg) =>
           Evaluator.evalExpr(msg) match {
-            case WillBeVal(_,e) =>  throw new CompilerException(s"Cannot evaluate error argument",Some(s))
+            case WillBeVal(_,_) =>  throw new CompilerException(s"Cannot evaluate error argument",Some(s))
             case err => throw new CompilerException(err.toString,Some(s))
           }
           None
         case DISCARDEXPR(e) =>
           Evaluator.evalExpr(e) match {
-            case WillBeVal(_,e) =>  throw new CompilerException(s"Cannot evaluate expression",Some(s))
+            case WillBeVal(_,_) =>  throw new CompilerException(s"Cannot evaluate expression",Some(s))
             case _ =>
           }
           None

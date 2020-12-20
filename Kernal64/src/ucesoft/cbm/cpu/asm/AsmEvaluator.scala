@@ -87,6 +87,7 @@ object AsmEvaluator {
             case ("isEmpty",0) => _ => NumberVal(if (list.isEmpty) 1 else 0)
             case ("add",1) => l => ListVal(list.addOne(l.head))
             case ("size",0) => _ => NumberVal(list.length)
+            case ("contains",1) => l => NumberVal(if (list.contains(l.head)) 1 else 0)
             // sid
             case ("asSID",0) => _ => analyzeSID(this)
             case _ => null
@@ -131,6 +132,8 @@ object AsmEvaluator {
             case ("values",0) => _ => values
             case ("isEmpty",0) => _ => NumberVal(if (list.isEmpty) 1 else 0)
             case ("size",0) => _ => NumberVal(list.length)
+            case ("contains",1) => l => NumberVal(if (map.contains(l.head)) 1 else 0)
+            case (field,0) => _ => map.getOrElse(StringVal(field),NullVal)
             case _ => null
           }
           Option(matched)
@@ -155,7 +158,9 @@ object AsmEvaluator {
             case ("get",1) => l => get(l.head)
             case ("length",0) => _ => NumberVal(fieldNames.size)
             case ("set",2) => l => set(l(0),l(1))
-            case ("fields",0) => _ => ListVal(fieldNames map StringVal toBuffer) //(for (f <- fieldNames) yield (f, 0) -> ((l: List[RuntimeValue]) => map.getOrElse(f, NullVal))).toMap
+            case ("fields",0) => _ => ListVal(fieldNames map StringVal toBuffer)
+            case ("has",1) => l => NumberVal(if (fieldNames.contains(l.head.toString)) 1 else 0)
+            case (field,0) if fieldNames.contains(field) => _ => map(field)
             case _ => null
           }
           Option(matched)

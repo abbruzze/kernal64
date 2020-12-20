@@ -86,6 +86,8 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   override val whiteSpace = "[ \t]+".r
   // =================================================================
 
+  private def nl : Parser[String] = "[\n\r]*".r
+
   private def lineComment: Parser[String] = "(//|;).*".r ^^ { s => if (s == ";") s.substring(1) else s.substring(2) }
   private def multilineComment: Parser[String] = """/\*[^\*]*\*(\*|[^\*/][^\*]*\*)*/""".r ^^ { c => c.substring(2, c.length - 2) }
   private def comment: Parser[String] = lineComment | multilineComment
@@ -185,15 +187,15 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
       case l ~ Some(op) => UnaryOp(op, Label(l.label,l.module), false)
     }
 
-  private def map : Parser[Expr] = "#[" ~ "[\n\r]*".r ~ "]" ^^ { _ => MapValue(Nil) } |
-    "#[" ~> repsep(list, ("[\n\r]*".r ~ "," ~ "[\n\r]*".r)) <~ "]" ~ "[\n\r]*".r ^^ { MapValue(_) }
+  private def map : Parser[Expr] = "#[" ~ nl ~ "]" ^^ { _ => MapValue(Nil) } |
+    "#[" ~> repsep(list, (nl ~ "," ~ nl)) <~ "]" ~ nl ^^ { MapValue(_) }
 
-  private def list: Parser[ListValue] = "[" ~ "[\n\r]*".r ~ "]" ^^ { _ => ListValue(Nil) } |
+  private def list: Parser[ListValue] = "[" ~ nl ~ "]" ^^ { _ => ListValue(Nil) } |
     ("[" ~> expr <~ "..") ~ expr ~ opt("," ~> expr) <~ "]" ^^ {
       case (from ~ to) ~ step =>
         ListValue(List(from, to, step.getOrElse(Value(1))), true)
     } |
-    "[" ~> repsep(expr, ("[\n\r]*".r ~ "," ~ "[\n\r]*".r)) <~ "]" ~ "[\n\r]*".r ^^ { ListValue(_) }
+    "[" ~> repsep(expr, (nl ~ "," ~ nl)) <~ "]" ~ nl ^^ { ListValue(_) }
     
   private def function: Parser[FunOp] = moduleLabel ~ ("(" ~> repsep(expr, ",") <~ ")") ^^ { case ModuleLabel(l,m) ~ args => FunOp(l,m, args) }
   private def newStruct: Parser[NewStruct] = moduleLabel ~ ("{" ~> repsep(expr, ",") <~ "}") ^^ { case ModuleLabel(l,m) ~ vals => NewStruct(l,m,vals.toArray) }
@@ -279,7 +281,7 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
       }
   }
   // ===================== STATEMENT =================================       
-  private def enum: Parser[Statement] = ("enum" ~ "{") ~> repsep(label ~ opt("=" ~> number), ",") <~ "}" ^^ {
+  private def enum: Parser[Statement] = ("enum" ~ "{") ~> nl ~> repsep(label ~ opt("=" ~> number), "," <~ nl) <~ nl <~ "}" ^^ {
     case l => ENUM(l map { case e ~ n => (e, n map { _.toInt }) })
   }
   private def struct: Parser[Statement] = opt("private") ~ ("struct" ~> label) ~ ("{" ~> repsep(label, ",") <~ "}") ^^ {
@@ -299,10 +301,10 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   }
   private def singleBlock: Parser[List[Statement]] = (asmStatement | statement) ^^ { List(_) } 
   private def multipleBlock: Parser[List[Statement]] = "{" ~> statements(false,false,false,false) <~ "}"
-  private def block: Parser[List[Statement]] = "[\n\r]*".r ~> (multipleBlock | singleBlock) <~ "[\n\r]*".r
-  private def macroBlock: Parser[List[Statement]] = "[\n\r]*".r ~> "{" ~> statements(true,false,false,false) <~ "}" <~ "[\n\r]*".r
-  private def funBlock: Parser[List[Statement]] = "[\n\r]*".r ~> "{" ~> statements(false,true,false,false) <~ "}" <~ "[\n\r]*".r
-  private def moduleBlock: Parser[List[Statement]] = "[\n\r]*".r ~> "{" ~> statements(false,true,false,true) <~ "}" <~ "[\n\r]*".r
+  private def block: Parser[List[Statement]] = nl ~> (multipleBlock | singleBlock) <~ nl
+  private def macroBlock: Parser[List[Statement]] = nl ~> "{" ~> statements(true,false,false,false) <~ "}" <~ nl
+  private def funBlock: Parser[List[Statement]] = nl ~> "{" ~> statements(false,true,false,false) <~ "}" <~ nl
+  private def moduleBlock: Parser[List[Statement]] = nl ~> "{" ~> statements(false,true,false,true) <~ "}" <~ nl
   
   private def ifStmt: Parser[Statement] = (("if" ~ "(") ~> expr <~ ")" <~ opt(comment)) ~ block ~ opt("else" ~> opt(comment) ~> block) ^^ {
     case cond ~ t ~ None => IF(cond, t, Nil)
@@ -363,7 +365,7 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
 
   private def allStatements(macroMode:Boolean, asmNotAllowed:Boolean, top:Boolean, module:Boolean) : Parser[List[Option[Statement]]] = {
     rep(
-      "[\t\n\r]*".r ~>
+      nl ~>
         (comment ^^ { _ => None } |
          label <~ ":" ^^ { case l => Some(LABELED(l)) } |
           (
@@ -381,7 +383,7 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
           ) ^^ {
             case s => Some(s)
           }
-        ) <~ "[\t\n\r]*".r)
+        ) <~ nl)
   }
   
   def topStatements : Parser[List[Statement]] = statements(false,false,true,false)
