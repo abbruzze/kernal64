@@ -639,7 +639,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
               ctx.newStack("for",false,Some(ctx.ctx.enclosedModule),true)
               stmts foreach { s => compile(s) }
               // post
-              for(p <- post) compile(EVAL(None,p))
+              for(p <- post) compile(p)
             }
             catch {
               case _:BreakException =>

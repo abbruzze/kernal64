@@ -41,7 +41,7 @@ object AsmParser {
   case class STRUCT(name: String, fields: List[String],isPrivate:Boolean) extends Statement
   case class ENUM(fields: List[(String, Option[Int])]) extends Statement
   case class WHILE(cond: Expr, body: List[Statement]) extends Statement
-  case class FOR(vars: List[VAR], cond: Expr, post: List[Expr], body: List[Statement]) extends Statement
+  case class FOR(vars: List[VAR], cond: Expr, post: List[Statement], body: List[Statement]) extends Statement
   case class MACRO(name:String,parameters:List[String],body:List[Statement]) extends Statement
   case class MACRO_CALL(name:String,actualParameters:List[Expr]) extends Statement
   case class FUNCTION(name:String,parameters:List[String],body:List[Statement],isPrivate:Boolean) extends Statement
@@ -311,7 +311,7 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
     case cond ~ t ~ Some(e) => IF(cond, t, e)
   }
   private def whileStmt: Parser[Statement] = (("while" ~ "(") ~> expr <~ ")" <~ opt(comment)) ~ block ^^ { case c ~ b => WHILE(c, b) }
-  private def forStmt: Parser[Statement] = ("for" ~ "(") ~> repsep((label <~ "=") ~ expr, ",") ~ (";" ~> expr <~ ";") ~ repsep(expr, ",") ~ (")" ~> opt(comment) ~> block) ^^ {
+  private def forStmt: Parser[Statement] = ("for" ~ "(") ~> repsep((label <~ "=") ~ expr, ",") ~ (";" ~> expr <~ ";") ~ repsep(statement, ",") ~ (")" ~> opt(comment) ~> block) ^^ {
     case vars ~ cond ~ post ~ body =>
       val vs = vars map { case n ~ e => VAR(n,e,false) }
       FOR(vs, cond, post, body)
