@@ -4,12 +4,21 @@ import ucesoft.cbm.peripheral.drive.Floppy
 import java.io.RandomAccessFile
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
-
 import ucesoft.cbm.formats.Diskette._
-
 import scala.collection.mutable.ListBuffer
 
+object G64 {
+  def DEFAULT_TRACK_LENGTH(track:Int) : Int = {
+    if (track <= 17) 7692
+    else if (track <= 24) 7142
+    else if (track <= 30) 6666
+    else 6250
+  }
+}
+
 private[formats] class G64(val file:String) extends Diskette {
+  import G64._
+
   val isReadOnly = !new java.io.File(file).canWrite
   private[this] var tracks : Array[Array[Int]] = _
   private[this] var trackOffsets : Array[Int] = _
@@ -135,13 +144,12 @@ private[formats] class G64(val file:String) extends Diskette {
     }
     // read track data
     for(i <- 0 until trackOffsets.length) {
-      if (trackOffsets(i) == 0) tracks(i) = Array.fill[Int](1)(0)
+      if (trackOffsets(i) == 0) tracks(i) = Array(0)
       else {
         disk.seek(trackOffsets(i))
         val trackLen = disk.read | disk.read << 8
-        //println(s"Track $i len=${Integer.toHexString(trackLen)}")
+        //println(s"Track $i len=$trackLen offset=${trackOffsets(i).toHexString}")
         tracks(i) = Array.ofDim[Int](trackLen)
-        //for(d <- 0 until trackLen) tracks(i)(d) = disk.read
         val buf = Array.ofDim[Byte](trackLen)
         disk.readFully(buf)
         var b = 0
@@ -183,7 +191,29 @@ private[formats] class G64(val file:String) extends Diskette {
     checkSector(b)
     b
   }
+  private def writeNewTrack : Unit = {
+    val trackLen = DEFAULT_TRACK_LENGTH(track >> 1)
+    tracks(track) = Array.fill[Int](trackLen)(0x55)
+    if (canWriteOnDisk) {
+      trackOffsets(track) = disk.length.toInt
+      // updating track data position
+      disk.seek(0x0C + 4 * track)
+      disk.write(trackOffsets(track) & 0xFF)
+      disk.write((trackOffsets(track) >> 8) & 0xFF)
+      disk.write((trackOffsets(track) >> 16) & 0xFF)
+      disk.write((trackOffsets(track) >> 24) & 0xFF)
+      // writing track length
+      disk.seek(trackOffsets(track))
+      disk.write(trackLen & 0xFF)
+      disk.write(trackLen >> 8)
+      // writing track data
+      disk.write(Array.fill[Byte](trackLen)(0x55))
+    }
+  }
+
   final def writeNextBit(value:Boolean) : Unit = {
+    if (trackOffsets(track) == 0) writeNewTrack // writing on an empty track
+
     checkSector(if (value) 1 else 0)
     trackIndexModified = true
     val mask = 1 << (8 - bit)
@@ -210,7 +240,7 @@ private[formats] class G64(val file:String) extends Diskette {
   def currentSector = sector
   def changeTrack(trackSteps:Int) : Unit = {
     track = trackSteps - 2
-    trackIndex = 0
+    trackIndex = trackIndex % tracks(track).length
     bit = 1
     notifyTrackSectorChangeListener
   }
