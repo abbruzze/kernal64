@@ -27,6 +27,12 @@ class GeoRAM(size:Int) extends ExpansionPort {
     dffe = 0
     rampage = ram(0)(0)
   }
+  override def hardReset : Unit = {
+    reset
+    for(i <- 0 until ram.length;j <- 0 until ram(i).length) {
+      java.util.Arrays.fill(ram(i)(j),0)
+    }
+  }
 
   final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
     if ((address & 0xFF00) == 0xDE00) rampage(address & 0xFF) else super.read(address,chipID)

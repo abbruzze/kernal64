@@ -42,6 +42,7 @@ trait CBMComponent {
   def reset : Unit
   def init : Unit
   def shutdown  : Unit = {}
+  def hardReset : Unit = reset
   
   final def change(oldComponent:CBMComponent,newComponent:CBMComponent) : Unit = {
     _components indexOf (oldComponent) match {
@@ -69,6 +70,13 @@ trait CBMComponent {
       c.resetComponent 
     }
     reset
+  }
+  final def hardResetComponent : Unit = {
+    Log.info(s"Hard Resetting ${componentID}")
+    _components foreach { c =>
+      c.hardResetComponent
+    }
+    hardReset
   }
   def initComponent : Unit = {
     Log.info(s"Initializing ${componentID}")

@@ -91,7 +91,6 @@ class IECBus extends CBMComponent {
       case IECBusLine.DATA => 
         if (value == GROUND) DATA |= 1 << l.bitmap else DATA &= ~(1 << l.bitmap)
       case IECBusLine.SRQ => 
-        val preSRQ = SRQ
         if (value == GROUND) SRQ |= 1 << l.bitmap else SRQ &= ~(1 << l.bitmap)
     }
   }

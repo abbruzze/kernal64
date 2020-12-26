@@ -454,6 +454,7 @@ class D1571(val driveID: Int,
     add(RW_HEAD)
     add(WD1770)
     if (ledListener != null) ledListener.turnOn
+    java.util.Arrays.fill(ram,0)
   }
   
   def reset : Unit = {
@@ -469,8 +470,12 @@ class D1571(val driveID: Int,
     goSleepingCycles = 0
     cycleFrac = 0.0
     if (ledListener != null) ledListener.turnOn
-    java.util.Arrays.fill(ram,0)
     ciaRunning = true
+  }
+
+  override def hardReset: Unit = {
+    reset
+    java.util.Arrays.fill(ram,0)
   }
   
   private def setFilename : Unit = {

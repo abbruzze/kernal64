@@ -58,12 +58,13 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
         try {
           val in = new DataInputStream(new FileInputStream(file))
           in.readFully(buffer)
+          in.close
           setStatus(STATUS_OK)
           import BusDataIterator._
           Some(new ArrayDataIterator(buffer))
         }
         catch {
-          case io:IOException =>
+          case _:IOException =>
             setStatus(STATUS_IO_ERROR)
             None
         }

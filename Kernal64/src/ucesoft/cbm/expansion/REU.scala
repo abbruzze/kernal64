@@ -115,6 +115,11 @@ object REU {
       shadowReuAddress = 0xF80000
       shadowTransferRegister = 0xFF
     }
+
+    override def hardReset : Unit = {
+      reset
+      java.util.Arrays.fill(reuMem,0)
+    }
     
     final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
       if (currentOperation == IDLE_OP && address >= 0xDF00 && address < 0xE000) readREU(address & 0x1F)

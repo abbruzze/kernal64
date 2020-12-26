@@ -261,6 +261,15 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     if (play) clock.play
   }
 
+  protected def hardReset(play:Boolean=true) : Unit = {
+    traceDialog.forceTracing(false)
+    diskTraceDialog.forceTracing(false)
+    if (Thread.currentThread != Clock.systemClock) clock.pause
+    hardResetComponent
+
+    if (play) clock.play
+  }
+
   protected def savePrg : Unit
 
   protected def loadPRGFile(file:File,autorun:Boolean) : Unit
@@ -1444,14 +1453,20 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
     fileMenu.addSeparator
 
-    val resetItem = new JMenuItem("Reset")
-    resetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    resetItem.addActionListener(_ => reset(true) )
-    fileMenu.add(resetItem)
+    val resetMenu = new JMenu("Reset")
+    fileMenu.add(resetMenu)
+    val softResetItem = new JMenuItem("Soft Reset")
+    softResetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK))
+    softResetItem.addActionListener(_ => reset(true) )
+    resetMenu.add(softResetItem)
+    val hardResetItem = new JMenuItem("Hard Reset")
+    hardResetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK))
+    hardResetItem.addActionListener(_ => hardReset(true) )
+    resetMenu.add(hardResetItem)
     val reset2Item = new JMenuItem("Reset and run last PRG")
     reset2Item.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.CTRL_DOWN_MASK))
     reset2Item.addActionListener(_ => reset(true,true) )
-    fileMenu.add(reset2Item)
+    resetMenu.add(reset2Item)
 
     fileMenu.addSeparator
 

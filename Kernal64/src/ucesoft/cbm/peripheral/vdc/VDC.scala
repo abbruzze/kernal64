@@ -267,6 +267,11 @@ class VDC extends RAMComponent {
     play
   }
 
+  override def hardReset: Unit = {
+    java.util.Arrays.fill(regs,0)
+    init
+  }
+
   @inline private def ram_adr(address:Int) : Int = {
     if ((regs(28) & 0x10) == 0x10) address & 0xFFFF
     else (address & 0x3F00) << 1 | (address & 0x81FF) // see vdc dump https://csdb.dk/release/?id=157510, patterns.txt

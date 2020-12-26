@@ -110,6 +110,11 @@ private[c128] class C128RAM extends RAMComponent {
     page_1 = 1
     page_1_bank = 0    
   }
+
+  override def hardReset : Unit = {
+    init
+    reset
+  }
   
   final def getBanksNumber : Int = if (expanded) 4 else 2
   /**

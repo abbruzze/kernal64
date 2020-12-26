@@ -50,10 +50,10 @@ object C1541Mems {
     
     def init : Unit = {
       Log.info("Initialaizing C1541 RAM memory ...")
+      java.util.Arrays.fill(mem,0)
     }
-    def reset : Unit = {
-      for(i <- 0 until mem.length) mem(i) = 0
-    }
+    def reset : Unit = {}
+    override def hardReset: Unit = init
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address & 0xFFFF)
     final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       mem(address & 0xFFFF) = value & 0xff
@@ -87,10 +87,10 @@ object C1541Mems {
     
     def init : Unit = {
       Log.info(s"Initialaizing C1541 Extended RAM ${Integer.toHexString(baseAddress)} memory ...")
+      java.util.Arrays.fill(mem,0)
     }
-    def reset : Unit = {
-      for(i <- 0 until mem.length) mem(i) = 0xFF
-    }
+    def reset : Unit = {}
+    override def hardReset: Unit = init
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = if (isActive) mem(address - baseAddress) else {
       if (baseAddress < KERNEL.startAddress) 0 else KERNEL.read(address)
     }

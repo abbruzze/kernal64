@@ -66,6 +66,8 @@ object SCPUC64MMU {
       }
     }
     def reset : Unit = {}
+
+    override def hardReset: Unit = init
     
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (ULTIMAX && chipID == ChipID.CPU) {
@@ -329,6 +331,13 @@ object SCPUC64MMU {
     override def afterInitHook : Unit = {
       check0001
       SCPU_ROM_MASK = (0xF7 + SCPU_ROM.getDynamicLength / 65536) << 16 | 0xFFFF
+    }
+
+    override def hardReset: Unit = {
+      reset
+      Log.debug("Initializing static & SIMM ram ...")
+      initSIMMMemory(fastram)
+      initSIMMMemory(simmram)
     }
     
     def reset : Unit = {

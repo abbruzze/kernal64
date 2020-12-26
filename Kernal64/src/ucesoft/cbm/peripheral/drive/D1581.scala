@@ -55,9 +55,6 @@ class D1581(val driveID: Int,
   private[this] final val _1581_WAIT_LOOP_ROUTINE = 0xB106
   private[this] final val WAIT_CYCLES_FOR_STOPPING = 4000000
   private[this] final val GO_SLEEPING_MESSAGE_CYCLES = 3000000
-  private[this] final val WRITE_PROTECT_SENSE = 0x10
-  private[this] final val WRITE_PROTECT_SENSE_WAIT = 3 * 400000L
-  private[this] final val REMOVING_DISK_WAIT = 500000L
   private[this] val clk = Clock.systemClock
   private[this] var running = true
   private[this] var tracing = false
@@ -288,6 +285,7 @@ class D1581(val driveID: Int,
     if (ledListener != null) ledListener.turnOn
     
     RW_HEAD.setSpeedZone(4)
+    java.util.Arrays.fill(ram,0)
   }
   
   def reset : Unit = {
@@ -304,9 +302,14 @@ class D1581(val driveID: Int,
       ledListener.turnOn
       ledListener.turnPower(false)
     }
-    java.util.Arrays.fill(ram,0)
+
     RW_HEAD.setSpeedZone(4)
     ciaRunning = true
+  }
+
+  override def hardReset: Unit = {
+    reset
+    java.util.Arrays.fill(ram,0)
   }
   
   override def setSpeedHz(speed:Int) : Unit = {

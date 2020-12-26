@@ -147,6 +147,11 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     cpuPostponedRMWCounter = 0
   }
 
+  override def hardReset: Unit = {
+    reset
+    for(b <- banks) java.util.Arrays.fill(b,0)
+  }
+
   override def init: Unit = {}
 
   def disinstall : Unit = {

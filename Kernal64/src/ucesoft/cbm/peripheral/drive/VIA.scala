@@ -55,10 +55,10 @@ abstract class VIA(val name:String,
   
   def init : Unit = {
     active = true
+    java.util.Arrays.fill(regs,0)
   }
   
   def reset : Unit = {
-    for(i <- 0 until regs.length) regs(i) = 0
     active = true
     paLatch = 0
     pbLatch = 0
@@ -71,6 +71,11 @@ abstract class VIA(val name:String,
     oneshotB = false
     oneshotBNew = false
     acrNew = false
+  }
+
+  override def hardReset: Unit = {
+    init
+    reset
   }
     
   def setActive(active:Boolean) : Unit = {

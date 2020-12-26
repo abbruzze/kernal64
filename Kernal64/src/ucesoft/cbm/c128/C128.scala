@@ -211,6 +211,8 @@ class C128 extends CBMComputer with MMUChangeListener {
             mouseEnabled ^= true
             enableMouse(mouseEnabled,vdcDisplay)
           // reset
+          case java.awt.event.KeyEvent.VK_R if e.isAltDown && e.isShiftDown =>
+            hardReset(true)
           case java.awt.event.KeyEvent.VK_R if e.isAltDown =>
             reset(true)
           // warp-mode

@@ -6,7 +6,6 @@ import ucesoft.cbm.peripheral.bus.BusDataIterator
 import scala.collection.mutable.ListBuffer
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
-import javax.swing.JFrame
 
 abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(bus, device) with Drive {
   protected var status = 0
