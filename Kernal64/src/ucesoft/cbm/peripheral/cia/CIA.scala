@@ -88,6 +88,10 @@ class CIA(val name:String,
     val componentID = name + " TOD"
     val componentType = CBMComponentType.CHIP 
     final private[this] val TICK_SUBID = 1
+    final private val PAL_TICK = 98990
+    final private val NTSC_TICK = 102273
+
+    private[this] var TICK_CYCLES = PAL_TICK // PAL
     
     case class Time(var h:Int,var m:Int,var s:Int,var ts:Int,var am:Boolean) {
       var freezed = false
@@ -192,7 +196,18 @@ class CIA(val name:String,
       properties
     }
     
-    def init = reset
+    def init : Unit = {
+      val clk = Clock.systemClock
+      clk.addChangeFrequencyListener(f => {
+        f match {
+          case clk.PAL_CLOCK_HZ =>
+            TICK_CYCLES = PAL_TICK
+          case _ =>
+            TICK_CYCLES = NTSC_TICK
+        }
+      })
+      reset
+    }
     
     def reset  : Unit = {
       actualTime.reset(1,0,0,0,true,true)
@@ -216,7 +231,7 @@ class CIA(val name:String,
       if (!manualClockTODUpdate) {
         val clk = Clock.systemClock
         clk.cancel(componentID)
-        clk.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 98990,tickCallback,TICK_SUBID))//98524//98990
+        clk.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + TICK_CYCLES,tickCallback,TICK_SUBID))
       }
     }
     
