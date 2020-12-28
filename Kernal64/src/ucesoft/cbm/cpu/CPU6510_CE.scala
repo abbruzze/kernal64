@@ -1943,7 +1943,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             data = mem.read(PC)
             PC = (PC + 1) & 0xFFFF
-            val const = if (notReadyDuringInstr) 0xEE else 0xEF
+            val const = 0xEE
             A = (A | const) & data
             X = A
             set_nz(A)

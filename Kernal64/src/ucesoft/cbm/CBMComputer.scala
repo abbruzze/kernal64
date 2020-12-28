@@ -59,7 +59,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val CONFIGURATION_GMOD2_FILE = "gmod2.file"
   protected val CONFIGURATION_AUTOSAVE = "autosave"
 
-  protected val PRG_RUN_DELAY_CYCLES = 2200000
+  protected def PRG_RUN_DELAY_CYCLES = 2200000
   protected var lastLoadedPrg : Option[File] = None
 
   // -------------- MENU ITEMS -----------------

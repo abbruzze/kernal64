@@ -32,7 +32,8 @@ class C128 extends CBMComputer with MMUChangeListener {
   protected val CONFIGURATION_FILENAME = "C128.config"
   private[this] val CONFIGURATION_VDC_FRAME_XY = "vdc.frame.xy"
   private[this] val CONFIGURATION_VDC_FRAME_DIM = "vdc.frame.dim"
-  override protected val PRG_RUN_DELAY_CYCLES = 6500000
+  override protected def PRG_RUN_DELAY_CYCLES = if (headless) super.PRG_RUN_DELAY_CYCLES else 6500000
+
 
   protected var vdcFullScreenAtBoot = false // used with --vdc-full-screen
 
