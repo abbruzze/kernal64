@@ -52,13 +52,13 @@ abstract class VIA(val name:String,
   private[this] final val PB_LATCH_ENABLED = 0x02
   
   protected var active = true
-  
+
   def init : Unit = {
     active = true
-    java.util.Arrays.fill(regs,0)
   }
-  
+
   def reset : Unit = {
+    java.util.Arrays.fill(regs,0)
     active = true
     paLatch = 0
     pbLatch = 0
@@ -71,11 +71,6 @@ abstract class VIA(val name:String,
     oneshotB = false
     oneshotBNew = false
     acrNew = false
-  }
-
-  override def hardReset: Unit = {
-    init
-    reset
   }
     
   def setActive(active:Boolean) : Unit = {
