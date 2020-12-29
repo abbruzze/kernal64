@@ -167,6 +167,10 @@ class C64 extends CBMComputer {
   }
 
   private def loadSettings(args:Array[String]) : Unit = {
+    def loadFile(fn:String) : Unit = {
+      val cmd = s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar
+      clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,true) ))
+    }
     settings.load(configuration)
     // AUTOPLAY
     settings.parseAndLoad(args) match {
@@ -175,11 +179,19 @@ class C64 extends CBMComputer {
         settings.get[String]("RUNFILE") match {
           case None =>
           case Some(fn) =>
-            val cmd = s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar
-            clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,true) ))
+            loadFile(fn)
         }
       case Some(f) =>
-        handleDND(new File(f),false,true)
+        settings.get[String]("DRIVE_8_FILE") match {
+          case None =>
+            handleDND(new File(f),false,true)
+          case Some(_) =>
+            // here we have both drive8 and PRG set: we load the given PRG file from disk 8
+            val fn = new File(f).getName
+            val dot = fn.indexOf('.')
+            val cbmFile = if (dot > 0) fn.substring(0,dot) else f
+            loadFile(cbmFile)
+        }
     }
     DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,true),attachDiskFile(_,_,_,None),drivesEnabled)
   }
@@ -503,23 +515,25 @@ class C64 extends CBMComputer {
   }
   
   protected def saveSettings(save:Boolean) : Unit = {
-    if (!zoomOverride) {
-      val dimension = display.getSize()
-      configuration.setProperty(CONFIGURATION_FRAME_DIM, dimension.width + "," + dimension.height)
-    }
-    configuration.setProperty(CONFIGURATION_FRAME_XY, displayFrame.getX + "," + displayFrame.getY)
-    if (save) {
-      settings.save(configuration)
-      println("Settings saved")
-    }
-    try {
-      val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
-      val out = new FileWriter(propsFile)
-      configuration.store(out, "C64 configuration file")
-      out.close
-    }
-    catch {
-      case _:IOException =>
+    if (!ignoreConfig) {
+      if (!zoomOverride) {
+        val dimension = display.getSize()
+        configuration.setProperty(CONFIGURATION_FRAME_DIM, dimension.width + "," + dimension.height)
+      }
+      configuration.setProperty(CONFIGURATION_FRAME_XY, displayFrame.getX + "," + displayFrame.getY)
+      if (save) {
+        settings.save(configuration)
+        println("Settings saved")
+      }
+      try {
+        val propsFile = new File(new File(scala.util.Properties.userHome), CONFIGURATION_FILENAME)
+        val out = new FileWriter(propsFile)
+        configuration.store(out, "C64 configuration file")
+        out.close
+      }
+      catch {
+        case _: IOException =>
+      }
     }
   }
 
@@ -573,6 +587,9 @@ class C64 extends CBMComputer {
     swing { initComponent }
     // VIC
     swing { displayFrame.pack }
+    // --ignore-config-file handling
+    if (args.exists(_ == "--ignore-config-file")) configuration.clear()
+    // screen's dimension and size restoration
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
       swing { updateVICScreenDimension(new Dimension(dim(0),dim(1))) }

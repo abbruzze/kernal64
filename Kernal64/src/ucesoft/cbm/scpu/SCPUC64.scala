@@ -175,7 +175,11 @@ class SCPUC64 extends CBMComputer {
     gifRecorder = GIFPanel.createGIFPanel(displayFrame,Array(display),Array("VIC"))
   }
 
-  private def loadSettings(args: Array[String]): Unit = {
+  private def loadSettings(args:Array[String]) : Unit = {
+    def loadFile(fn:String) : Unit = {
+      val cmd = s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar
+      clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,true) ))
+    }
     settings.load(configuration)
     // AUTOPLAY
     settings.parseAndLoad(args) match {
@@ -184,13 +188,21 @@ class SCPUC64 extends CBMComputer {
         settings.get[String]("RUNFILE") match {
           case None =>
           case Some(fn) =>
-            val cmd = s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar
-            clock.schedule(new ClockEvent("Loading", clock.currentCycles + 2200000, (cycles) => Keyboard.insertTextIntoKeyboardBuffer(cmd, mmu, true)))
+            loadFile(fn)
         }
       case Some(f) =>
-        handleDND(new File(f), false, true)
+        settings.get[String]("DRIVE_8_FILE") match {
+          case None =>
+            handleDND(new File(f),false,true)
+          case Some(_) =>
+            // here we have both drive8 and PRG set: we load the given PRG file from disk 8
+            val fn = new File(f).getName
+            val dot = fn.indexOf('.')
+            val cbmFile = if (dot > 0) fn.substring(0,dot) else f
+            loadFile(cbmFile)
+        }
     }
-    DrivesConfigPanel.registerDrives(displayFrame, drives, setDriveType(_, _, false), enableDrive(_,_,true), attachDisk(_, _, true), attachDiskFile(_, _, _, None), drivesEnabled)
+    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,true),attachDiskFile(_,_,_,None),drivesEnabled)
   }
 
   override def afterInitHook : Unit = {
@@ -613,7 +625,7 @@ class SCPUC64 extends CBMComputer {
     }
     // check help
     if (settings.checkForHelp(args)) {
-      println(s"Kernal64, Commodore 64 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
+      println(s"Kernal64, SuperCPU emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
       settings.printUsage("file to attach")
       sys.exit(0)
     }
@@ -624,6 +636,9 @@ class SCPUC64 extends CBMComputer {
     swing {
       displayFrame.pack
     }
+    // --ignore-config-file handling
+    if (args.exists(_ == "--ignore-config-file")) configuration.clear()
+    // screen's dimension and size restoration
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map {
         _.toInt

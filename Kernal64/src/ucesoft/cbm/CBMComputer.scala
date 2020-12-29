@@ -59,7 +59,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val CONFIGURATION_GMOD2_FILE = "gmod2.file"
   protected val CONFIGURATION_AUTOSAVE = "autosave"
 
-  protected def PRG_RUN_DELAY_CYCLES = 2200000
+  protected val PRG_RUN_DELAY_CYCLES = 2200000
   protected var lastLoadedPrg : Option[File] = None
 
   // -------------- MENU ITEMS -----------------
@@ -94,6 +94,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected var loadStateFromOptions = false // used with --load-state
   protected var traceOption = false // used with --trace
   protected var fullScreenAtBoot = false // used with --fullscreen
+  protected var ignoreConfig = false // used with --ignore-config-file
 
   // memory & main cpu
   protected val mmu : Memory
@@ -1287,6 +1288,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     settings.add("fullscreen",
       "Starts the emulator in full screen mode",
       (fs:Boolean) => if (fs) fullScreenAtBoot = true
+    )
+    settings.add("ignore-config-file",
+      "Ignore configuration file and starts emulator with default configuration",
+      (ic:Boolean) => ignoreConfig = ic
     )
   }
 

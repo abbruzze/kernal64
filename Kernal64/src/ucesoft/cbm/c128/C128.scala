@@ -32,7 +32,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   protected val CONFIGURATION_FILENAME = "C128.config"
   private[this] val CONFIGURATION_VDC_FRAME_XY = "vdc.frame.xy"
   private[this] val CONFIGURATION_VDC_FRAME_DIM = "vdc.frame.dim"
-  override protected def PRG_RUN_DELAY_CYCLES = if (headless) super.PRG_RUN_DELAY_CYCLES else 6500000
+  override protected val PRG_RUN_DELAY_CYCLES = 5400000
 
 
   protected var vdcFullScreenAtBoot = false // used with --vdc-full-screen
@@ -289,6 +289,10 @@ class C128 extends CBMComputer with MMUChangeListener {
   }
 
   private def loadSettings(args:Array[String]) : Unit = {
+    def loadFile(fn:String) : Unit = {
+      val cmd = s"""RUN"$fn"""" + 13.toChar
+      clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,false) ))
+    }
     settings.load(configuration)
     // AUTOPLAY
     settings.parseAndLoad(args) match {
@@ -297,11 +301,19 @@ class C128 extends CBMComputer with MMUChangeListener {
         settings.get[String]("RUNFILE") match {
           case None =>
           case Some(fn) =>
-            val cmd = s"""RUN"$fn"""" + 13.toChar
-            clock.schedule(new ClockEvent("Loading",clock.currentCycles + 2200000,(cycles) => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,false) ))
+            loadFile(fn)
         }
       case Some(f) =>
-        handleDND(new File(f),false,true)
+        settings.get[String]("DRIVE_8_FILE") match {
+          case None =>
+            handleDND(new File(f),false,true)
+          case Some(_) =>
+            // here we have both drive8 and PRG set: we load the given PRG file from disk 8
+            val fn = new File(f).getName
+            val dot = fn.indexOf('.')
+            val cbmFile = if (dot > 0) fn.substring(0,dot) else f
+            loadFile(cbmFile)
+        }
     }
     DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,c64Mode),attachDiskFile(_,_,_,None),drivesEnabled)
   }
@@ -966,6 +978,9 @@ class C128 extends CBMComputer with MMUChangeListener {
     }
     swing{ initComponent }
     checkFunctionROMS
+    // --ignore-config-file handling
+    if (args.exists(_ == "--ignore-config-file")) configuration.clear()
+    // screen's dimension and size restoration
     // VDC
     swing { vdcDisplayFrame.pack }    
     if (configuration.getProperty(CONFIGURATION_VDC_FRAME_DIM) != null) {
