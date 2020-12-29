@@ -1,15 +1,15 @@
-KERNAL64C64OPTS+=" --testcart"
-KERNAL64C64OPTS+=" --headless"
-KERNAL64C64OPTS+=" --warp"
-KERNAL64C64OPTS+=" --vic-palette pepto"
-KERNAL64C64OPTS+=" --screen-dim 1"
-KERNAL64C64OPTS+=" --cpujam-continue true"
-KERNAL64C64OPTS+=" --sid-cycle-exact"
-KERNAL64C64OPTS+=" --ignore-config-file"
+KERNAL64SCPU64OPTS+=" --testcart"
+KERNAL64SCPU64OPTS+=" --headless"
+KERNAL64SCPU64OPTS+=" --warp"
+KERNAL64SCPU64OPTS+=" --vic-palette pepto"
+KERNAL64SCPU64OPTS+=" --screen-dim 1"
+KERNAL64SCPU64OPTS+=" --cpujam-continue true"
+KERNAL64SCPU64OPTS+=" --sid-cycle-exact"
+KERNAL64SCPU64OPTS+=" --ignore-config-file"
 
-function kernal64c64_check_environment
+function kernal64scpu64_check_environment
 {
-    KERNAL64C64=$EMUDIR/k64.sh
+    KERNAL64SCPU64=$EMUDIR/kscpu64.sh
     
     if ! [ -x "$(command -v $JAVA_HOME/bin/java)" ]; then
         echo 'Error: java not installed.' >&2
@@ -20,7 +20,7 @@ function kernal64c64_check_environment
 
 # $1  option
 # $2  test path
-function kernal64c64_get_options
+function kernal64scpu64_get_options
 {
     exitoptions=""
     case "$1" in
@@ -32,9 +32,9 @@ function kernal64c64_get_options
                 testprogvideotype="PAL"
             ;;
         "vicii-ntsc")
-              exitoptions="--ntsc true"
-              testprogvideotype="NTSC"
-          ;;
+            exitoptions="--ntsc true"
+            testprogvideotype="NTSC"
+        ;;
         "sid-old")
                 new_sid_enabled=0
             ;;
@@ -82,13 +82,13 @@ function kernal64c64_get_options
 
 # $1  option
 # $2  test path
-function kernal64c64_get_cmdline_options
+function kernal64scpu64_get_cmdline_options
 {
     exitoptions=""
 }
 
 # called once before any tests run
-function kernal64c64_prepare
+function kernal64scpu64_prepare
 {
     true
 }
@@ -105,7 +105,7 @@ function kernal64c64_prepare
 # $3  timeout cycles
 # $4  test full path+name (may be empty)
 # $5- extra options for the emulator
-function kernal64c64_run_screenshot
+function kernal64scpu64_run_screenshot
 {
     if [ "$2" == "" ] ; then
         screenshottest="$mounted_crt"
@@ -116,9 +116,9 @@ function kernal64c64_run_screenshot
     mkdir -p "$1"/".testbench"
     rm -f "$1"/.testbench/"$screenshottest"-kernal64c64.png
     if [ $verbose == "1" ]; then
-        echo "RUN: "$KERNAL64C64 $KERNAL64C64OPTS $KERNAL64C64OPTSSCREENSHOT ${@:5} "--limitcycles" "$3" "--screenshot" "$1"/.testbench/"$screenshottest"-kernal64c64.png "$4"
+        echo "RUN: "$KERNAL64SCPU64 $KERNAL64SCPU64OPTS $KERNAL64SCPU64OPTSSCREENSHOT ${@:5} "--limitcycles" "$3" "--screenshot" "$1"/.testbench/"$screenshottest"-kernal64c64.png "$4"
     fi
-    $KERNAL64C64 $KERNAL64C64OPTS $KERNAL64C64OPTSSCREENSHOT ${@:5} "--limitcycles" "$3" "--screenshot" "$1"/.testbench/"$screenshottest"-kernal64c64.png "$4" 1> /dev/null 2> /dev/null
+    $KERNAL64SCPU64 $KERNAL64SCPU64OPTS $KERNAL64SCPU64OPTSSCREENSHOT ${@:5} "--limitcycles" "$3" "--screenshot" "$1"/.testbench/"$screenshottest"-kernal64c64.png "$4" 1> /dev/null 2> /dev/null
     exitcode=$?
 #    echo exitcode:$exitcode
     if [ $exitcode -ne 0 ]
@@ -127,8 +127,8 @@ function kernal64c64_run_screenshot
         then
             if [ $exitcode -ne 255 ]
             then
-                echo -ne "\nerror: call to $KERNAL64C64 failed.\n"
-                exit -1
+                echo -ne "\nerror: call to $KERNAL64SCPU64 failed.\n"
+#                exit -1
             fi
         fi
     fi
@@ -138,32 +138,36 @@ function kernal64c64_run_screenshot
         then
         
             # defaults for PAL
-            KERNAL64C64REFSXO=32
-            KERNAL64C64REFSYO=35
-            KERNAL64C64SXO=32
-            KERNAL64C64SYO=35
+            KERNAL64SCPU64REFSXO=32
+            KERNAL64SCPU64REFSYO=35
+            KERNAL64SCPU64SXO=32
+            KERNAL64SCPU64SYO=35
 
             if [ "${refscreenshotvideotype}" == "NTSC" ]; then
-                KERNAL64C64SXO=32
-                KERNAL64C64SYO=23
+                KERNAL64SCPU64SXO=32
+                KERNAL64SCPU64SYO=23
             fi
 
             # when either the testbench was run with --ntsc, or the test is ntsc-specific,
             # then we need the offsets on the NTSC screenshot
             if [ "${videotype}" == "NTSC" ] || [ "${testprogvideotype}" == "NTSC" ]; then
-                KERNAL64C64SXO=32
-                KERNAL64C64SYO=23
+                KERNAL64SCPU64SXO=32
+                KERNAL64SCPU64SYO=23
             fi
         
-            echo ./cmpscreens "$refscreenshotname" "$KERNAL64C64REFSXO" "$KERNAL64C64REFSYO" "$1"/.testbench/"$screenshottest"-kernal64c64.png "$KERNAL64C64SXO" "$KERNAL64C64SYO"
-            ./cmpscreens "$refscreenshotname" "$KERNAL64C64REFSXO" "$KERNAL64C64REFSYO" "$1"/.testbench/"$screenshottest"-kernal64c64.png "$KERNAL64C64SXO" "$KERNAL64C64SYO"
+            if [ $verbose == "1" ]; then
+                echo ./cmpscreens "$refscreenshotname" "$KERNAL64SCPU64REFSXO" "$KERNAL64SCPU64REFSYO" "$1"/.testbench/"$screenshottest"-kernal64c64.png "$KERNAL64SCPU64SXO" "$KERNAL64SCPU64SYO"
+            fi
+            ./cmpscreens "$refscreenshotname" "$KERNAL64SCPU64REFSXO" "$KERNAL64SCPU64REFSYO" "$1"/.testbench/"$screenshottest"-kernal64c64.png "$KERNAL64SCPU64SXO" "$KERNAL64SCPU64SYO"
             exitcode=$?
         else
             echo -ne "reference screenshot missing - "
             exitcode=255
         fi
     fi
-    echo "cmpscreen exited with: " $exitcode
+    if [ $verbose == "1" ]; then
+        echo "cmpscreen exited with: " $exitcode
+    fi
 }
 
 ################################################################################
@@ -177,12 +181,23 @@ function kernal64c64_run_screenshot
 # $3  timeout cycles
 # $4  test full path+name (may be empty)
 # $5- extra options for the emulator
-function kernal64c64_run_exitcode
+function kernal64scpu64_run_exitcode
 {
     if [ $verbose == "1" ]; then
-        echo "RUN: "$KERNAL64C64 $KERNAL64C64OPTS $KERNAL64C64OPTSEXITCODE ${@:5} "--limitcycles" "$3" "$4"
+        echo "RUN: "$KERNAL64SCPU64 $KERNAL64SCPU64OPTS $KERNAL64SCPU64OPTSEXITCODE ${@:5} "--limitcycles" "$3" "$4"
     fi
-    $KERNAL64C64 $KERNAL64C64OPTS $KERNAL64C64OPTSEXITCODE ${@:5} "--limitcycles" "$3" "$4" 1> /dev/null 2> /dev/null
+    $KERNAL64SCPU64 $KERNAL64SCPU64OPTS $KERNAL64SCPU64OPTSEXITCODE ${@:5} "--limitcycles" "$3" "$4" 1> /dev/null 2> /dev/null
     exitcode=$?
     #echo EXIT CODE for $2 is $exitcode
+    if [ $exitcode -ne 0 ]
+    then
+        if [ $exitcode -ne 1 ]
+        then
+            if [ $exitcode -ne 255 ]
+            then
+                echo -ne "\nerror: call to $KERNAL64SCPU64 failed.\n"
+#                exit -1
+            fi
+        fi
+    fi
 }

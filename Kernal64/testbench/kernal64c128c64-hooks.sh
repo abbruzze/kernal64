@@ -6,6 +6,7 @@ KERNAL64C128C64OPTS+=" --vic-palette pepto"
 KERNAL64C128C64OPTS+=" --screen-dim 1"
 KERNAL64C128C64OPTS+=" --cpujam-continue true"
 KERNAL64C128C64OPTS+=" --sid-cycle-exact"
+KERNAL64C128C64OPTS+=" --ignore-config-file"
 
 function kernal64c128c64_check_environment
 {
@@ -31,6 +32,10 @@ function kernal64c128c64_get_options
                 exitoptions=""
                 testprogvideotype="PAL"
             ;;
+        "vicii-ntsc")
+              exitoptions="--ntsc true"
+              testprogvideotype="NTSC"
+          ;;
         "sid-old")
                 new_sid_enabled=0
             ;;
@@ -138,6 +143,18 @@ function kernal64c128c64_run_screenshot
             KERNAL64C128C64REFSYO=35
             KERNAL64C128C64SXO=32
             KERNAL64C128C64SYO=35
+
+            if [ "${refscreenshotvideotype}" == "NTSC" ]; then
+                KERNAL64C128C64SXO=32
+                KERNAL64C128C64SYO=23
+            fi
+
+            # when either the testbench was run with --ntsc, or the test is ntsc-specific,
+            # then we need the offsets on the NTSC screenshot
+            if [ "${videotype}" == "NTSC" ] || [ "${testprogvideotype}" == "NTSC" ]; then
+                KERNAL64C128C64SXO=32
+                KERNAL64C128C64SYO=23
+            fi
         
             echo ./cmpscreens "$refscreenshotname" "$KERNAL64C128C64REFSXO" "$KERNAL64C128C64REFSYO" "$1"/.testbench/"$screenshottest"-kernal64c128c64.png "$KERNAL64C128C64SXO" "$KERNAL64C128C64SYO"
             ./cmpscreens "$refscreenshotname" "$KERNAL64C128C64REFSXO" "$KERNAL64C128C64REFSYO" "$1"/.testbench/"$screenshottest"-kernal64c128c64.png "$KERNAL64C128C64SXO" "$KERNAL64C128C64SYO"
