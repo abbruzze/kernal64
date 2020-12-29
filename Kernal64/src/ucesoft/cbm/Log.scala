@@ -24,7 +24,7 @@ object Log {
   def getOut : PrintWriter = out
   
   @inline private def format(m:String) = "[%10d]\t%s".format(if (Clock.isAvailable) Clock.systemClock.currentCycles else 0,m)
-  @inline private def log(msg:String) : Unit = { out.println(format(msg)) }
+  @inline private def log(msg:String) : Unit = if (out != null) out.println(format(msg))
   
   @inline final def fine(msg: => String): Unit = if ((severity & FINE) != 0) log(msg)
   @inline final def debug(msg: => String): Unit = if ((severity & DEBUG) != 0) log(msg)

@@ -125,14 +125,18 @@ class C64 extends CBMComputer {
     val lightPen = new LightPenButtonListener
     add(lightPen)
     display.addMouseListener(lightPen)
-    traceDialog = TraceDialog.getTraceDialog("CPU Debugger",displayFrame,mmu,cpu,display,vicChip)
-    diskTraceDialog = TraceDialog.getTraceDialog("Drive 8 Debugger",displayFrame,drives(0).getMem,drives(0))
     // drive leds
     add(driveLeds(0))        
     add(driveLeds(1))
     configureJoystick
     add(c1541)
-    Log.setOutput(traceDialog.logPanel.writer)
+    // tracing
+    if (!headless) {
+      traceDialog = TraceDialog.getTraceDialog("CPU Debugger", displayFrame, mmu, cpu, display, vicChip)
+      diskTraceDialog = TraceDialog.getTraceDialog("Drive 8 Debugger", displayFrame, drives(0).getMem, drives(0))
+      Log.setOutput(traceDialog.logPanel.writer)
+    }
+    else Log.setOutput(null)
     // tape
     datassette = new Datassette(cia1.setFlagLow _)
     mmu.setDatassette(datassette)
@@ -292,7 +296,7 @@ class C64 extends CBMComputer {
       disk.canWriteOnDisk = canWriteOnDisk
       disk.flushListener = diskFlusher
       drives(driveID).getFloppy.close
-      if (!traceDialog.isTracing) clock.pause
+      if (traceDialog != null && !traceDialog.isTracing) clock.pause
       drives(driveID).setDriveReader(disk,emulateInserting)
       clock.play
             
@@ -584,6 +588,8 @@ class C64 extends CBMComputer {
       settings.printUsage("file to attach")
       sys.exit(0)
     }
+    // --headless handling to disable logging & debugging
+    if (args.exists(_ == "--headless")) headless = true
     swing { initComponent }
     // VIC
     swing { displayFrame.pack }

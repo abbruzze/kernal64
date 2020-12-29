@@ -138,14 +138,18 @@ class SCPUC64 extends CBMComputer {
     val lightPen = new LightPenButtonListener
     add(lightPen)
     display.addMouseListener(lightPen)
-    traceDialog = TraceDialog.getTraceDialog("CPU Debugger",displayFrame, mmu, cpu, display, vicChip)
-    diskTraceDialog = TraceDialog.getTraceDialog("Drive 8 Debugger",displayFrame, drives(0).getMem, drives(0))
     // drive leds
     add(driveLeds(0))
     add(driveLeds(1))
     configureJoystick
     add(c1541)
-    Log.setOutput(traceDialog.logPanel.writer)
+    // tracing
+    if (!headless) {
+      traceDialog = TraceDialog.getTraceDialog("CPU Debugger", displayFrame, mmu, cpu, display, vicChip)
+      diskTraceDialog = TraceDialog.getTraceDialog("Drive 8 Debugger", displayFrame, drives(0).getMem, drives(0))
+      Log.setOutput(traceDialog.logPanel.writer)
+    }
+    else Log.setOutput(null)
     // tape
     // printer
     add(printer)
@@ -629,13 +633,11 @@ class SCPUC64 extends CBMComputer {
       settings.printUsage("file to attach")
       sys.exit(0)
     }
-    swing {
-      initComponent
-    }
+    // --headless handling to disable logging & debugging
+    if (args.exists(_ == "--headless")) headless = true
+    swing { initComponent }
     // VIC
-    swing {
-      displayFrame.pack
-    }
+    swing { displayFrame.pack }
     // --ignore-config-file handling
     if (args.exists(_ == "--ignore-config-file")) configuration.clear()
     // screen's dimension and size restoration
@@ -643,17 +645,13 @@ class SCPUC64 extends CBMComputer {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map {
         _.toInt
       }
-      swing {
-        updateVICScreenDimension(new Dimension(dim(0), dim(1)))
-      }
+      swing { updateVICScreenDimension(new Dimension(dim(0), dim(1))) }
     }
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map {
         _.toInt
       }
-      swing {
-        displayFrame.setLocation(xy(0), xy(1))
-      }
+      swing { displayFrame.setLocation(xy(0), xy(1)) }
     }
     // SETTINGS
     loadSettings(args)

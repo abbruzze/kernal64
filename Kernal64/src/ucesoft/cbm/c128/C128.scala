@@ -241,16 +241,18 @@ class C128 extends CBMComputer with MMUChangeListener {
     // light pen
     val lightPen = new LightPenButtonListener    
     add(lightPen)
-    display.addMouseListener(lightPen)    
-    // tracing
-    traceDialog = TraceDialog.getTraceDialog("CPU Debugger",displayFrame,mmu,z80,display,vicChip)
-    diskTraceDialog = TraceDialog.getTraceDialog("Disk8 Debugger",displayFrame,drives(0).getMem,drives(0))
-    //diskTraceDialog.forceTracing(true)
+    display.addMouseListener(lightPen)
     // drive leds
     add(driveLeds(0))        
     add(driveLeds(1))       
     configureJoystick
-    Log.setOutput(traceDialog.logPanel.writer)
+    // tracing
+    if (!headless) {
+      traceDialog = TraceDialog.getTraceDialog("CPU Debugger",displayFrame,mmu,z80,display,vicChip)
+      diskTraceDialog = TraceDialog.getTraceDialog("Disk8 Debugger",displayFrame,drives(0).getMem,drives(0))
+      Log.setOutput(traceDialog.logPanel.writer)
+    }
+    else Log.setOutput(null)
     // tape
     datassette = new c2n.Datassette(cia1.setFlagLow _)
     mmu.setDatassette(datassette)
@@ -386,18 +388,18 @@ class C128 extends CBMComputer with MMUChangeListener {
   }
   def cpuChanged(is8502:Boolean) : Unit = {
     if (is8502) {
-      traceDialog.traceListener = cpu      
+      if (traceDialog != null) traceDialog.traceListener = cpu
       z80Active = false
       cpu.setDMA(false)
       z80.requestBUS(true)
     }
     else {
-      traceDialog.traceListener = z80
+      if (traceDialog != null) traceDialog.traceListener = z80
       z80Active = true
       z80.requestBUS(false)
       cpu.setDMA(true)      
     }
-    traceDialog.forceTracing(traceDialog.isTracing)
+    if (traceDialog != null) traceDialog.forceTracing(traceDialog.isTracing)
     mmuStatusPanel.cpuChanged(is8502)
     Log.debug("Enabling CPU " + (if (z80Active) "Z80" else "8502"))
   }
@@ -541,7 +543,7 @@ class C128 extends CBMComputer with MMUChangeListener {
       disk.canWriteOnDisk = canWriteOnDisk
       disk.flushListener = diskFlusher
       drives(driveID).getFloppy.close
-      if (!traceDialog.isTracing) clock.pause
+      if (traceDialog != null && !traceDialog.isTracing) clock.pause
       drives(driveID).setDriveReader(disk,emulateInserting)
       clock.play
 
@@ -976,6 +978,8 @@ class C128 extends CBMComputer with MMUChangeListener {
       settings.printUsage("file to attach")
       sys.exit(0)
     }
+    // --headless handling to disable logging & debugging
+    if (args.exists(_ == "--headless")) headless = true
     swing{ initComponent }
     checkFunctionROMS
     // --ignore-config-file handling
