@@ -16,7 +16,7 @@ object Diskette {
   object FileType extends Enumeration {
     val DEL, SEQ, PRG, USR, REL, CBM = Value
   }
-  case class DirEntry(fileType: FileType.Value, fileName: String, t: Int, s: Int, sizeInSectors: Int)
+  case class DirEntry(fileType: FileType.Value, fileName: String, t: Int, s: Int, sizeInSectors: Int,entryTrack:Int,entrySector:Int,entryPos:Int)
   case class BamInfo(diskName: String, diskID: String, dosType: String,singleSide:Boolean,freeSectors:Int)
   case class FileData(fileName: String, startAddress: Int, data: Array[Int]) {
     def iterator = {
@@ -61,9 +61,9 @@ object Diskette {
   }  
   
   // factory method
-  def apply(fileName:String) : Diskette = {
+  def apply(fileName:String,load : Boolean = true) : Diskette = {
     val upper = fileName.toUpperCase
-    if (upper.endsWith(".D64") || upper.endsWith(".D71")) new D64_D71(fileName)
+    if (upper.endsWith(".D64") || upper.endsWith(".D71")) new D64_D71(fileName,load)
     else
     if (upper.endsWith(".D81") ) new D81(fileName)
     else
@@ -106,7 +106,7 @@ abstract class Diskette extends Floppy {
   
   protected def absoluteSector(t:Int,s:Int) : Int = 0
 
-  protected def makeDirEntryFromBuffer(buffer:Array[Byte]) : DirEntry = {
+  protected def makeDirEntryFromBuffer(buffer:Array[Byte],t:Int,s:Int,pos:Int) : DirEntry = {
     val fileType = FileType(buffer(2) & 7)
     val track = buffer(3)
     val sector = buffer(4)
@@ -120,7 +120,7 @@ abstract class Diskette extends Floppy {
       i += 1
     }
     val size = buffer(0x1E).toInt & 0xFF + (buffer(0x1F).toInt & 0xFF) * 256
-    DirEntry(fileType, fileName.toString, track, sector, size)
+    DirEntry(fileType, fileName.toString, track, sector, size,t,s,pos)
   }
   
   def directories : List[DirEntry] = {
@@ -129,7 +129,9 @@ abstract class Diskette extends Floppy {
     var dirs = new ListBuffer[DirEntry]
     var readNextSector = true
     val buffer = Array.ofDim[Byte](0x20)
-    while (readNextSector) {      
+    while (readNextSector) {
+      val currentT = t
+      val currentS = s
       disk.seek(absoluteSector(t, s) * BYTES_PER_SECTOR)
       var firstEntryOfSector = true
       var entryIndex = 0
@@ -150,7 +152,7 @@ abstract class Diskette extends Floppy {
         if (entryIndex == 9 || buffer.forall(_ == 0)) {
           readNextEntry = false // last+1 entry of this sector
         }
-        else dirs += makeDirEntryFromBuffer(buffer)
+        else dirs += makeDirEntryFromBuffer(buffer,currentT,currentS,entryIndex - 1)
       }
     }
     dirs.toList

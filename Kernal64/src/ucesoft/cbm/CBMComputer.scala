@@ -95,6 +95,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected var traceOption = false // used with --trace
   protected var fullScreenAtBoot = false // used with --fullscreen
   protected var ignoreConfig = false // used with --ignore-config-file
+  protected var loadPRGasDisk = false // used with --prg-as-disk
+  protected var disk8LoadedAsPRG = false
 
   // memory & main cpu
   protected val mmu : Memory
@@ -251,8 +253,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def mainLoop(cycles:Long) : Unit
 
   protected def reset(play:Boolean=true,loadAndRunLastPrg:Boolean = false) : Unit = {
-    traceDialog.forceTracing(false)
-    diskTraceDialog.forceTracing(false)
+    if (traceDialog != null) traceDialog.forceTracing(false)
+    if (diskTraceDialog != null) diskTraceDialog.forceTracing(false)
     if (Thread.currentThread != Clock.systemClock) clock.pause
     resetComponent
     if (loadAndRunLastPrg) lastLoadedPrg.foreach( f =>
@@ -263,8 +265,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def hardReset(play:Boolean=true) : Unit = {
-    traceDialog.forceTracing(false)
-    diskTraceDialog.forceTracing(false)
+    if (traceDialog != null) traceDialog.forceTracing(false)
+    if (diskTraceDialog != null) diskTraceDialog.forceTracing(false)
     if (Thread.currentThread != Clock.systemClock) clock.pause
     hardResetComponent
 
@@ -297,7 +299,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
           JOptionPane.YES_NO_CANCEL_OPTION,
           JOptionPane.ERROR_MESSAGE) match {
           case JOptionPane.YES_OPTION =>
-            traceDialog.forceTracing(true)
+            if (traceDialog != null) traceDialog.forceTracing(true)
             trace(true,true)
           case JOptionPane.CANCEL_OPTION => // continue
           case _ =>
@@ -472,9 +474,9 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   def setTraceListener(tl:Option[TraceListener]) : Unit = {
     tl match {
       case None =>
-        traceDialog.traceListener = cpu
+        if (traceDialog != null) traceDialog.traceListener = cpu
       case Some(t) =>
-        traceDialog.traceListener = t
+        if (traceDialog != null) traceDialog.traceListener = t
     }
   }
   // ------------------------------------------------------------------------------------------
@@ -495,9 +497,30 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   def attachDevice(file:File) : Unit = attachDevice(file,false)
 
+  protected def attachPRGAsDisk(file:File,autorun:Boolean = true) : Unit = {
+    val name = file.getName.toUpperCase
+    val disk = File.createTempFile("prgdrive8",".d64")
+    disk.deleteOnExit()
+    Diskette.makeEmptyDisk(disk.toString)
+    val d64 = new D64_D71(disk.toString,false)
+    d64.rename("AUTOSTART")
+    val in = new java.io.FileInputStream(file)
+    val prg = in.readAllBytes()
+    in.close
+    val startAddress = prg(0) | prg(1) << 8
+    val content = prg.drop(2)
+    val prgName = name.dropRight(4)
+    d64.addPRG(content,prgName,startAddress)
+    d64.close
+    disk8LoadedAsPRG = true
+    attachDiskFile(0,disk,autorun,Some(prgName),false)
+  }
+
   protected def attachDevice(file:File,autorun:Boolean,fileToLoad:Option[String] = None,emulateInserting:Boolean = true) : Unit = {
     val name = file.getName.toUpperCase
 
+    if (name.endsWith(".PRG") && loadPRGasDisk) attachPRGAsDisk(file)
+    else
     if (name.endsWith(".PRG")) {
       loadPRGFile(file,autorun)
       lastLoadedPrg = Some(file)
@@ -554,7 +577,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
     catch {
       case t:Throwable =>
-        t.printStackTrace(traceDialog.logPanel.writer)
+        if (traceDialog != null) t.printStackTrace(traceDialog.logPanel.writer)
 
         showError("Cartridge loading error",t.toString)
     }
@@ -702,8 +725,11 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     })
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
-        loadPRGFile(fc.getSelectedFile,false)
-        lastLoadedPrg = Some(fc.getSelectedFile)
+        if (loadPRGasDisk) attachPRGAsDisk(fc.getSelectedFile,false)
+        else {
+          loadPRGFile(fc.getSelectedFile, false)
+          lastLoadedPrg = Some(fc.getSelectedFile)
+        }
       case _ =>
     }
   }
@@ -1071,6 +1097,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def trace(cpu:Boolean,on:Boolean) : Unit = {
+    if (traceDialog == null) return
+
     if (cpu) {
       Log.setOutput(traceDialog.logPanel.writer)
       traceDialog.setVisible(on)
@@ -1087,7 +1115,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def ejectDisk(driveID:Int) : Unit = {
     drives(driveID).getFloppy.close
     driveLeds(driveID).setToolTipText("")
-    if (!traceDialog.isTracing) clock.pause
+    if (traceDialog != null && !traceDialog.isTracing) clock.pause
     if (drives(driveID).driveType == DriveType._1581) drives(driveID).setDriveReader(D1581.MFMEmptyFloppy,true)
     else drives(driveID).setDriveReader(EmptyFloppy,true)
     loadFileItems(driveID).setEnabled(false)
@@ -1394,6 +1422,20 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     fileMenu.add(loadFileItems(1))
     fileMenu.addSeparator
 
+    val prgAsDiskItem = new JCheckBoxMenuItem("Load PRG as D64")
+    prgAsDiskItem.addActionListener(_ => loadPRGasDisk =  prgAsDiskItem.isSelected)
+    fileMenu.add(prgAsDiskItem)
+    // Setting ---------------------------
+    settings.add("prg-as-disk",
+      "Load a PRG file as if inserted in a disk",
+      "LOAD_PRG_AS_D64",
+      (pad:Boolean) => {
+        loadPRGasDisk = pad
+        prgAsDiskItem.setSelected(loadPRGasDisk)
+      },
+      prgAsDiskItem.isSelected
+    )
+    // Setting ---------------------------
     val loadPrgItem = new JMenuItem("Load PRG file from local disk ...")
     loadPrgItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G,java.awt.event.InputEvent.ALT_DOWN_MASK))
     loadPrgItem.addActionListener(_ => loadPrg )
@@ -1412,7 +1454,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       },
       drivesEnabled(1)
     )
-    // -----------------------------------
+    // Setting ---------------------------
 
     val localDriveItem = new JMenu("Drive on device 10 ...")
     fileMenu.add(localDriveItem)
@@ -1551,7 +1593,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       "Starts the emulator in trace mode",
       (trace:Boolean) => {
         this.traceOption = trace
-        if (trace) {
+        if (trace && traceDialog != null) {
           traceDialog.forceTracing(true)
           traceDialog.setVisible(true)
           traceItem.setSelected(true)
@@ -1926,7 +1968,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         (df: String) => {
           if (df != "") attachDiskFile(drive, new File(df), false, None)
         },
-        floppyComponents(drive).drive.getFloppy.file
+        {
+          if (drive == 0 && disk8LoadedAsPRG) ""
+          else floppyComponents(drive).drive.getFloppy.file
+        }
       )
     }
   }

@@ -16,8 +16,6 @@ import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.vdc.VDC
-import ucesoft.cbm.peripheral.vic.Palette
-import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 import ucesoft.cbm.trace._
 
 object C128 extends App {

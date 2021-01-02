@@ -76,6 +76,8 @@ private[formats] class G64(val file:String) extends Diskette {
     val sectors = new collection.mutable.HashMap[(Int,Int),Array[Int]]
 
     while (readNextSector) {
+      val currentT = t
+      val currentS = s
       val sector : Array[Int] = sectors get (t,s) match {
         case None =>
           GCR.GCR2track(tracks((t - 1) * 2),-1,(tr,se,data) => { sectors += (tr,se) -> data })
@@ -109,7 +111,7 @@ private[formats] class G64(val file:String) extends Diskette {
         if (entryIndex == 9 || buffer.forall(_ == 0)) {
           readNextEntry = false // last+1 entry of this sector
         }
-        else dirs += makeDirEntryFromBuffer(buffer map { _.toByte })
+        else dirs += makeDirEntryFromBuffer(buffer map { _.toByte },currentT,currentS,entryIndex - 1)
       }
     }
     dirs.toList

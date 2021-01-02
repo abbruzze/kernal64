@@ -1,10 +1,10 @@
 package ucesoft.cbm.formats
-import java.io.RandomAccessFile
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
+import java.io.{ObjectInputStream, ObjectOutputStream, RandomAccessFile}
 import ucesoft.cbm.peripheral.drive.Floppy
 
-private[formats] class D64_D71(val file: String) extends Diskette {
+import scala.collection.mutable.ListBuffer
+
+class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   import Diskette._
   val canBeEmulated = true
   // D64
@@ -69,7 +69,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   
   protected final val disk = new RandomAccessFile(file, if (isReadOnly) "r" else "rw")
   private[this] val absoluteSectorCache = new collection.mutable.HashMap[Int,Int]
-  private[this] var _bam : BamInfo = bamInfo
+  private[this] val _bam : BamInfo = bamInfo
   private[this] val trackChangeBitMap = Array.ofDim[Long](70)
   
   @inline private def trackSectorModified(t:Int,s:Int) = trackChangeBitMap(t - 1) |= 1 << s
@@ -109,7 +109,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   def bam = _bam
   
   // CONSTRUCTOR
-  loadGCRImage
+  if (loadImage) loadGCRImage
   
   private def gcrImageOf(t:Int,s:Int) = if (t == 0 || t > GCRImage.length) GCR.EMPTY_GCR_SECTOR else GCRImage(t - 1)(s)
   
@@ -235,7 +235,6 @@ private[formats] class D64_D71(val file: String) extends Diskette {
   
   override def side = _side
   override def side_=(newSide:Int) : Unit = {
-    val oldT = track
     newSide match {
       case 0 if _side == 1 =>
           track -= (if (bam.singleSide) TOTAL_TRACKS else TOTAL_TRACKS >> 1)
@@ -251,8 +250,7 @@ private[formats] class D64_D71(val file: String) extends Diskette {
           gcrSector = gcrImageOf(track, sector)
       case _ =>
     }
-    //println(s"Side changed: ${_side} -> $newSide $oldT => $track")
-    _side = newSide    
+    _side = newSide
   }
   
   def reset  : Unit = {
@@ -336,4 +334,221 @@ private[formats] class D64_D71(val file: String) extends Diskette {
     sectorsPerCurrentTrack = TRACK_ALLOCATION(track)
     gcrSector = gcrImageOf(track, sector)
   }
+
+  // ================================== EDITOR ====================================================
+  def addPRG(file:Array[Byte],fileName:String,startAddress:Int) : Boolean = addFile(file,fileName,startAddress,true)
+  def addSEQ(file:Array[Byte],fileName:String) : Boolean = addFile(file,fileName,-1,false)
+
+  private def addFile(file:Array[Byte],fileName:String,startAddress:Int,isPRG:Boolean = true) : Boolean = {
+    def asByte(a:Array[Byte],p:Int) : Int = a(p).toInt & 0xFF
+    val fileBlocks = math.ceil(file.length / 256.0).toInt
+    if (fileBlocks > bam.freeSectors) return false
+    // load bam in buffer
+    val bamBuffer = readSectorBuffer(DIR_TRACK,BAM_SECTOR)
+    var dirSector = readSectorBuffer(DIR_TRACK,DIR_SECTOR)
+    val dirSectorsToUpdate = new ListBuffer[(Int,Int,Array[Byte])]
+
+    // search last dir entry
+    var t = asByte(dirSector,0)
+    var s = asByte(dirSector,1)
+    var lt = DIR_TRACK
+    var ls = DIR_SECTOR
+    while (t != 0 && s != 0xFF) {
+      lt = t
+      ls = s
+      dirSector = readSectorBuffer(t,s)
+      t = asByte(dirSector,0)
+      s = asByte(dirSector,1)
+    }
+    dirSectorsToUpdate.addOne((lt,ls,dirSector))
+
+    // check if there is an empty entry
+    var dirEntry = 2
+    var dirEntryFound = false
+    while (dirEntry < 256 && !dirEntryFound) {
+      if (asByte(dirSector,dirEntry) == 0) dirEntryFound = true
+      else dirEntry += 32
+    }
+    if (!dirEntryFound) { // no entry found on current sector
+      findFreeSector(bamBuffer,true) match {
+        case None =>
+          return false
+        case Some((nt,ns)) =>
+          // change next pointer
+          dirSector(0) = nt.toByte
+          dirSector(1) = ns.toByte
+          dirSector = Array.ofDim[Byte](256)
+          dirSectorsToUpdate.addOne((nt,ns,dirSector))
+          dirEntry = 2
+      }
+    }
+    dirSector(1) = 0xFF.toByte // last sector
+    dirSector(dirEntry) = if (isPRG) 0x82.toByte else 0x81.toByte // PRG or SEQ
+    for(i <- 0 until 16) dirSector(dirEntry + 3 + i) = if (i < fileName.length) fileName.charAt(i).toByte else 0xA0.toByte
+
+    // find space for file
+    var firstTrackSector = true
+    var fileOffset = 0
+    var sectors = new ListBuffer[(Int,Int)]
+    while (fileOffset < file.length) {
+      findFreeSector(bamBuffer,false) match {
+        case None =>
+          return false
+        case Some(ts@(nt,ns)) =>
+          if (firstTrackSector) {
+            firstTrackSector = false
+            dirSector(dirEntry + 1) = nt.toByte
+            dirSector(dirEntry + 2) = ns.toByte
+            fileOffset += 252
+          }
+          else fileOffset += 254
+          sectors += ts
+      }
+    }
+    dirSector(dirEntry + 0x1C) = (sectors.length & 0xFF).toByte
+    dirSector(dirEntry + 0x1D) = ((sectors.length >> 8) & 0xFF).toByte
+    // ok, space found, write file content
+    firstTrackSector = true
+    fileOffset = 0
+    while (!sectors.isEmpty) {
+      val (t,s) = sectors.head
+      disk.seek(absoluteSector(t, s) * BYTES_PER_SECTOR)
+      val diff = file.length - fileOffset
+      if (sectors.tail.isEmpty) {
+        disk.write(0)
+        disk.write(diff + 1)
+      }
+      else {
+        val (nt,ns) = sectors.tail.head
+        disk.write(nt)
+        disk.write(ns)
+      }
+
+      val len = if (firstTrackSector && isPRG) {
+        firstTrackSector = false
+        disk.write(startAddress & 0xFF)
+        disk.write((startAddress >> 8) & 0xFF)
+        252
+      }
+      else 254
+
+      disk.write(file,fileOffset,if (diff < len) diff else len)
+      fileOffset += len
+
+      sectors = sectors.tail
+    }
+    // write directory sectors
+    for((t,s,buffer) <- dirSectorsToUpdate) {
+      writeSectorBuffer(t,s,buffer)
+    }
+    // write bam
+    writeSectorBuffer(DIR_TRACK,BAM_SECTOR,bamBuffer)
+    true
+  }
+
+  private def findFreeSector(bam:Array[Byte],on18:Boolean) : Option[(Int,Int)] = {
+    def asByte(p:Int) : Int = bam(p).toInt & 0xFF
+    var track = if (on18) 18 else 17
+    val trackLimit = if (on18) 19 else TOTAL_TRACKS + 1
+    val jump = if (on18) 3 else 10
+    var trackCount = 0
+    while (trackCount < trackLimit) {
+      if (track != 18 || on18) {
+        val sectorPerTrack = TRACK_ALLOCATION(track)
+        val pos = 4 + (track - 1) * 4
+        if (asByte(pos) > 0) {
+          val sectorsMap = asByte(pos + 1) | asByte(pos + 2) << 8 | asByte(pos + 3) << 16
+          var mask = 1
+          var s = 0
+          var i = 0
+          while (i < sectorPerTrack) {
+            if ((sectorsMap & mask) == mask) { // found
+              val modSectorsMap = (sectorsMap & ~mask) & 0xFFFFFF
+              bam(pos + 1) = (modSectorsMap & 0xFF).toByte
+              bam(pos + 2) = ((modSectorsMap >> 8) & 0xFF).toByte
+              bam(pos + 3) = ((modSectorsMap >> 16) & 0xFF).toByte
+              bam(pos) = (bam(pos) - 1).toByte
+
+              return Some((track,s))
+            }
+            s = (s + jump) % sectorPerTrack
+            mask = 1 << s
+            i += 1
+          }
+        }
+      }
+      trackCount += 1
+      track = if (track == 1) TOTAL_TRACKS else track - 1
+    }
+    None
+  }
+
+  def deleteFile(entry:DirEntry) : Unit = {
+    val bamBuffer = readSectorBuffer(DIR_TRACK,BAM_SECTOR)
+    // DEL on directory
+    val dir = readSectorBuffer(entry.entryTrack,entry.entrySector)
+    dir(2 + entry.entryPos * 32) = 0 // DEL
+    // delete file
+    var t = entry.t
+    var s = entry.s
+    while (t != 0) {
+      makeFreeSector(bamBuffer,t,s)
+      disk.seek(absoluteSector(t,s) * BYTES_PER_SECTOR)
+      // read next t,s
+      t = disk.read
+      s = disk.read
+    }
+    writeSectorBuffer(entry.entryTrack,entry.entrySector,dir)
+    writeSectorBuffer(DIR_TRACK,BAM_SECTOR,bamBuffer)
+  }
+
+  def reloadGCR : Unit = loadGCRImage
+
+  def rename(name:String) : Unit = {
+    disk.seek(absoluteSector(DIR_TRACK,BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)
+    for(i <- 0 to 15) {
+      val c = if (i < name.length) name.charAt(i).toInt else 0xA0
+      disk.write(c)
+    }
+  }
+
+  private def makeFreeSector(bam:Array[Byte],t:Int,s:Int) : Unit = {
+    def asByte(p:Int) : Int = bam(p).toInt & 0xFF
+    val pos = 4 + (track - 1) * 4
+    bam(pos) = (bam(pos) + 1).toByte
+    val sectorsMap = asByte(pos + 1) | asByte(pos + 2) << 8 | asByte(pos + 3) << 16
+    val modSectorsMap = sectorsMap | 1 << s
+    bam(pos + 1) = (modSectorsMap & 0xFF).toByte
+    bam(pos + 2) = ((modSectorsMap >> 8) & 0xFF).toByte
+    bam(pos + 3) = ((modSectorsMap >> 16) & 0xFF).toByte
+  }
+
+  private def readSectorBuffer(t:Int,s:Int) : Array[Byte] = {
+    val buffer = Array.ofDim[Byte](256)
+    disk.seek(absoluteSector(t, s) * BYTES_PER_SECTOR)
+    disk.read(buffer)
+    buffer
+  }
+
+  private def writeSectorBuffer(t:Int,s:Int,sector:Array[Byte]) : Unit = {
+    disk.seek(absoluteSector(t, s) * BYTES_PER_SECTOR)
+    disk.write(sector)
+  }
+}
+
+object TestD64Editor extends App {
+  val d64 = new D64_D71("/Users/ealeame/Desktop/empty.d64",false)
+
+  val in = new java.io.FileInputStream("/Users/ealeame/Desktop/basictest.prg")
+  val file = in.readAllBytes()
+  val startAddress = file(0) | file(1) << 8
+  val content = file.drop(2)
+  for(i <- 1 to 1)
+  if (!d64.addPRG(content,s"BASICTEST",startAddress)) println("NO SPACE")
+
+
+  //d64.directories find { e =>e.fileName == "BRUCE LEE2" } foreach { d64.deleteFile }
+  d64.rename("AUTOSTART")
+  d64.reloadGCR
+  d64.close
 }
