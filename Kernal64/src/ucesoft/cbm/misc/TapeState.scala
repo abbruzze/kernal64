@@ -19,7 +19,7 @@ class TapeState(datassette:Datassette) extends JComponent with DatassetteListene
   progressBar.setVisible(false)
   progressBar.setStringPainted(true)
   setVisible(false)
-  setToolTipText("Right click to show controls")
+  setToolTipText("Click to show controls")
   initPopup
 
   override def paint(g: Graphics): Unit = {
@@ -102,11 +102,8 @@ class TapeState(datassette:Datassette) extends JComponent with DatassetteListene
     pop.add(tapeResetCounterItem)
 
     addMouseListener(new MouseAdapter {
-      override def mousePressed(e: MouseEvent): Unit = {
-        if (e.isPopupTrigger) pop.show(e.getComponent,e.getX,e.getY)
-      }
-      override def mouseReleased(e: MouseEvent): Unit = {
-        if (e.isPopupTrigger) pop.show(e.getComponent,e.getX,e.getY)
+      override def mouseClicked(e: MouseEvent): Unit = {
+        pop.show(e.getComponent,e.getX,e.getY)
       }
     })
   }

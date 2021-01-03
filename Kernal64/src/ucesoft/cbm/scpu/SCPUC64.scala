@@ -39,7 +39,7 @@ class SCPUC64 extends CBMComputer {
   override protected lazy val cpu = new CPU65816(mmu)
   protected val busSnooper = new BusSnoop(bus)
   protected var busSnooperActive = false
-  protected val c1541 = new C1541Emu(bus, DriveLed8Listener)
+  protected val c1541 = new C1541Emu(bus, driveLedListeners(0))
 
   private[this] val mmuStatusPanel = new MMUStatusPanel
   private[this] var cpuClocks = 1
@@ -69,9 +69,7 @@ class SCPUC64 extends CBMComputer {
     RS232ConfigPanel.registerAvailableRS232Drivers(displayFrame, AVAILABLE_RS232)
     ExpansionPort.addConfigurationListener(mmu)
     // drive
-    initDrive(0, DriveType._1541)
-    initDrive(1, DriveType._1541)
-    drivesEnabled(1) = false
+    initializedDrives
     // -----------------------
     ProgramLoader.cpu = cpu
     ProgramLoader.warpModeListener = warpMode _
@@ -84,10 +82,6 @@ class SCPUC64 extends CBMComputer {
     add(bus)
     add(expansionPort)
     add(rs232)
-    floppyComponents(0) = new FloppyComponent(8, drives(0), driveLeds(0))
-    add(floppyComponents(0))
-    floppyComponents(1) = new FloppyComponent(9, drives(1), driveLeds(1))
-    add(floppyComponents(1))
     // -----------------------
     val vicMemory = new C64VICMemory(mmu, mmu.CHAR_ROM, cpu)
     add(vicMemory)
@@ -138,9 +132,6 @@ class SCPUC64 extends CBMComputer {
     val lightPen = new LightPenButtonListener
     add(lightPen)
     display.addMouseListener(lightPen)
-    // drive leds
-    add(driveLeds(0))
-    add(driveLeds(1))
     configureJoystick
     add(c1541)
     // tracing
@@ -157,17 +148,7 @@ class SCPUC64 extends CBMComputer {
     add(flyerIEC)
 
     // info panel
-    val infoPanel = new JPanel(new BorderLayout)
-    val rowPanel = new JPanel(new BorderLayout(0, 0))
-    val row1Panel = new JPanel(new FlowLayout(FlowLayout.RIGHT))
-    val row2Panel = new JPanel(new FlowLayout(FlowLayout.RIGHT))
-    rowPanel.add("North", row1Panel)
-    rowPanel.add("South", row2Panel)
-    row1Panel.add(diskProgressPanels(0))
-    row1Panel.add(driveLeds(0))
-    row2Panel.add(diskProgressPanels(1))
-    row2Panel.add(driveLeds(1))
-    infoPanel.add("East", rowPanel)
+    val infoPanel = makeInfoPanel(false)
     infoPanel.add("West", mmuStatusPanel)
     mmuStatusPanel.setJiffyDosAction(mmu.setJiffyDOS _)
     mmuStatusPanel.setSys1MhzAction(mmu.setSystem1Mhz _)
@@ -211,9 +192,11 @@ class SCPUC64 extends CBMComputer {
 
   override def afterInitHook : Unit = {
     inspectDialog = InspectPanel.getInspectDialog(displayFrame, this)
-    // deactivate drive 9
-    drives(1).setActive(false)
-    driveLeds(1).setVisible(false)
+    // deactivate drives > 8
+    for(d <- 1 until TOTAL_DRIVES) {
+      drives(d).setActive(false)
+      driveLeds(d).setVisible(false)
+    }
   }
 
   protected def mainLoop(cycles: Long) : Unit = {
@@ -224,12 +207,11 @@ class SCPUC64 extends CBMComputer {
     if (cia12Running(1)) cia2.clock(false)
     //DRIVES
     var d = 0
-    while (d < 2) {
+    while (d < TOTAL_DRIVES) {
       if (drivesEnabled(d) && drivesRunning(d)) drives(d).clock(cycles)
-
       d += 1
     }
-    if (device10DriveEnabled) device10Drive.clock(cycles)
+    if (device12DriveEnabled) device12Drive.clock(cycles)
     // bus snoop
     if (busSnooperActive) busSnooper.clock(cycles)
     // printer

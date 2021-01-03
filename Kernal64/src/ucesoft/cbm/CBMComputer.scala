@@ -1,6 +1,6 @@
 package ucesoft.cbm
 
-import java.awt.{Color, Dimension}
+import java.awt.{BorderLayout, Color, Dimension, FlowLayout}
 import java.awt.event._
 import java.io._
 import java.util.zip.{GZIPInputStream, GZIPOutputStream}
@@ -64,7 +64,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   // -------------- MENU ITEMS -----------------
   protected val maxSpeedItem = new JCheckBoxMenuItem("Warp mode")
-  protected val loadFileItems = Array(new JMenuItem("Load file from attached disk 8 ..."), new JMenuItem("Load file from attached disk 9 ..."))
+  protected val loadFileItems = (for(d <- 0 until TOTAL_DRIVES) yield new JMenuItem(s"Load file from attached disk ${d + 8} ..."))
   protected val tapeMenu = new JMenu("Tape control...")
   protected val detachCtrItem = new JMenuItem("Detach cartridge")
   protected val cartMenu = new JMenu("Cartridge")
@@ -139,17 +139,31 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected var inspectDialog : InspectPanelDialog = _
   protected var traceItem,traceDiskItem : JCheckBoxMenuItem = _
   // -------------------- DISK -----------------
-  protected val drivesRunning = Array(true,true)
-  protected val drivesEnabled = Array(true,true)
+  final protected val TOTAL_DRIVES = 4
+  protected val drivesRunning = Array.fill[Boolean](TOTAL_DRIVES)(true)
+  protected val drivesEnabled = Array.fill[Boolean](TOTAL_DRIVES)(true)
   protected lazy val diskFlusher = new FloppyFlushUI(displayFrame)
-  protected val driveLeds = Array(new DriveLed,new DriveLed)
-  protected val floppyComponents = Array.ofDim[FloppyComponent](2)
-  protected val diskProgressPanels = Array(new DriveLoadProgressPanel,new DriveLoadProgressPanel)
+  protected val driveLeds = (for(d <- 0 until TOTAL_DRIVES) yield {
+    val led = new DriveLed(d + 8)
+    led.addMouseListener(new MouseAdapter {
+      override def mouseClicked(e: MouseEvent): Unit = attachDisk(d,false,isC64Mode)
+    })
+    led
+  }).toArray
+  protected val floppyComponents = Array.ofDim[FloppyComponent](TOTAL_DRIVES)
+  protected val diskProgressPanels = Array.fill[DriveLoadProgressPanel](TOTAL_DRIVES)(new DriveLoadProgressPanel)
+  protected val driveLedListeners = {
+    (for(d <- 0 until TOTAL_DRIVES) yield {
+      new AbstractDriveLedListener(driveLeds(d),diskProgressPanels(d)) {
+        if (d > 0) driveLeds(d).setVisible(false)
+      }
+    }).toArray
+  }
   protected val flyerIEC = new FlyerIEC(bus,file => attachDiskFile(0,file,false,None))
   protected var isFlyerEnabled = false
-  protected val drives : Array[Drive with TraceListener] = Array.ofDim(2)
-  protected var device10Drive : Drive = _
-  protected var device10DriveEnabled = false
+  protected val drives : Array[Drive with TraceListener] = Array.ofDim(TOTAL_DRIVES)
+  protected var device12Drive : Drive = _
+  protected var device12DriveEnabled = false
   protected var canWriteOnDisk = true
   // -------------------- TAPE -----------------
   protected var datassette : Datassette = _
@@ -224,12 +238,6 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
   // ------------------------------------ Drag and Drop ----------------------------
   protected val DNDHandler = new DNDHandler(handleDND(_,true,true))
-
-  protected object DriveLed8Listener extends AbstractDriveLedListener(driveLeds(0),diskProgressPanels(0))
-
-  protected object DriveLed9Listener extends AbstractDriveLedListener(driveLeds(1),diskProgressPanels(1)) {
-    driveLeds(1).setVisible(false)
-  }
   // ------------------- INITIALIZATION ------------------------
   initComputer
 
@@ -320,6 +328,26 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         //trace(true,true)
         reset(true)
     }
+  }
+
+  protected def makeInfoPanel(includeTape:Boolean) : JPanel = {
+    val infoPanel = new JPanel(new BorderLayout)
+    val rowPanel = new JPanel()
+    rowPanel.setLayout(new BoxLayout(rowPanel,BoxLayout.Y_AXIS))
+    for(d <- 0 until TOTAL_DRIVES) {
+      val row1Panel = new JPanel(new FlowLayout(FlowLayout.RIGHT,5,2))
+      rowPanel.add(row1Panel)
+      if (d == 0 && includeTape) {
+        val tapePanel = new TapeState(datassette)
+        datassette.setTapeListener(tapePanel)
+        row1Panel.add(tapePanel)
+        row1Panel.add(tapePanel.progressBar)
+      }
+      row1Panel.add(diskProgressPanels(d))
+      row1Panel.add(driveLeds(d))
+    }
+    infoPanel.add("East",rowPanel)
+    infoPanel
   }
 
   protected def swing(f: => Unit) : Unit = SwingUtilities.invokeAndWait(() => f)
@@ -591,6 +619,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     val canvas = new D64Canvas(fc,getCharROM,c64Mode)
     val sp = new javax.swing.JScrollPane(canvas)
     canvas.sp = sp
+    fc.setDialogTitle(s"Attach disk to drive ${driveID + 8}")
     fc.setAccessory(sp)
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
@@ -762,37 +791,32 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
+  protected def initializedDrives : Unit = {
+    for(d <- 0 until TOTAL_DRIVES) {
+      initDrive(d,DriveType._1541)
+      if (d > 0) drivesEnabled(d) = false
+      floppyComponents(d) = new FloppyComponent(8 + d,drives(d),driveLeds(d))
+      add(floppyComponents(d))
+      add(driveLeds(d))
+    }
+  }
+
   protected def initDrive(id:Int,driveType:DriveType.Value) : Unit = {
     val old = Option(drives(id))
     old match {
       case Some(od) if od.driveType == driveType => return
       case _ =>
     }
-    id match {
-      case 0 =>
-        drives(0) = driveType match {
-          case DriveType._1571 =>
-            DriveLed8Listener.setPowerLedMode(false)
-            new D1571(0x00,bus,DriveLed8Listener,_ => {})
-          case DriveType._1541 =>
-            DriveLed8Listener.setPowerLedMode(false)
-            new C1541(0x00,bus,DriveLed8Listener)
-          case DriveType._1581 =>
-            DriveLed8Listener.setPowerLedMode(true)
-            new D1581(0x00,bus,DriveLed8Listener)
-        }
-      case 1 =>
-        drives(1) = driveType match {
-          case DriveType._1571 =>
-            DriveLed9Listener.setPowerLedMode(false)
-            new D1571(0x01,bus,DriveLed9Listener,_ => {})
-          case DriveType._1541 =>
-            DriveLed9Listener.setPowerLedMode(false)
-            new C1541(0x01,bus,DriveLed9Listener)
-          case DriveType._1581 =>
-            DriveLed9Listener.setPowerLedMode(true)
-            new D1581(0x01,bus,DriveLed9Listener)
-        }
+    drives(id) = driveType match {
+      case DriveType._1571 =>
+        driveLedListeners(id).setPowerLedMode(false)
+        new D1571(id,bus,driveLedListeners(id),_ => {})
+      case DriveType._1541 =>
+        driveLedListeners(id).setPowerLedMode(false)
+        new C1541(id,bus,driveLedListeners(id))
+      case DriveType._1581 =>
+        driveLedListeners(id).setPowerLedMode(true)
+        new D1581(id,bus,driveLedListeners(id))
     }
 
     old match {
@@ -850,31 +874,31 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   protected def writeOnDiskSetting(enabled:Boolean) : Unit = {
     canWriteOnDisk = enabled
-    for(d <- 0 to 1) drives(d).getFloppy.canWriteOnDisk = canWriteOnDisk
+    for(d <- 0 until TOTAL_DRIVES) drives(d).getFloppy.canWriteOnDisk = canWriteOnDisk
   }
 
-  protected def enableDrive10(enabled:Boolean,fn:Option[String]) : Unit = {
+  protected def enableDrive12(enabled:Boolean, fn:Option[String]) : Unit = {
     if (enabled) {
-      device10Drive = new LocalDrive(bus,10)
+      device12Drive = new LocalDrive(bus,12)
       changeLocalDriveDir(fn)
     }
-    device10DriveEnabled = enabled
+    device12DriveEnabled = enabled
   }
 
   protected def changeLocalDriveDir(fileName:Option[String] = None) : Unit = {
     fileName match {
       case None =>
         val fc = new JFileChooser
-        fc.setCurrentDirectory(device10Drive.asInstanceOf[LocalDrive].getCurrentDir)
+        fc.setCurrentDirectory(device12Drive.asInstanceOf[LocalDrive].getCurrentDir)
         fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
-        fc.setDialogTitle("Choose the current device 10 local directory")
+        fc.setDialogTitle("Choose the current device 12 local directory")
         fc.showOpenDialog(displayFrame) match {
           case JFileChooser.APPROVE_OPTION =>
-            device10Drive.asInstanceOf[LocalDrive].setCurrentDir(fc.getSelectedFile)
+            device12Drive.asInstanceOf[LocalDrive].setCurrentDir(fc.getSelectedFile)
           case _ =>
         }
       case Some(fn) =>
-        device10Drive.asInstanceOf[LocalDrive].setCurrentDir(new File(fn))
+        device12Drive.asInstanceOf[LocalDrive].setCurrentDir(new File(fn))
     }
   }
 
@@ -1395,31 +1419,32 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     autorunDiskItem.addActionListener(_ => attachDisk(0,true,true) )
     fileMenu.add(autorunDiskItem)
 
-    val attachDisk0Item = new JMenuItem("Attach disk 8...")
-    attachDisk0Item.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_8,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    attachDisk0Item.addActionListener(_ => attachDisk(0,false,true) )
-    fileMenu.add(attachDisk0Item)
-    val attachDisk1Item = new JMenuItem("Attach disk 9...")
-    attachDisk1Item.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_9,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    attachDisk1Item.addActionListener(_ => attachDisk(1,false,true) )
-    fileMenu.add(attachDisk1Item)
+    val attackDiskItem = new JMenu("Attach disk ...")
+    fileMenu.add(attackDiskItem)
+    for(d <- 0 until TOTAL_DRIVES) {
+      val attachDisk0Item = new JMenuItem(s"Attach disk ${d + 8}...")
+      val key = if (d > 1) java.awt.event.KeyEvent.VK_0 + (d - 2) else java.awt.event.KeyEvent.VK_8 + d
+      attachDisk0Item.setAccelerator(KeyStroke.getKeyStroke(key,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK))
+      attachDisk0Item.addActionListener(_ => attachDisk(d,false,isC64Mode) )
+      attackDiskItem.add(attachDisk0Item)
+    }
     // For settings see below, after drive type
 
     val ejectMenu = new JMenu("Eject disk")
     fileMenu.add(ejectMenu)
-    val ejectDisk0Item = new JMenuItem("Eject disk 8...")
-    ejectDisk0Item.addActionListener(_ => ejectDisk(0) )
-    ejectMenu.add(ejectDisk0Item)
-    val ejectDisk1Item = new JMenuItem("Eject disk 9...")
-    ejectDisk1Item.addActionListener(_ => ejectDisk(1) )
-    ejectMenu.add(ejectDisk1Item)
+    for(d <- 0 until TOTAL_DRIVES) {
+      val ejectDisk0Item = new JMenuItem(s"Eject disk ${d + 8} ...")
+      ejectDisk0Item.addActionListener(_ => ejectDisk(d) )
+      ejectMenu.add(ejectDisk0Item)
+    }
 
-    loadFileItems(0).setEnabled(false)
-    loadFileItems(0).addActionListener(_ => loadFileFromAttachedFile(0,true,true) )
-    fileMenu.add(loadFileItems(0))
-    loadFileItems(1).setEnabled(false)
-    loadFileItems(1).addActionListener(_ => loadFileFromAttachedFile(1,true,true) )
-    fileMenu.add(loadFileItems(1))
+    val loadFileItem = new JMenu("Fast load from attached disk ...")
+    fileMenu.add(loadFileItem)
+    for(d <- 0 until TOTAL_DRIVES) {
+      loadFileItems(d).setEnabled(false)
+      loadFileItems(d).addActionListener(_ => loadFileFromAttachedFile(d,true,isC64Mode) )
+      loadFileItem.add(loadFileItems(d))
+    }
     fileMenu.addSeparator
 
     val prgAsDiskItem = new JCheckBoxMenuItem("Load PRG as D64")
@@ -1446,38 +1471,40 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     fileMenu.add(savePrgItem)
 
     // Setting ---------------------------
-    settings.add("drive9-enabled",
-      "Enabled/disable driver 9",
-      "DRIVE_9_ENABLED",
-      (d9e:Boolean) => {
-        enableDrive(1,d9e,false)
-      },
-      drivesEnabled(1)
-    )
+    for(d <- 1 until TOTAL_DRIVES) {
+      settings.add(s"drive${8 + d}-enabled",
+        s"Enabled/disable driver ${8 + d}",
+        s"DRIVE_${8 + d}_ENABLED",
+        (de: Boolean) => {
+          enableDrive(d, de, false)
+        },
+        drivesEnabled(d)
+      )
+    }
     // Setting ---------------------------
 
-    val localDriveItem = new JMenu("Drive on device 10 ...")
+    val localDriveItem = new JMenu("Drive on device 12 ...")
     fileMenu.add(localDriveItem)
     val group0 = new ButtonGroup
     val noLocalDriveItem = new JRadioButtonMenuItem("Disabled")
     noLocalDriveItem.setSelected(true)
-    noLocalDriveItem.addActionListener(_ => enableDrive10(false,None) )
+    noLocalDriveItem.addActionListener(_ => enableDrive12(false,None) )
     group0.add(noLocalDriveItem)
     localDriveItem.add(noLocalDriveItem)
     val localDriveEnabled = new JRadioButtonMenuItem("Local drive ...")
-    localDriveEnabled.addActionListener(_ => enableDrive10(true,None) )
+    localDriveEnabled.addActionListener(_ => enableDrive12(true,None) )
     group0.add(localDriveEnabled)
     localDriveItem.add(localDriveEnabled)
     // Setting ---------------------------
-    settings.add("drive10-local-path",
-      "Enabled driver 10 to the given local path",
+    settings.add("drive12-local-path",
+      "Enabled driver 12 to the given local path",
       "DRIVE_10_PATH",
       (d10p:String) => {
         val enabled = d10p != ""
-        enableDrive10(enabled,if (enabled) Some(d10p) else None)
+        enableDrive12(enabled,if (enabled) Some(d10p) else None)
         localDriveEnabled.setSelected(enabled)
       },
-      if (device10DriveEnabled) device10Drive.asInstanceOf[LocalDrive].getCurrentDir.toString
+      if (device12DriveEnabled) device12Drive.asInstanceOf[LocalDrive].getCurrentDir.toString
       else ""
     )
     // -----------------------------------
@@ -1940,7 +1967,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setDrivesSettings : Unit = {
-    for(drive <- 0 to 1) {
+    for(drive <- 0 until TOTAL_DRIVES) {
       // Setting ---------------------------
       settings.add(s"drive${drive + 8}-type",
         "Set the driver's type (1541,1571,1581)",

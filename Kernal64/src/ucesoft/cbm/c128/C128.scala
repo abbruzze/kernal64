@@ -84,9 +84,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     RS232ConfigPanel.registerAvailableRS232Drivers(displayFrame,AVAILABLE_RS232)
     ExpansionPort.addConfigurationListener(mmu)       
     // drive
-    initDrive(0,DriveType._1571)
-    initDrive(1,DriveType._1571)
-    drivesEnabled(1) = false
+    initializedDrives
     // -----------------------
     ProgramLoader.cpu = cpu
     ProgramLoader.warpModeListener = warpMode _
@@ -102,11 +100,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     add(controlPortB)
     add(bus)
     add(expansionPort)
-    add(rs232)    
-    floppyComponents(0) = new FloppyComponent(8,drives(0),driveLeds(0))
-    add(floppyComponents(0))
-    floppyComponents(1) = new FloppyComponent(9,drives(1),driveLeds(1))
-    add(floppyComponents(1))
+    add(rs232)
     // -----------------------
     val vicMemory = mmu
     ExpansionPort.setMemoryForEmptyExpansionPort(mmu)
@@ -240,9 +234,6 @@ class C128 extends CBMComputer with MMUChangeListener {
     val lightPen = new LightPenButtonListener    
     add(lightPen)
     display.addMouseListener(lightPen)
-    // drive leds
-    add(driveLeds(0))        
-    add(driveLeds(1))       
     configureJoystick
     // tracing
     if (!headless) {
@@ -259,26 +250,8 @@ class C128 extends CBMComputer with MMUChangeListener {
     add(printer)
     // Flyer
     add(flyerIEC)
-    
-    // info panel
-    val infoPanel = new JPanel(new BorderLayout)
-    val rowPanel = new JPanel(new BorderLayout(0,0))
-    val row1Panel = new JPanel(new FlowLayout(FlowLayout.RIGHT))
-    val row2Panel = new JPanel(new FlowLayout(FlowLayout.RIGHT))
-    rowPanel.add("North",row1Panel)
-    rowPanel.add("South",row2Panel)
-    val tapePanel = new TapeState(datassette)
-    datassette.setTapeListener(tapePanel)
-    row1Panel.add(tapePanel)
-    row1Panel.add(tapePanel.progressBar)
-    row1Panel.add(diskProgressPanels(0))
-    row1Panel.add(driveLeds(0))
-    row2Panel.add(diskProgressPanels(1))
-    row2Panel.add(driveLeds(1))
-    infoPanel.add("East",rowPanel)
-    infoPanel.add("West",mmuStatusPanel)
-    mmuStatusPanel.setVisible(false)
-    displayFrame.getContentPane.add("South",infoPanel)
+
+    displayFrame.getContentPane.add("South",makeInfoPanel(true))
     displayFrame.setTransferHandler(DNDHandler)    
     Log.info(sw.toString)
 
@@ -319,10 +292,12 @@ class C128 extends CBMComputer with MMUChangeListener {
   }
   
   override def afterInitHook  : Unit = {
-	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)    
-    // deactivate drive 9
-    drives(1).setActive(false)    
-    driveLeds(1).setVisible(false)
+	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)
+    // deactivate drives > 8
+    for(d <- 1 until TOTAL_DRIVES) {
+      drives(d).setActive(false)
+      driveLeds(d).setVisible(false)
+    }
     // set the correct CPU configuration
     cpuChanged(false)
   }
@@ -340,7 +315,7 @@ class C128 extends CBMComputer with MMUChangeListener {
 
       d += 1
     }
-    if (device10DriveEnabled) device10Drive.clock(cycles)
+    if (device12DriveEnabled) device12Drive.clock(cycles)
     // printer
     if (printerEnabled) printer.clock(cycles)
     // Flyer
