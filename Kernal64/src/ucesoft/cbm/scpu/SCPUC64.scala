@@ -39,7 +39,6 @@ class SCPUC64 extends CBMComputer {
   override protected lazy val cpu = new CPU65816(mmu)
   protected val busSnooper = new BusSnoop(bus)
   protected var busSnooperActive = false
-  protected val c1541 = new C1541Emu(bus, driveLedListeners(0))
 
   private[this] val mmuStatusPanel = new MMUStatusPanel
   private[this] var cpuClocks = 1
@@ -133,7 +132,6 @@ class SCPUC64 extends CBMComputer {
     add(lightPen)
     display.addMouseListener(lightPen)
     configureJoystick
-    add(c1541)
     // tracing
     if (!headless) {
       traceDialog = TraceDialog.getTraceDialog("CPU Debugger", displayFrame, mmu, cpu, display, vicChip)
@@ -290,11 +288,6 @@ class SCPUC64 extends CBMComputer {
       val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
       if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
       val isD64 = file.getName.toUpperCase.endsWith(".D64")
-      if (drives(driveID) == c1541 && !isD64) {
-
-        showError("Disk attaching error", "Format not allowed on a 1541 not in true emulation mode")
-        return
-      }
       val disk = Diskette(file.toString)
       disk.canWriteOnDisk = canWriteOnDisk
       disk.flushListener = diskFlusher

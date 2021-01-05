@@ -614,6 +614,23 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
+  protected def attachLocalDir(driveID:Int) : Unit = {
+    val fc = new JFileChooser
+    val canvas = new D64Canvas(fc,getCharROM,isC64Mode)
+    val sp = new javax.swing.JScrollPane(canvas)
+    canvas.sp = sp
+    fc.setDialogTitle(s"Attach local directory to drive ${driveID + 8}")
+    fc.setAccessory(sp)
+    fc.setFileView(new C64FileView)
+    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+    fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
+    fc.showOpenDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        attachDiskFile(driveID,fc.getSelectedFile,false,canvas.selectedFile)
+      case _ =>
+    }
+  }
+
   protected def attachDisk(driveID:Int,autorun:Boolean,c64Mode:Boolean) : Unit = {
     val fc = new JFileChooser
     val canvas = new D64Canvas(fc,getCharROM,c64Mode)
@@ -1427,6 +1444,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       attachDisk0Item.setAccelerator(KeyStroke.getKeyStroke(key,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK))
       attachDisk0Item.addActionListener(_ => attachDisk(d,false,isC64Mode) )
       attackDiskItem.add(attachDisk0Item)
+    }
+
+    val attackLocalDiskItem = new JMenu("Attach local directory as disk ...")
+    fileMenu.add(attackLocalDiskItem)
+    for(d <- 0 until TOTAL_DRIVES) {
+      val attachDisk0Item = new JMenuItem(s"Attach local directory on disk ${d + 8}...")
+      attachDisk0Item.addActionListener(_ => attachLocalDir(d) )
+      attackLocalDiskItem.add(attachDisk0Item)
     }
     // For settings see below, after drive type
 

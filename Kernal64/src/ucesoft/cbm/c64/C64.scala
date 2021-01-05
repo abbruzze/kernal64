@@ -36,7 +36,6 @@ class C64 extends CBMComputer {
   protected val mmu = new C64MMU.MAIN_MEMORY
   protected val busSnooper = new BusSnoop(bus)
   protected var busSnooperActive = false
-  protected val c1541 = new C1541Emu(bus,driveLedListeners(0))
 
   def reset  : Unit = {
     dma = false
@@ -120,7 +119,6 @@ class C64 extends CBMComputer {
     add(lightPen)
     display.addMouseListener(lightPen)
     configureJoystick
-    add(c1541)
     // tracing
     if (!headless) {
       traceDialog = TraceDialog.getTraceDialog("CPU Debugger", displayFrame, mmu, cpu, display, vicChip)
@@ -260,15 +258,13 @@ class C64 extends CBMComputer {
   protected def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String],emulateInserting:Boolean = true) : Unit = {
     try {   
       if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
-      val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
-      if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
-      val isD64 = file.getName.toUpperCase.endsWith(".D64")
-      if (drives(driveID) == c1541 && !isD64) {
-        
-        showError("Disk attaching error","Format not allowed on a 1541 not in true emulation mode")
-        return
+      if (!file.isDirectory) {
+        val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
+        if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
       }
-      val disk = Diskette(file.toString)
+      val isD64 = file.getName.toUpperCase.endsWith(".D64") || file.isDirectory
+
+      val disk = if (file.isDirectory) D64LocalDirectory.createDiskFromLocalDir(file) else Diskette(file.toString)
       disk.canWriteOnDisk = canWriteOnDisk
       disk.flushListener = diskFlusher
       drives(driveID).getFloppy.close
