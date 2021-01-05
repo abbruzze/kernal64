@@ -140,7 +140,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   override def flush  : Unit = {
     if (sectorModified && canWriteOnDisk) {
       sectorModified = false
-      flushListener.flushing(file.toString,{
+      flushListener.flushing(file,{
         val gcrTrack = new collection.mutable.ArrayBuffer[Int](400 * 20)
         val tracks = TOTAL_TRACKS
         for(t <- 1 to tracks) {
@@ -216,8 +216,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   private[this] var trackChangeListener : Floppy#TrackListener = null
   private[this] var bit = 1
   private[this] var _side = 0
-  private[this] var trackSideBase = 0
-  
+
   override def isOnIndexHole = gcrIndex > 0 && gcrIndex < 3
   
   override def minTrack = _side match {
@@ -232,6 +231,8 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     case 1 =>
       totalTracks
   }
+
+  def isModified : Boolean = sectorModified
   
   override def side = _side
   override def side_=(newSide:Int) : Unit = {
@@ -269,7 +270,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     if (bit == 8) rotate else bit += 1
     b
   }
-  final def writeNextBit(value:Boolean) : Unit = {
+  def writeNextBit(value:Boolean) : Unit = {
     sectorModified = true
     trackSectorModified(track,sector)
     val mask = 1 << (8 - bit)
@@ -277,7 +278,10 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     if (bit == 8) rotate else bit += 1
   }
   final def nextByte : Int = gcrSector(gcrIndex)
-  final def writeNextByte(b:Int) = gcrSector(gcrIndex) = b & 0xFF  
+  def writeNextByte(b:Int) = {
+    gcrSector(gcrIndex) = b & 0xFF
+    sectorModified = true
+  }
   
   @inline private def rotate  : Unit = {
     bit = 1
@@ -416,7 +420,8 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
       val diff = file.length - fileOffset
       if (sectors.tail.isEmpty) {
         disk.write(0)
-        disk.write(diff + 1)
+        val lastByte = if (firstTrackSector) 3 + diff else 1 + diff
+        disk.write(lastByte)
       }
       else {
         val (nt,ns) = sectors.tail.head
@@ -523,14 +528,14 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     bam(pos + 3) = ((modSectorsMap >> 16) & 0xFF).toByte
   }
 
-  private def readSectorBuffer(t:Int,s:Int) : Array[Byte] = {
+  protected def readSectorBuffer(t:Int,s:Int) : Array[Byte] = {
     val buffer = Array.ofDim[Byte](256)
     disk.seek(absoluteSector(t, s) * BYTES_PER_SECTOR)
     disk.read(buffer)
     buffer
   }
 
-  private def writeSectorBuffer(t:Int,s:Int,sector:Array[Byte]) : Unit = {
+  protected def writeSectorBuffer(t:Int,s:Int,sector:Array[Byte]) : Unit = {
     disk.seek(absoluteSector(t, s) * BYTES_PER_SECTOR)
     disk.write(sector)
   }
