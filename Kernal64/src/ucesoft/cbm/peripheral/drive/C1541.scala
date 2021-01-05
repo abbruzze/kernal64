@@ -17,7 +17,7 @@ import ucesoft.cbm.ClockEvent
 
 class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends TraceListener with Drive {
   val driveType = DriveType._1541
-  val componentID = "C1541 Disk Drive " + jackID
+  val componentID = "C1541 Disk Drive " + (jackID + 8)
   val formatExtList = List("D64","D71","G64")
   override val MIN_SPEED_HZ = 985248
   override val MAX_SPEED_HZ = 1000000
@@ -25,7 +25,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] val LOAD_ROUTINE = 0xD7B4
   private[this] val WAIT_LOOP_ROUTINE = 0xEBFF//0xEC9B //0xEBFF//0xEC9B
   private[this] val WAIT_CYCLES_FOR_STOPPING = 2000000
-  private[this] val GO_SLEEPING_MESSAGE_CYCLES = 3000000
   private[this] var CYCLE_ADJ = 0.0 //(MAX_SPEED_MHZ - MIN_SPEED_MHZ) / MIN_SPEED_MHZ.toDouble
   private[this] var currentSpeedHz = MIN_SPEED_HZ
   private[this] var cycleFrac = 0.0
@@ -34,7 +33,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   private[this] val clk = Clock.systemClock
   private[this] var running = true
   private[this] var awakeCycles = 0L
-  private[this] var goSleepingCycles = 0L
   private[this] var tracing = false
   private[this] var canSleep = true
   private[this] var floppy : Floppy = EmptyFloppy
@@ -202,9 +200,9 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
           RW_HEAD.setMotor(motorOn)
           if (ledListener != null) {
             if (ledOn) ledListener.turnOn else ledListener.turnOff
-            if (!motorOn) {
+            if (lastMotorOn && !motorOn) {
+              RW_HEAD.setCurrentFileName("")
               ledListener.endLoading
-              if (lastMotorOn && !motorOn) RW_HEAD.setCurrentFileName("")
             }
           }
           val newSpeedZone = (value & 0xFF) >> 5 & 0x3
@@ -313,7 +311,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     running = true
     runningListener(true)
     awakeCycles = 0
-    goSleepingCycles = 0
     cycleFrac = 0.0
     if (ledListener != null) ledListener.turnOn
   }
@@ -377,8 +374,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       runningListener(false)
       viaBus.setActive(false)
       viaDisk.setActive(false)
-      goSleepingCycles = cycles
-      //ledListener.beginLoadingOf("Disk go sleeping...")
+      ledListener.endLoading
     }
   }
 
@@ -401,9 +397,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       viaDisk.clock(cycles)
       viaBus.clock(cycles)
       if (RW_HEAD.rotate) viaDisk.byteReady
-    } else if (cycles - goSleepingCycles > GO_SLEEPING_MESSAGE_CYCLES) {
-      ledListener.endLoading
-      goSleepingCycles = Long.MaxValue
     }
   }
 
@@ -441,7 +434,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     out.writeDouble(cycleFrac)
     out.writeBoolean(running)
     out.writeLong(awakeCycles)
-    out.writeLong(goSleepingCycles)
     out.writeBoolean(canSleep)
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
@@ -454,7 +446,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     running = in.readBoolean
     runningListener(running)
     awakeCycles = in.readLong
-    goSleepingCycles = in.readLong
     canSleep = in.readBoolean
   }
   protected def allowsStateRestoring : Boolean = true

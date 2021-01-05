@@ -27,7 +27,7 @@ class D1571(val driveID: Int,
             TraceListener with 
             Drive {
   val driveType = DriveType._1571
-  val componentID = "D1571 Disk Drive " + driveID
+  val componentID = "D1571 Disk Drive " + (driveID + 8)
   val formatExtList = List("D64","D71","G64")
   override val MIN_SPEED_HZ = 985248
   override val MAX_SPEED_HZ = 1000000
@@ -41,7 +41,6 @@ class D1571(val driveID: Int,
   private[this] val _1541_LOAD_ROUTINE = 0xD7B4
   private[this] val _1541_WAIT_LOOP_ROUTINE = 0xEBFF
   private[this] val WAIT_CYCLES_FOR_STOPPING = 2000000
-  private[this] final val GO_SLEEPING_MESSAGE_CYCLES = 3000000
   private[this] val clk = Clock.systemClock
   private[this] var running = true
   private[this] var tracing = false
@@ -51,7 +50,6 @@ class D1571(val driveID: Int,
   private[this] var busDataDirection = 0 // VIA1 PA1 Output
   private[this] var activeHead = 0       // VIA1 PA2 Output
   private[this] var awakeCycles = 0L
-  private[this] var goSleepingCycles = 0L
   private[this] var canSleep = true
   private[this] var CYCLE_ADJ = 0.0 //(MAX_SPEED_MHZ - MIN_SPEED_MHZ) / MIN_SPEED_MHZ.toDouble
   private[this] var currentSpeedHz = MIN_SPEED_HZ
@@ -467,7 +465,6 @@ class D1571(val driveID: Int,
     running = true
     runningListener(true)
     awakeCycles = 0
-    goSleepingCycles = 0
     cycleFrac = 0.0
     if (ledListener != null) ledListener.turnOn
     ciaRunning = true
@@ -505,7 +502,7 @@ class D1571(val driveID: Int,
       runningListener(false)
       VIA1.setActive(false)
       VIA2.setActive(false)
-      goSleepingCycles = cycles
+      ledListener.endLoading
     }
   }
   
@@ -531,11 +528,6 @@ class D1571(val driveID: Int,
       
       if (RW_HEAD.rotate) VIA2.byteReady
       WD1770.clock
-    }
-    else
-    if (cycles - goSleepingCycles > GO_SLEEPING_MESSAGE_CYCLES) {
-      ledListener.endLoading
-      goSleepingCycles = Long.MaxValue
     }
   }
   

@@ -108,7 +108,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
   }
   @inline private def fmt2(i:Int) : String = if (i < 10) "0" + i else i.toString
   private def updateTrackSectorLabelProgress(track:Int,halfTrack:Boolean,sector:Option[Int]) : Unit = {
-    if (ledListener != null) {      
+    if (ledListener != null && motorOn) {
       sector match {
         case None =>
           if (track != lastNotifiedTrack) {
