@@ -13,6 +13,32 @@ import javax.swing.JFrame
 import ucesoft.cbm.cpu.Memory
 
 object Keyboard {
+  private var keybThread : KeyboardThread = _
+  private var keybThreadRunning = false
+
+  private class KeyboardThread(txt:String,mem:Memory,c64Mode:Boolean) extends Thread {
+    override def run : Unit = {
+      keybThreadRunning = true
+      val maxLenAddr = if (c64Mode) 649 else 2592
+      val bufferAddr = if (c64Mode) 631 else 842
+      val lenAddr = if (c64Mode) 198 else 208
+
+      val len = mem.read(maxLenAddr)
+      var strpos = 0
+      while (keybThreadRunning && strpos < txt.length) {
+        val size = if (len < txt.length - strpos) len else txt.length - strpos
+        for(i <- 0 until size) {
+          val c = txt.charAt(strpos).toUpper
+          mem.write(bufferAddr + i,if (c != '\n') c else 0x0D)
+          strpos += 1
+        }
+        mem.write(lenAddr,size)
+        while (keybThreadRunning && mem.read(lenAddr) > 0) Thread.sleep(1)
+      }
+      keybThreadRunning = false
+    }
+  }
+
   def insertSmallTextIntoKeyboardBuffer(txt:String,mem:Memory,c64Mode:Boolean) : Unit = {
     val bufferAddr = if (c64Mode) 631 else 842
     val lenAddr = if (c64Mode) 198 else 208
@@ -23,27 +49,9 @@ object Keyboard {
   }
 
   def insertTextIntoKeyboardBuffer(txt:String,mem:Memory,c64Mode:Boolean): Unit = {
-    new Thread {
-      val maxLenAddr = if (c64Mode) 649 else 2592
-      val bufferAddr = if (c64Mode) 631 else 842
-      val lenAddr = if (c64Mode) 198 else 208
-      override def run : Unit = {
-        val len = mem.read(maxLenAddr)
-        var strpos = 0
-        while (strpos < txt.length) {
-          val size = if (len < txt.length - strpos) len else txt.length - strpos
-          for(i <- 0 until size) {
-            val c = txt.charAt(strpos).toUpper
-            mem.write(bufferAddr + i,if (c != '\n') c else 0x0D)
-            strpos += 1
-          }
-          mem.write(lenAddr,size)
-          val ts = System.currentTimeMillis
-          // wait max 10 secs...
-          while (mem.read(lenAddr) > 0 && System.currentTimeMillis - ts < 10000) Thread.sleep(1)
-        }
-      }
-    }.start
+    if (keybThreadRunning) keybThreadRunning = false
+    keybThread = new KeyboardThread(txt,mem,c64Mode)
+    keybThread.start
   }
 }
 
@@ -83,6 +91,7 @@ class Keyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) => Un
     for(i <- 0 until rowSelector.length) rowSelector(i) = false
     for(i <- 0 until rowSelector.length) c128ExtendedRowSelector(i) = false
     for(i <- 0 until rowSelector.length) colSelector(i) = false
+    Keyboard.keybThreadRunning = false
   }
     
   override def getProperties = {
