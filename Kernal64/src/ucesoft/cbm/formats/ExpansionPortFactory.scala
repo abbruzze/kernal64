@@ -763,26 +763,26 @@ object ExpansionPortFactory {
   def loadExpansionPort(crtName: String, irqAction: (Boolean) => Unit, nmiAction: (Boolean) => Unit, ram: Memory,config:Properties): ExpansionPort = {
     val crt = new Cartridge(crtName)
     crt.ctrType match {
-      case 1 => new Type1CartridgeExpansionPort(crt,nmiAction,ram)
-      case 3 => new Type3CartridgeExpansionPort(crt, nmiAction,ram)
-      case 0 => new CartridgeExpansionPort(crt,ram)
-      case 4 => new SimonsBasicCartridgeExpansionPort(crt,ram)
-      case 21 => new Comal80CartridgeExpansionPort(crt,ram)
-      case 19 => new Type19CartridgeExpansionPort(crt,ram)
-      case 17 => new Type17CartridgeExpansionPort(crt,ram)
-      case 15 => new Type15CartridgeExpansionPort(crt,ram)
-      case 16 => new Type16CartridgeExpansionPort(crt,ram)
-      case 32 => new Type32CartridgeExpansionPort(crt,ram)
-      case 5 => new Type5CartridgeExpansionPort(crt,ram)
-      case 7 => new Type7CartridgeExpansionPort(crt,ram)
-      case 8 => new Type8CartridgeExpansionPort(crt,ram)
-      case 10 => new Type10CartridgeExpansionPort(crt,ram)
-      case 13 => new Type13CartridgeExpansionPort(crt,ram)
-      case 20 => new Type20CartridgeExpansionPort(crt,nmiAction,ram)
-      case 60 => new GMOD2CartridgeExpansionPort(crt,ram,config)
-      case 18 => new Type18CartridgeExpansionPort(crt,ram)
-      case 51 => new Type51CartridgeExpansionPort(crt,ram)
-      case 53 => new Type53CartridgeExpansionPort(crt,ram)
+      case 1 => new Type1CartridgeExpansionPort(crt,nmiAction,ram)        // ActionReplay
+      case 3 => new Type3CartridgeExpansionPort(crt, nmiAction,ram)       // Final Cartridge III
+      case 0 => new CartridgeExpansionPort(crt,ram)                       // default
+      case 4 => new SimonsBasicCartridgeExpansionPort(crt,ram)            // Simon's Basic
+      case 21 => new Comal80CartridgeExpansionPort(crt,ram)               // Comal 80
+      case 19 => new Type19CartridgeExpansionPort(crt,ram)                // Magic Desk
+      case 17 => new Type17CartridgeExpansionPort(crt,ram)                // Dinamic
+      case 15 => new Type15CartridgeExpansionPort(crt,ram)                // Game System
+      case 16 => new Type16CartridgeExpansionPort(crt,ram)                // Warp Speed
+      case 32 => new Type32CartridgeExpansionPort(crt,ram)                // Easy Flash
+      case 5 => new Type5CartridgeExpansionPort(crt,ram)                  // Ocean Type 1
+      case 7 => new Type7CartridgeExpansionPort(crt,ram)                  // Fun Play
+      case 8 => new Type8CartridgeExpansionPort(crt,ram)                  // Super Games
+      case 10 => new Type10CartridgeExpansionPort(crt,ram)                // Epyx Fastload
+      case 13 => new Type13CartridgeExpansionPort(crt,ram)                // Final Cartridge I
+      case 20 => new Type20CartridgeExpansionPort(crt,nmiAction,ram)      // Super Snapshot V5
+      case 60 => new GMOD2CartridgeExpansionPort(crt,ram,config)          // GMOD 2
+      case 18 => new Type18CartridgeExpansionPort(crt,ram)                // Zaxxon
+      case 51 => new Type51CartridgeExpansionPort(crt,ram)                // Mach 5
+      case 53 => new Type53CartridgeExpansionPort(crt,ram)                // Page Fox
       case _ =>        
         throw new IllegalArgumentException(s"Unsupported cartridge type ${crt.ctrType} for ${crt.name}")
     }
