@@ -6,6 +6,7 @@ KERNAL64C64OPTS+=" --screen-dim 1"
 KERNAL64C64OPTS+=" --cpujam-continue true"
 KERNAL64C64OPTS+=" --sid-cycle-exact"
 KERNAL64C64OPTS+=" --ignore-config-file"
+KERNAL64C64OPTS+=" --prg-as-disk"
 
 function kernal64c64_check_environment
 {
