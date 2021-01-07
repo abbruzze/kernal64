@@ -62,7 +62,7 @@ object ExpansionPortFactory {
     def ROML = if (romlBanks.size > 0) romlBanks(romlBankIndex) else null
     def ROMH = if (romhBanks.size > 0) romhBanks(romhBankIndex) else null
 
-    override def toString = s"ExpansionPort{crt=${crt} game=${game} exrom=${exrom} romlBanks=${romlBanks.mkString("<", ",", ">")} romhBanks=${romhBanks.mkString("<", ",", ">")}}"
+    override def toString = s"ExpansionPort{crt=${crt} game=${game} exrom=${exrom}\n\tromlBanks=${romlBanks.mkString("<", "\n\t\t", ">")}\n\tromhBanks=${romhBanks.mkString("<", "\n\t\t", ">")}}"
 
     override def saveState(out: ObjectOutputStream): Unit = {
       crt.saveState(out)
@@ -401,8 +401,8 @@ object ExpansionPortFactory {
         if ((address & 2) == 0) {//(address == 0xDE00) {
           val bank = value & 0x3F
           //println(s"Selecting bank $bank")
-          romlBankIndex = bank
-          romhBankIndex = bank
+          if (romlBanks.contains(bank)) romlBankIndex = bank
+          if (romhBanks.contains(bank)) romhBankIndex = bank
         }
         else 
         /*if (address == 0xDE02)*/ {
