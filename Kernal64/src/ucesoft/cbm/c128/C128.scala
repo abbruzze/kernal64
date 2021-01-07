@@ -84,7 +84,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     RS232ConfigPanel.registerAvailableRS232Drivers(displayFrame,AVAILABLE_RS232)
     ExpansionPort.addConfigurationListener(mmu)       
     // drive
-    initializedDrives
+    initializedDrives(DriveType._1571)
     // -----------------------
     ProgramLoader.cpu = cpu
     ProgramLoader.warpModeListener = warpMode _
@@ -310,7 +310,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     if (cia12Running(1)) cia2.clock(false)
     //DRIVES
     var d = 0
-    while (d < 2) {
+    while (d < TOTAL_DRIVES) {
       if (drivesEnabled(d) && drivesRunning(d)) drives(d).clock(cycles)
 
       d += 1

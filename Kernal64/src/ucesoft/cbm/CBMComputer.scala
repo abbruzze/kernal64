@@ -808,9 +808,9 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
   }
 
-  protected def initializedDrives : Unit = {
+  protected def initializedDrives(defaultDriveType:DriveType.Value) : Unit = {
     for(d <- 0 until TOTAL_DRIVES) {
-      initDrive(d,DriveType._1541)
+      initDrive(d,defaultDriveType)
       if (d > 0) drivesEnabled(d) = false
       floppyComponents(d) = new FloppyComponent(8 + d,drives(d),driveLeds(d))
       add(floppyComponents(d))

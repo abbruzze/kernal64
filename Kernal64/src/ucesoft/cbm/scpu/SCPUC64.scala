@@ -68,7 +68,7 @@ class SCPUC64 extends CBMComputer {
     RS232ConfigPanel.registerAvailableRS232Drivers(displayFrame, AVAILABLE_RS232)
     ExpansionPort.addConfigurationListener(mmu)
     // drive
-    initializedDrives
+    initializedDrives(DriveType._1541)
     // -----------------------
     ProgramLoader.cpu = cpu
     ProgramLoader.warpModeListener = warpMode _
