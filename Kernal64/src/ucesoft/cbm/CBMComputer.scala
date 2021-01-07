@@ -41,7 +41,7 @@ object CBMComputer {
     catch {
       case i:Settings.SettingIllegalArgumentException =>
         println(s"Bad command line argument: ${i.getMessage}")
-        sys.exit(1)
+        sys.exit(100)
       case t:Throwable =>
         cbm.errorHandler(t)
         if (cbm.isHeadless) sys.exit(1)
