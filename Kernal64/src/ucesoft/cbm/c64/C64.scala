@@ -472,6 +472,8 @@ class C64 extends CBMComputer {
     val gmod2Item = new JMenuItem("GMOD2 eeprom file...")
     gmod2Item.addActionListener(_ => chooseGMod2 )
     IOItem.add(gmod2Item)
+
+    setEasyFlashSettings(IOItem)
     
     IOItem.addSeparator
 

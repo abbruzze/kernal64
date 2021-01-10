@@ -485,6 +485,8 @@ class SCPUC64 extends CBMComputer {
     gmod2Item.addActionListener(_ => chooseGMod2)
     IOItem.add(gmod2Item)
 
+    setEasyFlashSettings(IOItem)
+
     IOItem.addSeparator
 
     setCPMSettings(IOItem)

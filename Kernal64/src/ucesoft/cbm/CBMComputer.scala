@@ -11,6 +11,7 @@ import ucesoft.cbm.cpu.{CPU65xx, Memory, ROM}
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.expansion.cpm.CPMCartridge
 import ucesoft.cbm.formats._
+import ucesoft.cbm.formats.cart.EasyFlash
 import ucesoft.cbm.game.{GamePlayer, GameUI}
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral.bus.IECBus
@@ -2309,5 +2310,13 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     sfmNextFrameItem.addActionListener(_ => display.advanceOneFrame )
     sfmItem.add(sfmNextFrameItem)
     parent.add(sfmItem)
+  }
+
+  protected def setEasyFlashSettings(parent:JMenu) : Unit = {
+    val efMenu = new JMenu("EasyFlash")
+    val jumperItem = new JCheckBoxMenuItem("Easy Flash jumper on")
+    jumperItem.addActionListener( _ => EasyFlash.jumper = jumperItem.isSelected )
+    efMenu.add(jumperItem)
+    parent.add(efMenu)
   }
 }
