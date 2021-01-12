@@ -40,7 +40,7 @@ class ROM(ram: Memory,
       val buffer = Array.ofDim[Byte](length)
       in.readFully(buffer)
       in.close
-      for (i <- 0 until length) mem(i) = buffer(i) & 0xff
+      if (mem != null) for (i <- 0 until length) mem(i) = buffer(i) & 0xff
     }
     else {
       // Loading variable length ROM ...
