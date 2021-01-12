@@ -65,10 +65,11 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   // -------------- MENU ITEMS -----------------
   protected val maxSpeedItem = new JCheckBoxMenuItem("Warp mode")
-  protected val loadFileItems = (for(d <- 0 until TOTAL_DRIVES) yield new JMenuItem(s"Load file from attached disk ${d + 8} ..."))
+  protected val loadFileItems = for(d <- 0 until TOTAL_DRIVES) yield new JMenuItem(s"Load file from attached disk ${d + 8} ...")
   protected val tapeMenu = new JMenu("Tape control...")
   protected val detachCtrItem = new JMenuItem("Detach cartridge")
   protected val cartMenu = new JMenu("Cartridge")
+  protected val easyFlashWriteChangesItem = new JMenuItem("Write changes")
 
   protected val settings = new ucesoft.cbm.misc.Settings
 
@@ -596,13 +597,15 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       ExpansionPort.getExpansionPort.eject
       val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.setLine(Switcher.CRT,_),nmiSwitcher.setLine(Switcher.CRT,_),getRAM,configuration)
       println(ep)
-      if (ep.isFreezeButtonSupported) cartMenu.setVisible(true)
+      cartMenu.setVisible(true)
       ExpansionPort.setExpansionPort(ep)
       ExpansionPort.currentCartFileName = file.toString
       Log.info(s"Attached cartridge ${ExpansionPort.getExpansionPort.name}")
       if (!stateLoading) reset(false)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
       detachCtrItem.setEnabled(true)
+      // easyflash
+      easyFlashWriteChangesItem.setEnabled(ep.isInstanceOf[EasyFlash])
     }
     catch {
       case t:Throwable =>
@@ -791,6 +794,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
     detachCtrItem.setEnabled(false)
     cartMenu.setVisible(false)
+    // easyflash
+    easyFlashWriteChangesItem.setEnabled(false)
     ExpansionPort.currentCartFileName = ""
   }
 
@@ -1138,6 +1143,11 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     JOptionPane.showMessageDialog(displayFrame,about,"About",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
   }
 
+  protected def showSettings : Unit = {
+    val settingsPanel = new SettingsPanel(settings)
+    JOptionPane.showMessageDialog(displayFrame,settingsPanel,"Settings",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
+  }
+
   protected def trace(cpu:Boolean,on:Boolean) : Unit = {
     if (traceDialog == null) return
 
@@ -1282,6 +1292,9 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     setGameMenu(gamesMenu)
     setHelpMenu(helpMenu)
 
+    val cartInfoItem = new JMenuItem("Cart info ...")
+    cartInfoItem.addActionListener(_ => showCartInfo )
+    cartMenu.add(cartInfoItem)
     val cartButtonItem = new JMenuItem("Press cartridge button...")
     cartButtonItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Z,java.awt.event.InputEvent.ALT_DOWN_MASK))
     cartButtonItem.addActionListener(_ => cartButtonRequested = true )
@@ -1362,6 +1375,30 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     settings.add("ignore-config-file",
       "Ignore configuration file and starts emulator with default configuration",
       (ic:Boolean) => ignoreConfig = ic
+    )
+    settings.add("kernel",
+      "Set kernel rom path",
+      (kp:String) => if (kp != null && kp != "") reloadROM(ROM.C64_KERNAL_ROM_PROP,kp)
+    )
+    settings.add("basic",
+      "Set basic rom path",
+      (bp:String) => if (bp != null && bp != "") reloadROM(ROM.C64_BASIC_ROM_PROP,bp)
+    )
+    settings.add("charrom",
+      "Set char rom path",
+      (cp:String) => if (cp != null && cp != "") reloadROM(ROM.C64_CHAR_ROM_PROP,cp)
+    )
+    settings.add("1541dos",
+      "Set 1541 dos rom path",
+      (dp:String) => if (dp != null && dp != "") reloadROM(ROM.D1541_DOS_ROM_PROP,dp)
+    )
+    settings.add("1571dos",
+      "Set 1571 dos rom path",
+      (dp:String) => if (dp != null && dp != "") reloadROM(ROM.D1571_DOS_ROM_PROP,dp)
+    )
+    settings.add("1581dos",
+      "Set 1581 dos rom path",
+      (dp:String) => if (dp != null && dp != "") reloadROM(ROM.D1581_DOS_ROM_PROP,dp)
     )
   }
 
@@ -1694,6 +1731,9 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     val aboutItem = new JMenuItem("About")
     aboutItem.addActionListener(_ => showAbout )
     helpMenu.add(aboutItem)
+    val settingsItem = new JMenuItem("Settings")
+    settingsItem.addActionListener(_ => showSettings )
+    helpMenu.add(settingsItem)
   }
 
   protected def setDriveMenu(parent:JMenu) : Unit = {
@@ -2313,10 +2353,56 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setEasyFlashSettings(parent:JMenu) : Unit = {
-    val efMenu = new JMenu("EasyFlash")
+    val easyFlashMenu = new JMenu("EasyFlash")
     val jumperItem = new JCheckBoxMenuItem("Easy Flash jumper on")
     jumperItem.addActionListener( _ => EasyFlash.jumper = jumperItem.isSelected )
-    efMenu.add(jumperItem)
-    parent.add(efMenu)
+    easyFlashMenu.add(jumperItem)
+    easyFlashWriteChangesItem.addActionListener(_ => easyFlashWriteChanges )
+    easyFlashWriteChangesItem.setEnabled(false)
+    easyFlashMenu.add(easyFlashWriteChangesItem)
+    parent.add(easyFlashMenu)
+  }
+
+  protected def easyFlashWriteChanges : Unit = {
+    ExpansionPort.getInternalExpansionPort match {
+      case ef:EasyFlash =>
+        ef.createCRT
+      case _ =>
+    }
+  }
+
+  protected def reloadROM(resource:String,location:String) : Unit = {
+    val oldLocation = configuration.getProperty(resource)
+    try {
+      configuration.setProperty(resource, location)
+      ROM.reload(resource)
+    }
+    finally {
+      configuration.setProperty(resource,if (oldLocation == null) "" else oldLocation)
+    }
+  }
+
+  protected def showCartInfo : Unit = {
+    ExpansionPort.getExpansionPort.getCRT match {
+      case Some(crt) =>
+        val cols : Array[Object] = Array("Property","Value")
+        val data : Array[Array[Object]] = Array(
+          Array("Name",crt.name),
+          Array("Type",crt.ctrType.toString),
+          Array("EXROM",crt.EXROM.toString),
+          Array("GAME",crt.GAME.toString),
+          Array("Banks",crt.chips.length.toString),
+          Array("Size",s"${crt.kbSize}Kb")
+        )
+        val banks : Array[Array[Object]] = for(b <- crt.chips) yield {
+          Array("Bank %2d at %4X".format(b.bankNumber,b.startingLoadAddress),"%sKb".format(b.romSize / 1024))
+        }
+        val table = new JTable(data ++ banks,cols)
+        val sp = new JScrollPane(table)
+        val panel = new JPanel(new BorderLayout)
+        panel.add("Center",sp)
+        JOptionPane.showMessageDialog(displayFrame,panel,"Cart info",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
+      case None =>
+    }
   }
 }

@@ -3,7 +3,6 @@ package ucesoft.cbm.scpu
 import java.awt.datatransfer.DataFlavor
 import java.awt.{Toolkit, _}
 import java.io._
-
 import javax.swing._
 import javax.swing.filechooser.FileFilter
 import ucesoft.cbm._
@@ -20,6 +19,7 @@ import ucesoft.cbm.peripheral.vic.Palette
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 import ucesoft.cbm.trace.{InspectPanel, TraceDialog}
 import ucesoft.cbm.c64._
+import ucesoft.cbm.cpu.ROM
 
 object SCPUC64 extends App {
   CBMComputer.turnOn(new SCPUC64,args)
@@ -493,7 +493,14 @@ class SCPUC64 extends CBMComputer {
 
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
-    romItem.addActionListener(_ => ROMPanel.showROMPanel(displayFrame, configuration, true,true, () => saveSettings(false)))
+    romItem.addActionListener(_ => {
+      clock.pause
+      ROMPanel.showROMPanel(displayFrame, configuration, true,true, () => {
+        saveSettings(false)
+        reset()
+      })
+      clock.play
+    })
 
     val scpuRamItem = new JMenu("SCPU RAM")
     optionMenu.add(scpuRamItem)
@@ -597,6 +604,16 @@ class SCPUC64 extends CBMComputer {
   }
 
   protected def allowsStateRestoring: Boolean = true
+
+  override protected def setGlobalCommandLineOptions : Unit = {
+    super.setGlobalCommandLineOptions
+
+    settings.remove("kernel")
+    settings.add("kernel",
+      "Set scpu kernel rom path",
+      (kp:String) => if (kp != null && kp != "") reloadROM(ROM.SCPU64_ROM_PROP,kp)
+    )
+  }
 
   // -----------------------------------------------------------------------------------------
 

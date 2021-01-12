@@ -17,7 +17,7 @@ object C1541Mems {
   private class DISK_KERNEL extends ROM(null,"C1541_KERNEL",KERNEL_M,16384,D1541_DOS_ROM_PROP) {
     private[this] val startAndLen = {
       try {
-        val in = ROM.getROMInputStream(resourceName)
+        val in = ROM.getROMInputStream(this,resourceName)
         val al = (0x10000 - in.available,in.available)
         in.close
         al

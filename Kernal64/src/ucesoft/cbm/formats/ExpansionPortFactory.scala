@@ -4,12 +4,7 @@ import java.io.{ObjectInputStream, ObjectOutputStream}
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortType}
-import ucesoft.cbm.Clock
-import ucesoft.cbm.ClockEvent
-import ucesoft.cbm.misc.{AMF29F040, FlashListener, M93C86}
-
 import java.util.Properties
-import ucesoft.cbm.Log
 
 import scala.collection.mutable
 
@@ -44,7 +39,6 @@ object ExpansionPortFactory {
       }
       val map = new mutable.HashMap[Int,Memory]()
       map.addAll(banks)
-      map
     }
     // ROMH Banks
     protected val romhBanks : mutable.HashMap[Int,Memory] = {
@@ -65,6 +59,8 @@ object ExpansionPortFactory {
       map.addAll(banks)
       map
     }
+
+    override def getCRT: Option[Cartridge] = Some(crt)
 
     private var _romlBankIndex = 0
     private var _romhBankIndex = 0

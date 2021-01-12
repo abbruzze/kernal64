@@ -17,7 +17,7 @@ object Cartridge {
   }
 }
 
-class Cartridge(file:String) {
+class Cartridge(val file:String) {
   class Chip {
     var bankNumber = 0
     var startingLoadAddress = 0
@@ -29,7 +29,7 @@ class Cartridge(file:String) {
       if (in.readByte != 'C' || in.readByte != 'H' || in.readByte != 'I' || in.readByte != 'P') throw new IOException("CHIP signature not found")
       in.skipBytes(6)
       bankNumber = in.readByte * 256 + in.readByte
-      startingLoadAddress = (in.readByte * 256 + in.readByte) & 0xFFFF
+      startingLoadAddress = (in.readByte << 8 + in.readByte) & 0xFFFF
       romSize = (in.readByte * 256 + in.readByte) & 0xFFFF
       romData = Array.ofDim(romSize)
       for(i <- 0 until romSize) romData(i) = in.readByte.toInt & 0xFF
@@ -86,4 +86,51 @@ class Cartridge(file:String) {
   }
   
   override def toString = s"Cartridge ${name} type=${ctrType} EXROM=${EXROM} GAME=${GAME} CHIPS=${chips.map{_.toString} mkString("[",",","]")}"
+}
+
+class CartridgeBuilder(crt:String,name:String,crtType:Int,exrom:Boolean,game:Boolean) {
+  private val out = new FileOutputStream(crt)
+
+  // signature
+  for(i <- 0 to 15) out.write("C64 CARTRIDGE   ".charAt(i))
+  // header length
+  out.write(0) ;out.write(0) ;out.write(0) ; out.write(0x40)
+  // version
+  out.write(1) ; out.write(0)
+  // type
+  out.write(crtType >> 8) ; out.write(crtType & 0xFF)
+  // EXROM
+  out.write(if (exrom) 0 else 1)
+  // GAME
+  out.write(if (game) 0 else 1)
+  // reserved
+  for(_ <- 0x1A to 0x1F) out.write(0)
+  // name
+  for(i <- 0 to 31) out.write(if (i < name.length) name.charAt(i).toInt else 0)
+
+  def addChip(startAddress:Int,chipType:Int,bank:Int,data:Array[Int]) : Unit = {
+    // signature
+    for(i <- 0 to 3) out.write("CHIP".charAt(i))
+    // total packet length
+    val tpl = 0x10 + data.length
+    out.write(tpl >> 24) ; out.write(tpl >> 16) ; out.write(tpl >> 8) ; out.write(tpl & 0xFF)
+    // type
+    out.write(chipType >> 8) ; out.write(chipType & 0xFF)
+    // bank number
+    out.write(bank >> 8) ; out.write(bank & 0xFF)
+    // load address
+    out.write(startAddress >> 8) ; out.write(startAddress & 0xFF)
+    // image size
+    out.write(data.length >> 8) ; out.write(data.length & 0xFF)
+    // data
+    val bdata = Array.ofDim[Byte](data.length)
+    var i = 0
+    while (i < data.length) {
+      bdata(i) = data(i).toByte
+      i += 1
+    }
+    out.write(bdata)
+  }
+
+  def finish : Unit = out.close
 }

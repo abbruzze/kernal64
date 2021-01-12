@@ -5,6 +5,8 @@ import ucesoft.cbm.ChipID
 import ucesoft.cbm.Log
 import ucesoft.cbm.cpu.RAMComponent
 import ucesoft.cbm.CBMComponentType
+import ucesoft.cbm.formats.Cartridge
+
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 
@@ -59,6 +61,7 @@ abstract class ExpansionPort extends RAMComponent {
   
   def freezeButton  : Unit = {}
   def isFreezeButtonSupported = false
+  def getCRT : Option[Cartridge] = None
   
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
@@ -111,6 +114,7 @@ object ExpansionPort {
     final override def setBaLow(baLow:Boolean) = expansionPort.setBaLow(baLow)
     final override def freezeButton = expansionPort.freezeButton
     final override def isFreezeButtonSupported = expansionPort.isFreezeButtonSupported
+    final override def getCRT: Option[Cartridge] = expansionPort.getCRT
     final override def eject = expansionPort.eject
     final override def shutdown = expansionPort.shutdown
     // state
@@ -154,6 +158,7 @@ object ExpansionPort {
   }
 
   def getExpansionPort = proxyExpansionPort
+  def getInternalExpansionPort = expansionPort
   def setMemoryForEmptyExpansionPort(mem:LastByteReadMemory) = memoryForEmptyExpansionPort = mem
   def setExpansionPort(expansionPort: ExpansionPort) = {
     this.expansionPort = expansionPort

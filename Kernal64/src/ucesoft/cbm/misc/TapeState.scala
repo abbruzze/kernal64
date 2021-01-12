@@ -15,7 +15,7 @@ class TapeState(datassette:Datassette) extends JComponent with DatassetteListene
   private[this] val pop = new JPopupMenu()
 
   setPreferredSize(new Dimension(10, 10))
-  progressBar.setPreferredSize(new Dimension(100, 15))
+  progressBar.setPreferredSize(new Dimension(50, 15))
   progressBar.setVisible(false)
   progressBar.setStringPainted(true)
   setVisible(false)

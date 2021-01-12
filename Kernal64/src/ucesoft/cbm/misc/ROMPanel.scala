@@ -19,10 +19,11 @@ class ROMPanel(prop:Properties,c64Only:Boolean,scpu:Boolean = false) extends JPa
   private val SCPU = 32
   private case class ROM(label:String,propName:String,romType:Int,var path:Option[String] = None,var item:Option[String] = None) {
     def apply(prop:Properties): Unit = {
-      var value = if (!path.isDefined || path.get == "") "" else {
+      val value = if (!path.isDefined || path.get == "") "" else {
         if (item.isDefined) path.get + "," + item.get else path.get
       }
       prop.setProperty(propName,value)
+      ucesoft.cbm.cpu.ROM.reload(propName)
     }
   }
 
@@ -158,6 +159,7 @@ object ROMPanel {
   def showROMPanel(parent:JFrame,prop:Properties,c64Only:Boolean,scpu:Boolean = false,applyCallBack : () => Unit) = {
     val f = new JDialog(parent,"System ROMs",true)
     f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
+    f.setLocationRelativeTo(parent)
 
     val contentPane = f.getContentPane
     val romPanel = new ROMPanel(prop,c64Only,scpu)
@@ -171,8 +173,6 @@ object ROMPanel {
       romPanel.applyUpdates
       f.dispose
       applyCallBack()
-      val msg = if (c64Only) "Restart the emulator to apply changes" else "<html>For functions ROMs reset to apply changes,<br>otherwise restart the emulator</html>"
-      JOptionPane.showMessageDialog(parent,msg,"Info",JOptionPane.INFORMATION_MESSAGE)
     })
     buttonPanel.add(okB)
     buttonPanel.add(cancelB)

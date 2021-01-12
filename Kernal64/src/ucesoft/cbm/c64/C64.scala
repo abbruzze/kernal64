@@ -481,7 +481,14 @@ class C64 extends CBMComputer {
 
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
-    romItem.addActionListener( _ => ROMPanel.showROMPanel(displayFrame,configuration,true,false,() => saveSettings(false)) )
+    romItem.addActionListener( _ => {
+      clock.pause
+      ROMPanel.showROMPanel(displayFrame,configuration,true,false,() => {
+        saveSettings(false)
+        reset()
+      })
+      clock.play
+    })
   }
 
   def turnOff  : Unit = {

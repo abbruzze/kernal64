@@ -831,10 +831,15 @@ class C128 extends CBMComputer with MMUChangeListener {
 
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
-    romItem.addActionListener( _ => ROMPanel.showROMPanel(displayFrame,configuration,false,false,() => {
-      saveSettings(false)
-      checkFunctionROMS
-    }) )
+    romItem.addActionListener( _ => {
+      clock.pause
+      ROMPanel.showROMPanel(displayFrame,configuration,false,false,() => {
+        saveSettings(false)
+        checkFunctionROMS
+        reset()
+      })
+      clock.play
+    } )
   }
 
   private def setVDCFullScreen : Unit = {
@@ -883,6 +888,15 @@ class C128 extends CBMComputer with MMUChangeListener {
     settings.add("vdc-fullscreen",
       "Starts the emulator with VDC in full screen mode",
       (fs:Boolean) => if (fs) vdcFullScreenAtBoot = true
+    )
+
+    settings.add("kernel128",
+      "Set kernel 128 rom path",
+      (kp:String) => if (kp != null && kp != "") reloadROM(ROM.C128_KERNAL_ROM_PROP,kp)
+    )
+    settings.add("charrom128",
+      "Set char rom 128 path",
+      (kp:String) => if (kp != null && kp != "") reloadROM(ROM.C128_CHAR_ROM_PROP,kp)
     )
   }
   

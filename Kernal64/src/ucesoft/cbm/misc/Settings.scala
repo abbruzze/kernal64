@@ -5,6 +5,8 @@ import java.util.Properties
 object Settings {
   class SettingIllegalArgumentException(msg:String) extends Exception(msg)
 
+  case class SettingInfo(name:String,description:String)
+
   trait SettingConv[T] {
     def convert(value:String) : T
     val defValue : T
@@ -81,7 +83,11 @@ class Settings {
             description : String,
             loadF : T => Unit)(implicit settingConv:SettingConv[T]) : Unit = {
     settings += new Setting(cmdLine,description,"",loadF,null.asInstanceOf[T])
-  } 
+  }
+
+  def remove(cmdLine:String) : Unit = {
+    settings.find(_.cmdLine == cmdLine).foreach( settings -= _ )
+  }
   
   def load(p:Properties) : Unit = {
     for(s <- settings) s.load(p)
@@ -100,6 +106,8 @@ class Settings {
       println("--" + opt + s.description)
     }
   }
+
+  def getSettings : List[SettingInfo] = settings map { s => SettingInfo(s.cmdLine,s.description) } toList
   
   def parseAndLoad(args:Array[String]) : Option[String] = {
     var p = 0

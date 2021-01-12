@@ -30,7 +30,11 @@ class ROM(ram: Memory,
   def init  : Unit = {
     mem = Array.fill(length)(0)
     Log.info(s"Initialaizing ${name} memory ...")
-    val in = new DataInputStream(ROM.getROMInputStream(resourceName))
+    reload
+  }
+
+  def reload : Unit = {
+    val in = new DataInputStream(ROM.getROMInputStream(this,resourceName))
     if (length > 0) {
       in.skip(initialOffset)
       val buffer = Array.ofDim[Byte](length)
@@ -101,8 +105,18 @@ object ROM {
                                                          D1581_DOS_ROM_PROP -> "roms/1581.rom")
 
   var props : Properties = _
+  private val registeredROMMap = new collection.mutable.HashMap[String,ROM]
 
-  def getROMInputStream(resource:String) : InputStream = {
+  def reload(resource:String) : Unit = {
+    registeredROMMap get resource match {
+      case Some(rom) =>
+        rom.reload
+      case None =>
+    }
+  }
+
+  def getROMInputStream(rom:ROM,resource:String) : InputStream = {
+    if (!registeredROMMap.contains(resource)) registeredROMMap += resource -> rom
     val prop = props.getProperty(resource)
     if (prop != null && prop != "") {
       if (!new File(prop).exists) throw new FileNotFoundException(s"ROM '$prop' not found")
