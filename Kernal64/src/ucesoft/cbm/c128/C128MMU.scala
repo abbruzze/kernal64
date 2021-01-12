@@ -179,7 +179,13 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     internalROMType = romType
     val rom = _rom map { _.toInt & 0xFF }
     if (_rom.length <= 16384) { // only mid affected      
-      if (internal) internalFunctionROM_mid = rom else externalFunctionROM_mid = rom
+      if (internal) {
+        internalFunctionROM_mid = rom
+        internalFunctionROM_high = rom
+      } else {
+        externalFunctionROM_mid = rom
+        externalFunctionROM_high = rom
+      }
     }
     else {
       val midRom = Array.ofDim[Int](16384)
@@ -636,7 +642,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   @inline private[this] def mem_read_function_rom_0xC000_0xFFFF(internal:Boolean,_address:Int) : Int = {
     val address = _address & 0x3FFF
     if (internal) {
-      if (internalFunctionROM_high == null) return 0      
+      if (internalFunctionROM_high == null) return 0
       if (address >= internalFunctionROM_high.length) return 0
       internalFunctionROM_high(address)
     }
