@@ -7,9 +7,5 @@ trait DriveLedListener {
   def turnOn : Unit
   def turnOff : Unit
   def isOn : Boolean
-  def beginLoadingOf(fileName:String,indeterminate:Boolean=false) : Unit
-  def updateLoading(perc:Int) : Unit
-  def endLoading : Unit
-  def beginSavingOf(fileName:String) : Unit
-  def endSaving : Unit
+  def moveTo(track:Int,sector:Option[Int],halfTrack:Boolean) : Unit
 }

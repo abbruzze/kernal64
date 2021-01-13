@@ -153,10 +153,9 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     led
   }).toArray
   protected val floppyComponents = Array.ofDim[FloppyComponent](TOTAL_DRIVES)
-  protected val diskProgressPanels = Array.fill[DriveLoadProgressPanel](TOTAL_DRIVES)(new DriveLoadProgressPanel)
   protected val driveLedListeners = {
     (for(d <- 0 until TOTAL_DRIVES) yield {
-      new AbstractDriveLedListener(driveLeds(d),diskProgressPanels(d)) {
+      new AbstractDriveLedListener(driveLeds(d)) {
         if (d > 0) driveLeds(d).setVisible(false)
       }
     }).toArray
@@ -345,7 +344,6 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         row1Panel.add(tapePanel)
         row1Panel.add(tapePanel.progressBar)
       }
-      row1Panel.add(diskProgressPanels(d))
       row1Panel.add(driveLeds(d))
     }
     infoPanel.add("East",rowPanel)

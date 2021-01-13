@@ -202,7 +202,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
             if (ledOn) ledListener.turnOn else ledListener.turnOff
             if (lastMotorOn && !motorOn) {
               RW_HEAD.setCurrentFileName("")
-              ledListener.endLoading
             }
           }
           val newSpeedZone = (value & 0xFF) >> 5 & 0x3
@@ -374,7 +373,6 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       runningListener(false)
       viaBus.setActive(false)
       viaDisk.setActive(false)
-      ledListener.endLoading
     }
   }
 

@@ -106,7 +106,6 @@ abstract class RWHeadController(protected var floppy:Floppy,
     motorOn = on
     if (on && floppy.isEmpty) floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
   }
-  @inline private def fmt2(i:Int) : String = if (i < 10) "0" + i else i.toString
   private def updateTrackSectorLabelProgress(track:Int,halfTrack:Boolean,sector:Option[Int]) : Unit = {
     if (ledListener != null && motorOn) {
       sector match {
@@ -115,9 +114,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
             lastNotifiedTrack = track
             SwingUtilities.invokeLater(new Runnable {
               def run : Unit = {
-                var trackFormat = fmt2(track)
-                if (halfTrack) trackFormat += "."
-                ledListener.beginLoadingOf(s"$currentFilename $trackFormat",true)
+                ledListener.moveTo(track,sector,halfTrack)
               }
             })
           }
@@ -127,10 +124,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
             lastNotifiedSector = sec
             SwingUtilities.invokeLater(new Runnable {
               def run : Unit = {
-                var trackFormat = fmt2(track)
-                val secFormat = fmt2(sec)
-                if (halfTrack) trackFormat += "."
-                ledListener.beginLoadingOf(s"$currentFilename $trackFormat/$secFormat",true)
+                ledListener.moveTo(track,sector,halfTrack)
               }
             })
           }

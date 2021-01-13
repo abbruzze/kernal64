@@ -19,14 +19,20 @@ class DriveLed(id:Int) extends JComponent with CBMComponent {
   private[this] final val POWER_LED_ON = Color.RED
   private[this] final val POWER_ACCESS_LED_ON = Color.GREEN
   private[this] var powerLedMode = false
+  private[this] val label = new JLabel("")
 
   setLayout(new FlowLayout(FlowLayout.LEFT))
   add(new JLabel("%2d:".format(id)))
   add(new Led)
+  add(label)
 
   def setPowerLedMode(on:Boolean) = {
     powerLedMode = on
     repaint()
+  }
+
+  def showLedInfo(info:String) : Unit = {
+    label.setText("%s".format(info))
   }
 
   private class Led extends JComponent {

@@ -58,7 +58,6 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
   override protected def loadData(fileName: String): Option[BusDataIterator] = {
     try {
       if (DEBUG) println("Loading " + fileName)
-      ledListener.beginLoadingOf(fileName)
       Some(driveReader.get.load(fileName.toString).iterator)
     } catch {
       case e: FileNotFoundException => None
@@ -148,9 +147,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     job match {
       case SAVE_FILE =>
         if (DEBUG) println("Saving file " + channels(channel).fileName + " " + channels(channel).buffer.length)
-        ledListener.endSaving
       case _ =>
-        ledListener.endLoading
       // TODO
     }
     setStatus(STATUS_OK)
@@ -159,25 +156,21 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
   override def fileNameReceived : Unit = {
     super.fileNameReceived
     if (channels(channel).fileName.toString.startsWith("#")) channels(channel).open
-    if (job == SAVE_FILE) ledListener.beginSavingOf(channels(channel).fileName.toString)
     if (channel == 15 && channels(channel).fileName.length > 0) handleChannel15
   }
 
   override def dataNotFound : Unit = {
     super.dataNotFound
     setStatus(STATUS_FILE_NOT_FOUND)
-    ledListener.endLoading
   }
 
   override def byteJustWritten(isLast: Boolean) : Unit = {
     super.byteJustWritten(isLast)
-    ledListener.updateLoading(channels(channel).dataToSend.get.getPerc)
   }
 
   override protected def load(fileName: String) : Unit = {
     if (fileName != "#") {
       super.load(fileName)
-      ledListener.beginLoadingOf(fileName)
     } else if (DEBUG) println("Loading from #")
   }
 

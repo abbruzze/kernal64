@@ -319,7 +319,6 @@ class D1581(val driveID: Int,
     if (pc == _1581_WAIT_LOOP_ROUTINE && canSleep && !RW_HEAD.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
       running = false
       runningListener(false)
-      ledListener.endLoading
     }
   }
   

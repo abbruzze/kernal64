@@ -304,7 +304,6 @@ class D1571(val driveID: Int,
           if (ledListener != null) {
             if (ledOn) ledListener.turnOn else ledListener.turnOff
             if (!motorOn) {
-              ledListener.endLoading
               if (lastMotorOn && !motorOn) RW_HEAD.setCurrentFileName("")
             }
           }
@@ -502,7 +501,6 @@ class D1571(val driveID: Int,
       runningListener(false)
       VIA1.setActive(false)
       VIA2.setActive(false)
-      ledListener.endLoading
     }
   }
   
