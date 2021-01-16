@@ -2093,7 +2093,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     Y = 0
     SR = 0
     SP = 0
-    import ucesoft.cbm.cpu
+    sei
     Log.info(s"CPU reset! PC = ${hex4(PC)}")
   }
 
