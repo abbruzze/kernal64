@@ -172,7 +172,7 @@ abstract class Diskette extends Floppy {
   def loadInMemory(mem: Memory, fileName: String, relocate: Boolean,c64Mode:Boolean,drive:Int) : Unit = {
     load(fileName) match {
       case FileData(fn, startAddress, data) =>
-        val (start,end) = ProgramLoader.loadPRG(mem,data,if (relocate) Some(startAddress) else None,c64Mode,drive)
+        val (start,end) = ProgramLoader.loadPRG(mem,data,if (relocate) Some(startAddress) else None,c64Mode,drive,fileName)
         println(s"Loaded $fn from $start to $end")
       case _ =>
     }
