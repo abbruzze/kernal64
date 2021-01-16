@@ -1335,7 +1335,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       "Take a screenshot of VIC screen and save it on the given file path. Used with --testcart only.",
       (file:String) => if (file != "") {
         TestCart.screenshotFile = Some(file)
-        TestCart.screeshotHandler = display.saveSnapshot _
+        TestCart.screeshotHandler = display.waitFrameSaveSnapshot _
       }
     )
     settings.add("cpujam-continue",

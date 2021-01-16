@@ -860,7 +860,7 @@ class C128 extends CBMComputer with MMUChangeListener {
       "Take a screenshot of VDC screen and save it on the given file path. Used with --testcart only.",
       (file:String) => if (file != "") {
         TestCart.screenshotFile = Some(file)
-        TestCart.screeshotHandler = vdcDisplay.saveSnapshot _
+        TestCart.screeshotHandler = vdcDisplay.waitFrameSaveSnapshot _
       }
     )
     settings.add("ext-rom",

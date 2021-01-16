@@ -55,6 +55,10 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   private[this] var singleFrameCounter = 0
   private[this] val singleFrameModeMonitor = new Object
 
+  private[this] var waitFrameAndSaveSnapshotFile : File = _
+  private[this] var waitFrameAndSaveSnapshotCounter = 0
+  private[this] var waitFrameAndSaveSnapshotCallback : () => Unit = _
+
   addMouseMotionListener(this)
   addMouseListener(this)
 
@@ -252,9 +256,18 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       repaint()
       if (remote != null) remote.updateVideo(x1,y1,x2,y2)
     }
-    else
-    if (drawRasterLine || mouseZoomEnabled) repaint()
-    
+    else if (drawRasterLine || mouseZoomEnabled) repaint()
+
+    if (waitFrameAndSaveSnapshotFile != null) {
+      if (waitFrameAndSaveSnapshotCounter < 2) waitFrameAndSaveSnapshotCounter += 1
+      else {
+        saveSnapshot(waitFrameAndSaveSnapshotFile)
+        waitFrameAndSaveSnapshotCallback()
+        waitFrameAndSaveSnapshotCounter = 0
+        waitFrameAndSaveSnapshotFile = null
+      }
+    }
+
     frameCounter += 1
     totalFrameCounter += 1
     if (singleFrameMode) {
@@ -291,6 +304,11 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     val snap = createImage(getSize().width, getSize().height).asInstanceOf[BufferedImage]
     paint(snap.getGraphics)
     ImageIO.write(snap, "png", file)
+  }
+
+  def waitFrameSaveSnapshot(file:File, callback:() => Unit) : Unit = {
+    waitFrameAndSaveSnapshotFile = file
+    waitFrameAndSaveSnapshotCallback = callback
   }
   
   // state

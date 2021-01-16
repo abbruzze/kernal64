@@ -371,13 +371,12 @@ object C64MMU {
           else if (address < 0xDD00) cia1.write(address,value)
           else if (address < 0xDE00) cia2.write(address,value)
           else expansionPort.write(address,value)
+          if (TestCart.enabled) TestCart.write(address,value)
         }
         else ram.write(address,value)
       }
       // KERNAL or RAM or ROMH
       else if (c64MC.romhultimax) ROMH_ULTIMAX.write(address,value) else ram.write(address,value)
-      // TestCart
-      if (TestCart.enabled) TestCart.write(address,value)
     }
     
     override def toString = ram.toString
