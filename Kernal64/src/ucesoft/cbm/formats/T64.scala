@@ -22,7 +22,7 @@ class T64(file: String) {
     
     val endAddress = entry.startAddress + entry.length
     println("Loaded " + entry.fileName + " from " + entry.startAddress + " to " + endAddress)
-    ProgramLoader.updateBASICPointers(mem,entry.startAddress,endAddress,c64Mode,1)
+    ProgramLoader.updateBASICPointers(mem,entry.startAddress,endAddress,c64Mode,1,entry.fileName)
   }
 
   private def read = t64.read & 0xFF
