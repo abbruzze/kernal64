@@ -277,8 +277,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       if (z80enabled) writeZ80(address,value) else write128(address,value)
     }
     else write64(address,value)
-    // TestCart
-    if (TestCart.enabled) TestCart.write(address,value)
     lastByteOnBUS = value
   }
   
@@ -622,6 +620,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     else if (address < 0xDE00) cia_dd00.write(address,value)
     // I/O expansion slots 1 & 2 -----------------------------------------
     else expansionPort.write(address,value)
+    // TestCart
+    if (TestCart.enabled) TestCart.write(address,value)
   }
   /*
    * internal & external function ROM
@@ -744,7 +744,9 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
         else if (address < 0xDC00) COLOR_RAM.write(address,value)
         else if (address < 0xDD00) cia_dc00.write(address,value)
         else if (address < 0xDE00) cia_dd00.write(address,value)
-        else expansionPort.write(address,value) 
+        else expansionPort.write(address,value)
+        // TestCart
+        if (TestCart.enabled) TestCart.write(address,value)
       }
       else ram.write(address,value)
     }
