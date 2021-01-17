@@ -22,7 +22,7 @@ class ActionReplay(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) exte
     }
   }
 
-  private object CRTRAM extends Memory {
+  private object CRTRAM extends ROMMemory {
     val name = "ActionReplay RAM"
     val startAddress = 0x8000
     val length = 0x2000
@@ -31,7 +31,9 @@ class ActionReplay(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) exte
     def init  : Unit = {}
     def reset  : Unit = {}
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = crtRAM(address & 0x1FFF)
-    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = crtRAM(address & 0x1FFF) = value
+    override def writeROM(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
+      crtRAM(address & 0x1FFF) = value
+    }
   }
 
   override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = if (address < 0xDF00) 0 else readIO2(address)
@@ -54,7 +56,7 @@ class ActionReplay(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) exte
       if ((value & 0x40) != 0) nmiAction(false)
       if ((value & 0x4) != 0) isActive = false
       notifyMemoryConfigurationChange
-      //println(s"bank=$romlBankIndex game=$game exrom=$exrom ram=$exportRAM active=$isActive")
+      //println(s"value=${value.toHexString} bank=$romlBankIndex game=$game exrom=$exrom ram=$exportRAM active=$isActive")
     }
   }
 

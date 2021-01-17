@@ -12,7 +12,15 @@ object ExpansionPortFactory {
   class CartridgeExpansionPort(crt: Cartridge,ram:Memory) extends ExpansionPort {
     val TYPE : ExpansionPortType.Value = ExpansionPortType.CRT
 
-    class ROM(val name: String, val startAddress: Int, val length: Int, val data: Array[Int]) extends Memory {
+    abstract class ROMMemory extends Memory {
+      final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
+        if (!(!game && exrom)) ram.write(address,value,chipID) // ultimax: Internal memory does not respond to write accesses to these areas
+        writeROM(address,value,chipID)
+      }
+      protected def writeROM(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
+    }
+
+    class ROM(val name: String, val startAddress: Int, val length: Int, val data: Array[Int]) extends ROMMemory {
       val isRom = true
       def isActive = true
       def init  : Unit = {}
@@ -22,9 +30,7 @@ object ExpansionPortFactory {
           else data(address - startAddress)
         } else data(address - startAddress)
       }
-      def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
-        ram.write(address,value,chipID)
-      }
+
       override def toString = s"ROM(${name})[startAddress=${Integer.toHexString(startAddress)} length=${length}]"
     }
     val name = crt.name

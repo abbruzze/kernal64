@@ -12,7 +12,7 @@ class PageFox(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram)
   private[this] var enabled = false
   private[this] var bankSelect,chipselect = 0
 
-  private class ROMCart(override val startAddress:Int,isLow:Boolean) extends Memory {
+  private class ROMCart(override val startAddress:Int,isLow:Boolean) extends ROMMemory {
     val name = if (isLow) "ROML" else "ROMH"
     val length = 8192
     val isRom = true
@@ -24,9 +24,8 @@ class PageFox(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram)
       else
         if (isLow) romlBanks(romlBankIndex).read(address) else romhBanks(romhBankIndex).read(address)
     }
-    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {
+    override def writeROM(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {
       if (chipselect == 2) cart_ram((address & 0x3FFF) + (bankSelect << 14)) = value
-      ram.write(address,value,chipID)
     }
   }
 

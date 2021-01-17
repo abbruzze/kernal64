@@ -2,9 +2,8 @@ package ucesoft.cbm.formats.cart
 
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.formats.{Cartridge, CartridgeBuilder}
+import ucesoft.cbm.formats.{Cartridge, CartridgeBuilder }
 import ucesoft.cbm.formats.ExpansionPortFactory.CartridgeExpansionPort
-import ucesoft.cbm.formats.cart.EasyFlash.jumper
 import ucesoft.cbm.misc.{AMF29F040, FlashListener}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
@@ -17,7 +16,7 @@ object EasyFlash {
 class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,ram) {
   private[this] val io2mem = Array.ofDim[Int](256)
 
-  private class FlashROM(low:Boolean) extends Memory with FlashListener {
+  private class FlashROM(low:Boolean) extends ROMMemory with FlashListener {
     val name = "FLASH"
     val startAddress = if (low) 0x8000 else 0xE000
     val length = 8192
@@ -75,15 +74,9 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
 
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = amf29f040.read(address)
 
-    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
+    override def writeROM(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       //println("Flash write to %4X = %2X".format(address,value))
       amf29f040.write(address,value)
-
-      /**
-       * Don't know how the RAM under the ROM can be written when flashing.
-       * Suppose jumper is the key.
-       */
-      if (!jumper) ram.write(address,value)
     }
 
     def updateROMBank : Unit = amf29f040.setROMBank(if (low) EasyFlash.super.ROML else EasyFlash.super.ROMH)

@@ -12,7 +12,7 @@ class SuperSnapshot5(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) ex
   private[this] var ramEnabled = false
   private[this] val internalRam = Array.ofDim[Int](8192)
 
-  private object CRTRAM extends Memory {
+  private object CRTRAM extends ROMMemory {
     val name = "SuperSnapShot v5 RAM"
     val startAddress = 0x0000
     val length = 0x8000
@@ -24,7 +24,7 @@ class SuperSnapshot5(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) ex
       if (ramEnabled) internalRam(address & 0x1FFF)
       else romlBanks(romlBankIndex).read(address)
     }
-    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
+    override def writeROM(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
       if (ramEnabled && enabled) internalRam(address & 0x1FFF) = value
       else romlBanks(romlBankIndex).write(address,value)
     }

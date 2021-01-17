@@ -6,7 +6,7 @@ import ucesoft.cbm.formats.Cartridge
 import ucesoft.cbm.formats.ExpansionPortFactory.CartridgeExpansionPort
 
 class Ocean(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
-  object ROMLMirrored extends Memory {
+  object ROMLMirrored extends ROMMemory {
     val name = "ROMH"
     val startAddress = 0xA000
     val length = 8192
@@ -14,7 +14,6 @@ class Ocean(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     def isActive = true
     def init  : Unit = {}
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = romlBanks(romlBankIndex).read(0x8000 + address - startAddress)
-    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
   }
   private[this] val VALID_CRT = crt.kbSize == 128 || crt.kbSize == 256 || crt.kbSize == 512
   private[this] val CRT_16K = crt.kbSize == 128 || crt.kbSize == 256
