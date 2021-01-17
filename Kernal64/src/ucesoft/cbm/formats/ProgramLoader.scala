@@ -45,7 +45,7 @@ object ProgramLoader {
     loadingWithWarp = false
   }
 
-  def updateBASICPointers(mem:Memory,startAddress:Int,endAddress:Int,c64Mode:Boolean,drive:Int) : Unit = {
+  def updateBASICPointers(mem:Memory,startAddress:Int,endAddress:Int,c64Mode:Boolean,drive:Int,fileName:String) : Unit = {
     c64Mode match {
       case true =>
         val endOfBasic = mem.read(55) | mem.read(56) << 8
@@ -63,7 +63,6 @@ object ProgramLoader {
         mem.write(163, 64)
         mem.write(0xAE,endAddress & 0xFF)
         mem.write(0xAF,endAddress >> 8)
-        mem.write(183, 0)
         mem.write(184, 1)
         mem.write(185, 96)
         mem.write(186, drive)
@@ -71,6 +70,18 @@ object ProgramLoader {
         mem.write(188,endOfBasic >> 8)
         mem.write(195, 1)
         mem.write(196, 8)
+        mem.write(183, 0)
+
+        // filename
+        /* Ignored for now: breaks testbench decimalmode c128 in c64 mode
+        var i = 0
+        while (i < fileName.length && i < 16) {
+          mem.write(0x9FF0,fileName.charAt(i).toUpper)
+          i += 1
+        }
+
+        mem.write(183,if (fileName.length > 16) 16 else fileName.length)
+         */
       case false =>
         mem.write(0x2B,startAddress & 0xFF)
         mem.write(0xAC,startAddress & 0xFF)
@@ -104,11 +115,13 @@ object ProgramLoader {
     }
     in.close
     val end = start + size
-    updateBASICPointers(mem,start,end,c64Mode,drive)
+    val dotprg = file.getName.lastIndexOf(".")
+    val fileName = if (dotprg != -1) file.getName.substring(0,dotprg) else file.getName
+    updateBASICPointers(mem,start,end,c64Mode,drive,fileName)
     (start,end)
   }
 
-  def loadPRG(mem:Memory,data:Array[Int],startAddress:Option[Int],c64Mode:Boolean,drive:Int): (Int,Int) = {
+  def loadPRG(mem:Memory,data:Array[Int],startAddress:Option[Int],c64Mode:Boolean,drive:Int,fileName:String): (Int,Int) = {
     val start = startAddress match {
       case Some(address) => address
       case None => this.startAddress(mem,c64Mode)
@@ -122,7 +135,7 @@ object ProgramLoader {
       dataIndex += 1
     }
     val end = (start + data.length) & 0xFFFF
-    updateBASICPointers(mem,start,end,c64Mode,drive)
+    updateBASICPointers(mem,start,end,c64Mode,drive,fileName)
     (start,end)
   }
 
