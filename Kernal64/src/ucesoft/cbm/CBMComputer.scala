@@ -60,7 +60,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val CONFIGURATION_GMOD2_FILE = "gmod2.file"
   protected val CONFIGURATION_AUTOSAVE = "autosave"
 
-  protected val PRG_RUN_DELAY_CYCLES = 2200000
+  protected def PRG_RUN_DELAY_CYCLES = 2200000
   protected var lastLoadedPrg : Option[File] = None
 
   // -------------- MENU ITEMS -----------------
@@ -1240,7 +1240,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     else vicZoomFactor = 0 // undefined
   }
 
-  protected def setVICModel(model:VICType.Value,preserveDisplayDim:Boolean = false) : Unit = {
+  protected def setVICModel(model:VICType.Value,preserveDisplayDim:Boolean = false,resetFlag:Boolean) : Unit = {
     clock.pause
     val vicType = model match {
       case VICType.PAL => VIC_PAL
@@ -1256,7 +1256,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       displayFrame.pack
     }
 
-    reset()
+    if (resetFlag) reset()
     clock.play
   }
 
@@ -2295,9 +2295,9 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     group.add(ntscItem)
     vicModelItem.add(palItem)
     vicModelItem.add(ntscItem)
-    palItem.addActionListener( _ => setVICModel(VICType.PAL) )
+    palItem.addActionListener( _ => setVICModel(VICType.PAL,false,true) )
     palItem.setSelected(true)
-    ntscItem.addActionListener( _ => setVICModel(VICType.NTSC) )
+    ntscItem.addActionListener( _ => setVICModel(VICType.NTSC,false,true) )
     parent.add(vicModelItem)
 
     settings.add("ntsc",
@@ -2305,7 +2305,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       "VIDEO_NTSC",
       (set: Boolean) => {
         if (set) {
-          setVICModel(VICType.NTSC,true)
+          setVICModel(VICType.NTSC,true,false)
           ntscItem.setSelected(true)
         }
       },

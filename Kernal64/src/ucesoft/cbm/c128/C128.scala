@@ -30,7 +30,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   protected val CONFIGURATION_FILENAME = "C128.config"
   private[this] val CONFIGURATION_VDC_FRAME_XY = "vdc.frame.xy"
   private[this] val CONFIGURATION_VDC_FRAME_DIM = "vdc.frame.dim"
-  override protected val PRG_RUN_DELAY_CYCLES = 5400000
+  override protected def PRG_RUN_DELAY_CYCLES = if (isC64Mode) super.PRG_RUN_DELAY_CYCLES else 5400000
 
 
   protected var vdcFullScreenAtBoot = false // used with --vdc-full-screen
@@ -263,8 +263,8 @@ class C128 extends CBMComputer with MMUChangeListener {
 
   private def loadSettings(args:Array[String]) : Unit = {
     def loadFile(fn:String) : Unit = {
-      val cmd = s"""RUN"$fn"""" + 13.toChar
-      clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,false) ))
+      val cmd = if (isC64Mode) s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar else s"""RUN"$fn"""" + 13.toChar
+      clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,isC64Mode) ))
     }
     settings.load(configuration)
     // AUTOPLAY
