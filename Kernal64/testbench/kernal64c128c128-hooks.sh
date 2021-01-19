@@ -31,7 +31,7 @@ function kernal64c128c128_get_options
                 testprogvideotype="PAL"
             ;;
         "vicii-ntsc")
-              exitoptions="--ntsc true"
+              exitoptions="--ntsc true --screen-dim 1"
               testprogvideotype="NTSC"
           ;;
         "sid-old")
@@ -115,9 +115,17 @@ function kernal64c128c128_run_screenshot
     mkdir -p "$1"/".testbench"
     rm -f "$1"/.testbench/"$screenshottest"-kernal64C128C128.png
     if [ $verbose == "1" ]; then
-        echo "RUN: "$KERNAL64C128C128 $KERNAL64C128C128OPTS $KERNAL64C128C128OPTSSCREENSHOT ${@:5} "--limitcycles" "$3" "--screenshot" "$1"/.testbench/"$screenshottest"-kernal64C128C128.png "$4"
+        if [ $viciiscreenshot == "1" ]; then
+            echo "RUN: "$KERNAL64C128C128 $KERNAL64C128C128OPTS $KERNAL64C128C128OPTSSCREENSHOT ${@:5} "--limitcycles" "$3" "--screenshot" "$1"/.testbench/"$screenshottest"-kernal64C128C128.png "$4"
+        else
+            echo "RUN: "$KERNAL64C128C128 $KERNAL64C128C128OPTS $KERNAL64C128C128OPTSSCREENSHOT ${@:5} "--limitcycles" "$3" "--vdcscreenshot" "$1"/.testbench/"$screenshottest"-kernal64C128C128.png "$4"
+        fi
     fi
-    $KERNAL64C128C128 $KERNAL64C128C128OPTS $KERNAL64C128C128OPTSSCREENSHOT ${@:5} "--limitcycles" "$3" "--screenshot" "$1"/.testbench/"$screenshottest"-kernal64C128C128.png "$4" 1> /dev/null 2> /dev/null
+    if [ $viciiscreenshot == "1" ]; then
+        $KERNAL64C128C128 $KERNAL64C128C128OPTS $KERNAL64C128C128OPTSSCREENSHOT ${@:5} "--limitcycles" "$3" "--screenshot" "$1"/.testbench/"$screenshottest"-kernal64C128C128.png "$4" 1> /dev/null 2> /dev/null
+    else
+        $KERNAL64C128C128 $KERNAL64C128C128OPTS $KERNAL64C128C128OPTSSCREENSHOT ${@:5} "--limitcycles" "$3" "--vdcscreenshot" "$1"/.testbench/"$screenshottest"-kernal64C128C128.png "$4" 1> /dev/null 2> /dev/null
+    fi
     exitcode=$?
 #    echo exitcode:$exitcode
     if [ $exitcode -ne 0 ]
@@ -143,6 +151,8 @@ function kernal64c128c128_run_screenshot
             KERNAL64C128C128SYO=35
 
             if [ "${refscreenshotvideotype}" == "NTSC" ]; then
+                KERNAL64C128C128REFSXO=32
+                KERNAL64C128C128REFSYO=23
                 KERNAL64C128C128SXO=32
                 KERNAL64C128C128SYO=23
             fi
@@ -150,6 +160,8 @@ function kernal64c128c128_run_screenshot
             # when either the testbench was run with --ntsc, or the test is ntsc-specific,
             # then we need the offsets on the NTSC screenshot
             if [ "${videotype}" == "NTSC" ] || [ "${testprogvideotype}" == "NTSC" ]; then
+                KERNAL64C128C128REFSXO=32
+                KERNAL64C128C128REFSYO=23
                 KERNAL64C128C128SXO=32
                 KERNAL64C128C128SYO=23
             fi

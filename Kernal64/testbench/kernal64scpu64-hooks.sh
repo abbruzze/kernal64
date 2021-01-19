@@ -32,7 +32,7 @@ function kernal64scpu64_get_options
                 testprogvideotype="PAL"
             ;;
         "vicii-ntsc")
-            exitoptions="--ntsc true"
+            exitoptions="--ntsc true --screen-dim 1"
             testprogvideotype="NTSC"
         ;;
         "sid-old")
@@ -144,6 +144,8 @@ function kernal64scpu64_run_screenshot
             KERNAL64SCPU64SYO=35
 
             if [ "${refscreenshotvideotype}" == "NTSC" ]; then
+                KERNAL64SCPU64REFSXO=32
+                KERNAL64SCPU64REFSYO=23
                 KERNAL64SCPU64SXO=32
                 KERNAL64SCPU64SYO=23
             fi
@@ -151,6 +153,8 @@ function kernal64scpu64_run_screenshot
             # when either the testbench was run with --ntsc, or the test is ntsc-specific,
             # then we need the offsets on the NTSC screenshot
             if [ "${videotype}" == "NTSC" ] || [ "${testprogvideotype}" == "NTSC" ]; then
+                KERNAL64SCPU64REFSXO=32
+                KERNAL64SCPU64REFSYO=23
                 KERNAL64SCPU64SXO=32
                 KERNAL64SCPU64SYO=23
             fi

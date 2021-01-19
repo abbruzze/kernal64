@@ -6,17 +6,16 @@ KERNAL64C64OPTS+=" --screen-dim 1"
 KERNAL64C64OPTS+=" --cpujam-continue true"
 KERNAL64C64OPTS+=" --sid-cycle-exact"
 KERNAL64C64OPTS+=" --ignore-config-file"
-KERNAL64C64OPTS+=" --prg-as-disk"
 
 function kernal64c64_check_environment
 {
     KERNAL64C64=$EMUDIR/k64.sh
-    
+
     if ! [ -x "$(command -v $JAVA_HOME/bin/java)" ]; then
         echo 'Error: java not installed.' >&2
         exit 1
     fi
-    
+
 }
 
 # $1  option
@@ -33,7 +32,7 @@ function kernal64c64_get_options
                 testprogvideotype="PAL"
             ;;
         "vicii-ntsc")
-              exitoptions="--ntsc true"
+              exitoptions="--ntsc true --screen-dim 1"
               testprogvideotype="NTSC"
           ;;
         "sid-old")
@@ -137,7 +136,7 @@ function kernal64c64_run_screenshot
     then
         if [ -f "$refscreenshotname" ]
         then
-        
+
             # defaults for PAL
             KERNAL64C64REFSXO=32
             KERNAL64C64REFSYO=35
@@ -145,6 +144,8 @@ function kernal64c64_run_screenshot
             KERNAL64C64SYO=35
 
             if [ "${refscreenshotvideotype}" == "NTSC" ]; then
+		            KERNAL64C64REFSXO=32
+                KERNAL64C64REFSYO=23
                 KERNAL64C64SXO=32
                 KERNAL64C64SYO=23
             fi
@@ -152,10 +153,12 @@ function kernal64c64_run_screenshot
             # when either the testbench was run with --ntsc, or the test is ntsc-specific,
             # then we need the offsets on the NTSC screenshot
             if [ "${videotype}" == "NTSC" ] || [ "${testprogvideotype}" == "NTSC" ]; then
+		            KERNAL64C64REFSXO=32
+                KERNAL64C64REFSYO=23
                 KERNAL64C64SXO=32
                 KERNAL64C64SYO=23
             fi
-        
+
             echo ./cmpscreens "$refscreenshotname" "$KERNAL64C64REFSXO" "$KERNAL64C64REFSYO" "$1"/.testbench/"$screenshottest"-kernal64c64.png "$KERNAL64C64SXO" "$KERNAL64C64SYO"
             ./cmpscreens "$refscreenshotname" "$KERNAL64C64REFSXO" "$KERNAL64C64REFSYO" "$1"/.testbench/"$screenshottest"-kernal64c64.png "$KERNAL64C64SXO" "$KERNAL64C64SYO"
             exitcode=$?
