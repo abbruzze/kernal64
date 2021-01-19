@@ -588,6 +588,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   }
   @inline private[this] def mem_write_0xD000_0xDFFF(address:Int,value:Int) : Unit = {
     ioacc = true
+    // TestCart
+    if (TestCart.enabled) TestCart.write(address,value)
     // VIC ---------------------------------------------------------------
     if (address < 0xD400) {
       // additional VIC registers D02F & D030
@@ -620,8 +622,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     else if (address < 0xDE00) cia_dd00.write(address,value)
     // I/O expansion slots 1 & 2 -----------------------------------------
     else expansionPort.write(address,value)
-    // TestCart
-    if (TestCart.enabled) TestCart.write(address,value)
   }
   /*
    * internal & external function ROM
