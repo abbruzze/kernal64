@@ -75,6 +75,11 @@ class CIA(val name:String,
   private[this] var irqOnNextClock = false
   private[this] var irqSrcOnNextClock = 0
 
+  private[this] var lastIcrMask = 0
+  private[this] var lastIcrMaskClock = 0L
+
+  private[this] val clk = Clock.systemClock
+
   @inline private def timerIdleCallBack(id:Int,idle:Boolean): Unit = {
     val lastRunning = timerABRunning(0) || timerABRunning(1)
     timerABRunning(id) = !idle
@@ -197,7 +202,6 @@ class CIA(val name:String,
     }
     
     def init : Unit = {
-      val clk = Clock.systemClock
       clk.addChangeFrequencyListener(f => {
         f match {
           case clk.PAL_CLOCK_HZ =>
@@ -229,9 +233,8 @@ class CIA(val name:String,
 
     @inline private def reschedule = {
       if (!manualClockTODUpdate) {
-        val clk = Clock.systemClock
         clk.cancel(componentID)
-        clk.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + TICK_CYCLES,tickCallback,TICK_SUBID))
+        clk.schedule(new ClockEvent(componentID,clk.currentCycles + TICK_CYCLES,tickCallback,TICK_SUBID))
       }
     }
     
@@ -394,7 +397,9 @@ class CIA(val name:String,
   }
 
   @inline private def setIRQ(src:Int) = {
-    if ((icrMask & icr) > 0) {
+    val deltaClock = if (ciaModel == CIA_MODEL_8521) 0 else 1
+    val currentIcrMask = if (clk.currentCycles == lastIcrMaskClock + deltaClock) lastIcrMask else icrMask
+    if ((currentIcrMask & icr) > 0) {
       icr |= 0x80
       Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
       irqAction(true)
@@ -404,8 +409,6 @@ class CIA(val name:String,
   @inline private def setIRQOnNextClock(src:Int): Unit = {
     if (ciaModel == CIA_MODEL_8521) setIRQ(src) // set immediately
     else {
-      //val clk = Clock.systemClock
-      //clk.schedule(new ClockEvent(componentID + "_IRQ", clk.currentCycles + 1, _ => setIRQ))
       irqOnNextClock = true
       irqSrcOnNextClock = src
     }
@@ -497,11 +500,12 @@ class CIA(val name:String,
     //println(s"$name SDR=${Integer.toHexString(value)} '${value.toChar}'")
       }
     case ICR =>
+      lastIcrMask = icrMask
+      lastIcrMaskClock = clk.currentCycles
       val mustSet = (value & 0x80) == 0x80 
       if (mustSet) icrMask |= value & 0x7f else icrMask &= ~value
       
       if ((icrMask & icr & 0x1f) != 0) {
-        val clk = Clock.systemClock
         val delay = if (ciaModel == CIA_MODEL_8521) 1 else 2
         clk.schedule(new ClockEvent(componentID + "_IRQ", clk.currentCycles + delay, _ => setIRQ(-1)))
       }

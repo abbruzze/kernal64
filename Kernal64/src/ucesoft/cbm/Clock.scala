@@ -100,8 +100,8 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
 
   private[this] var cycles = 0L
 
-  def currentCycles = cycles
-  def nextCycles = cycles + 1
+  final def currentCycles = cycles
+  final def nextCycles = cycles + 1
 
   def maximumSpeed = _maximumSpeed
   def maximumSpeed_=(maximumSpeed:Boolean) : Unit = {
