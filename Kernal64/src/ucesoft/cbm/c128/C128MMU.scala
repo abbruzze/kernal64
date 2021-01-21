@@ -679,7 +679,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
           if (reg == VIC_XSCAN_REG) return vic_xscan_reg | 0xF8
           if (reg == VIC_CLKRATE_REG) return vic_clkrate_reg | 0xFC
           return vic.read(address)
-        } 
+        }
+        /***** MMU is not visible in C64 mode
         if (address >= 0xD500 && address < 0xD50C) {
           // MMU REGS ----------------------------------------------------------
           if (address == MMU_CR1) return cr_reg
@@ -688,6 +689,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
           if (address == 0xD50B) return MMU_D50B_read
           // -------------------------------------------------------------------
         }
+         */
         if (address >= 0xD600 && address < 0xD700) return vdc.read(address)
         if (address < 0xD800) return sid.read(address)
         if (address < 0xDC00) return COLOR_RAM.read(address) & 0x0F | lastByteRead & 0xF0
@@ -736,8 +738,10 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
           else vic.write(address,value)
         }
         // MMU REGS ----------------------------------------------------------
+        /***** MMU is not visible in C64 mode
         else if (address == MMU_CR1) MMU_CR_write(value)
         else if (address > 0xD500 && address < 0xD50C) mem_write_D5xx(address,value)
+        */
         else if (address >= 0xD600 && address < 0xD700) vdc.write(address,value)
         // -------------------------------------------------------------------
         else if (address < 0xD800) sid.write(address,value)
