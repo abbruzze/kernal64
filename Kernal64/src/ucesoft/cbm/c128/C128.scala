@@ -251,7 +251,10 @@ class C128 extends CBMComputer with MMUChangeListener {
     // Flyer
     add(flyerIEC)
 
-    displayFrame.getContentPane.add("South",makeInfoPanel(true))
+    mmuStatusPanel.setVisible(false)
+    val statusPanel = makeInfoPanel(true)
+    statusPanel.add("West",mmuStatusPanel)
+    displayFrame.getContentPane.add("South",statusPanel)
     displayFrame.setTransferHandler(DNDHandler)    
     Log.info(sw.toString)
 
