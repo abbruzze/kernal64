@@ -24,12 +24,7 @@ object ExpansionPortFactory {
       val isRom = true
       def isActive = true
       def init  : Unit = {}
-      def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
-        if (!game && exrom) {
-          if (startAddress == 0xA000) data(address - 0xE000)
-          else data(address - startAddress)
-        } else data(address - startAddress)
-      }
+      def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = data(address & 0x1FFF)
 
       override def toString = s"ROM(${name})[startAddress=${Integer.toHexString(startAddress)} length=${length}]"
     }
@@ -124,6 +119,7 @@ object ExpansionPortFactory {
     val crt = new Cartridge(crtName)
     crt.ctrType match {
       case 1 => new ActionReplay(crt,nmiAction,ram)
+      case 2 => new KCS(crt,ram,nmiAction)
       case 3 => new FinalCartridgeIII(crt, nmiAction,ram)
       case 0 => new CartridgeExpansionPort(crt,ram)
       case 4 => new SimonsBasic(crt,ram)
