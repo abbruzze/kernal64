@@ -4,7 +4,7 @@ import ucesoft.cbm.{Clock, ClockEvent}
 import ucesoft.cbm.cpu.Memory
 
 trait FlashListener {
-  def flash(address:Int,value:Int,low:Boolean)
+  def flash(address:Int,value:Int,low:Boolean) : Unit
   def eraseSector : Unit
 }
 
