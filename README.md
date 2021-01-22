@@ -3,7 +3,7 @@
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
 
-Kernal64 ver 1.6.2_b8
+Kernal64 ver 1.7.0_b15
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -11,11 +11,9 @@ Kernal64 ver 1.6.2_b8
 
 ### Installation
 Go to https://github.com/abbruzze/kernal64/releases/latest and download and unzip on your computer the latest version.
-Be sure to have a jre (1.8 or above) in the path and launch:
+Be sure to have a jre (11 or above) in the path and launch:
 - On Windows: **k64.bat**, **kscpu64.bat** or **k128.bat**. If you want the shell support (for --help command line, for example) you could use the **k64s.bat**, **kscpu64s.bat** or **k128s.bat** scripts.
 - On Linux: **k64.sh**, **kscpu64.sh** or **k128.sh**.
-
-I experienced a boost in performance using Java 9+.
 
 The scripts start java with the -server option for performance reason. It could happen that your Java installation does not support the server option. In this case edit the script and remove the -server option.
 
@@ -23,6 +21,51 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.7.0_b15 (Jan 22th 2021)
+- General
+	- Added drives 10 and 11: 8 to 11 are the available disk drives. The old local (not true drive) 10 has been moved to 12.
+	- Removed drive's progress bar to optimize GUI space
+	- New local filesystem mode: the user can attach a local directory to a disk (8 - 11). The files will be loaded into a virtual D64 (if there's space for all) that will be written back to the source directory when closed.
+	- Added --prg-as-disk option: if checked every PRG file will be loaded as if it was a disk
+	- Added --fullscreen --vdc-fullscreen options
+	- Added --ignore-config-file option: if activated the emulator will not load any configuration file at start up.
+	- Added Single Frame Mode for VIC & VDC : when in Single Frame Mode the user can advance in the emulation frame by frame.
+	- Added cassette's controls over cassette's panel. Added forward & rewind controls.
+	- Added Reset (CTRL+ALT+R) command that restores the last PRG file 
+	- Added Hard Reset
+	- Fixed LAX_I constant to 0xEE always
+	- Fixed handling of G64 disk: now it's possible to write on empty tracks
+	- Fixed CRT Comal80
+	- Fixed ULTIMAX mode: writings to roms don't affect underlying ram.
+	- Fixed testcart when screeshot is requested: must wait at least 1 frame. When IO is not active now testcart is disabled.
+	- Fixed CPU 6510: must set I on reset
+	- Added display effects: mirroring and flipping
+	- Added tape counter
+	- Improved tap handling: user can select in the preview panel which entry to run. Added tap counter on GUI
+	- Modified border handling: removed check on cycle 63 in checkVertical
+	- Added under various VIC menù the possibility to hide VIC's borders
+	- VIC's new colodor Palette
+	- Fixed SID's mute setting: after reset mute setting is preserved
+	- Added support for NTSC
+	- New brand Assembler (inspired by KickAssembler) with breakpoints, macros, high level statements, etc. see https://github.com/abbruzze/kernal64/tree/master/Kernal64/asm
+	- Added EasyFlash support for flashing roms. Added EasyFlash jumper on GUI settings.
+	- Added ROM reloading to change rom content without restarting emulator.
+	- Added Settings panel on Help menu.
+	- Added Cart Info panel on Cartridge menu.
+	- Added new options for roms: --kernal, --charrom, --basic, etc.
+	- Changed process exit code when a bad line argument is encountered: from 1 to 100 (for testbench)
+- C64
+	- Support for BeamRacer card (https://beamracer.net)
+    ![](https://github.com/abbruzze/kernal64/blob/master/images/BeamRacer/bitmap.gif)
+    ![](https://github.com/abbruzze/kernal64/blob/master/images/BeamRacer/reflections.gif)
+- C128
+	- Fixed function rom handling: if rom's size < 16K the mid rom is copied in the high rom. Now TurboAssembler128 works.
+	- VDC: added on the VDC window the possibility to handle or not the automatic resolution adaptation of the monitor. Needed to run properly VDC-MCD demo (https://csdb.dk/release/?id=197895)
+	- VDC: added handling of reg 27 > 0 to attributes processing in case of bitmap mode
+	- Fixed testcart: when IO is not active now testcart is disabled
+
+ 
 
 ### What's new in 1.6.2_b8 (Oct 19th 2020) (update)
 - C128
