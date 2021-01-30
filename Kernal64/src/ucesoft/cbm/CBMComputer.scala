@@ -11,7 +11,7 @@ import ucesoft.cbm.cpu.{CPU65xx, Memory, ROM}
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.expansion.cpm.CPMCartridge
 import ucesoft.cbm.formats._
-import ucesoft.cbm.formats.cart.EasyFlash
+import ucesoft.cbm.formats.cart.{EasyFlash, GMOD3}
 import ucesoft.cbm.game.{GamePlayer, GameUI}
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral.bus.IECBus
@@ -70,6 +70,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val detachCtrItem = new JMenuItem("Detach cartridge")
   protected val cartMenu = new JMenu("Cartridge")
   protected val easyFlashWriteChangesItem = new JMenuItem("Write changes")
+  protected val GMOD3WriteChangesItem = new JMenuItem("GMOD3 Write changes")
 
   protected val settings = new ucesoft.cbm.misc.Settings
 
@@ -593,7 +594,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     try {
       if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
       ExpansionPort.getExpansionPort.eject
-      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.setLine(Switcher.CRT,_),nmiSwitcher.setLine(Switcher.CRT,_),getRAM,configuration)
+      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.setLine(Switcher.CRT,_),nmiSwitcher.setLine(Switcher.CRT,_),getRAM,mmu,configuration)
       println(ep)
       cartMenu.setVisible(true)
       ExpansionPort.setExpansionPort(ep)
@@ -604,6 +605,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       detachCtrItem.setEnabled(true)
       // easyflash
       easyFlashWriteChangesItem.setEnabled(ep.isInstanceOf[EasyFlash])
+      // GMOD3
+      GMOD3WriteChangesItem.setEnabled(ep.isInstanceOf[GMOD3])
     }
     catch {
       case t:Throwable =>
@@ -794,6 +797,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     cartMenu.setVisible(false)
     // easyflash
     easyFlashWriteChangesItem.setEnabled(false)
+    // GMOD 3
+    GMOD3WriteChangesItem.setEnabled(false)
     ExpansionPort.currentCartFileName = ""
   }
 
@@ -2361,6 +2366,17 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     parent.add(easyFlashMenu)
   }
 
+  protected def setGMOD3FlashSettings(parent:JMenu) : Unit = {
+    val gmodMenu = new JMenu("GMOD ...")
+    val gmod2Item = new JMenuItem("GMOD2 eeprom file...")
+    gmod2Item.addActionListener(_ => chooseGMod2 )
+    gmodMenu.add(gmod2Item)
+    GMOD3WriteChangesItem.setEnabled(false)
+    gmodMenu.add(GMOD3WriteChangesItem)
+    GMOD3WriteChangesItem.addActionListener(_ => GMOD3WriteChanges )
+    parent.add(gmodMenu)
+  }
+
   protected def easyFlashWriteChanges : Unit = {
     ExpansionPort.getInternalExpansionPort match {
       case ef:EasyFlash =>
@@ -2368,6 +2384,15 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       case _ =>
     }
   }
+
+  protected def GMOD3WriteChanges : Unit = {
+    ExpansionPort.getInternalExpansionPort match {
+      case ef:GMOD3 =>
+        ef.createCRT
+      case _ =>
+    }
+  }
+
 
   protected def reloadROM(resource:String,location:String) : Unit = {
     val oldLocation = configuration.getProperty(resource)
