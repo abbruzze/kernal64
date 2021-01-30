@@ -279,7 +279,10 @@ object C64MMU {
 
     final def read(_address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       val address = _address & 0xFFFF
-      if (isForwardRead) forwardReadTo.read(address)
+      if (isForwardRead) {
+        val read = forwardReadTo.read(address)
+        if (read >= 0) return read
+      }
       if (ULTIMAX) {
         if (chipID == ChipID.VIC) {
           val bank = address & 0xF000

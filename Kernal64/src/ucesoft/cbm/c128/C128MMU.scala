@@ -375,7 +375,10 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // 8502 =======================================================================
   @inline private[this] def ioenabled : Boolean = (cr_reg & 1) == 0
   @inline private[this] def read128(address: Int): Int = {
-    if (isForwardRead) forwardReadTo.read(address)
+    if (isForwardRead) {
+      val read = forwardReadTo.read(address)
+      if (read >= 0) return read
+    }
     // 0/1 ports --------------------------------------------
     if (address == 0) return _0
     if (address == 1) return read128_1
@@ -659,7 +662,10 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     if (ULTIMAX) {
       if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return lastByteRead
     }
-    if (isForwardRead) forwardReadTo.read(address)
+    if (isForwardRead) {
+      val read = forwardReadTo.read(address)
+      if (read > 0) return read
+    }
     if (address == 0) return _0
     if (address == 1) return read64_1 
     if (address < 0x8000) return ram.read(address)
