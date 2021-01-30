@@ -16,7 +16,7 @@ object ProgramLoader {
     if (c64Mode) {
       if (loadingWithWarpEnabled) {
         val pc = cpu.getCurrentInstructionPC
-        if (pc == 0xF4E8 && !loadingWithWarp) {
+        if (pc == 0xF4A5 && !loadingWithWarp) {
           loadingWithWarp = true
           if (warpModeListener != null) warpModeListener(true)
         }
