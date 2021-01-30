@@ -481,9 +481,7 @@ class SCPUC64 extends CBMComputer {
 
     IOItem.addSeparator
 
-    val gmod2Item = new JMenuItem("GMOD2 eeprom file...")
-    gmod2Item.addActionListener(_ => chooseGMod2)
-    IOItem.add(gmod2Item)
+    setGMOD3FlashSettings(IOItem)
 
     setEasyFlashSettings(IOItem)
 

@@ -779,8 +779,6 @@ class C128 extends CBMComputer with MMUChangeListener {
     optionMenu.addSeparator
 
     setSIDSettings(optionMenu)
-    
-    optionMenu.addSeparator
 
     setDrivesSettings
     
@@ -814,10 +812,8 @@ class C128 extends CBMComputer with MMUChangeListener {
     setDigiMAXSettings(IOItem)
     
     IOItem.addSeparator
-    
-    val gmod2Item = new JMenuItem("GMOD2 eeprom file...")
-    gmod2Item.addActionListener(_ => chooseGMod2 )
-    IOItem.add(gmod2Item)
+
+    setGMOD3FlashSettings(IOItem)
 
     setEasyFlashSettings(IOItem)
     

@@ -31,18 +31,18 @@ object ExpansionPortFactory {
     val name = crt.name
     val crtType = crt.ctrType
     // ROML Banks
-    protected val romlBanks : mutable.HashMap[Int,Memory] = {
+    protected val romlBanks : mutable.LinkedHashMap[Int,Memory] = {
       val banks = crt.chips filter { c => c.startingLoadAddress >= 0x8000 && c.startingLoadAddress < 0xA000 } map { c =>
         val data = Array.ofDim[Int](8192)
         val size = if (c.romSize > 8192) 8192 else c.romSize
         Array.copy(c.romData, 0, data, 0, size)
         convertBankNumber(c.bankNumber) -> (new ROM(s"${crt.name}-roml-${convertBankNumber(c.bankNumber)}", c.startingLoadAddress, size, data): Memory)
       }
-      val map = new mutable.HashMap[Int,Memory]()
+      val map = new mutable.LinkedHashMap[Int,Memory]()
       map.addAll(banks)
     }
     // ROMH Banks
-    protected val romhBanks : mutable.HashMap[Int,Memory] = {
+    protected val romhBanks : mutable.LinkedHashMap[Int,Memory] = {
       val banks = crt.chips filter { c =>
         (c.startingLoadAddress >= 0xA000 && c.startingLoadAddress < 0xC000) ||
           c.startingLoadAddress >= 0xE000 ||
@@ -56,7 +56,7 @@ object ExpansionPortFactory {
         } else c.startingLoadAddress
         convertBankNumber(c.bankNumber) -> (new ROM(s"${crt.name}-romh-${convertBankNumber(c.bankNumber)}", startAddress, size, data): Memory)
       }
-      val map = new mutable.HashMap[Int,Memory]()
+      val map = new mutable.LinkedHashMap[Int,Memory]()
       map.addAll(banks)
       map
     }
@@ -114,7 +114,7 @@ object ExpansionPortFactory {
   }
 
   // ====================================================================================================
-  def loadExpansionPort(crtName: String, irqAction: (Boolean) => Unit, nmiAction: (Boolean) => Unit, ram: Memory,config:Properties): ExpansionPort = {
+  def loadExpansionPort(crtName: String, irqAction: (Boolean) => Unit, nmiAction: (Boolean) => Unit, ram: Memory,forwardRam:Memory,config:Properties): ExpansionPort = {
     import cart._
     val crt = new Cartridge(crtName)
     crt.ctrType match {
@@ -136,6 +136,7 @@ object ExpansionPortFactory {
       case 13 => new FinalCartridgeI(crt,ram)
       case 20 => new SuperSnapshot5(crt,nmiAction,ram)
       case 60 => new GMOD2(crt,ram,config)
+      case 62 => new GMOD3(crt,ram,forwardRam)
       case 18 => new Zaxxon(crt,ram)
       case 51 => new Mach5(crt,ram)
       case 53 => new PageFox(crt,ram)
