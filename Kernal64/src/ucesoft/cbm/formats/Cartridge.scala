@@ -26,13 +26,16 @@ class Cartridge(val file:String) {
     var romData : Array[Int] = null
     
     def load(in:RandomAccessFile) : Unit = {
+      def nextByte : Int = in.readByte.toInt & 0xFF
       if (in.readByte != 'C' || in.readByte != 'H' || in.readByte != 'I' || in.readByte != 'P') throw new IOException("CHIP signature not found")
       in.skipBytes(6)
-      bankNumber = in.readByte * 256 + in.readByte
-      startingLoadAddress = (in.readByte << 8 + in.readByte) & 0xFFFF
-      romSize = (in.readByte * 256 + in.readByte) & 0xFFFF
+      bankNumber = (nextByte << 8) + nextByte
+      startingLoadAddress = ((nextByte << 8) + nextByte) & 0xFFFF
+      romSize = ((nextByte << 8) + nextByte) & 0xFFFF
+      val buffer = Array.ofDim[Byte](romSize)
+      in.read(buffer)
       romData = Array.ofDim(romSize)
-      for(i <- 0 until romSize) romData(i) = in.readByte.toInt & 0xFF
+      for(i <- 0 until romSize) romData(i) = buffer(i).toInt & 0xFF
     }
     
     override def toString = s"CHIP bank=${bankNumber} loadAddress=${Integer.toHexString(startingLoadAddress)} romSize=${romSize}"
