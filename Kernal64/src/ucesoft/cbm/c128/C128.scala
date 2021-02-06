@@ -346,6 +346,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   
   protected def setDMA(dma:Boolean) : Unit = {
     this.dma = dma
+    mmu.setDMA(dma)
     if (z80Active) z80.requestBUS(dma) else cpu.setDMA(dma)    
   }
   

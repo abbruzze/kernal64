@@ -36,6 +36,8 @@ private[c128] class C128RAM extends RAMComponent {
   // page 0 & 1 ------------------------------------
   private[this] var page_0,page_0_bank,page_1_bank = 0
   private[this] var page_1 = 1
+  // DMA
+  private[this] var dma = false
   // -----------------------------------------------
   private object Bank0 extends Memory {
     val isRom = false
@@ -50,6 +52,8 @@ private[c128] class C128RAM extends RAMComponent {
   }
   
   def getBank0 : Memory = Bank0
+
+  final def setDMA(dma:Boolean) : Unit = this.dma = dma
   
   override def getProperties = {
     super.getProperties
@@ -199,6 +203,8 @@ private[c128] class C128RAM extends RAMComponent {
   
   final def read(_address: Int, chipID: ChipID.ID = ChipID.CPU) : Int = {
     if (chipID == ChipID.VIC) return mem(VICbank)(_address)
+
+    if (dma) return mem(VICbank)(_address) // to be investigated if it's correct
     
     val address = page_0_1(_address) & 0xFFFF
     if (_address < 0x100) return mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_0_bank)(address)
@@ -220,6 +226,10 @@ private[c128] class C128RAM extends RAMComponent {
   }
   
   final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
+    if (dma) { // to be investigated if it's correct
+      mem(VICbank)(_address) = value
+      return
+    }
     val address = page_0_1(_address) & 0xFFFF
     if (_address < 0x100) mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_0_bank)(address) = value
     else if (_address < 0x200) mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_1_bank)(address) = value
@@ -259,6 +269,7 @@ private[c128] class C128RAM extends RAMComponent {
     out.writeInt(page_1)
     out.writeInt(page_0_bank)
     out.writeInt(page_1_bank)
+    out.writeBoolean(dma)
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     expanded = in.readBoolean    
@@ -278,6 +289,7 @@ private[c128] class C128RAM extends RAMComponent {
     page_1 = in.readInt
     page_0_bank = in.readInt
     page_1_bank = in.readInt
+    dma = in.readBoolean
   }
   protected def allowsStateRestoring = true
 }

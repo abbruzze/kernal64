@@ -117,6 +117,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   def colorRAM = COLOR_RAM
   def RAM = ram
   def CHAR_ROM = CHARACTERS128_ROM
+
+  final def setDMA(dma:Boolean) : Unit = ram.setDMA(dma)
   
   override def getProperties = {
     properties.setProperty("VIC bank",vicBank.toString)
