@@ -1,10 +1,9 @@
 package ucesoft.cbm.c64
 
 import ucesoft.cbm.peripheral.vic.VICMemory
-import ucesoft.cbm.Log
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.ChipID
+import ucesoft.cbm.{CBMComponentType, ChipID, Clock, ClockEvent, Log}
 import ucesoft.cbm.cpu.{CPU65xx, Memory}
+
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import java.util.Properties
@@ -21,6 +20,7 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
   private[this] var baseAddress = 0
   private[this] var memLastByteRead = 0
   private[this] var ultimax = false
+  private[this] var isGlueLogicCustom = false
   
   def getBank = bank
   
@@ -40,8 +40,23 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
     super.getProperties
   }
 
+  final def setCustomGlueLogic(custom:Boolean) : Unit = this.isGlueLogicCustom = custom
+
   final def setVideoBank(bank: Int) : Unit = {
-    this.bank = ~bank & 3
+    var b = ~bank & 3
+    if (isGlueLogicCustom) {
+      if ((b ^ this.bank) == 3) {
+        val nextCycleBank = b
+        b = 3
+        val clk = Clock.systemClock
+        clk.schedule(new ClockEvent("VICBankCustomIC", clk.nextCycles, _ => {
+          this.bank = nextCycleBank
+          baseAddress = this.bank << 14
+        }))
+      }
+    }
+
+    this.bank = b
     baseAddress = this.bank << 14
     //Log.debug(s"Set VIC bank to ${bank}. Internal bank is ${this.bank}")
   }
