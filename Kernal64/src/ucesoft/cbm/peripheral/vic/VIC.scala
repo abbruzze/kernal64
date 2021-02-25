@@ -90,10 +90,6 @@ final class VIC(mem: VICMemory,
   private[this] var xCoord : Array[Int] = _
   private[this] var drawBorderOpt = true
   private[this] var pendingDrawBorderModeChange = false
-  // --------------------- DEBUG --------------------------------------------------------------------------
-  private[this] var traceRasterLineInfo = false
-  final private[this] val traceRasterLineBuffer = Array.fill(SCREEN_WIDTH)("")
-  private[this] var traceRasterLine = 0
   // ------------------------ C128 $D030 test bit & others ------------------------------------------------
   private[this] var c128TestBitEnabled = false
   private[this] var refreshCycle = false
@@ -228,6 +224,7 @@ final class VIC(mem: VICMemory,
    * Set Background Color 0 - 3 to one of the 16 Colors ($00-$0F)
    */
   final private[this] val backgroundColor = Array(0, 0, 0, 0)
+
   // Last background drawn
   private[this] var lastBackground = 0
   /*
@@ -247,6 +244,17 @@ final class VIC(mem: VICMemory,
   final private[this] val sprites = Array(new Sprite(0), new Sprite(1), new Sprite(2), new Sprite(3), new Sprite(4), new Sprite(5), new Sprite(6), new Sprite(7))
   private[this] var spritesDisplayedMask = 0
   private[this] var spriteDMAon = 0
+
+  // PIPELINE =============================================================================
+  private[this] var dataToDrawPipe = 0L
+  private[this] var vmliToDrawPipe = 0
+  private[this] var rasterCycleToDrawPipe = 0
+  private[this] var displayLineToDrawPipe = 0
+  private[this] var rasterCycleToDraw, displayLineToDraw = 0
+  final private[this] val shadowBackgroundColor = Array(0, 0, 0, 0)
+  private[this] var backgroundColorChangedIndex = -1
+  private[this] var shadowBorderColor = -1
+  // ======================================================================================
 
   // ---------------------------- PIXELS --------------------------------------------------
   //  grey dot gfx info |...|doc 1|doc 0|sprite priority|sp 2|sp 1|sp 0|transparent|background/foreground|c3|c2|c1|c0|
@@ -361,7 +369,7 @@ final class VIC(mem: VICMemory,
     }
 
     final def producePixels : Unit = {
-      var xcoord = xCoord(rasterCycle)
+      var xcoord = xCoord(rasterCycleToDraw)
       var i = 0
       var finished = false
 
@@ -419,7 +427,6 @@ final class VIC(mem: VICMemory,
       if ((pixel & PIXEL_TRANSPARENT) == 0) hasPixels = true
       if (dataPriority) pixel |= PIXEL_SPRITE_PRIORITY
       pixel |= index << 6
-      if (traceRasterLineInfo) pixel |= PIXEL_DOX_S
       pixel
     }
 
@@ -444,10 +451,14 @@ final class VIC(mem: VICMemory,
         mc = (mc + 1) & 0x3F
       }
       else
-      if (first) gdata = internalDataBus << 16
+      if (first) {
+        gdata <<= 8
+        gdata |= internalDataBus
+      }
       else {
-        mem.read(0x3FFF,ChipID.VIC)
-        gdata |= mem.lastByteRead << 8 | internalDataBus
+        val ghost = mem.read(0x3FFF,ChipID.VIC)
+        gdata <<= 16
+        gdata |= ghost << 8 | internalDataBus
         //hasPixels = false
       } // idle access
     }
@@ -482,7 +493,10 @@ final class VIC(mem: VICMemory,
           spritesDisplayedMask |= DMA_INDEX
         }
       }
-      else display = false
+      else {
+        display = false
+        spritesDisplayedMask &= ~DMA_INDEX
+      }
     }
     // state
     protected def saveState(out:ObjectOutputStream) : Unit = {
@@ -541,35 +555,25 @@ final class VIC(mem: VICMemory,
     private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
     private[this] val pixels = Array.fill(8)(PIXEL_TRANSPARENT)
     private[this] var lastBorderColor = -1
-    //private[this] var drawBorder = false
 
     def init : Unit = {}
     def reset : Unit = {}
 
-    final def getPixels : Array[Int] = if (isBlank || !drawBorderOpt/* || !drawBorder*/) ALL_TRANSPARENT else pixels
+    final def getPixels : Array[Int] = if (isBlank || !drawBorderOpt) ALL_TRANSPARENT else pixels
 
     final def producePixels  : Unit = {
-      // optimization
-      /*
-      drawBorder = !den ||
-        rasterLine <= TOP_BOTTOM_FF_COMP(rsel)(0) ||
-        rasterLine >= TOP_BOTTOM_FF_COMP(rsel)(1) ||
-        (rasterCycle > 8 && rasterCycle < 17) || (rasterCycle > 53 && rasterCycle < 61)
-      if (!drawBorder) return
-      */
-      // if we're surely inside the gfx area, the border pixels are the same as previous cycle
-
       if (!drawBorderOpt) return
 
-      val inSideGfx = false//!is8565 && rasterCycle > 17 && rasterCycle < 53 && lastBorderColor == borderColor
-      if (!isBlank && !inSideGfx) {
-        var xcoord = xCoord(rasterCycle)
-        val color = if (traceRasterLineInfo) borderColor | PIXEL_DOX_B else borderColor
+      if (!isBlank) {
+        var xcoord = xCoord(rasterCycleToDraw)
 
         checkVertical
 
         var i = 0
         while (i < 8) {
+          val color = if (i < 1) {
+            if (shadowBorderColor == -1) borderColor else shadowBorderColor
+          } else borderColor
           val hasBorder = checkBorderFF(xcoord)
           pixels(i) = if (hasBorder) {
             if (is8565 && i == 0 && lastColorReg == 0xFA) 0x0F else color
@@ -632,22 +636,10 @@ final class VIC(mem: VICMemory,
     val componentID = "GFXShifter"
     val componentType = CBMComponentType.INTERNAL
     private[this] var gdata,gdataLatch = 0
-    //private[this] val xscrollBuffer = Array.fill(8)(PIXEL_BLACK)
     private[this] val pixels = Array.fill(8)(PIXEL_TRANSPARENT)
-
-    private[this] var mcm, ecm, isBlank = false
-    private[this] var vml_p, vml_c: Array[Int] = _
-    private[this] var vmli = 0
-    private[this] var isInDisplayState = false
     private[this] var mcFlop = 0
 
     final def getPixels = pixels
-
-    final def setData(gdata: Int) : Unit = {
-      this.gdataLatch = gdata
-      //this.gdata = gdata
-      //mcFlop = 0
-    }
 
     final def init : Unit = {}
     final def reset : Unit = {
@@ -657,14 +649,16 @@ final class VIC(mem: VICMemory,
 
     @inline private def shift(counter:Int) = {
       val vmli = if (counter < xscroll) {
-        if (this.vmli > 0) this.vmli - 1 else 0
+        if (vmliToDraw > 0) vmliToDraw - 1 else 0
       }
-      else this.vmli
+      else vmliToDraw
 
       if (counter == xscroll) {
         gdata = gdataLatch
         mcFlop = 0
       }
+
+      val backgroundColor = if (counter < 1) shadowBackgroundColor else VIC.this.backgroundColor
 
       val pixel = if (isBlank || gdata < 0) PIXEL_BLACK
       else if (!bmm) { // text mode
@@ -759,24 +753,17 @@ final class VIC(mem: VICMemory,
       pixel
     }
 
-    final def producePixels : Unit = {
-      isBlank = VIC.this.isBlank
-      mcm = VIC.this.mcm
-      ecm = VIC.this.ecm
-      vml_p = VIC.this.vml_p
-      vml_c = VIC.this.vml_c
-      vmli = VIC.this.vmliToDraw
-      isInDisplayState = VIC.this.isInDisplayState
-
+    final def producePixels(gdata:Int) : Unit = {
+      gdataLatch = gdata
       // light pen checking
       var xcoord = 0
       var lpx = 0
       var baseX = 0
-      val checkLP = lightPenEnabled && rasterLine == display.getLightPenY
+      val checkLP = lightPenEnabled && displayLineToDraw == display.getLightPenY
       if (checkLP) {
-        xcoord = xCoord(rasterCycle)
+        xcoord = xCoord(rasterCycleToDraw)
         lpx = display.getLightPenX
-        baseX = rasterCycle << 3
+        baseX = rasterCycleToDraw << 3
       }
       var counter = 0
       while (counter < 8) {
@@ -793,13 +780,11 @@ final class VIC(mem: VICMemory,
     // state
     protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeInt(gdata)
-      //out.writeObject(xscrollBuffer)
       out.writeInt(gdataLatch)
       out.writeInt(mcFlop)
     }
     protected def loadState(in:ObjectInputStream) : Unit = {
       gdata = in.readInt
-      //loadMemory[Int](xscrollBuffer,in)
       gdataLatch = in.readInt
       mcFlop = in.readInt
 
@@ -925,8 +910,8 @@ final class VIC(mem: VICMemory,
   def triggerLightPen : Unit = {
     if (canUpdateLightPenCoords) {
       canUpdateLightPenCoords = false
-      lightPenXYCoord(0) = (xCoord(rasterCycle) >> 1) & 0xFF
-      lightPenXYCoord(1) = rasterLine & 0xFF
+      lightPenXYCoord(0) = ((xCoord(rasterCycle) >> 1) & 0xFF) + 2
+      lightPenXYCoord(1) = displayLine & 0xFF
       interruptControlRegister |= 8
       // check if we must set interrupt
       //if ((interruptControlRegister & interruptMaskRegister & 0x0f) != 0) irqRequest
@@ -1090,10 +1075,13 @@ final class VIC(mem: VICMemory,
         //Log.fine("Sprite X expansion set to " + Integer.toBinaryString(spriteXExpansion))
         case 30 | 31 => // can't be written
         case 32 =>
+          shadowBorderColor = borderColor
           borderColor = value & 0x0F
           lastColorReg = 0xFA // value for border reg
         //Log.debug("VIC border color set to " + borderColor)
         case 33 | 34 | 35 | 36 =>
+          shadowBackgroundColor(offset - 33) = backgroundColor(offset - 33)
+          backgroundColorChangedIndex = offset - 33
           backgroundColor(offset - 33) = value & 0x0F
           lastColorReg = offset - 33
         //Log.debug("VIC background color #%d set to %d".format(offset - 33,value))
@@ -1138,9 +1126,19 @@ final class VIC(mem: VICMemory,
     }
     refreshCycle = false
 
-    //if (coprocessor != null && coprocessor.isActive) coprocessor.cycle(rasterLine,rasterCycle)
+    // End of PHI2 phase
+
+    if (badLine && rasterCycle > 14 && rasterCycle < 55) cAccess
 
     drawCycle
+
+    if (backgroundColorChangedIndex != -1) {
+      shadowBackgroundColor(backgroundColorChangedIndex) = backgroundColor(backgroundColorChangedIndex)
+      backgroundColorChangedIndex = -1
+    }
+    if (shadowBorderColor != -1) {
+      shadowBorderColor = -1
+    }
 
     if (rasterCycle == model.RASTER_CYCLES) {
       rasterCycle = 0
@@ -1150,18 +1148,14 @@ final class VIC(mem: VICMemory,
 
     rasterCycle += 1
 
-    if (showDebug) {
-      display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
-    }
+    if (showDebug) display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
 
-    dataToDraw = -1
-    vmliToDraw = vmli
+    var dataToDraw = -1
+    vmliToDrawPipe = vmliToDrawPipe << 8 | vmli
 
     if (badLine) isInDisplayState = true
 
     if (rasterLine == 0x30) denOn30 |= den
-
-    //if (coprocessor != null && coprocessor.isActive) coprocessor.cycle(rasterLine,rasterCycle)
 
     // ----------------------------------------------
 
@@ -1173,17 +1167,9 @@ final class VIC(mem: VICMemory,
       case 2 =>
         // check raster line with raster latch if irq enabled
         if (rasterLine == 0) checkRasterIRQ
-      case 3 =>
-      case 4 =>
-      case 5 =>
-      case 6 =>
-      case 7 =>
-      case 8 =>
-      case 9 =>
-      case 10 =>
+      case 3|4|5|6|7|8|9|10 =>
       case 11 =>
-        mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
-        refreshCycle = true
+        refreshAccess
       case 55 =>
         var c = 0
         while (c < 8) {
@@ -1192,21 +1178,18 @@ final class VIC(mem: VICMemory,
         }
         if (isInDisplayState) {
           // g-access
-          dataToDraw = readCharFromMemory
+          dataToDraw = gAccess
           vc = (vc + 1) & 0x3FF //% 1024
           vmli = (vmli + 1) & 0x3F
         }
         else dataToDraw = idleAccess
       case 56 =>
-        //mem.read(0x3FFF,ChipID.VIC)
         var c = 0
         while (c < 8) {
           sprites(c).check55_56(false)
           c += 1
         }
       case 57 =>
-        //mem.read(0x3FFF,ChipID.VIC)
-      // ---------------------------------------------------------------
       case 58 =>
         var c = 0
         while (c < 8) {
@@ -1223,50 +1206,37 @@ final class VIC(mem: VICMemory,
           isInDisplayState = true
         }
       // ---------------------------------------------------------------
-      case 59 =>
-      case 60 =>
-      case 61 =>
-      case 62 =>
-      case 63 =>
-      case _ if rasterCycle < 55 => // 12 - 54
+      case 59|60|61|62|63 =>
+      case 12|13 =>
         setBaLow(badLine)
-        if (isInDisplayState && rasterCycle >= 16) {
+        refreshAccess
+      case 14 =>
+        setBaLow(badLine)
+        refreshAccess
+        vc = vcbase
+        vmli = 0
+        if (badLine) rc = 0
+      case 15 =>
+        setBaLow(badLine)
+        refreshAccess
+      case _ if rasterCycle < 55 => // 16 - 54
+        setBaLow(badLine)
+        if (isInDisplayState) {
           // g-access
-          dataToDraw = readCharFromMemory
+          dataToDraw = gAccess
           vc = (vc + 1) & 0x3FF
           vmli = (vmli + 1) & 0x3F
-          // c-access
-          if (badLine) readAndStoreVideoMemory
         }
-        else
-        if (!isInDisplayState && rasterCycle >= 16) dataToDraw = idleAccess
+        else dataToDraw = idleAccess
 
-        (rasterCycle : @switch) match {
-          case 12 =>
-            mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
-            refreshCycle = true
-          case 13 =>
-            mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
-            refreshCycle = true
-          case 14 =>
-            mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
-            refreshCycle = true
-            vc = vcbase
-            vmli = 0
-            if (badLine) rc = 0
-          case 15 =>
-            mem.read(0x3F00 | ref,ChipID.VIC) ; ref = (ref - 1) & 0xFF // DRAM REFRESH
-            refreshCycle = true
-            // c-access
-            if (badLine) readAndStoreVideoMemory
-          case 16 =>
-            var c = 0
-            while (c < 8) {
-              sprites(c).check16
-              c += 1
-            }
-          case _ =>
+        if (rasterCycle == 16) {
+          var c = 0
+          while (c < 8) {
+            sprites(c).check16
+            c += 1
+          }
         }
+
       case _ => // rasterCycle > 54
     }
 
@@ -1278,7 +1248,7 @@ final class VIC(mem: VICMemory,
         val first = (sprInfo & (1 << 16)) > 0
         sprites(sprite - 1).readMemoryData(first)
       }
-      else if (!refreshCycle && dataToDraw == -1) mem.read(0x3FFF,ChipID.VIC)
+      if (sprite == 0 && !refreshCycle && dataToDraw == -1) mem.read(0x3FFF,ChipID.VIC)
       val ba = sprInfo & 0xFF
       setBaLow((spriteDMAon & ba) > 0)
     }
@@ -1286,6 +1256,17 @@ final class VIC(mem: VICMemory,
 
     internalDataBus = 0xFF
     if (coprocessor != null && coprocessor.isActive) coprocessor.cycle(rasterLine,rasterCycle)
+
+    // PIPELINE
+    dataToDrawPipe = dataToDrawPipe << 32 | (dataToDraw & 0xFFFFFFFFL)
+    displayLineToDrawPipe = displayLineToDrawPipe << 16 | displayLine
+    rasterCycleToDrawPipe = rasterCycleToDrawPipe << 8 | rasterCycle
+  }
+
+  private def refreshAccess : Unit = {
+    mem.read(0x3F00 | ref,ChipID.VIC)
+    ref = (ref - 1) & 0xFF // DRAM REFRESH
+    refreshCycle = true
   }
 
   @inline private def idleAccess : Int = {
@@ -1324,17 +1305,6 @@ final class VIC(mem: VICMemory,
     }
   }
 
-  @inline private[this] def tracePixel(pixel: Int, x: Int) : Unit = {
-    val source = (pixel >> 10) & 3 match {
-      case 0 => 'N'
-      case 1 => 'B'
-      case 2 => 'G'
-      case 3 => 'S'
-    }
-    val color = pixel & 0x0F
-    val isForeground = (pixel & PIXEL_FOREGROUND) > 0
-    traceRasterLineBuffer(x) = "%c%2d%c%s%s".format(source,color, if (isForeground) 'F' else 'B', if (mcm) "M" else "", if (ecm) "E" else "")
-  }
   @inline private[this] def drawPixel(index: Int, y: Int, pixel: Int) = {
     val color = VIC_RGB(pixel & 0x0F)
     if (displayMem(index) != color) {
@@ -1350,25 +1320,28 @@ final class VIC(mem: VICMemory,
   }
 
   @inline private def drawCycle : Unit = {
+    // PIPELINE ===================
+    rasterCycleToDraw = (rasterCycleToDrawPipe >> 8) & 0xFF
+    displayLineToDraw = (displayLineToDrawPipe >> 16) & 0xFFFF
+    dataToDraw = ((dataToDrawPipe >> 32) & 0xFFFFFFFF).toInt
+    vmliToDraw = (vmliToDrawPipe >> 8) & 0xFF
+    // ============================
     val almostOneSprite = spritesDisplayedMask > 0
 
-    val outOfYScreen = displayLine <= model.BLANK_TOP_LINE || displayLine >= model.BLANK_BOTTOM_LINE
+    val outOfYScreen = displayLineToDraw <= model.BLANK_TOP_LINE || displayLineToDraw >= model.BLANK_BOTTOM_LINE
     isBlank = outOfYScreen
     if (outOfYScreen) return
-    val outOfXScreen = rasterCycle < model.BLANK_LEFT_CYCLE || rasterCycle > model.BLANK_RIGHT_CYCLE
+    val outOfXScreen = rasterCycleToDraw < model.BLANK_LEFT_CYCLE || rasterCycleToDraw > model.BLANK_RIGHT_CYCLE
     isBlank |= outOfXScreen
 
     val y = displayLine
-    val x = (rasterCycle - 1) << 3
+    val x = (rasterCycleToDraw - 1) << 3
     var index = y * SCREEN_WIDTH + x
     var s, i = 0
 
     // --------------------- GFX -------------------------
     val borderOnOpt = verticalBorderFF && rasterLine != TOP_BOTTOM_FF_COMP(rsel)(0)
-    if (!borderOnOpt && dataToDraw >= 0) {
-      gfxShifter.setData(dataToDraw)
-      gfxShifter.producePixels
-    }
+    if (!borderOnOpt && dataToDraw >= 0) gfxShifter.producePixels(dataToDraw)
     // ------------------- Sprites -----------------------
 
     if (almostOneSprite)
@@ -1463,7 +1436,7 @@ final class VIC(mem: VICMemory,
   /**
    * To be called on bad lines
    */
-  @inline private def readAndStoreVideoMemory : Unit = {
+  @inline private def cAccess : Unit = {
     if (_baLow) {
       val busAvailable = clk.currentCycles - baLowFirstCycle > 2
       if (busAvailable) {
@@ -1480,7 +1453,7 @@ final class VIC(mem: VICMemory,
     }
   }
 
-  @inline private def readCharFromMemory : Int = {
+  @inline private def gAccess : Int = {
     val coprocessor_gdata = if (!is8565 && coprocessor != null && coprocessor.isActive) coprocessor.g_access(rasterCycle) else -1
     if (coprocessor_gdata != -1) coprocessor_gdata
     else
@@ -1506,14 +1479,6 @@ final class VIC(mem: VICMemory,
  	DEN bit was set during an arbitrary cycle of raster line $30.
    */
   @inline private def isBadLine = rasterLine >= 0x30 && rasterLine <= 0xF7 && ((rasterLine & 7) == yscroll) && denOn30
-
-  def enableTraceRasterLine(enabled: Boolean) = traceRasterLineInfo = enabled
-  def setTraceRasterLineAt(traceRasterLine: Int) = this.traceRasterLine = traceRasterLine
-  def getTraceRasterLineInfo = {
-    val line = traceRasterLine + "=" + (traceRasterLineBuffer mkString "|")
-    for (i <- 0 until traceRasterLineBuffer.length) traceRasterLineBuffer(i) = ""
-    line
-  }
 
   def getMemory = mem
 
@@ -1658,7 +1623,7 @@ final class VIC(mem: VICMemory,
   protected def allowsStateRestoring : Boolean = true
 
   def getRasterLine : Int = rasterLine
-  def getRasterCycle : Int = if (rasterCycle == model.RASTER_CYCLES) 1 else rasterCycle + 1
+  def getRasterCycle : Int = rasterCycle //if (rasterCycle == model.RASTER_CYCLES) 1 else rasterCycle + 1
 
   // COPROCESSOR ============================================================================================
   override def turnOnInterruptControlRegisterBits(value:Int) : Unit = {
