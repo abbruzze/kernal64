@@ -16,7 +16,7 @@ final class VIC(mem: VICMemory,
                 colorMem:Memory,
                 irqAction: (Boolean) => Unit,
                 baLow: (Boolean) => Unit,
-                is8565:Boolean = false) extends Chip with RAMComponent with VICContext {
+                isVICIIe:Boolean = false) extends Chip with RAMComponent with VICContext {
   override lazy val componentID = "VICII"
   val name = "VIC"
   val isRom = false
@@ -90,6 +90,7 @@ final class VIC(mem: VICMemory,
   private[this] var xCoord : Array[Int] = _
   private[this] var drawBorderOpt = true
   private[this] var pendingDrawBorderModeChange = false
+  private[this] var isNewVICModel = isVICIIe // 8565 for PAL, 8562 for NTSC
   // ------------------------ C128 $D030 test bit & others ------------------------------------------------
   private[this] var c128TestBitEnabled = false
   private[this] var refreshCycle = false
@@ -257,21 +258,11 @@ final class VIC(mem: VICMemory,
   // ======================================================================================
 
   // ---------------------------- PIXELS --------------------------------------------------
-  //  grey dot gfx info |...|doc 1|doc 0|sprite priority|sp 2|sp 1|sp 0|transparent|background/foreground|c3|c2|c1|c0|
-  //                  20|...|  11 | 10  |       9       | 8  | 7  | 6  |     5     |          4          | 3| 2| 1| 0|
-
-  // |doc 1|doc 0|
-  // | 0   |  0  | = 'N'
-  // | 0   |  1  | = 'B'
-  // | 1   |  0  | = 'G'
-  // | 1   |  1  | = 'S'
+  //  grey dot gfx info |sprite priority|sp 2|sp 1|sp 0|transparent|background/foreground|c3|c2|c1|c0|
+  //                  10|       9       | 8  | 7  | 6  |     5     |          4          | 3| 2| 1| 0|
 
   final private[this] val PIXEL_FOREGROUND = 1 << 4
   final private[this] val PIXEL_TRANSPARENT = 1 << 5
-  final private[this] val PIXEL_DOX_N = 0
-  final private[this] val PIXEL_DOX_B = 1 << 10
-  final private[this] val PIXEL_DOX_G = 2 << 10
-  final private[this] val PIXEL_DOX_S = 3 << 10
   final private[this] val PIXEL_SPRITE_PRIORITY = 1 << 9
   final private[this] val PIXEL_BLACK = 0
 
@@ -576,7 +567,7 @@ final class VIC(mem: VICMemory,
           } else borderColor
           val hasBorder = checkBorderFF(xcoord)
           pixels(i) = if (hasBorder) {
-            if (is8565 && i == 0 && lastColorReg == 0xFA) 0x0F else color
+            if (isVICIIe && i == 0 && lastColorReg == 0xFA) 0x0F else color
           } else PIXEL_TRANSPARENT
           i += 1
           xcoord += 1
@@ -678,9 +669,9 @@ final class VIC(mem: VICMemory,
             else
             if (isInDisplayState) {
               val backIndex = if (ecm) (vml_p(vmli) >> 6) & 3 else 0
-              backgroundColor(backIndex) | (backIndex + 1) << 20
+              backgroundColor(backIndex) | (backIndex + 1) << 10
             }
-            else backgroundColor(0)// | 1 << 20
+            else backgroundColor(0)
           }
         }
         else { // multi color mode
@@ -689,15 +680,15 @@ final class VIC(mem: VICMemory,
           (cbit : @switch) match {
             case 0 => if (ecm) PIXEL_BLACK // invalid text mode (background)
             else
-            if (isInDisplayState) backgroundColor(cbit) | (cbit + 1) << 20  // background
+            if (isInDisplayState) backgroundColor(cbit) | (cbit + 1) << 10  // background
             else backgroundColor(0)
             case 1 => if (ecm) PIXEL_BLACK // invalid text mode (background)
             else
-            if (isInDisplayState) backgroundColor(cbit) | (cbit + 1) << 20 // background
+            if (isInDisplayState) backgroundColor(cbit) | (cbit + 1) << 10 // background
             else PIXEL_BLACK
             case 2 => if (ecm) PIXEL_BLACK | PIXEL_FOREGROUND // invalid text mode (foreground)
             else
-            if (isInDisplayState) backgroundColor(cbit) | PIXEL_FOREGROUND | (cbit + 1) << 20 // foreground
+            if (isInDisplayState) backgroundColor(cbit) | PIXEL_FOREGROUND | (cbit + 1) << 10 // foreground
             else PIXEL_FOREGROUND
             case 3 => if (ecm) PIXEL_BLACK | PIXEL_FOREGROUND // invalid text mode (foreground)
             else
@@ -729,7 +720,7 @@ final class VIC(mem: VICMemory,
           (cbit : @switch) match {
             case 0x00 => if (ecm) PIXEL_BLACK // invalid bitmap mode (background)
             else
-            if (isInDisplayState) backgroundColor(0) | 1 << 20 // background
+            if (isInDisplayState) backgroundColor(0) | 1 << 10 // background
             else backgroundColor(0)
             case 0x100 => if (ecm) PIXEL_BLACK // invalid bitmap mode (background)
             else
@@ -768,8 +759,8 @@ final class VIC(mem: VICMemory,
       var counter = 0
       while (counter < 8) {
         pixels(counter) = shift(counter)
-        if (is8565) {
-          val greyReg = ((pixels(counter) >> 20) & 7) - 1
+        if (isNewVICModel) {
+          val greyReg = ((pixels(counter) >> 10) & 7) - 1
           if (counter == 0 && lastColorReg == greyReg) pixels(counter) = 0x0F
         }
 
@@ -871,9 +862,15 @@ final class VIC(mem: VICMemory,
     java.util.Arrays.fill(displayMem,0)
     display.showFrame(-1,0, lastModPixelX, model.RASTER_LINES)
     lastBackground = 0
+    dataToDrawPipe = 0
+    displayLineToDrawPipe = 0
+    rasterCycleToDrawPipe = 0
+    vmliToDrawPipe = 0
 
     if (coprocessor != null) coprocessor.reset
   }
+
+  def setNEWVICModel(newModel:Boolean) : Unit = isNewVICModel = newModel || isVICIIe
 
   def setDrawBorder(on:Boolean) : Unit = {
     drawBorderOpt = on
@@ -910,7 +907,7 @@ final class VIC(mem: VICMemory,
   def triggerLightPen : Unit = {
     if (canUpdateLightPenCoords) {
       canUpdateLightPenCoords = false
-      lightPenXYCoord(0) = ((xCoord(rasterCycle) >> 1) & 0xFF) + 2
+      lightPenXYCoord(0) = ((xCoord(rasterCycle) >> 1) & 0xFF) + (if (isNewVICModel) 1 else 2)
       lightPenXYCoord(1) = displayLine & 0xFF
       interruptControlRegister |= 8
       // check if we must set interrupt
@@ -1153,9 +1150,11 @@ final class VIC(mem: VICMemory,
     var dataToDraw = -1
     vmliToDrawPipe = vmliToDrawPipe << 8 | vmli
 
-    if (badLine) isInDisplayState = true
-
     if (rasterLine == 0x30) denOn30 |= den
+
+    badLine = isBadLine
+
+    if (badLine) isInDisplayState = true
 
     // ----------------------------------------------
 
@@ -1163,7 +1162,6 @@ final class VIC(mem: VICMemory,
       case 1 =>
         // check raster line with raster latch if irq enabled
         if (rasterLine > 0) checkRasterIRQ
-        badLine = isBadLine
       case 2 =>
         // check raster line with raster latch if irq enabled
         if (rasterLine == 0) checkRasterIRQ
@@ -1340,7 +1338,7 @@ final class VIC(mem: VICMemory,
     var s, i = 0
 
     // --------------------- GFX -------------------------
-    val borderOnOpt = verticalBorderFF && rasterLine != TOP_BOTTOM_FF_COMP(rsel)(0)
+    val borderOnOpt = verticalBorderFF && displayLine != TOP_BOTTOM_FF_COMP(rsel)(0)
     if (!borderOnOpt && dataToDraw >= 0) gfxShifter.producePixels(dataToDraw)
     // ------------------- Sprites -----------------------
 
@@ -1454,7 +1452,7 @@ final class VIC(mem: VICMemory,
   }
 
   @inline private def gAccess : Int = {
-    val coprocessor_gdata = if (!is8565 && coprocessor != null && coprocessor.isActive) coprocessor.g_access(rasterCycle) else -1
+    val coprocessor_gdata = if (!isVICIIe && coprocessor != null && coprocessor.isActive) coprocessor.g_access(rasterCycle) else -1
     if (coprocessor_gdata != -1) coprocessor_gdata
     else
     if (_2MhzMode) mem.byteOnBUS
@@ -1482,15 +1480,11 @@ final class VIC(mem: VICMemory,
 
   def getMemory = mem
 
-  def c128TestBitEnabled(enabled:Boolean) : Unit = {
-    c128TestBitEnabled = enabled
-  }
+  def c128TestBitEnabled(enabled:Boolean) : Unit = c128TestBitEnabled = enabled
 
   def isRefreshCycle = refreshCycle
 
-  def set2MhzMode(enabled:Boolean) : Unit = {
-    _2MhzMode = enabled
-  }
+  def set2MhzMode(enabled:Boolean) : Unit = _2MhzMode = enabled
 
   def dump = {
     val sb = new StringBuffer("VIC dump:\n")
@@ -1563,6 +1557,7 @@ final class VIC(mem: VICMemory,
     out.writeObject(vml_p)
     out.writeObject(vml_c)
     out.writeInt(lastBackground)
+    out.writeBoolean(isNewVICModel)
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     videoMatrixAddress = in.readInt
@@ -1619,6 +1614,7 @@ final class VIC(mem: VICMemory,
     loadMemory[Int](vml_p,in)
     loadMemory[Int](vml_c,in)
     lastBackground = in.readInt
+    isNewVICModel = in.readBoolean
   }
   protected def allowsStateRestoring : Boolean = true
 
