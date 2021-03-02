@@ -116,7 +116,10 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
           val cycles = clk.currentCycles - lastWriteLineChangeClock
           //println("Writing " + Integer.toHexString(cycles.toInt) + " " + Integer.toHexString(cycles.toInt >> 3))
           tap match {
-            case Some(t) => t.write(cycles.toInt >> 3)
+            case Some(t) =>
+              t.write(cycles.toInt >> 3)
+              counter = counterMap.findCounter(tap.get.getOffset.toInt) % 1000
+              update
             case None =>
           }
         }
