@@ -63,6 +63,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   }
 
   final override def setDMA(dma: Boolean) : Unit = {
+    // when dma is set from REU, both RDY & AEC are asserted, so if the cpu tries to write on the bus, the writing has no effect
     this.dma = dma
     ready = !this.baLow && !dma
   }
@@ -513,7 +514,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   // -----------------------------------------------------------------------------------------------------  
 
   @inline private[this] def push(data: Int) : Unit = {
-    mem.write(0x0100 | SP, data)
+    if (!dma) mem.write(0x0100 | SP, data)
     SP = (SP - 1) & 0xff
   }
 
@@ -1061,7 +1062,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
           }
         }
         case RMW_DO_IT1 => () => {
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           Execute
         }
         // ------------------ OPERATIONS -------------------------------
@@ -1119,15 +1120,15 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
         }
         // Store group
         case O_STA => () => {
-          mem.write(ar, A)
+          if (!dma) mem.write(ar, A)
           Last
         }
         case O_STX => () => {
-          mem.write(ar, X)
+          if (!dma) mem.write(ar, X)
           Last
         }
         case O_STY => () => {
-          mem.write(ar, Y)
+          if (!dma) mem.write(ar, Y)
           Last
         }
         // Transfer group
@@ -1245,13 +1246,13 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case O_INC => () => {
           rdbuf = (rdbuf + 1) & 0xFF
           set_nz(rdbuf)
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           Last
         }
         case O_DEC => () => {
           rdbuf = (rdbuf - 1) & 0xFF
           set_nz(rdbuf)
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           Last
         }
         // Logic group
@@ -1378,7 +1379,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case O_ASL => () => {
           if ((rdbuf & N_FLAG) == N_FLAG) sec else clc
           rdbuf = (rdbuf << 1) & 0xFF
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           set_nz(rdbuf)
           Last
         }
@@ -1394,7 +1395,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case O_LSR => () => {
           if ((rdbuf & 0x01) == 0x01) sec else clc
           rdbuf = (rdbuf >> 1) & 0xFF
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           set_nz(rdbuf)
           Last
         }
@@ -1412,7 +1413,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if ((rdbuf & N_FLAG) == N_FLAG) sec else clc
           rdbuf = ((rdbuf << 1) & 0xff) | oldC
           set_nz(rdbuf)
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           Last
         }
         case O_ROL_A => () => {
@@ -1430,7 +1431,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if ((rdbuf & 1) == 1) sec else clc
           rdbuf = ((rdbuf >> 1) & 0xff) | oldC
           set_nz(rdbuf)
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           Last
         }
         case O_ROR_A => () => {
@@ -1452,7 +1453,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
         }
         case O_PHA1 => () => {
           //push(A)
-          mem.write(SP | 0x100, A)
+          if (!dma) mem.write(SP | 0x100, A)
           SP = (SP - 1) & 0xFF
           Last
         }
@@ -1550,12 +1551,12 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
           }
         }
         case O_JSR2 => () => {
-          mem.write(SP | 0x100, (PC >> 8) & 0xFF)
+          if (!dma) mem.write(SP | 0x100, (PC >> 8) & 0xFF)
           SP = (SP - 1) & 0xFF
           state = O_JSR3
         }
         case O_JSR3 => () => {
-          mem.write(SP | 0x100, PC & 0xFF)
+          if (!dma) mem.write(SP | 0x100, PC & 0xFF)
           SP = (SP - 1) & 0xFF
           state = O_JSR4
         }
@@ -1645,12 +1646,12 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
           }
         }
         case O_BRK1 => () => {
-          mem.write(SP | 0x100, PC >> 8)
+          if (!dma) mem.write(SP | 0x100, PC >> 8)
           SP = (SP - 1) & 0xFF
           state = O_BRK2
         }
         case O_BRK2 => () => {
-          mem.write(SP | 0x100, PC & 0xFF)
+          if (!dma) mem.write(SP | 0x100, PC & 0xFF)
           SP = (SP - 1) & 0xFF
           state = O_BRK3
         }
@@ -1826,14 +1827,14 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
         }
         // Store A/X group
         case O_SAX => () => {
-          mem.write(ar, A & X)
+          if (!dma) mem.write(ar, A & X)
           Last
         }
         // ASL/ORA group
         case O_SLO => () => {
           if ((rdbuf & 0x80) > 0) sec else clc
           rdbuf <<= 1
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           A |= rdbuf
           set_nz(A)
           Last
@@ -1843,7 +1844,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
           val tmp = (rdbuf & 0x80) > 0
           rdbuf = if (isCarry) (rdbuf << 1) | 0x01 else rdbuf << 1
           if (tmp) sec else clc
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           A &= rdbuf
           set_nz(A)
           Last
@@ -1852,7 +1853,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case O_SRE => () => {
           if ((rdbuf & 0x01) > 0) sec else clc
           rdbuf >>= 1
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           A ^= rdbuf
           set_nz(A)
           Last
@@ -1862,14 +1863,14 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
           val tmp = (rdbuf & 0x01) > 0
           rdbuf = if (isCarry) (rdbuf >> 1) | 0x80 else rdbuf >> 1
           if (tmp) sec else clc
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           do_adc(rdbuf)
           Last
         }
         // DEC/CMP group
         case O_DCP => () => {
           rdbuf = (rdbuf - 1) & 0xFF
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           ar = A - rdbuf
           set_nz(ar)
           if (ar >= 0) sec else clc
@@ -1878,7 +1879,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
         // INC/SBC group
         case O_ISB => () => {
           rdbuf = (rdbuf + 1) & 0xFF
-          mem.write(ar, rdbuf)
+          if (!dma) mem.write(ar, rdbuf)
           do_sbc(rdbuf)
           Last
         }
@@ -1975,25 +1976,25 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
           SP = A & X
           val value = if (notReadyDuringInstr) SP else (ar2 + 1) & SP
           val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
-          mem.write(target,value)
+          if (!dma) mem.write(target,value)
           Last
         }
         case O_SHY => () => { // ar2 contains the high byte of the operand address
           val value = if (notReadyDuringInstr) Y else Y & (ar2 + 1)
           val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
-          mem.write(target,value)
+          if (!dma) mem.write(target,value)
           Last
         }
         case O_SHX => () => { // ar2 contains the high byte of the operand address
           val value = if (notReadyDuringInstr) X else X & (ar2 + 1)
           val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
-          mem.write(target,value)
+          if (!dma) mem.write(target,value)
           Last
         }
         case O_SHA => () => { // ar2 contains the high byte of the operand address
           val value = if (notReadyDuringInstr) A & X else A & X & (ar2 + 1)
           val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
-          mem.write(target, value)
+          if (!dma) mem.write(target, value)
           Last
         }
         case O_JAM => () => {
