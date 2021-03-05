@@ -35,6 +35,7 @@ import scala.util.{Failure, Success}
 object CBMComputer {
   def turnOn(computer : => CBMComputer,args:Array[String]) : Unit = {
     UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
+
     val cbm = computer
     try {
       cbm.turnOn(args)
@@ -75,16 +76,19 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val settings = new ucesoft.cbm.misc.Settings
 
   protected lazy val configuration = {
+    val kernalConfigHome = System.getProperty("kernal.config",scala.util.Properties.userHome)
     val props = new Properties
-    val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
+    val propsFile = new File(new File(kernalConfigHome),CONFIGURATION_FILENAME)
     if (propsFile.exists) {
       try {
         props.load(new FileReader(propsFile))
       }
       catch {
         case _:IOException =>
+          setDefaultProperties(props)
       }
     }
+    else setDefaultProperties(props)
     ROM.props = props
     props
   }
@@ -142,7 +146,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected var inspectDialog : InspectPanelDialog = _
   protected var traceItem,traceDiskItem : JCheckBoxMenuItem = _
   // -------------------- DISK -----------------
-  final protected val TOTAL_DRIVES = 4
+  final protected val TOTAL_DRIVES = SettingsKey.TOTAL_DRIVES
   protected val drivesRunning = Array.fill[Boolean](TOTAL_DRIVES)(true)
   protected val drivesEnabled = Array.fill[Boolean](TOTAL_DRIVES)(true)
   protected lazy val diskFlusher = new FloppyFlushUI(displayFrame)
@@ -1245,8 +1249,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     else vicZoomFactor = 0 // undefined
   }
 
-  protected def setVICModel(model:VICType.Value,preserveDisplayDim:Boolean = false,resetFlag:Boolean) : Unit = {
-    clock.pause
+  protected def setVICModel(model:VICType.Value,preserveDisplayDim:Boolean = false,resetFlag:Boolean,play:Boolean = true) : Unit = {
+    if (play) clock.pause
     val vicType = model match {
       case VICType.PAL => VIC_PAL
       case VICType.NTSC => VIC_NTSC
@@ -1262,7 +1266,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
 
     if (resetFlag) reset()
-    clock.play
+    if (play) clock.play
   }
 
   // -------------------------------------------------------------------
@@ -1332,7 +1336,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     )
     settings.add("run-file",
       "Run the given file taken from the attached disk",
-      "RUNFILE",
+      SettingsKey.RUN_FILE,
       (runFile:String) => {},
       ""
     )
@@ -1403,6 +1407,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       "Set 1581 dos rom path",
       (dp:String) => if (dp != null && dp != "") reloadROM(ROM.D1581_DOS_ROM_PROP,dp)
     )
+    settings.add("viciinew",
+      "Set VICII new model",
+      (nm:Boolean) => vicChip.setNEWVICModel(nm)
+    )
   }
 
   protected def setFileMenu(fileMenu:JMenu) : Unit = {
@@ -1413,7 +1421,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     // Setting ---------------------------
     settings.add("warponload",
       "Enabled/disable warp mode on load",
-      "WARPLOAD",
+      SettingsKey.WARP_ON_LOAD,
       (wpl:Boolean) => {
         ProgramLoader.loadingWithWarpEnabled = wpl
         warpModeOnLoad.setSelected(wpl)
@@ -1519,7 +1527,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     // Setting ---------------------------
     settings.add("prg-as-disk",
       "Load a PRG file as if inserted in a disk",
-      "LOAD_PRG_AS_D64",
+      SettingsKey.LOAD_PRG_AS_D64,
       (pad:Boolean) => {
         loadPRGasDisk = pad
         prgAsDiskItem.setSelected(loadPRGasDisk)
@@ -1540,7 +1548,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     for(d <- 1 until TOTAL_DRIVES) {
       settings.add(s"drive${8 + d}-enabled",
         s"Enabled/disable driver ${8 + d}",
-        s"DRIVE_${8 + d}_ENABLED",
+        SettingsKey.DRIVE_X_ENABLED(d),
         (de: Boolean) => {
           enableDrive(d, de, false)
         },
@@ -1564,7 +1572,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     // Setting ---------------------------
     settings.add("drive12-local-path",
       "Enabled driver 12 to the given local path",
-      "DRIVE_10_PATH",
+      SettingsKey.DRIVE_12_PATH,
       (d10p:String) => {
         val enabled = d10p != ""
         enableDrive12(enabled,if (enabled) Some(d10p) else None)
@@ -1582,7 +1590,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     // Setting ---------------------------
     settings.add("write-on-disk",
       "Tells if the modifications made on disks must be written on file",
-      "WRITE_ON_DISK",
+      SettingsKey.WRITE_ON_DISK,
       (wod:Boolean) => {
         writeOnDiskCheckItem.setSelected(wod)
         writeOnDiskSetting(wod)
@@ -1616,7 +1624,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     // Setting ---------------------------
     settings.add("cart",
       "Attach the given cartridge",
-      "ATTACH_CTR",
+      SettingsKey.ATTACH_CTR,
       (cart:String) => if (cart != "") loadCartridgeFile(new File(cart))
       ,
       ExpansionPort.currentCartFileName
@@ -1800,7 +1808,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     // Setting ---------------------------
     settings.add("vic-palette",
       "Set the palette type (bright,vice,pepto,colodore)",
-      "PALETTE",
+      SettingsKey.PALETTE,
       (dt:String) => {
         dt match {
           case "bright"|"" =>
@@ -1826,16 +1834,16 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     )
     settings.add("rendering-type",
       "Set the rendering type (default,bilinear,bicubic)",
-      "RENDERING_TYPE",
+      SettingsKey.RENDERING_TYPE,
       (dt:String) => {
         dt match {
-          case "bilinear"|"" =>
+          case "bilinear" =>
             setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
             renderingBilinear1Item.setSelected(true)
           case "bicubic" =>
             setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
             renderingBicubic1Item.setSelected(true)
-          case "default" =>
+          case "default"|"" =>
             setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
             renderingDefault1Item.setSelected(true)
           case _ =>
@@ -1927,7 +1935,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     // Setting ---------------------------
     settings.add("printer-enabled",
       "Enable printer",
-      "PRINTER_ENABLED",
+      SettingsKey.PRINTER_ENABLED,
       (pe:Boolean) => {
         enablePrinter(pe)
         printerEnabledItem.setSelected(pe)
@@ -1961,7 +1969,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     // Setting ---------------------------
     settings.add("sid-8580",
       "Enable sid 8580 type",
-      "SID_8580",
+      SettingsKey.SID_8580,
       (sid8580:Boolean) => {
         sid.setModel(!sid8580)
         sid8580Item.setSelected(sid8580)
@@ -1987,7 +1995,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     // Setting ---------------------------
     settings.add("dual-sid",
       s"Enable dual sid on the given address. Valid addresses are: ${addressMap.keys.mkString(",")}",
-      "DUAL_SID",
+      SettingsKey.DUAL_SID,
       (adr:String) => if (adr != null && adr != "") {
         addressMap get adr match {
           case Some(item) =>
@@ -2016,7 +2024,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     // Setting ---------------------------
     settings.add("sid-cycle-exact",
       "With this option enabled the SID emulation is more accurate with a decrease of performance",
-      "SID_CYCLE_EXACT",
+      SettingsKey.SID_CYCLE_EXACT,
       (sce:Boolean) => {
         clock.pause
         sidCycleExact = sce
@@ -2040,7 +2048,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       // Setting ---------------------------
       settings.add(s"drive${drive + 8}-type",
         "Set the driver's type (1541,1571,1581)",
-        s"DRIVER${drive + 8}_TYPE",
+        SettingsKey.DRIVE_X_TYPE(drive),
         (dt: String) => {
           dt match {
             case "1541" =>
@@ -2060,7 +2068,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
       settings.add(s"drive${drive + 8}-file",
         s"Attach a file to drive ${drive + 8}",
-        s"DRIVE_${drive + 8}_FILE",
+        SettingsKey.DRIVE_X_FILE(drive),
         (df: String) => {
           if (df != "") attachDiskFile(drive, new File(df), false, None)
         },
@@ -2108,6 +2116,18 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     reu512Item.addActionListener(_ => setREU(Some(REU.REU_1750),None) )
     group5.add(reu512Item)
     reuItem.add(reu512Item)
+    val reu1MItem = new JRadioButtonMenuItem("1M")
+    reu1MItem.addActionListener(_ => setREU(Some(REU.REU_1M),None) )
+    group5.add(reu1MItem)
+    reuItem.add(reu1MItem)
+    val reu2MItem = new JRadioButtonMenuItem("2M")
+    reu2MItem.addActionListener(_ => setREU(Some(REU.REU_2M),None) )
+    group5.add(reu2MItem)
+    reuItem.add(reu2MItem)
+    val reu4MItem = new JRadioButtonMenuItem("4M")
+    reu4MItem.addActionListener(_ => setREU(Some(REU.REU_4M),None) )
+    group5.add(reu4MItem)
+    reuItem.add(reu4MItem)
     val reu16MItem = new JRadioButtonMenuItem("16M ...")
     reu16MItem.addActionListener(_ => choose16MREU )
     group5.add(reu16MItem)
@@ -2115,8 +2135,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     parent.add(reuItem)
 
     settings.add("reu-type",
-      "Set the reu type (none,128,256,512,16384)",
-      "REU_TYPE",
+      "Set the reu type (none,128,256,512,1024,2048,4096,16384)",
+      SettingsKey.REU_TYPE,
       (reu:String) => {
         val reuPars = reu.split(",")
         if (reuPars(0) == "" || reuPars(0) == "none") setREU(None,None)
@@ -2131,6 +2151,15 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
             case REU.REU_1764 =>
               setREU(Some(REU.REU_1764),None)
               reu256Item.setSelected(true)
+            case REU.REU_1M =>
+              setREU(Some(REU.REU_1M),None)
+              reu1MItem.setSelected(true)
+            case REU.REU_2M =>
+              setREU(Some(REU.REU_2M),None)
+              reu2MItem.setSelected(true)
+            case REU.REU_4M =>
+              setREU(Some(REU.REU_4M),None)
+              reu4MItem.setSelected(true)
             case REU.REU_16M =>
               setREU(Some(REU.REU_16M),if (reuPars.length == 2 && reuPars(1) != "null") Some(reuPars(1)) else None)
               reu16MItem.setSelected(true)
@@ -2175,7 +2204,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     // Setting ---------------------------
     settings.add("geo-ram",
       "Set the georam size (none,256,512)",
-      "GEO_RAM",
+      SettingsKey.GEO_RAM,
       (geo:String) => {
         if (geo == "512") {
           _512kGeoItem.setSelected(true)
@@ -2236,7 +2265,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     parent.add(cpmItem)
     settings.add("cpm64-enabled",
       s"Attach the CP/M cart",
-      "CPM64",
+      SettingsKey.CPM64,
       (cpm: Boolean) => {
         if (cpm) {
           enableCPMCart(true)
@@ -2280,7 +2309,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
     settings.add("beam-racer-enabled",
       s"Install Beam Racer VIC's coprocessor",
-      "BEAMRACER",
+      SettingsKey.BEAMRACER,
       (br: Boolean) => {
         if (br) {
           vicChip.setCoprocessor(new VASYL(vicChip,cpu,dmaSwitcher.setLine(Switcher.EXT,_)))
@@ -2307,7 +2336,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
     settings.add("ntsc",
       s"Set ntsc video standard",
-      "VIDEO_NTSC",
+      SettingsKey.VIDEO_NTSC,
       (set: Boolean) => {
         if (set) {
           setVICModel(VICType.NTSC,true,false)
@@ -2329,7 +2358,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
     settings.add("vic-border-off",
       s"Doesn't draw VIC's borders",
-      "VIC_BORDER_MODE",
+      SettingsKey.VIC_BORDER_MODE,
       (on: Boolean) => {
         vicChip.setDrawBorder(!on)
         borderOnItem.setSelected(!on)
@@ -2426,6 +2455,24 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         panel.add("Center",sp)
         JOptionPane.showMessageDialog(displayFrame,panel,"Cart info",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
       case None =>
+    }
+  }
+
+  protected def setDefaultProperties(configuration:Properties) : Unit = {
+    configuration.setProperty(SettingsKey.RENDERING_TYPE,"default")
+    configuration.setProperty(SettingsKey.WRITE_ON_DISK,"true")
+  }
+
+  protected def saveConfigurationFile : Unit = {
+    try {
+      val kernalConfigHome = System.getProperty("kernal.config",scala.util.Properties.userHome)
+      val propsFile = new File(new File(kernalConfigHome), CONFIGURATION_FILENAME)
+      val out = new FileWriter(propsFile)
+      configuration.store(out, "C64 configuration file")
+      out.close
+    }
+    catch {
+      case _: IOException =>
     }
   }
 }
