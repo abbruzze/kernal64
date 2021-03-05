@@ -105,8 +105,11 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
 
   def maximumSpeed = _maximumSpeed
   def maximumSpeed_=(maximumSpeed:Boolean) : Unit = {
+    if (!maximumSpeed) {
+      skipThrottle = true
+      setupNextMeasurement
+    }
     _maximumSpeed = maximumSpeed
-    if (!maximumSpeed) skipThrottle = true
   }
 
   override def getProperties = {
