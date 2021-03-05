@@ -1,9 +1,8 @@
 package ucesoft.cbm.peripheral.sid
 
-import resid.{SID => RESID}
+import resid2.{SID => RESID}
 import ucesoft.cbm.Chip
 import ucesoft.cbm.ChipID
-import ucesoft.cbm.peripheral.sid.resid.ISIDDefs
 import ucesoft.cbm.Clock
 import ucesoft.cbm.ClockEvent
 import java.io.ObjectOutputStream
@@ -25,11 +24,9 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   
   val isActive = true
   
-  private[this] val sid = {
+  private[this] val sid : SIDChip = {
     val sid = new RESID
-    sid.set_chip_model(ISIDDefs.chip_model.MOS6581)
-    //sid.set_sampling_parameters(CPU_FREQ,ISIDDefs.sampling_method.SAMPLE_FAST, SAMPLE_RATE,-1, 0.97)
-    sid.enable_filter(true)
+    sid.setModel(0)
     sid
   }
 
@@ -65,7 +62,6 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     CPU_FREQ = f.toInt
     CLOCKS_PER_SAMPLE = CPU_FREQ / SAMPLE_RATE
     CLOCKS_PER_SAMPLE_REST = ((CPU_FREQ * 1000L) / SAMPLE_RATE).toInt - CLOCKS_PER_SAMPLE * 1000
-    sid.set_sampling_parameters(CPU_FREQ,ISIDDefs.sampling_method.SAMPLE_FAST, SAMPLE_RATE,-1, 0.97)
     if (sid2 != null) sid2.setCPUFrequency(f)
   }
 
@@ -110,11 +106,11 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   
   def setModel(is6581:Boolean) : Unit = {
     if (is6581) {
-      sid.set_chip_model(ISIDDefs.chip_model.MOS6581)
+      sid.setModel(0)
       if (sid2 != null) sid2.setModel(true)
     }
     else {
-      sid.set_chip_model(ISIDDefs.chip_model.MOS8580)
+      sid.setModel(1)
       if (sid2 != null) sid2.setModel(false)
     }
   }
@@ -137,9 +133,13 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   final def read(address: Int, chipID: ChipID.ID) : Int = decode(address) match {
     case -1 => sid2.read(address)
     case POTX_OFS =>
-      if (mouseEnabled) (MouseCage.x & 0x7F) << 1 else 0
+      val value = if (mouseEnabled) (MouseCage.x & 0x7F) << 1 else 0xFF
+      sid.updateBusValue(value)
+      value
     case POTY_OFS =>
-      if (mouseEnabled) (0x7F - (MouseCage.y & 0x7F)) << 1 else 0
+      val value = if (mouseEnabled) (0x7F - (MouseCage.y & 0x7F)) << 1 else 0xFF
+      sid.updateBusValue(value)
+      value
     case ofs => sid.read(ofs)
   }
   final def write(address: Int, value: Int, chipID: ChipID.ID) = {
@@ -163,7 +163,11 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
 
     val delta = cycles - lastCycles
     lastCycles = cycles
-    sid.clock(delta.toInt)
+    var c = delta.toInt
+    while (c > 0) {
+      sid.clock
+      c -= 1
+    }
 
     driver.addSample(sid.output)
 
@@ -214,11 +218,11 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   }
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
-    out.writeObject(sid.read_state)
+    sid.saveState(out)
     out.writeBoolean(cycleExact)
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
-    sid.write_state(in.readObject.asInstanceOf[ucesoft.cbm.peripheral.sid.resid.SID.State])
+    sid.loadState(in)
     cycleExact = in.readBoolean
     Clock.systemClock.cancel(componentID)
     start

@@ -22,9 +22,13 @@
  */
 package ucesoft.cbm.peripheral.sid.resid;
 
+import ucesoft.cbm.peripheral.sid.SIDChip;
+
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
-public class SID {
+public class SID implements SIDChip {
 
 	/**
 	 * This is a patch against ReSID
@@ -556,6 +560,11 @@ public class SID {
 		default:
 			break;
 		}
+	}
+
+	@Override
+	public void setModel(int mode) {
+		set_chip_model(mode == 0 ? ISIDDefs.chip_model.MOS6581 : ISIDDefs.chip_model.MOS8580);
 	}
 
 	/**
@@ -1316,5 +1325,28 @@ public class SID {
 		sample_offset -= delta_t.delta_t << FIXP_SHIFT;
 		delta_t.delta_t = 0;
 		return s;
+	}
+
+	@Override
+	public void saveState(ObjectOutputStream out) {
+		try {
+			out.writeObject(read_state());
+		}
+		catch (Throwable e) {
+			throw new RuntimeException("Can't save SID state",e);
+		}
+	}
+	@Override
+	public void loadState(ObjectInputStream in) {
+		try {
+			write_state((State)in.readObject());
+		}
+		catch (Throwable e) {
+			throw new RuntimeException("Can't load SID state",e);
+		}
+	}
+
+	public void updateBusValue(int value) {
+		bus_value = value;
 	}
 }
