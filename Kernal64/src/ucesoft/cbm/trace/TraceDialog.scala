@@ -152,13 +152,16 @@ class TraceDialog private (title:String,
         }
         else
           if (address.contains(" ")) {
-            val addresses = address split " " map { s => s2a(s.trim) }
+            val pars = address split " "
             var col = 0
             val sb = new StringBuilder
             val ascii = new StringBuilder
-            for (a <- addresses(0) to addresses(1)) {
+            var file : FileOutputStream = null
+            if (pars.length == 3) file = new FileOutputStream(pars(2))
+            for (a <- s2a(pars(0)) to s2a(pars(1))) {
               if (col == 0) sb.append("%04X: ".format(a))
               val c = mem.read(a)
+              if (file != null) file.write(c)
               if (c > 32) ascii.append(c.toChar) else ascii.append('.')
               sb.append("%02X ".format(c))
               col += 1
@@ -169,6 +172,7 @@ class TraceDialog private (title:String,
                 ascii.clear
               }
             }
+            if (file != null) file.close
             if (sb.length > 0) info(sb.toString)
           } else if (address.startsWith("w")) {
             val a = s2a(address.substring(1))
@@ -215,9 +219,7 @@ class TraceDialog private (title:String,
   }
   private def showRaster(show:Boolean) : Unit = {
     display.get.setRasterLineAt(rasterLineSpinner.getValue.asInstanceOf[Int])
-    vic.get.setTraceRasterLineAt(rasterLineSpinner.getValue.asInstanceOf[Int])
     display.get.setDrawRasterLine(show)
-    vic.get.enableTraceRasterLine(show)
   }
   private def traceFile(button:JToggleButton) : Unit = {
     if (!button.isSelected) {
@@ -292,7 +294,6 @@ class TraceDialog private (title:String,
     rasterLineSpinner.addChangeListener(_ => {
         val r = rasterLineSpinner.getValue.asInstanceOf[Int]
         display.get.setRasterLineAt(r)
-        vic.get.setTraceRasterLineAt(r)
       }
     )
     rasterLineSpinner.getEditor.asInstanceOf[DefaultEditor].getTextField.setEditable(true)
