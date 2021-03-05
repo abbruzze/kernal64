@@ -595,8 +595,8 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   final def isActive : Boolean = beamRacerActiveState == 2
 
-  @inline private def adjustCurrentRasterCycle(rasterCycle:Int) : Int = if (rasterCycle == vicCtx.getVICModel.RASTER_CYCLES) 1 else rasterCycle + 1
-  @inline private def adjustCurrentRasterLine(rasterCycle:Int,rasterLine:Int) : Int = if (rasterCycle == vicCtx.getVICModel.RASTER_CYCLES) (rasterLine + 1) % vicCtx.getVICModel.RASTER_LINES else rasterLine
+  @inline private def adjustCurrentRasterCycle(rasterCycle:Int) : Int = rasterCycle//if (rasterCycle == vicCtx.getVICModel.RASTER_CYCLES) 1 else rasterCycle + 1
+  @inline private def adjustCurrentRasterLine(rasterCycle:Int,rasterLine:Int) : Int = rasterLine//if (rasterCycle == vicCtx.getVICModel.RASTER_CYCLES) (rasterLine + 1) % vicCtx.getVICModel.RASTER_LINES else rasterLine
 
   final def cycle(_rasterLine:Int,_rasterCycle:Int) : Unit = {
     rasterCycle = adjustCurrentRasterCycle(_rasterCycle)

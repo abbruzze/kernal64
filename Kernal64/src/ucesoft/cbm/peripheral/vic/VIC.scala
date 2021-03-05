@@ -31,7 +31,10 @@ final class VIC(mem: VICMemory,
 
   def setVICModel(model:VICModel) : Unit = {
     this.model = model
+    lastModPixelY = 0
     lastModPixelX = model.BLANK_RIGHT_CYCLE << 3
+    firstModPixelX = model.BLANK_LEFT_CYCLE << 3
+    firstModPixelY = -1
     xCoord = model.XCOORD
   }
 
@@ -78,7 +81,8 @@ final class VIC(mem: VICMemory,
   private[this] var isBlank = false // valid inside drawCycle: tells if we are in the blank area
   private[this] var display: Display = null // the display
   private[this] var displayMem: Array[Int] = null
-  private[this] var firstModPixelX, firstModPixelY = 0 // first x,y pixel coordinate modified
+  private[this] var firstModPixelY = -1 // first y pixel coordinate modified
+  private[this] var firstModPixelX = model.BLANK_LEFT_CYCLE << 3
   private[this] var lastModPixelX = model.BLANK_RIGHT_CYCLE << 3
   private[this] var lastModPixelY = 0 // last y pixel coordinate modified
   private[this] var lightPenEnabled = false
@@ -857,10 +861,10 @@ final class VIC(mem: VICMemory,
     spriteDMAon = 0
     spritesDisplayedMask = 0
     ref = 0
-    lastModPixelY = model.RASTER_LINES
-    firstModPixelY = 0
-    java.util.Arrays.fill(displayMem,0)
-    display.showFrame(-1,0, lastModPixelX, model.RASTER_LINES)
+    lastModPixelY = 0
+    lastModPixelX = model.BLANK_RIGHT_CYCLE << 3
+    firstModPixelX = model.BLANK_LEFT_CYCLE << 3
+    firstModPixelY = -1
     lastBackground = 0
     dataToDrawPipe = 0
     displayLineToDrawPipe = 0
@@ -1289,7 +1293,7 @@ final class VIC(mem: VICMemory,
       denOn30 = false
       canUpdateLightPenCoords = true
       display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
-      firstModPixelX = -1
+      firstModPixelY = -1
       ref = 0xFF
       vcbase = 0
       vc = 0
@@ -1307,12 +1311,7 @@ final class VIC(mem: VICMemory,
     val color = VIC_RGB(pixel & 0x0F)
     if (displayMem(index) != color) {
       displayMem(index) = color
-
-      if (firstModPixelX == -1) {
-        firstModPixelX = model.BLANK_LEFT_CYCLE << 3
-        firstModPixelY = y
-      }
-
+      if (firstModPixelY == -1) firstModPixelY = y
       lastModPixelY = y
     }
   }
@@ -1486,21 +1485,6 @@ final class VIC(mem: VICMemory,
 
   def set2MhzMode(enabled:Boolean) : Unit = _2MhzMode = enabled
 
-  def dump = {
-    val sb = new StringBuffer("VIC dump:\n")
-    sb.append(s"Video Bank:\t\t\t${mem.getBank} = ${Integer.toHexString(mem.getBankAddress)}\n")
-    sb.append(if (bmm) "Bitmap mode\n" else "Text mode\n")
-    sb.append(s"Extended color mode\t\t${ecm}\n")
-    sb.append(s"Multi color mode\t\t${mcm}\n")
-    sb.append(s"Raster line\t\t\t${rasterLine}\n")
-    sb.append(s"Display enabled\t\t\t${den}\n")
-    sb.append(s"Display size\t\t\t${if (csel == 1) "40" else "38"}x${if (rsel == 1) "25" else "24"}\n")
-    sb.append(s"Raster IRQ on\t\t\t${rasterLatch}\n")
-    sb.append(s"Video matrix address\t\t${Integer.toHexString(videoMatrixAddress)}\n")
-    sb.append(s"Char address\t\t\t${Integer.toHexString(characterAddress)}\n")
-    sb.append(s"Bitmap address\t\t\t${Integer.toHexString(bitmapAddress)}\n")
-    sb.toString
-  }
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeInt(videoMatrixAddress)
