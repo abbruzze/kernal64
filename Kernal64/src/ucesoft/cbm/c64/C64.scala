@@ -34,6 +34,7 @@ class C64 extends CBMComputer {
   protected val mmu = new C64MMU.MAIN_MEMORY
   protected val busSnooper = new BusSnoop(bus)
   protected var busSnooperActive = false
+  private[this] val vicMemory = new C64VICMemory(mmu,mmu.CHAR_ROM,cpu)
 
   def reset  : Unit = {
     dma = false
@@ -67,7 +68,6 @@ class C64 extends CBMComputer {
     add(expansionPort)
     add(rs232)
     // -----------------------
-    val vicMemory = new C64VICMemory(mmu,mmu.CHAR_ROM,cpu)
     add(vicMemory)
     ExpansionPort.setMemoryForEmptyExpansionPort(vicMemory)
     ExpansionPort.addConfigurationListener(vicMemory)    
@@ -485,6 +485,16 @@ class C64 extends CBMComputer {
       })
       clock.play
     })
+  }
+
+  override protected def setGlobalCommandLineOptions : Unit = {
+    super.setGlobalCommandLineOptions
+    settings.add("custom-glue-logic",
+      "Set internal glue logic to custom (C64C)",
+      (gl:Boolean) => if (gl) {
+        vicMemory.setCustomGlueLogic(true)
+      }
+    )
   }
 
   def turnOff  : Unit = {
