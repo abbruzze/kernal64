@@ -154,10 +154,11 @@ object C64MMU {
     
     private[this] var ULTIMAX = false
     private[this] var ddr = 0
-    private[this] var pr = 0
+    private[this] var data,data_out = 0x3F
     private[this] var exrom,game = false
-    private[this] var lastCycle1Written6,lastCycle1Written7 = 0L
-    private[this] var capacitor6,capacitor7 = false
+    private[this] var data_falloff_bit6, data_falloff_bit7 = false
+    private[this] var data_set_clk_bit6,data_set_clk_bit7 = 0L
+    private[this] var data_set_bit6, data_set_bit7 = 0
     private[this] val CAPACITOR_FADE_CYCLES = 350000
     private[this] var datassette : Datassette = _
     private[this] var lastByteReadMemory : LastByteReadMemory = _
@@ -190,37 +191,42 @@ object C64MMU {
       properties.setProperty("Mem config",MEM_CONFIG(memConfig).toString)
       properties.setProperty("$0",Integer.toHexString(ddr))
       properties.setProperty("$1",Integer.toHexString(read0001))
-      properties.setProperty("pr",Integer.toHexString(pr))
       properties.setProperty("exrom",exrom.toString)
       properties.setProperty("game",game.toString)
-      properties.setProperty("capacitor 6",capacitor6.toString)
-      properties.setProperty("capacitor 7",capacitor7.toString)
+      properties.setProperty("capacitor 6",data_set_clk_bit6.toString)
+      properties.setProperty("capacitor 7",data_set_clk_bit7.toString)
       properties
     }
     
     @inline private def read0001 = {
-      val playSense = if ((ddr & 0x10) > 0) pr & 0x10 else if (datassette.isPlayPressed) 0x00 else 0x10
+      data_out = (data_out & ~ddr) | (data & ddr)
+      var data_read = (data | ~ddr) & (data_out | 0x7)
+      if ((ddr & 0x20) == 0) data_read &= 0xDF
+      data_read &= 0xef
+
+      val playSense = if ((ddr & 0x10) > 0) data & 0x10 else if (datassette.isPlayPressed) 0x00 else 0x10
+      data_read |= playSense
+
       val clk = Clock.systemClock.currentCycles
-      // check bit 6 & 7
-      // bit 6
-      if (capacitor6) {
-        if (clk - lastCycle1Written6 > CAPACITOR_FADE_CYCLES) {
-          pr &= 0xBF
-          capacitor6 = false
-        }
-        //else pr |= 0x40
+      if (data_falloff_bit6 && (data_set_clk_bit6 < clk)) {
+        data_falloff_bit6 = false;
+        data_set_bit6 = 0;
       }
-      // bit 7
-      if (capacitor7) {
-        if (clk - lastCycle1Written7 > CAPACITOR_FADE_CYCLES) {
-          pr &= 0x7F
-          capacitor7 = false
-        }
-        //else pr |= 0x80
+      if (data_falloff_bit7 && (data_set_clk_bit7 < clk)) {
+        data_falloff_bit7 = false;
+        data_set_bit7 = 0;
       }
-      var one = pr & 0xEF | playSense | ((ddr & 0x7) ^ 0x7) // pull up resistors
-      if ((ddr & 0x20) == 0) one &= 0xDF
-      one
+
+      if ((ddr & 0x40) == 0) {
+        data_read &= ~0x40
+        data_read |= data_set_bit6
+      }
+      if ((ddr & 0x80) == 0) {
+        data_read &= ~0x80
+        data_read |= data_set_bit7
+      }
+
+      data_read
     }
 
     @inline private def check0001  : Unit = {
@@ -237,7 +243,7 @@ object C64MMU {
       this.game = game
       this.exrom = exrom
       
-      val newMemConfig = (~ddr | pr) & 0x7 | (if (game) 1 << 3 else 0) | (if (exrom) 1 << 4 else 0)
+      val newMemConfig = (data | ~ddr) & 0x7 | (if (game) 1 << 3 else 0) | (if (exrom) 1 << 4 else 0)
       if (memConfig == newMemConfig) return
       
       memConfig = newMemConfig
@@ -270,7 +276,12 @@ object C64MMU {
     def reset  : Unit = {
       Log.info("Resetting main memory...")
       ddr = 0
-      pr = 0//read0001
+      data = 0
+      data_out = 0
+      data_set_bit6 = 0
+      data_set_bit7 = 0
+      data_falloff_bit6 = false
+      data_falloff_bit7 = false
       memConfig = -1
       ULTIMAX = false
       ram.ULTIMAX = false
@@ -331,31 +342,21 @@ object C64MMU {
 
       if (address < 2) {
         ram.write(address,lastByteReadMemory.lastByteRead)
-        if (address == 0) { // $00
-          val clk = Clock.systemClock.currentCycles
-          if ((ddr & 0x80) > 0 && (value & 0x80) == 0 && !capacitor7) {
-            lastCycle1Written7 = clk
-            capacitor7 = true
-          }
-          //else capacitor7 = false
-          if ((value & 0x80) > 0 && capacitor7) capacitor7 = false
-          if ((value & 0x40) > 0 && capacitor6) capacitor6 = false
-          if ((ddr & 0x40) > 0 && (value & 0x40) == 0 && !capacitor6) {
-            lastCycle1Written6 = clk
-            capacitor6 = true
-          }
-          //else capacitor6 = false
-          ddr = value
+        if (address == 0) ddr = value else data = value
+
+        val clk = Clock.systemClock.currentCycles
+
+        if ((ddr & 0x40) > 0) {
+          data_set_clk_bit6 = clk + CAPACITOR_FADE_CYCLES
+          data_set_bit6 = data & 0x40
+          data_falloff_bit6 = true
         }
-        else { // $01
-          pr = value & 0x3F | (pr & 0xC0)
-          if ((ddr & 0x80) > 0) {
-            if ((value & 0x80) > 0) pr |= 0x80 else pr &= 0x7F
-          }
-          if ((ddr & 0x40) > 0) {
-            if ((value & 0x40) > 0) pr |= 0x40 else pr &= 0xBF
-          }
+        if ((ddr & 0x80) > 0) {
+          data_set_clk_bit7 = clk + CAPACITOR_FADE_CYCLES
+          data_set_bit7 = data & 0x80
+          data_falloff_bit7 = true
         }
+
         check0001
       }
       else if (address < 0x8000) ram.write(address,value)
@@ -387,7 +388,8 @@ object C64MMU {
     protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeBoolean(ULTIMAX)
       out.writeInt(ddr)
-      out.writeInt(pr)
+      out.writeInt(data)
+      out.writeInt(data_out)
       out.writeBoolean(exrom)
       out.writeBoolean(game)
       out.writeInt(memConfig)
@@ -395,7 +397,8 @@ object C64MMU {
     protected def loadState(in:ObjectInputStream) : Unit = {
       ULTIMAX = in.readBoolean
       ddr = in.readInt
-      pr = in.readInt
+      data = in.readInt
+      data_out = in.readInt
       exrom = in.readBoolean
       game = in.readBoolean
       memConfig = in.readInt

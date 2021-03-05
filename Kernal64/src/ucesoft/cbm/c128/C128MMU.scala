@@ -1,25 +1,18 @@
 package ucesoft.cbm.c128
 
+import ucesoft.cbm.c64.{ExtendedROM, MemConfig}
 import ucesoft.cbm.cpu.{CPU65xx, Memory, RAMComponent, ROM, Z80}
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.ChipID
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-
-import javax.swing.JFrame
-import ucesoft.cbm.expansion.ExpansionPortConfigurationListener
-import ucesoft.cbm.c64.ExtendedROM
-import ucesoft.cbm.Log
-import ucesoft.cbm.peripheral.cia.CIA
-import ucesoft.cbm.peripheral.vic.VIC
-import ucesoft.cbm.peripheral.sid.SID
-import ucesoft.cbm.peripheral.c2n.Datassette
-import ucesoft.cbm.c64.MemConfig
-import ucesoft.cbm.expansion.ExpansionPort
-import ucesoft.cbm.peripheral.vdc.VDC
-import ucesoft.cbm.peripheral.keyboard.Keyboard
-import ucesoft.cbm.peripheral.vic.VICMemory
+import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortConfigurationListener}
 import ucesoft.cbm.misc.TestCart
+import ucesoft.cbm.peripheral.c2n.Datassette
+import ucesoft.cbm.peripheral.cia.CIA
+import ucesoft.cbm.peripheral.keyboard.Keyboard
+import ucesoft.cbm.peripheral.sid.SID
+import ucesoft.cbm.peripheral.vdc.VDC
+import ucesoft.cbm.peripheral.vic.{VIC, VICMemory}
+import ucesoft.cbm.{CBMComponentType, ChipID, Clock, Log}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 trait MMUChangeListener {
   def frequencyChanged(f:Int) : Unit // 1 or 2
@@ -96,6 +89,11 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // ==========================================================================================
   private[this] var _0 = 0
   private[this] var _1 = 0
+  private[this] var data_out = 0x3F
+  private[this] var data_falloff_bit7 = false
+  private[this] var data_set_clk_bit7 = 0L
+  private[this] var data_set_bit7 = 0
+  private[this] val CAPACITOR_FADE_CYCLES = 53000
   // C64 memory configuration =================================================================
   private[this] var c64MemConfig = -1
   private[this] var c64MC : MemConfig = _
@@ -234,7 +232,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     memLastByteRead = 0
     ioacc = false
     check128_1
-
+    data_out = 0
   }
   
   final def setIO(cia_dc00:CIA,cia_dd00:CIA,vic:VIC,sid:SID,vdc:VDC) : Unit = {
@@ -721,8 +719,14 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     if (isForwardWrite) forwardWriteTo.write(address,value)
     
     if (address < 2) {
-      if (address == 0) _0 = value & 0xFF
-      else _1 = value & 0x3F
+      if (address == 0) _0 = value & 0xFF else _1 = value
+      val clk = Clock.systemClock.currentCycles
+
+      if ((_0 & 0x80) > 0) {
+        data_set_clk_bit7 = clk + CAPACITOR_FADE_CYCLES
+        data_set_bit7 = _1 & 0x80
+        data_falloff_bit7 = true
+      }
       ram.write(address,memLastByteRead)
       check64_1
     }
@@ -767,19 +771,37 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   }
  
   @inline private[this] def read64_1 : Int = {
-    val playSense = if ((_0 & 0x10) > 0) _1 & 0x10 else if (datassette.isPlayPressed) 0x00 else 0x10
-    val capsLockSense =  if (keyboard.isCapsLockPressed) 0x0 else 0x1
-    var one = _1 & 0x2F | capsLockSense << 6 | playSense | ((_0 & 0x7) ^ 0x7) // pull up resistors
-    
-    if ((_0 & 0x20) == 0) one &= 0xDF    // CASS MOTOR is output
-    if ((_0 & 0x40) == 0x40) one &= 0xBF // CAPS-LOCK is an input
-    if ((_0 & 0x10) == 0x10) one &= 0xEF // PLAY-SENSE is an input
+    val ddr = _0
+    val data = _1
+    data_out = (data_out & ~ddr) | (data & ddr)
+    var data_read = (data | ~ddr) & (data_out | 0x7)
+    if ((ddr & 0x20) == 0) data_read &= 0xDF
+    data_read &= 0xef
+
+    val playSense = if ((ddr & 0x10) > 0) data & 0x10 else if (datassette.isPlayPressed) 0x00 else 0x10
+    data_read |= playSense
+
+    val capsLockSense = if (keyboard.isCapsLockPressed) 0x0 else 0x1
+    var one = capsLockSense << 6 | data_read & 0xBF
+
+    val clk = Clock.systemClock.currentCycles
+    if (data_falloff_bit7 && (data_set_clk_bit7 < clk)) {
+      data_falloff_bit7 = false;
+      data_set_bit7 = 0;
+    }
+
+    if ((ddr & 0x80) == 0) {
+      one &= ~0x80
+      one |= data_set_bit7
+    }
+
     one
   }
   @inline private[this] def check64_1  : Unit = {
     // check tape motor
-    datassette.setMotor((_0 & 0x20) > 0 && (_1 & 0x20) == 0)
-    datassette.setWriteLine((_0 & 0x08) > 0 && (_1 & 0x08) > 0)
+    val pr = read64_1
+    datassette.setMotor((_0 & 0x20) > 0 && (pr & 0x20) == 0)
+    datassette.setWriteLine((_0 & 0x08) > 0 && (pr & 0x08) > 0)
     val EXROM = expansionPort.EXROM
     val GAME = expansionPort.GAME
     expansionPortConfigurationChanged(GAME,EXROM)
@@ -833,6 +855,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     out.writeInt(vic_clkrate_reg)
     out.writeInt(_0)
     out.writeInt(_1)
+    out.write(data_out)
     out.writeInt(c64MemConfig)
     out.writeBoolean(ULTIMAX)
     out.writeInt(videoBank)
@@ -867,6 +890,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     
     _0 = in.readInt
     _1 = in.readInt
+    data_out = in.readInt
     c64MemConfig = in.readInt
     if (c64MemConfig != -1) c64MC = C64_MEM_CONFIG(c64MemConfig)
     ULTIMAX = in.readBoolean
