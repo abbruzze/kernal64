@@ -4,7 +4,6 @@ import java.awt._
 import java.awt.datatransfer.DataFlavor
 import java.awt.event._
 import java.io._
-
 import javax.swing._
 import ucesoft.cbm._
 import ucesoft.cbm.cpu._
@@ -16,7 +15,10 @@ import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.vdc.VDC
+import ucesoft.cbm.peripheral.vic.VICType
 import ucesoft.cbm.trace._
+
+import java.util.Properties
 
 object C128 extends App {
   CBMComputer.turnOn(new C128,args)
@@ -909,27 +911,21 @@ class C128 extends CBMComputer with MMUChangeListener {
   }
   
   protected def saveSettings(save:Boolean) : Unit = {
-    configuration.setProperty(CONFIGURATION_FRAME_XY,displayFrame.getX + "," + displayFrame.getY)
-    if (!zoomOverride) {
-      val dimension = display.getSize()
-      configuration.setProperty(CONFIGURATION_FRAME_DIM,dimension.width + "," + dimension.height)
-    }
+    if (!ignoreConfig) {
+      configuration.setProperty(CONFIGURATION_FRAME_XY, displayFrame.getX + "," + displayFrame.getY)
+      if (!zoomOverride) {
+        val dimension = display.getSize()
+        configuration.setProperty(CONFIGURATION_FRAME_DIM, dimension.width + "," + dimension.height)
+      }
 
-    configuration.setProperty(CONFIGURATION_VDC_FRAME_XY,vdcDisplayFrame.getX + "," + vdcDisplayFrame.getY)
-    val vdcDimension = vdcDisplay.getSize()
-    configuration.setProperty(CONFIGURATION_VDC_FRAME_DIM,vdcDimension.width + "," + vdcDimension.height)
-    if (save) {
-      settings.save(configuration)
-      println("Settings saved")
-    }
-    try {
-      val propsFile = new File(new File(scala.util.Properties.userHome),CONFIGURATION_FILENAME)
-      val out = new FileWriter(propsFile)
-      configuration.store(out, "C128 configuration file")
-      out.close
-    }
-    catch {
-      case _:IOException =>
+      configuration.setProperty(CONFIGURATION_VDC_FRAME_XY, vdcDisplayFrame.getX + "," + vdcDisplayFrame.getY)
+      val vdcDimension = vdcDisplay.getSize()
+      configuration.setProperty(CONFIGURATION_VDC_FRAME_DIM, vdcDimension.width + "," + vdcDimension.height)
+      if (save) {
+        settings.save(configuration)
+        println("Settings saved")
+      }
+      saveConfigurationFile
     }
   }
   
@@ -943,6 +939,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     out.writeBoolean(FSDIRasInput)
     out.writeBoolean(c64Mode)
     out.writeInt(cpuFrequency)
+    out.writeObject(vicChip.getVICModel.VIC_TYPE.toString)
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     drivesEnabled(0) = in.readBoolean
@@ -953,11 +950,18 @@ class C128 extends CBMComputer with MMUChangeListener {
     FSDIRasInput = in.readBoolean
     c64Mode = in.readBoolean
     cpuFrequency = in.readInt
+    val vicModel = VICType.withName(in.readObject.toString)
+    setVICModel(vicModel,false,false,false)
   }
   protected def allowsStateRestoring : Boolean = true
   // -----------------------------------------------------------------------------------------
   protected def getRAM = mmu.RAM
   protected def getCharROM = mmu.CHAR_ROM
+
+  override protected def setDefaultProperties(configuration:Properties) : Unit = {
+    super.setDefaultProperties(configuration)
+    configuration.setProperty(SettingsKey.RENDERING_TYPE,"bilinear")
+  }
 
   def turnOn(args:Array[String]) : Unit = {
     swing { setMenu }
@@ -983,17 +987,20 @@ class C128 extends CBMComputer with MMUChangeListener {
     if (configuration.getProperty(CONFIGURATION_VDC_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_VDC_FRAME_XY) split "," map { _.toInt }
       swing { vdcDisplayFrame.setLocation(xy(0),xy(1)) }
-    } 
+    }
+    else vdcDisplayFrame.setLocationByPlatform(true)
     // VIC
     swing { displayFrame.pack }
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
       swing { updateVICScreenDimension(new Dimension(dim(0),dim(1))) }
     }
+    else vicZoom(2)
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }
       swing { displayFrame.setLocation(xy(0),xy(1)) }
-    }     
+    }
+    else displayFrame.setLocationByPlatform(true)
     // SETTINGS
     loadSettings(args)
     // VIEW

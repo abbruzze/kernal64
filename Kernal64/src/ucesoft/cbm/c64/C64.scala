@@ -1,14 +1,7 @@
 package ucesoft.cbm.c64
 
-import java.awt.datatransfer.DataFlavor
-import java.awt.{Toolkit, _}
-import java.io._
-
-import javax.swing._
-import javax.swing.filechooser.FileFilter
 import ucesoft.cbm._
 import ucesoft.cbm.expansion._
-import ucesoft.cbm.expansion.cpm.CPMCartridge
 import ucesoft.cbm.formats._
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
@@ -16,9 +9,14 @@ import ucesoft.cbm.peripheral.bus.BusSnoop
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
-import ucesoft.cbm.peripheral.vic.Palette
-import ucesoft.cbm.peripheral.vic.Palette.PaletteType
+import ucesoft.cbm.peripheral.vic.VICType
 import ucesoft.cbm.trace.{InspectPanel, TraceDialog}
+
+import java.awt.datatransfer.DataFlavor
+import java.awt.{Toolkit, _}
+import java.io._
+import javax.swing._
+import javax.swing.filechooser.FileFilter
 
 object C64 extends App {
   CBMComputer.turnOn(new C64,args)
@@ -508,15 +506,7 @@ class C64 extends CBMComputer {
         settings.save(configuration)
         println("Settings saved")
       }
-      try {
-        val propsFile = new File(new File(scala.util.Properties.userHome), CONFIGURATION_FILENAME)
-        val out = new FileWriter(propsFile)
-        configuration.store(out, "C64 configuration file")
-        out.close
-      }
-      catch {
-        case _: IOException =>
-      }
+      saveConfigurationFile
     }
   }
 
@@ -528,6 +518,7 @@ class C64 extends CBMComputer {
     out.writeBoolean(drivesEnabled(0))
     out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
+    out.writeObject(vicChip.getVICModel.VIC_TYPE.toString)
 
     // VIC Coprocessor
     vicChip.getCoprocessor match {
@@ -542,6 +533,8 @@ class C64 extends CBMComputer {
     drivesEnabled(0) = in.readBoolean
     drivesEnabled(1) = in.readBoolean
     printerEnabled = in.readBoolean
+    val vicModel = VICType.withName(in.readObject.toString)
+    setVICModel(vicModel,false,false,false)
 
     // VIC Coprocessor
     in.readBoolean match {
@@ -579,10 +572,12 @@ class C64 extends CBMComputer {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }
       swing { updateVICScreenDimension(new Dimension(dim(0),dim(1))) }
     }
+    else vicZoom(2)
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map { _.toInt }
       swing { displayFrame.setLocation(xy(0),xy(1)) }
     }
+    else displayFrame.setLocationByPlatform(true)
     // SETTINGS
     loadSettings(args)
     // VIEW

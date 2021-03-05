@@ -1,25 +1,24 @@
 package ucesoft.cbm.scpu
 
-import java.awt.datatransfer.DataFlavor
-import java.awt.{Toolkit, _}
-import java.io._
-import javax.swing._
-import javax.swing.filechooser.FileFilter
 import ucesoft.cbm._
+import ucesoft.cbm.c64._
+import ucesoft.cbm.cpu.ROM
 import ucesoft.cbm.cpu.wd65816.CPU65816
 import ucesoft.cbm.expansion._
-import ucesoft.cbm.expansion.cpm.CPMCartridge
 import ucesoft.cbm.formats._
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
 import ucesoft.cbm.peripheral.bus.BusSnoop
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
-import ucesoft.cbm.peripheral.vic.Palette
-import ucesoft.cbm.peripheral.vic.Palette.PaletteType
+import ucesoft.cbm.peripheral.vic.VICType
 import ucesoft.cbm.trace.{InspectPanel, TraceDialog}
-import ucesoft.cbm.c64._
-import ucesoft.cbm.cpu.ROM
+
+import java.awt.datatransfer.DataFlavor
+import java.awt.{Toolkit, _}
+import java.io._
+import javax.swing._
+import javax.swing.filechooser.FileFilter
 
 object SCPUC64 extends App {
   CBMComputer.turnOn(new SCPUC64,args)
@@ -525,7 +524,7 @@ class SCPUC64 extends CBMComputer {
     scpuRamItem.add(scpu16MRAMItem)
     settings.add("scpu-ram",
       s"super ram size: none,1,4,8,16",
-      "SCPU_MEM_SIZE",
+      SettingsKey.SCPU_MEM_SIZE,
       (size: String) => {
         if (size == "" || size == null) { scpu16MRAMItem.setSelected(true) ; mmu.setSIMMSize(16) }
         else if (size == "none") { scpuNORAMItem.setSelected(true) ; mmu.setSIMMSize(0) }
@@ -544,7 +543,7 @@ class SCPUC64 extends CBMComputer {
 
     settings.add("scpu-jiffydos-enabled",
       s"Enables JiffyDOS at startup",
-      "SCPU_JIFFYDOS_ENABLED",
+      SettingsKey.SCPU_JIFFYDOS_ENABLED,
       (jiffyEnabled: Boolean) => {
         mmu.setJiffyDOS(jiffyEnabled)
         mmuStatusPanel.enableJiffyDOS(jiffyEnabled)
@@ -562,23 +561,17 @@ class SCPUC64 extends CBMComputer {
   }
 
   protected def saveSettings(save: Boolean): Unit = {
-    if (!zoomOverride) {
-      val dimension = display.getSize()
-      configuration.setProperty(CONFIGURATION_FRAME_DIM, dimension.width + "," + dimension.height)
-    }
-    configuration.setProperty(CONFIGURATION_FRAME_XY, displayFrame.getX + "," + displayFrame.getY)
-    if (save) {
-      settings.save(configuration)
-      println("Settings saved")
-    }
-    try {
-      val propsFile = new File(new File(scala.util.Properties.userHome), CONFIGURATION_FILENAME)
-      val out = new FileWriter(propsFile)
-      configuration.store(out, "C64 configuration file")
-      out.close
-    }
-    catch {
-      case _: IOException =>
+    if (!ignoreConfig) {
+      if (!zoomOverride) {
+        val dimension = display.getSize()
+        configuration.setProperty(CONFIGURATION_FRAME_DIM, dimension.width + "," + dimension.height)
+      }
+      configuration.setProperty(CONFIGURATION_FRAME_XY, displayFrame.getX + "," + displayFrame.getY)
+      if (save) {
+        settings.save(configuration)
+        println("Settings saved")
+      }
+      saveConfigurationFile
     }
   }
 
@@ -592,6 +585,7 @@ class SCPUC64 extends CBMComputer {
     out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
     out.writeInt(cpuClocks)
+    out.writeObject(vicChip.getVICModel.VIC_TYPE.toString)
   }
 
   protected def loadState(in: ObjectInputStream) : Unit = {
@@ -599,6 +593,8 @@ class SCPUC64 extends CBMComputer {
     drivesEnabled(1) = in.readBoolean
     printerEnabled = in.readBoolean
     cpuClocks = in.readInt
+    val vicModel = VICType.withName(in.readObject.toString)
+    setVICModel(vicModel,false,false,false)
   }
 
   protected def allowsStateRestoring: Boolean = true
@@ -639,12 +635,14 @@ class SCPUC64 extends CBMComputer {
       }
       swing { updateVICScreenDimension(new Dimension(dim(0), dim(1))) }
     }
+    else vicZoom(2)
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map {
         _.toInt
       }
       swing { displayFrame.setLocation(xy(0), xy(1)) }
     }
+    else displayFrame.setLocationByPlatform(true)
     // SETTINGS
     loadSettings(args)
     // VIEW
