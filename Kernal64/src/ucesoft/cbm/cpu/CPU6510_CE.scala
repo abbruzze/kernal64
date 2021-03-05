@@ -54,7 +54,8 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   private[this] var delay1CycleIRQCheck = false
   private[this] var forceIRQNow = false
   private[this] var prevIClearedFlag = false
-  private[this] var pageCrossed,notReadyDuringInstr = false
+  private[this] var pageCrossed = false
+  private[this] var readyCycles = 0
 
   // -----------------------------------------
   final override def setBaLow(baLow: Boolean) : Unit = {
@@ -534,7 +535,6 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   @inline private[this] def Last  : Unit = {
     state = 0
-    notReadyDuringInstr = false
   }
 
   private def initStates  : Unit = {
@@ -1909,30 +1909,35 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             data = mem.read(PC)
             PC = (PC + 1) & 0xFFFF
-            data &= A
-            A = if (isCarry) (data >> 1) | 0x80 else data >> 1
-            if (!isDecimal) {
-              set_nz(A)
-              if ((A & 0x40) > 0) sec else clc
-              if (((A & 0x40) ^ ((A & 0x20) << 1)) > 0) sev else clv
+            var tmp = A & data
+            if (isDecimal) {
+              var tmp_2 = tmp
+              tmp_2 |= (if (isCarry) 1 << 8 else 0)
+              tmp_2 >>= 1
+              if (isCarry) sen else cln
+              if (tmp_2 == 0) sez else clz
+              if (((tmp_2 ^ tmp) & 0x40) > 0) sev else clv
+              if (((tmp & 0xf) + (tmp & 0x1)) > 0x5) tmp_2 = (tmp_2 & 0xf0) | ((tmp_2 + 0x6) & 0xf)
+              if (((tmp & 0xf0) + (tmp & 0x10)) > 0x50) {
+                tmp_2 = (tmp_2 & 0x0f) | ((tmp_2 + 0x60) & 0xf0)
+                sec
+              } else clc
+              A = tmp_2 & 0xFF
             }
             else {
-              if (isCarry) sen else cln
-              if (A == 0) sez else clz
-              if (((data ^ A) & 0x40) != 0) sev else clv
-              if ((data & 0x0F) + (data & 0x01) > 5) A = A & 0xF0 | (A + 6) & 0x0F
-              if (((data + (data & 0x10)) & 0x1F0) > 0x50) {
-                sec
-                A += 0x60
-              }
-              else clc
+              tmp |= (if (isCarry) 1 << 8 else 0)
+              tmp >>= 1
+              set_nz(tmp)
+              if ((tmp & 0x40) > 0) sec else clc
+              if (((tmp & 0x40) ^ ((tmp & 0x20) << 1)) > 0) sev else clv
+              A = tmp & 0xFF
             }
             Last
           }
         }
         case O_ANE_I => () => {
           if (ready) {
-            val const = if (notReadyDuringInstr) 0xEE else 0xEF
+            val const = if ((readyCycles & 4) == 0) 0xEE else 0xEF
             data = mem.read(PC)
             PC = (PC + 1) & 0xFFFF
             A = (A | const) & X & data
@@ -1974,26 +1979,26 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
         }
         case O_SHS => () => { // ar2 contains the high byte of the operand address
           SP = A & X
-          val value = if (notReadyDuringInstr) SP else (ar2 + 1) & SP
-          val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
+          val value = if ((readyCycles & 4) == 0) SP else (ar2 + 1) & SP
+          val target = if (!pageCrossed) ar else (ar & 0x00FF) | (value << 8) & (ar & 0xFF00)
           if (!dma) mem.write(target,value)
           Last
         }
         case O_SHY => () => { // ar2 contains the high byte of the operand address
-          val value = if (notReadyDuringInstr) Y else Y & (ar2 + 1)
-          val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
+          val value = if ((readyCycles & 4) == 0) Y else Y & (ar2 + 1)
+          val target = if (!pageCrossed) ar else (ar & 0x00FF) | (value << 8) & (ar & 0xFF00)
           if (!dma) mem.write(target,value)
           Last
         }
         case O_SHX => () => { // ar2 contains the high byte of the operand address
-          val value = if (notReadyDuringInstr) X else X & (ar2 + 1)
-          val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
+          val value = if ((readyCycles & 4) == 0) X else X & (ar2 + 1)
+          val target = if (!pageCrossed) ar else (ar & 0x00FF) | (value << 8) & (ar & 0xFF00)
           if (!dma) mem.write(target,value)
           Last
         }
         case O_SHA => () => { // ar2 contains the high byte of the operand address
-          val value = if (notReadyDuringInstr) A & X else A & X & (ar2 + 1)
-          val target = if (!pageCrossed) ar else (ar & 0x00FF) | value << 8
+          val value = if ((readyCycles & 4) == 0) A & X else A & X & (ar2 + 1)
+          val target = if (!pageCrossed) ar else (ar & 0x00FF) | (value << 8) & (ar & 0xFF00)
           if (!dma) mem.write(target, value)
           Last
         }
@@ -2033,42 +2038,43 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   }
 
   @inline private[this] def do_adc(data: Int) : Unit = {
-    var tmp = A + data + (if (isCarry) 1 else 0)
-    if ((tmp & 0xFF) == 0) sez else clz
+    val C = if (isCarry) 1 else 0
+    var res = A + data + C
+    if ((res & 0xFF) == 0) sez else clz
 
     if (isDecimal) {
-      tmp = (A & 0xf) + (data & 0xf) + (if (isCarry) 1 else 0)
-      if (tmp > 0x9) tmp += 0x6
-
-      if (tmp <= 0x0f) tmp = (tmp & 0xf) + (A & 0xf0) + (data & 0xf0)
-      else tmp = (tmp & 0xf) + (A & 0xf0) + (data & 0xf0) + 0x10
-      if ((((A ^ data) & 0x80) == 0) && (((A ^ tmp) & 0x80) != 0)) sev else clv
-      if ((tmp & 0x80) > 0) sen else cln
-      if ((tmp & 0x1f0) > 0x90) tmp += 0x60
-      if (tmp >= 0x100) sec else clc
-      A = tmp & 0xff
-    } else {
-      if ((((A ^ data) & 0x80) == 0) && (((A ^ tmp) & 0x80) != 0)) sev else clv
-      if (tmp > 0xff) sec else clc
-      A = tmp & 0xff
-      set_nz(A)
+      res = (A & 0x0f) + (data & 0x0f) + C
+      if( res > 0x09 ) res += 0x06
+      val c = if (res > 0x0f) 1 else 0
+      res = (A & 0xf0) + (data & 0xf0) + (c << 4) + (res & 0x0f)
+      if ((res & 0x80) > 0) sen else cln
+      if ((((A ^ data) & 0x80) == 0) && (((A ^ res) & 0x80) != 0)) sev else clv
+      if( res > 0x9f ) res += 0x60
     }
+    else {
+      if ((((A ^ data) & 0x80) == 0) && (((A ^ res) & 0x80) != 0)) sev else clv
+      if ((res & 0x80) > 0) sen else cln
+    }
+    if (res >= 0x100) sec else clc
+    A = res & 0xFF
   }
 
   @inline private[this] def do_sbc(data: Int) : Unit = {
-    var tmp = A - data - (if (isCarry) 0 else 1)
-    val nextCarry = tmp >= 0
-    tmp = tmp & 0x1ff
-    set_nz(tmp)
-    if ((((A ^ tmp) & 0x80) != 0) && (((A ^ data) & 0x80) != 0)) sev else clv
+    val oldC = if (isCarry) 0 else -1
+    val dataInv = ~data & 0xFF
+    var res = A + dataInv + (if (isCarry) 1 else 0)
+    if ((res & 0xFF) == 0) sez else clz
+    if (res >= 0x100) sec else clc
+    if ((res & 0x80) > 0) sen else cln
+    if ((((A ^ dataInv) & 0x80) == 0) && (((A ^ res) & 0x80) != 0)) sev else clv
     if (isDecimal) {
-      tmp = (A & 0xf) - (data & 0xf) - (if (isCarry) 0 else 1)
-      if ((tmp & 0x10) > 0) tmp = ((tmp - 6) & 0xf) | ((A & 0xf0) - (data & 0xf0) - 0x10)
-      else tmp = (tmp & 0xf) | ((A & 0xf0) - (data & 0xf0))
-      if ((tmp & 0x100) > 0) tmp -= 0x60
+      var AL = (A & 0x0f) - (data & 0x0f) + oldC
+      if (AL < 0) AL = ((AL - 0x06) & 0x0F) - 0x10
+      var res2 = (A & 0xf0) - (data & 0xf0) + AL
+      if (res2 < 0) res2 -= 0x60
+      res = res2
     }
-    A = tmp & 0xFF
-    if (nextCarry) sec else clc
+    A = res & 0xFF
   }
 
   def init = {
@@ -2088,7 +2094,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     forceIRQNow = false
     prevIClearedFlag = false
     pageCrossed = false
-    notReadyDuringInstr = false
+    readyCycles = 0
     A = 0
     X = 0
     Y = 0
@@ -2112,11 +2118,12 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   }
 
   @inline private def fetchAndExecute  : Unit = {
+    readyCycles = readyCycles << 1 | (if (ready) 1 else 0)
+
     if (breakType != null && state == 0 && breakType.isBreak(PC, false, false)) {
       tracing = true
       breakCallBack(CpuStepInfo(PC,toString))
     }
-
 
     // check interrupts
     if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - nmiFirstCycle >= 2) {
@@ -2162,8 +2169,6 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     delay1CycleIRQCheck = false
     prevIClearedFlag = false
 
-    if (!ready) notReadyDuringInstr = true
-
     try {
       states(state)()
     }
@@ -2206,6 +2211,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     out.writeBoolean(forceIRQNow)
     out.writeBoolean(delay1CycleIRQCheck)
     out.writeBoolean(prevIClearedFlag)
+    out.writeInt(readyCycles)
   }
 
   protected def loadState(in: ObjectInputStream) : Unit = {
@@ -2232,6 +2238,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     forceIRQNow = in.readBoolean
     delay1CycleIRQCheck = in.readBoolean
     prevIClearedFlag = in.readBoolean
+    readyCycles = in.readInt
   }
 
   protected def allowsStateRestoring : Boolean = true
