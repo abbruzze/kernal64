@@ -3,12 +3,12 @@ package ucesoft.cbm.peripheral.vic
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.{CBMComponent, CBMComponentType, Chip, ChipID, Clock}
 import Palette._
+import ucesoft.cbm.c64.C64VICMemory
 import ucesoft.cbm.cpu.RAMComponent
 
 import annotation.switch
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
-
 import ucesoft.cbm.peripheral.vic.coprocessor.{VICContext, VICCoprocessor}
 
 
@@ -66,8 +66,8 @@ final class VIC(mem: VICMemory,
   private[this] var den = false // blank screen if false
   private[this] var denOn30 = false // den value at raster line $30
   private[this] var badLine = false
-  private[this] var bmm = false // bitmap mode: true enabled
-  private[this] var ecm = false // extended color mode: true enabled
+  private[this] var bmm,bmmDelay = false // bitmap mode: true enabled
+  private[this] var ecm,ecmDelay = false // extended color mode: true enabled
   private[this] var csel = 0 // 1 => 40 cols, 0 => 38 cols
   private[this] var mcm = false // multi color mode: true enabled
   private[this] var res = false // video enabled: false enabled
@@ -95,6 +95,7 @@ final class VIC(mem: VICMemory,
   private[this] var drawBorderOpt = true
   private[this] var pendingDrawBorderModeChange = false
   private[this] var isNewVICModel = isVICIIe // 8565 for PAL, 8562 for NTSC
+  private[this] var frameToSkip,currentFrameToSkip = 0
   // ------------------------ C128 $D030 test bit & others ------------------------------------------------
   private[this] var c128TestBitEnabled = false
   private[this] var refreshCycle = false
@@ -874,6 +875,11 @@ final class VIC(mem: VICMemory,
     if (coprocessor != null) coprocessor.reset
   }
 
+  def setFrameToSkip(fts:Int) : Unit = {
+    frameToSkip = fts
+    currentFrameToSkip = 0
+  }
+
   def setNEWVICModel(newModel:Boolean) : Unit = isNewVICModel = newModel || isVICIIe
 
   def setDrawBorder(on:Boolean) : Unit = {
@@ -997,6 +1003,8 @@ final class VIC(mem: VICMemory,
           yscroll = controlRegister1 & 7
           rsel = (controlRegister1 & 8) >> 3
           den = (controlRegister1 & 16) == 16
+          bmmDelay = bmm
+          ecmDelay = ecm
           bmm = (controlRegister1 & 32) == 32
           ecm = (controlRegister1 & 64) == 64
 
@@ -1263,6 +1271,9 @@ final class VIC(mem: VICMemory,
     dataToDrawPipe = dataToDrawPipe << 32 | (dataToDraw & 0xFFFFFFFFL)
     displayLineToDrawPipe = displayLineToDrawPipe << 16 | displayLine
     rasterCycleToDrawPipe = rasterCycleToDrawPipe << 8 | rasterCycle
+
+    bmmDelay = bmm
+    ecmDelay = ecm
   }
 
   private def refreshAccess : Unit = {
@@ -1292,7 +1303,12 @@ final class VIC(mem: VICMemory,
     if (displayLine == 0) {
       denOn30 = false
       canUpdateLightPenCoords = true
-      display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
+      if (frameToSkip == 0 || currentFrameToSkip == 0) {
+        display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
+        currentFrameToSkip = frameToSkip
+      }
+      else currentFrameToSkip -= 1
+
       firstModPixelY = -1
       ref = 0xFF
       vcbase = 0
@@ -1455,17 +1471,26 @@ final class VIC(mem: VICMemory,
     if (coprocessor_gdata != -1) coprocessor_gdata
     else
     if (_2MhzMode) mem.byteOnBUS
-    else
-    if (bmm) {
-      val offset = bitmapAddress | ((vc & 0x3ff) << 3) | rc
-      val bitmap = mem.read(offset,ChipID.VIC)
-      //Log.debug(s"Reading bitmap at ${offset} = ${bitmap}")
-      bitmap
-    } else {
+    else {
+      if ((bmm ^ bmmDelay) && model == VIC_PAL) {
+        val adrFrom = gAccessAddress(bmmDelay,ecmDelay)
+        val adrTo = gAccessAddress(bmm,ecm)
+        val vm = mem.asInstanceOf[C64VICMemory]
+        val address = if (!vm.isCharROMAddress(adrFrom) && vm.isCharROMAddress(adrTo)) {
+          (adrFrom & 0xff) | (adrTo & 0x3f00)
+        } else adrTo
+        mem.read(address,ChipID.VIC)
+      }
+      else mem.read(gAccessAddress(bmm,ecm),ChipID.VIC)
+    }
+
+  }
+
+  @inline private def gAccessAddress(bmm:Boolean,ecm:Boolean) : Int = {
+    if (bmm) bitmapAddress | ((vc & 0x3ff) << 3) | rc
+    else {
       val charCode = if (ecm) vml_p(vmli) & 0x3F else vml_p(vmli)
-      val char = mem.read(characterAddress | (charCode << 3) | rc,ChipID.VIC)
-      //Log.fine(s"Reading char at ${characterAddress} for char code ${charCode} with rc=${rc} pattern=${char}")
-      char
+      characterAddress | (charCode << 3) | rc
     }
   }
 
