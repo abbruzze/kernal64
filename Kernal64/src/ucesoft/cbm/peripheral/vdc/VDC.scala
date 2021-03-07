@@ -733,25 +733,13 @@ class VDC extends RAMComponent {
   }
 
   @inline private def fetchGFXAndAttrs : Unit = {
-    val cursorMode = regs(10) & 0x60
-    val cursorTopLine = regs(10) & 0x1F
-    val cursorBottomLine = regs(11) & 0x1F
     val useAttributes = (regs(25) & 0x40) > 0
 
     var c = 0
+    val reverse = (regs(24) & 0x40) > 0
     while (c < regs(1) + 1) {
-      var reverse = (regs(24) & 0x40) > 0
-
       gfxBuffer(c) = ram(ram_adr(ram_base_ptr + c))
       if (c >= 82) gfxBuffer(c - 41) = gfxBuffer(c)
-
-      val showCursor = ram_base_ptr + c == cursor_pos && cursorMode != 0x20
-      if (showCursor) {
-        val isCursorLine = if (cursorTopLine < cursorBottomLine) currentCharScanLine >= cursorTopLine && currentCharScanLine <= cursorBottomLine
-        else currentCharScanLine < cursorBottomLine || currentCharScanLine > cursorTopLine
-        reverse ^= isCursorLine
-        if (cursorMode != 0x00 && isCursorLine) reverse ^= cursorOn // cursor blinking
-      }
 
       if (useAttributes) attrBuffer(c) = ram(ram_adr(attr_base_ptr + c)) ^ (if (reverse) 0x40 else 0x00)
       else attrBuffer(c) = if (reverse) 0x40 else 0x00
@@ -810,9 +798,14 @@ class VDC extends RAMComponent {
         //if (char_col == 0 && firstRowLine) fetchGFXAndAttrs
 
         val charCode = gfxBuffer(char_col)
+        val attr = attrBuffer(char_col)
+        val cursorMode = regs(10) & 0x60
+        val cursorTopLine = regs(10) & 0x1F
+        val cursorBottomLine = regs(11) & 0x1F
+        val showCursor = ram_ptr == cursor_pos && cursorMode != 0x20
+
         ram_ptr += 1
 
-        val attr = attrBuffer(char_col)
         if (useAttributes) {
           if ((attr & 0x80) > 0) alternateCharSetOfs = if (ychars_total > 15) 0x2000 else 0x1000
           reverse = (attr & 0x40) > 0
@@ -821,6 +814,13 @@ class VDC extends RAMComponent {
           fg = PALETTE(attr & 0x0F)
         }
         else reverse = (attr & 0x40) > 0
+
+        if (showCursor) {
+          val isCursorLine = if (cursorTopLine < cursorBottomLine) currentCharScanLine >= cursorTopLine && currentCharScanLine <= cursorBottomLine
+          else currentCharScanLine < cursorBottomLine || currentCharScanLine > cursorTopLine
+          reverse ^= isCursorLine
+          if (cursorMode != 0x00 && isCursorLine) reverse ^= cursorOn // cursor blinking
+        }
 
         val char_address = if (ychars_total > 15) (regs(28) & 0xC0) << 8 else chargen_adr
         val char_ptr = char_address + alternateCharSetOfs + charCode * bytes_per_char + currentCharScanLine
