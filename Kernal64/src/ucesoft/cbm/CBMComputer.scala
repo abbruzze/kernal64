@@ -1318,8 +1318,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     settings.add("warp",
       "Run warp mode",
       (warp:Boolean) => if (warp) {
-        clock.maximumSpeed = true
-        maxSpeedItem.setSelected(true)
+        warpMode(true)
       }
     )
     settings.add("headless",
