@@ -31,10 +31,10 @@ final class VIC(mem: VICMemory,
 
   def setVICModel(model:VICModel) : Unit = {
     this.model = model
-    lastModPixelY = 0
+    lastModPixelY = model.RASTER_LINES
     lastModPixelX = model.BLANK_RIGHT_CYCLE << 3
-    firstModPixelX = model.BLANK_LEFT_CYCLE << 3
-    firstModPixelY = -1
+    firstModPixelX = -1
+    firstModPixelY = 0
     xCoord = model.XCOORD
   }
 
@@ -81,8 +81,7 @@ final class VIC(mem: VICMemory,
   private[this] var isBlank = false // valid inside drawCycle: tells if we are in the blank area
   private[this] var display: Display = null // the display
   private[this] var displayMem: Array[Int] = null
-  private[this] var firstModPixelY = -1 // first y pixel coordinate modified
-  private[this] var firstModPixelX = model.BLANK_LEFT_CYCLE << 3
+  private[this] var firstModPixelX, firstModPixelY = 0 // first x,y pixel coordinate modified
   private[this] var lastModPixelX = model.BLANK_RIGHT_CYCLE << 3
   private[this] var lastModPixelY = 0 // last y pixel coordinate modified
   private[this] var lightPenEnabled = false
@@ -95,7 +94,6 @@ final class VIC(mem: VICMemory,
   private[this] var drawBorderOpt = true
   private[this] var pendingDrawBorderModeChange = false
   private[this] var isNewVICModel = isVICIIe // 8565 for PAL, 8562 for NTSC
-  private[this] var frameToSkip,currentFrameToSkip = 0
   // ------------------------ C128 $D030 test bit & others ------------------------------------------------
   private[this] var c128TestBitEnabled = false
   private[this] var refreshCycle = false
@@ -862,10 +860,10 @@ final class VIC(mem: VICMemory,
     spriteDMAon = 0
     spritesDisplayedMask = 0
     ref = 0
-    lastModPixelY = 0
+    lastModPixelY = model.RASTER_LINES
     lastModPixelX = model.BLANK_RIGHT_CYCLE << 3
-    firstModPixelX = model.BLANK_LEFT_CYCLE << 3
-    firstModPixelY = -1
+    firstModPixelX = -1//model.BLANK_LEFT_CYCLE << 3
+    firstModPixelY = 0
     lastBackground = 0
     dataToDrawPipe = 0
     displayLineToDrawPipe = 0
@@ -873,11 +871,6 @@ final class VIC(mem: VICMemory,
     vmliToDrawPipe = 0
 
     if (coprocessor != null) coprocessor.reset
-  }
-
-  def setFrameToSkip(fts:Int) : Unit = {
-    frameToSkip = fts
-    currentFrameToSkip = 0
   }
 
   def setNEWVICModel(newModel:Boolean) : Unit = isNewVICModel = newModel || isVICIIe
@@ -1303,13 +1296,8 @@ final class VIC(mem: VICMemory,
     if (displayLine == 0) {
       denOn30 = false
       canUpdateLightPenCoords = true
-      if (frameToSkip == 0 || currentFrameToSkip == 0) {
-        display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
-        currentFrameToSkip = frameToSkip
-      }
-      else currentFrameToSkip -= 1
-
-      firstModPixelY = -1
+      display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
+      firstModPixelX = -1
       ref = 0xFF
       vcbase = 0
       vc = 0
@@ -1327,7 +1315,10 @@ final class VIC(mem: VICMemory,
     val color = VIC_RGB(pixel & 0x0F)
     if (displayMem(index) != color) {
       displayMem(index) = color
-      if (firstModPixelY == -1) firstModPixelY = y
+      if (firstModPixelX == -1) {
+        firstModPixelY = y
+        firstModPixelX = model.BLANK_LEFT_CYCLE << 3
+      }
       lastModPixelY = y
     }
   }
@@ -1472,11 +1463,10 @@ final class VIC(mem: VICMemory,
     else
     if (_2MhzMode) mem.byteOnBUS
     else {
-      if ((bmm ^ bmmDelay) && model == VIC_PAL) {
+      if ((bmm ^ bmmDelay) && (model == VIC_PAL && !(isVICIIe || isNewVICModel))) {
         val adrFrom = gAccessAddress(bmmDelay,ecmDelay)
         val adrTo = gAccessAddress(bmm,ecm)
-        val vm = mem.asInstanceOf[C64VICMemory]
-        val address = if (!vm.isCharROMAddress(adrFrom) && vm.isCharROMAddress(adrTo)) {
+        val address = if (!mem.isCharROMAddress(adrFrom) && mem.isCharROMAddress(adrTo)) {
           (adrFrom & 0xff) | (adrTo & 0x3f00)
         } else adrTo
         mem.read(address,ChipID.VIC)
