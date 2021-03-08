@@ -73,6 +73,11 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
   }
   
   final def readPhi2(address:Int) : Int = readPhi1(address)
+
+  final def isCharROMAddress(address:Int) : Boolean = {
+    val realAddress = baseAddress | address
+    (realAddress & 0x7000) == 0x1000 && !ultimax
+  }
   
   @inline private def readPhi1(address: Int) : Int = {
     val realAddress = baseAddress | address

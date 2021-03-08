@@ -815,6 +815,11 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   final def lastByteRead = memLastByteRead
 
   override def readPCOpcode = ram.read(cpu.getPC)
+
+  final def isCharROMAddress(address:Int) : Boolean = {
+    val realAddress = vicBaseAddress | address
+    (realAddress & 0x7000) == 0x1000 && !ULTIMAX
+  }
   
   @inline private def vicReadPhi1(address: Int) : Int = {
     val realAddress = vicBaseAddress | address
