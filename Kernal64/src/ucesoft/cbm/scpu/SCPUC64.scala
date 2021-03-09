@@ -162,18 +162,17 @@ class SCPUC64 extends CBMComputer {
       val cmd = s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar
       clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,true) ))
     }
-    settings.load(configuration)
     // AUTOPLAY
-    settings.parseAndLoad(args) match {
+    preferences.parseAndLoad(args,configuration) match {
       case None =>
         // run the given file name
-        settings.get[String]("RUNFILE") match {
+        preferences[String](Preferences.PREF_RUNFILE) match {
           case None =>
           case Some(fn) =>
             loadFile(fn)
         }
       case Some(f) =>
-        settings.get[String]("DRIVE_8_FILE") match {
+        preferences[String](Preferences.PREF_DRIVE_X_FILE(0)) match {
           case None =>
             handleDND(new File(f),false,true)
           case Some(_) =>
@@ -293,6 +292,7 @@ class SCPUC64 extends CBMComputer {
       drives(driveID).getFloppy.close
       if (!traceDialog.isTracing) clock.pause
       drives(driveID).setDriveReader(disk, emulateInserting)
+      preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID),file.toString)
       clock.play
 
       loadFileItems(driveID).setEnabled(isD64)
@@ -353,6 +353,8 @@ class SCPUC64 extends CBMComputer {
   }
 
   protected def setSettingsMenu(optionMenu: JMenu) : Unit = {
+    import Preferences._
+
     val driveMenu = new JMenuItem("Drives ...")
     driveMenu.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L, java.awt.event.InputEvent.ALT_DOWN_MASK))
     optionMenu.add(driveMenu)
@@ -499,57 +501,44 @@ class SCPUC64 extends CBMComputer {
       clock.play
     })
 
+    // SCPU-RAM ===========================================================================================
     val scpuRamItem = new JMenu("SCPU RAM")
     optionMenu.add(scpuRamItem)
     val groupscpu = new ButtonGroup
     val scpuNORAMItem = new JRadioButtonMenuItem("0M")
-    scpuNORAMItem.addActionListener(_ => mmu.setSIMMSize(0))
+    scpuNORAMItem.addActionListener(_ => preferences(PREF_SCPURAM) = "none" )
     groupscpu.add(scpuNORAMItem)
     scpuRamItem.add(scpuNORAMItem)
     val scpu1MRAMItem = new JRadioButtonMenuItem("1M")
-    scpu1MRAMItem.addActionListener(_ => mmu.setSIMMSize(1))
+    scpu1MRAMItem.addActionListener(_ => preferences(PREF_SCPURAM) = "1" )
     groupscpu.add(scpu1MRAMItem)
     scpuRamItem.add(scpu1MRAMItem)
     val scpu4MRAMItem = new JRadioButtonMenuItem("4M")
-    scpu4MRAMItem.addActionListener(_ => mmu.setSIMMSize(4))
+    scpu4MRAMItem.addActionListener(_ => preferences(PREF_SCPURAM) = "4" )
     groupscpu.add(scpu4MRAMItem)
     scpuRamItem.add(scpu4MRAMItem)
     val scpu8MRAMItem = new JRadioButtonMenuItem("8M")
-    scpu8MRAMItem.addActionListener(_ => mmu.setSIMMSize(8))
+    scpu8MRAMItem.addActionListener(_ => preferences(PREF_SCPURAM) = "8" )
     groupscpu.add(scpu8MRAMItem)
     scpuRamItem.add(scpu8MRAMItem)
     val scpu16MRAMItem = new JRadioButtonMenuItem("16M")
-    scpu16MRAMItem.addActionListener(_ => mmu.setSIMMSize(16))
+    scpu16MRAMItem.addActionListener(_ => preferences(PREF_SCPURAM) = "16" )
     groupscpu.add(scpu16MRAMItem)
     scpuRamItem.add(scpu16MRAMItem)
-    settings.add("scpu-ram",
-      s"super ram size: none,1,4,8,16",
-      SettingsKey.SCPU_MEM_SIZE,
-      (size: String) => {
-        if (size == "" || size == null) { scpu16MRAMItem.setSelected(true) ; mmu.setSIMMSize(16) }
-        else if (size == "none") { scpuNORAMItem.setSelected(true) ; mmu.setSIMMSize(0) }
-        else if (size == "1") { scpu1MRAMItem.setSelected(true) ; mmu.setSIMMSize(1) }
-        else if (size == "4") { scpu4MRAMItem.setSelected(true) ; mmu.setSIMMSize(4) }
-        else if (size == "8") { scpu8MRAMItem.setSelected(true) ; mmu.setSIMMSize(8) }
-        else if (size == "16") {scpu16MRAMItem.setSelected(true)  ; mmu.setSIMMSize(16) }
-        else throw new IllegalArgumentException(s"Bad SIMM size: $size")
-      },
-      if (scpuNORAMItem.isSelected) "none"
-      else if (scpu1MRAMItem.isSelected) "1"
-      else if (scpu4MRAMItem.isSelected) "4"
-      else if (scpu8MRAMItem.isSelected) "8"
-      else "16"
-    )
-
-    settings.add("scpu-jiffydos-enabled",
-      s"Enables JiffyDOS at startup",
-      SettingsKey.SCPU_JIFFYDOS_ENABLED,
-      (jiffyEnabled: Boolean) => {
-        mmu.setJiffyDOS(jiffyEnabled)
-        mmuStatusPanel.enableJiffyDOS(jiffyEnabled)
-      },
-      mmu.isJiffyDOSEnabled
-    )
+    preferences.add(PREF_SCPURAM,"super ram size: none,1,4,8,16","none",Set("none","1","4","8","16")) { size =>
+      if (size == "" || size == null) { scpu16MRAMItem.setSelected(true) ; mmu.setSIMMSize(16) }
+      else if (size == "none") { scpuNORAMItem.setSelected(true) ; mmu.setSIMMSize(0) }
+      else if (size == "1") { scpu1MRAMItem.setSelected(true) ; mmu.setSIMMSize(1) }
+      else if (size == "4") { scpu4MRAMItem.setSelected(true) ; mmu.setSIMMSize(4) }
+      else if (size == "8") { scpu8MRAMItem.setSelected(true) ; mmu.setSIMMSize(8) }
+      else if (size == "16") {scpu16MRAMItem.setSelected(true)  ; mmu.setSIMMSize(16) }
+      else throw new IllegalArgumentException(s"Bad SIMM size: $size")
+    }
+    // SCPU-JIFFYDOS-ENABLED ==============================================================================
+    preferences.add(PREF_SCPUJIFFYDOSENABLED,"Enables JiffyDOS at startup",false) { jiffyEnabled =>
+      mmu.setJiffyDOS(jiffyEnabled)
+      mmuStatusPanel.enableJiffyDOS(jiffyEnabled)
+    }
   }
 
   def turnOff : Unit = {
@@ -568,7 +557,7 @@ class SCPUC64 extends CBMComputer {
       }
       configuration.setProperty(CONFIGURATION_FRAME_XY, displayFrame.getX + "," + displayFrame.getY)
       if (save) {
-        settings.save(configuration)
+        preferences.save(configuration)
         println("Settings saved")
       }
       saveConfigurationFile
@@ -600,13 +589,13 @@ class SCPUC64 extends CBMComputer {
   protected def allowsStateRestoring: Boolean = true
 
   override protected def setGlobalCommandLineOptions : Unit = {
+    import Preferences._
     super.setGlobalCommandLineOptions
 
-    settings.remove("kernel")
-    settings.add("kernel",
-      "Set scpu kernel rom path",
-      (kp:String) => if (kp != null && kp != "") reloadROM(ROM.SCPU64_ROM_PROP,kp)
-    )
+    preferences.remove("kernel")
+    preferences.add(PREF_KERNEL,"Set scpu kernel rom path","") { kp =>
+      if (kp != "") reloadROM(ROM.SCPU64_ROM_PROP,kp)
+    }
   }
 
   // -----------------------------------------------------------------------------------------
@@ -616,9 +605,9 @@ class SCPUC64 extends CBMComputer {
       setMenu
     }
     // check help
-    if (settings.checkForHelp(args)) {
+    if (preferences.checkForHelp(args)) {
       println(s"Kernal64, SuperCPU emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
-      settings.printUsage("file to attach")
+      preferences.printUsage("file to attach")
       sys.exit(0)
     }
     // --headless handling to disable logging & debugging

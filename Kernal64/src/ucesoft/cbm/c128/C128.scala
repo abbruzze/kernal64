@@ -271,18 +271,17 @@ class C128 extends CBMComputer with MMUChangeListener {
       val cmd = if (isC64Mode) s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar else s"""RUN"$fn"""" + 13.toChar
       clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,isC64Mode) ))
     }
-    settings.load(configuration)
     // AUTOPLAY
-    settings.parseAndLoad(args) match {
+    preferences.parseAndLoad(args,configuration) match {
       case None =>
         // run the given file name
-        settings.get[String]("RUNFILE") match {
+        preferences[String](Preferences.PREF_RUNFILE) match {
           case None =>
           case Some(fn) =>
             loadFile(fn)
         }
       case Some(f) =>
-        settings.get[String]("DRIVE_8_FILE") match {
+        preferences[String](Preferences.PREF_DRIVE_X_FILE(0)) match {
           case None =>
             handleDND(new File(f),false,true)
           case Some(_) =>
@@ -524,6 +523,7 @@ class C128 extends CBMComputer with MMUChangeListener {
       drives(driveID).getFloppy.close
       if (traceDialog != null && !traceDialog.isTracing) clock.pause
       drives(driveID).setDriveReader(disk,emulateInserting)
+      preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID),file.toString)
       clock.play
 
       loadFileItems(driveID).setEnabled(!isG64)
@@ -591,6 +591,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   }
 
   override def setSettingsMenu(optionMenu:JMenu) : Unit = {
+    import Preferences._
     setDriveMenu(optionMenu)
 
     optionMenu.addSeparator
@@ -599,55 +600,42 @@ class C128 extends CBMComputer with MMUChangeListener {
     optionMenu.add(vdcMenu)
     val _80enabledAtStartupItem = new JCheckBoxMenuItem("80 columns enabled at startup")
     _80enabledAtStartupItem.setSelected(false)
-    _80enabledAtStartupItem.addActionListener(e => enableVDC80(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    _80enabledAtStartupItem.addActionListener(_ => preferences(PREF_VDC80STARTUP) = _80enabledAtStartupItem.isSelected )
     vdcMenu.add(_80enabledAtStartupItem)
-    // Setting ---------------------------
-    settings.add("vdc-80-startup",
-                 "Enable VDC 80 columns at startup",
-                 "80COLATSTARTUP",
-                 (vdc80:Boolean) => {
-                   enableVDC80(vdc80)
-                   _80enabledAtStartupItem.setSelected(vdc80)
-                 },
-                 _80enabledAtStartupItem.isSelected
-    )
-    // -----------------------------------
+    // VDC-80-STARTUP =====================================================================================
+    preferences.add(PREF_VDC80STARTUP,"Enable VDC 80 columns at startup",false) { vdc80 =>
+      enableVDC80(vdc80)
+      _80enabledAtStartupItem.setSelected(vdc80)
+    }
+    // ====================================================================================================
+
+    // VDC-DISABLED =======================================================================================
     val vdcEnabled = new JCheckBoxMenuItem("VDC enabled")
     vdcEnabled.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_E,java.awt.event.InputEvent.ALT_DOWN_MASK))
     vdcEnabled.setSelected(true)
-    vdcEnabled.addActionListener(e => enabledVDC(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    vdcEnabled.addActionListener(_ => preferences(PREF_VDCDISABLED) = vdcEnabled.isSelected )
     vdcMenu.add(vdcEnabled)
-    // Setting ---------------------------
-    settings.add("vdc-disabled",
-                 "Disable VDC monitor",
-                 "VDCDISABLED",
-                 (vdcE:Boolean) => {
-                   this.vdcEnabled &= !vdcE
-                   vdcEnabled.setSelected(!vdcE)
-                 },
-                 !vdcEnabled.isSelected
-    )
-    // -----------------------------------
+    preferences.add(PREF_VDCDISABLED,"Disable VDC monitor",false) { vdcE =>
+      this.vdcEnabled &= !vdcE
+      vdcEnabled.setSelected(!vdcE)
+    }
+    // ====================================================================================================
+
     val vdcSeparateThreadItem = new JCheckBoxMenuItem("VDC on its own thread")
     vdcSeparateThreadItem.setSelected(false)
     vdcSeparateThreadItem.addActionListener(e => if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) vdc.setOwnThread else vdc.stopOwnThread )
     vdcMenu.add(vdcSeparateThreadItem)
-    
+
+    // MMU-PANEL-ENABLED ==================================================================================
     val statusPanelItem = new JCheckBoxMenuItem("MMU status panel enabled")
     statusPanelItem.setSelected(false)
-    statusPanelItem.addActionListener(e => enableMMUPanel(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    statusPanelItem.addActionListener(_ => preferences(PREF_MMUPANELENABLED) = statusPanelItem.isSelected )
     optionMenu.add(statusPanelItem)
-    // Setting ---------------------------
-    settings.add("mmupanel-enabled",
-                 "Enable mmu panel",
-                 "MMUSTATUS",
-                 (mmuE:Boolean) => { 
-                   enableMMUPanel(mmuE)
-                   statusPanelItem.setSelected(mmuE)
-                 },
-                 statusPanelItem.isSelected
-    )
-    // -----------------------------------
+    preferences.add(PREF_MMUPANELENABLED,"Enable mmu panel",false) { mmuE =>
+      enableMMUPanel(mmuE)
+      statusPanelItem.setSelected(mmuE)
+    }
+    // ====================================================================================================
     
     optionMenu.addSeparator
     
@@ -856,50 +844,36 @@ class C128 extends CBMComputer with MMUChangeListener {
   }
 
   override protected def setGlobalCommandLineOptions : Unit = {
+    import Preferences._
     super.setGlobalCommandLineOptions
 
-    settings.add("vdcscreenshot",
-      "Take a screenshot of VDC screen and save it on the given file path. Used with --testcart only.",
-      (file:String) => if (file != "") {
-        TestCart.screenshotFile = Some(file)
-        TestCart.screeshotHandler = vdcDisplay.waitFrameSaveSnapshot _
-      }
-    )
-    settings.add("ext-rom",
-      "External function ROM path",
-      (extRom:String) => {
-        if (extRom != null && extRom != "") {
-          configuration.setProperty(ROM.C128_EXTERNAL_ROM_PROP, extRom)
-          checkFunctionROMS
-        }
-      }
-    )
-    settings.add("int-rom",
-      "Internal function ROM (<rom path>,NORMAL|MEGABIT)",
-      (intRom:String) => {
-        if (intRom != null && intRom != "") {
-          configuration.setProperty(ROM.C128_INTERNAL_ROM_PROP, intRom)
-          checkFunctionROMS
-        }
-      }
-    )
-    settings.add("go64",
-      "Run in 64 mode",
-      (go64:Boolean) => if (go64) mmu.go64
-    )
-    settings.add("vdc-fullscreen",
-      "Starts the emulator with VDC in full screen mode",
-      (fs:Boolean) => if (fs) vdcFullScreenAtBoot = true
-    )
-
-    settings.add("kernel128",
-      "Set kernel 128 rom path",
-      (kp:String) => if (kp != null && kp != "") reloadROM(ROM.C128_KERNAL_ROM_PROP,kp)
-    )
-    settings.add("charrom128",
-      "Set char rom 128 path",
-      (kp:String) => if (kp != null && kp != "") reloadROM(ROM.C128_CHAR_ROM_PROP,kp)
-    )
+    // VDCSCREENSHOT ======================================================================================
+    preferences.add(PREF_VDCSCREENSHOT,"Take a screenshot of VDC screen and save it on the given file path. Used with --testcart only.","") { file =>
+      TestCart.screenshotFile = Some(file)
+      TestCart.screeshotHandler = vdcDisplay.waitFrameSaveSnapshot _
+    }
+    // EXT-ROM ============================================================================================
+    preferences.add(PREF_128EXTROM,"External function ROM path","") { extRom =>
+      configuration.setProperty(ROM.C128_EXTERNAL_ROM_PROP, extRom)
+      checkFunctionROMS
+    }
+    // INT-ROM ============================================================================================
+    preferences.add(PREF_128INTROM,"Internal function ROM (<rom path>,NORMAL|MEGABIT)","") { intRom =>
+      configuration.setProperty(ROM.C128_INTERNAL_ROM_PROP, intRom)
+      checkFunctionROMS
+    }
+    // GO-64 ==============================================================================================
+    preferences.add(PREF_128GO64,"Run in 64 mode",false) { go64 => if (go64) mmu.go64 }
+    // VDC-FULLSCREEN =====================================================================================
+    preferences.add(PREF_VDCFULLSCREEN,"Starts the emulator with VDC in full screen mode",false) { vdcFullScreenAtBoot = _ }
+    // KERNEL128 ==========================================================================================
+    preferences.add(PREF_KERNEL128,"Set kernel 128 rom path","") { kp =>
+      if (kp != "") reloadROM(ROM.C128_KERNAL_ROM_PROP,kp)
+    }
+    // CHARROM128 =========================================================================================
+    preferences.add(PREF_CHARROM128,"Set char rom 128 path","") { cp =>
+      if (cp != "") reloadROM(ROM.C128_CHAR_ROM_PROP,cp)
+    }
   }
   
   def turnOff  : Unit = {
@@ -922,7 +896,7 @@ class C128 extends CBMComputer with MMUChangeListener {
       val vdcDimension = vdcDisplay.getSize()
       configuration.setProperty(CONFIGURATION_VDC_FRAME_DIM, vdcDimension.width + "," + vdcDimension.height)
       if (save) {
-        settings.save(configuration)
+        preferences.save(configuration)
         println("Settings saved")
       }
       saveConfigurationFile
@@ -966,9 +940,9 @@ class C128 extends CBMComputer with MMUChangeListener {
   def turnOn(args:Array[String]) : Unit = {
     swing { setMenu }
     // check help
-    if (settings.checkForHelp(args)) {
+    if (preferences.checkForHelp(args)) {
       println(s"Kernal64, Commodore 128 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
-      settings.printUsage("file to attach")
+      preferences.printUsage("file to attach")
       sys.exit(0)
     }
     // --headless handling to disable logging & debugging

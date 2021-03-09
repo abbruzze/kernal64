@@ -146,18 +146,18 @@ class C64 extends CBMComputer {
       val cmd = s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar
       clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,true) ))
     }
-    settings.load(configuration)
+    //settings.load(configuration)
     // AUTOPLAY
-    settings.parseAndLoad(args) match {
+    preferences.parseAndLoad(args,configuration) match {
       case None =>
         // run the given file name
-        settings.get[String]("RUNFILE") match {
-          case None =>
-          case Some(fn) =>
+        preferences[String](Preferences.PREF_RUNFILE) match {
+          case Some(fn) if fn != null && fn != "" =>
             loadFile(fn)
+          case _ =>
         }
       case Some(f) =>
-        settings.get[String]("DRIVE_8_FILE") match {
+        preferences[String](Preferences.PREF_DRIVE_X_FILE(0)) match {
           case None =>
             handleDND(new File(f),false,true)
           case Some(_) =>
@@ -268,6 +268,7 @@ class C64 extends CBMComputer {
       drives(driveID).getFloppy.close
       if (traceDialog != null && !traceDialog.isTracing) clock.pause
       drives(driveID).setDriveReader(disk,emulateInserting)
+      preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID),file.toString)
       clock.play
             
       loadFileItems(driveID).setEnabled(isD64)
@@ -488,13 +489,10 @@ class C64 extends CBMComputer {
   }
 
   override protected def setGlobalCommandLineOptions : Unit = {
+    import Preferences._
     super.setGlobalCommandLineOptions
-    settings.add("custom-glue-logic",
-      "Set internal glue logic to custom (C64C)",
-      (gl:Boolean) => if (gl) {
-        vicMemory.setCustomGlueLogic(true)
-      }
-    )
+    // CUSTOM-GLUE-LOGIC ==================================================================================
+    preferences.add(PREF_CUSTOMGLUELOGIC,"Set internal glue logic to custom (C64C)",false) { vicMemory.setCustomGlueLogic(_) }
   }
 
   def turnOff  : Unit = {
@@ -513,7 +511,7 @@ class C64 extends CBMComputer {
       }
       configuration.setProperty(CONFIGURATION_FRAME_XY, displayFrame.getX + "," + displayFrame.getY)
       if (save) {
-        settings.save(configuration)
+        preferences.save(configuration)
         println("Settings saved")
       }
       saveConfigurationFile
@@ -552,7 +550,7 @@ class C64 extends CBMComputer {
       case true =>
         in.readObject.toString match { // copy factory
           case "VASYL" =>
-            settings.getLoadF[Boolean]("BEAMRACER").foreach(_(true))
+            preferences(Preferences.PREF_BEAMRACERENABLED) = true
           case cn =>
             throw new IllegalArgumentException(s"Coprocessor $cn unknown")
         }
@@ -565,9 +563,9 @@ class C64 extends CBMComputer {
   def turnOn(args:Array[String]) : Unit = {
     swing { setMenu }
     // check help
-    if (settings.checkForHelp(args)) {
+    if (preferences.checkForHelp(args)) {
       println(s"Kernal64, Commodore 64 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
-      settings.printUsage("file to attach")
+      preferences.printUsage("file to attach")
       sys.exit(0)
     }
     // --headless handling to disable logging & debugging

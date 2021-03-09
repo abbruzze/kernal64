@@ -5,11 +5,11 @@ import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.cpu.Memory
 
 object DriveType extends Enumeration {
-  val _1541 = Value
-  val _1571 = Value
-  val _1581 = Value
-  val OTHER = Value
-  val LOCAL = Value
+  val _1541 = Value("1541")
+  val _1571 = Value("1571")
+  val _1581 = Value("1581")
+  val OTHER = Value("OTHER")
+  val LOCAL = Value("LOCAL")
 }
 
 trait Drive extends CBMComponent {

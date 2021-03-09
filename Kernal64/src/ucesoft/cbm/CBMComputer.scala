@@ -73,7 +73,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val easyFlashWriteChangesItem = new JMenuItem("Write changes")
   protected val GMOD3WriteChangesItem = new JMenuItem("GMOD3 Write changes")
 
-  protected val settings = new ucesoft.cbm.misc.Settings
+  protected val preferences = new Preferences
 
   protected lazy val configuration = {
     val kernalConfigHome = System.getProperty("kernal.config",scala.util.Properties.userHome)
@@ -486,19 +486,20 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
   def expansionPortStateHandler(in:ObjectInputStream,portType:ExpansionPortType.Value) : Unit = {
     import ExpansionPortType._
+    import Preferences._
 
     portType match {
       case CRT =>
         val crtFile = Cartridge.createCRTFileFromState(in)
         loadCartridgeFile(crtFile,true)
       case CPM =>
-        settings.getLoadF[Boolean]("CPM64").foreach(_(true))
+        preferences(PREF_CPMCARTENABLED) = true
       case GEORAM =>
-        settings.getLoadF[String]("GEO_RAM").foreach(_(in.readInt.toString))
+        preferences(PREF_GEORAM) = in.readInt.toString
       case REU =>
-        settings.getLoadF[String]("REU_TYPE").foreach(_(in.readInt.toString))
+        preferences(PREF_REUTYPE) = in.readInt.toString
       case DUALSID =>
-        settings.getLoadF[String]("DUAL_SID").foreach(_(in.readObject.toString))
+        preferences(PREF_DUALSID) = in.readInt.toString
       case _ =>
     }
   }
@@ -604,6 +605,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       ExpansionPort.setExpansionPort(ep)
       ExpansionPort.currentCartFileName = file.toString
       Log.info(s"Attached cartridge ${ExpansionPort.getExpansionPort.name}")
+      preferences.updateWithoutNotify(Preferences.PREF_CART,file.toString)
       if (!stateLoading) reset(false)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
       detachCtrItem.setEnabled(true)
@@ -925,10 +927,12 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         fc.showOpenDialog(displayFrame) match {
           case JFileChooser.APPROVE_OPTION =>
             device12Drive.asInstanceOf[LocalDrive].setCurrentDir(fc.getSelectedFile)
+            preferences.updateWithoutNotify(Preferences.PREF_DRIVE12LOCALPATH,fc.getSelectedFile.toString)
           case _ =>
         }
       case Some(fn) =>
         device12Drive.asInstanceOf[LocalDrive].setCurrentDir(new File(fn))
+        preferences.updateWithoutNotify(Preferences.PREF_DRIVE12LOCALPATH,fn)
     }
   }
 
@@ -946,6 +950,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def setDriveType(drive:Int,dt:DriveType.Value,dontPlay:Boolean = false) : Unit = {
     clock.pause
     initDrive(drive,dt)
+    preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_TYPE(drive),dt.toString)
     if (!dontPlay) clock.play
   }
 
@@ -995,6 +1000,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def choose16MREU: Unit = {
+    import Preferences._
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileView(new C64FileView)
@@ -1006,6 +1012,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       case JFileChooser.APPROVE_OPTION|JFileChooser.CANCEL_OPTION =>
         try {
           setREU(Some(REU.REU_16M),if (fc.getSelectedFile == null) None else Some(fc.getSelectedFile.toString))
+          preferences.updateWithoutNotify(PREF_REUTYPE,if (fc.getSelectedFile == null) REU.REU_16M.toString else s"${REU.REU_16M},${fc.getSelectedFile.toString}")
         }
         catch {
           case t:Throwable =>
@@ -1109,12 +1116,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def enableCPMCart(enabled:Boolean): Unit = {
+    import Preferences._
     ExpansionPort.getExpansionPort.eject
     if (enabled) {
       ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,dmaSwitcher.setLine(Switcher.CRT,_),setTraceListener _))
       detachCtrItem.setEnabled(true)
     }
     else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+    preferences.updateWithoutNotify(PREF_CPMCARTENABLED,enabled)
   }
 
   protected def manageRS232 : Unit = {
@@ -1151,7 +1160,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def showSettings : Unit = {
-    val settingsPanel = new SettingsPanel(settings)
+    val settingsPanel = new SettingsPanel(preferences)
     JOptionPane.showMessageDialog(displayFrame,settingsPanel,"Settings",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
   }
 
@@ -1178,6 +1187,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     if (drives(driveID).driveType == DriveType._1581) drives(driveID).setDriveReader(D1581.MFMEmptyFloppy,true)
     else drives(driveID).setDriveReader(EmptyFloppy,true)
     loadFileItems(driveID).setEnabled(false)
+    preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID),"")
     clock.play
   }
 
@@ -1314,120 +1324,75 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setGlobalCommandLineOptions : Unit = {
+    import Preferences._
     // non-saveable settings
-    settings.add("warp",
-      "Run warp mode",
-      (warp:Boolean) => if (warp) {
-        warpMode(true)
-      }
-    )
-    settings.add("headless",
-      "Run with no windows",
-      (hl:Boolean) => if (hl) headless = true
-    )
-    settings.add("testcart",
-      "Run with test cart",
-      (tc:Boolean) => if (tc) TestCart.enabled = true
-    )
-    settings.add("limitcycles",
-      "Run at most the number of cycles specified",
-      (cycles:String) => if (cycles != "" && cycles.toLong > 0) clock.limitCyclesTo(cycles.toLong)
-    )
-    settings.add("run-file",
-      "Run the given file taken from the attached disk",
-      SettingsKey.RUN_FILE,
-      (runFile:String) => {},
-      ""
-    )
-    settings.add("screenshot",
-      "Take a screenshot of VIC screen and save it on the given file path. Used with --testcart only.",
-      (file:String) => if (file != "") {
+    preferences.add(PREF_WARP,"Run warp mode",false) { warpMode(_) }
+    preferences.add(PREF_HEADLESS,"Activate headless mode",false) { headless = _ }
+    preferences.add(PREF_TESTCART,"Activate testcart mode",false) { TestCart.enabled = _ }
+    preferences.add(PREF_LIMITCYCLES,"Run at most the number of cycles specified","") { cycles =>
+      if (cycles != "" && cycles.toLong > 0) clock.limitCyclesTo(cycles.toLong)
+    }
+    preferences.add(PREF_RUNFILE,"Run the given file taken from the attached disk",null:String) { file => }
+    preferences.add(PREF_SCREENSHOT,"Take a screenshot of VIC screen and save it on the given file path. Used with --testcart only.","") { file =>
+      if (file != "") {
         TestCart.screenshotFile = Some(file)
         TestCart.screeshotHandler = display.waitFrameSaveSnapshot _
       }
-    )
-    settings.add("cpujam-continue",
-      "On cpu jam continue execution",
-      (jam:Boolean) => cpujamContinue = jam
-    )
-    settings.add("cia-model",
-      "Set the CIA model (both cia1 and cia2). 6526 for old cia, 8521 for the new one. Default is 6526. ",
-      (cm:String) => if (cm == "8521") {
-        cia1.setCIAModel(CIA.CIA_MODEL_8521)
-        cia2.setCIAModel(CIA.CIA_MODEL_8521)
-      }
-    )
-    settings.add("load-state",
-      "Load a previous saved state.",
-      (file:String) => if (file != "") {
+    }
+    preferences.add(PREF_CPUJAMCONTINUE,"On cpu jam continue execution",false) { cpujamContinue = _ }
+    preferences.add(PREF_CIAMODEL,
+         "Set the CIA model (both cia1 and cia2). 6526 for old cia, 8521 for the new one. Default is 6526.",
+             "6526",Set("6526","8521")) { model =>
+      val cm = if (model == "8521") CIA.CIA_MODEL_8521 else CIA.CIA_MODEL_6526
+      cia1.setCIAModel(cm)
+      cia2.setCIAModel(cm)
+    }
+    preferences.add(PREF_LOADSTATE,"Load a previous saved state.","") { file =>
+      if (file != "") {
         try {
           loadStateFromOptions = true
           loadState(Some(file))
         }
         finally loadStateFromOptions = false
       }
-    )
-    settings.add("screen-dim",
-      "Zoom factor. Valued accepted are 1 and 2",
-      (f:Int) => if (f == 1 || f == 2) {
-        vicZoom(f)
-        zoomOverride = true
+    }
+    preferences.add(PREF_SCREENDIM,"Zoom factor. Valued accepted are 1 and 2",0,Set(1,2)) { dim =>
+      vicZoom(dim)
+      zoomOverride = true
+    }
+    preferences.add(PREF_FULLSCREEN,"Starts the emulator in full screen mode",false) { fullScreenAtBoot = _ }
+    preferences.add(PREF_IGNORE_CONFIG_FILE,"Ignore configuration file and starts emulator with default configuration",false) { ignoreConfig = _ }
+    preferences.add(PREF_KERNEL,"Set kernel rom path","") { file => if (file != "") reloadROM(ROM.C64_KERNAL_ROM_PROP,file) }
+    preferences.add(PREF_BASIC,"Set basic rom path","") { file => if (file != "") reloadROM(ROM.C64_BASIC_ROM_PROP,file) }
+    preferences.add(PREF_CHARROM,"Set char rom path","") { file => if (file != "") reloadROM(ROM.C64_CHAR_ROM_PROP,file) }
+    preferences.add(PREF_1541DOS,"Set 1541 dos rom path","") { file => if (file != "") reloadROM(ROM.D1541_DOS_ROM_PROP,file) }
+    preferences.add(PREF_1571DOS,"Set 1571 dos rom path","") { file => if (file != "") reloadROM(ROM.D1571_DOS_ROM_PROP,file) }
+    preferences.add(PREF_1581DOS,"Set 1581 dos rom path","") { file => if (file != "") reloadROM(ROM.D1581_DOS_ROM_PROP,file) }
+    preferences.add(PREF_VICIINEW,"Set VICII new model",false) { vicChip.setNEWVICModel(_) }
+
+    preferences.add(PREF_TRACE,"Starts the emulator in trace mode",false) { trace =>
+      traceOption = trace
+      if (trace && traceDialog != null) {
+        traceDialog.forceTracing(true)
+        traceDialog.setVisible(true)
+        traceItem.setSelected(true)
       }
-    )
-    settings.add("fullscreen",
-      "Starts the emulator in full screen mode",
-      (fs:Boolean) => if (fs) fullScreenAtBoot = true
-    )
-    settings.add("ignore-config-file",
-      "Ignore configuration file and starts emulator with default configuration",
-      (ic:Boolean) => ignoreConfig = ic
-    )
-    settings.add("kernel",
-      "Set kernel rom path",
-      (kp:String) => if (kp != null && kp != "") reloadROM(ROM.C64_KERNAL_ROM_PROP,kp)
-    )
-    settings.add("basic",
-      "Set basic rom path",
-      (bp:String) => if (bp != null && bp != "") reloadROM(ROM.C64_BASIC_ROM_PROP,bp)
-    )
-    settings.add("charrom",
-      "Set char rom path",
-      (cp:String) => if (cp != null && cp != "") reloadROM(ROM.C64_CHAR_ROM_PROP,cp)
-    )
-    settings.add("1541dos",
-      "Set 1541 dos rom path",
-      (dp:String) => if (dp != null && dp != "") reloadROM(ROM.D1541_DOS_ROM_PROP,dp)
-    )
-    settings.add("1571dos",
-      "Set 1571 dos rom path",
-      (dp:String) => if (dp != null && dp != "") reloadROM(ROM.D1571_DOS_ROM_PROP,dp)
-    )
-    settings.add("1581dos",
-      "Set 1581 dos rom path",
-      (dp:String) => if (dp != null && dp != "") reloadROM(ROM.D1581_DOS_ROM_PROP,dp)
-    )
-    settings.add("viciinew",
-      "Set VICII new model",
-      (nm:Boolean) => vicChip.setNEWVICModel(nm)
-    )
+    }
   }
 
   protected def setFileMenu(fileMenu:JMenu) : Unit = {
+    import Preferences._
+    // WARP ON LOAD =======================================================================================
     val warpModeOnLoad = new JCheckBoxMenuItem("Warp mode on load")
-    warpModeOnLoad.setSelected(true)
-    warpModeOnLoad.addActionListener(e => ProgramLoader.loadingWithWarpEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected )
+    warpModeOnLoad.setSelected(false)
+    warpModeOnLoad.addActionListener(_ => preferences(PREF_WARPONLOAD) = warpModeOnLoad.isSelected )
     fileMenu.add(warpModeOnLoad)
     // Setting ---------------------------
-    settings.add("warponload",
-      "Enabled/disable warp mode on load",
-      SettingsKey.WARP_ON_LOAD,
-      (wpl:Boolean) => {
-        ProgramLoader.loadingWithWarpEnabled = wpl
-        warpModeOnLoad.setSelected(wpl)
-      },
-      warpModeOnLoad.isSelected
-    )
-    // -----------------------------------
+    preferences.add(PREF_WARPONLOAD,"Enabled/disable warp mode on load",false) { wpl =>
+      ProgramLoader.loadingWithWarpEnabled = wpl
+      warpModeOnLoad.setSelected(wpl)
+    }
+    // ====================================================================================================
 
     val zipItem = new JMenuItem("Attach zip ...")
     zipItem.addActionListener(_ => attachZip )
@@ -1520,20 +1485,16 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
     fileMenu.addSeparator
 
+    // LOAD PRG AS D64 ====================================================================================
     val prgAsDiskItem = new JCheckBoxMenuItem("Load PRG as D64")
-    prgAsDiskItem.addActionListener(_ => loadPRGasDisk =  prgAsDiskItem.isSelected)
+    prgAsDiskItem.addActionListener(_ => preferences(PREF_PRGASDISK) = prgAsDiskItem.isSelected )
     fileMenu.add(prgAsDiskItem)
     // Setting ---------------------------
-    settings.add("prg-as-disk",
-      "Load a PRG file as if inserted in a disk",
-      SettingsKey.LOAD_PRG_AS_D64,
-      (pad:Boolean) => {
-        loadPRGasDisk = pad
-        prgAsDiskItem.setSelected(loadPRGasDisk)
-      },
-      prgAsDiskItem.isSelected
-    )
-    // Setting ---------------------------
+    preferences.add(PREF_PRGASDISK,"Load a PRG file as if inserted in a disk",false) { pad =>
+      loadPRGasDisk = pad
+      prgAsDiskItem.setSelected(loadPRGasDisk)
+    }
+    // ====================================================================================================
     val loadPrgItem = new JMenuItem("Load PRG file from local disk ...")
     loadPrgItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G,java.awt.event.InputEvent.ALT_DOWN_MASK))
     loadPrgItem.addActionListener(_ => loadPrg )
@@ -1543,19 +1504,13 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     savePrgItem.addActionListener(_ => savePrg )
     fileMenu.add(savePrgItem)
 
-    // Setting ---------------------------
+    // DRIVEX-ENABLED =====================================================================================
     for(d <- 1 until TOTAL_DRIVES) {
-      settings.add(s"drive${8 + d}-enabled",
-        s"Enabled/disable driver ${8 + d}",
-        SettingsKey.DRIVE_X_ENABLED(d),
-        (de: Boolean) => {
-          enableDrive(d, de, false)
-        },
-        drivesEnabled(d)
-      )
+      preferences.add(PREF_DRIVE_X_ENABLED(d),s"Enabled/disable driver ${8 + d}",false) { enableDrive(d, _, false) }
     }
-    // Setting ---------------------------
+    // ====================================================================================================
 
+    // DRIVE12-LOCAL-PATH =================================================================================
     val localDriveItem = new JMenu("Drive on device 12 ...")
     fileMenu.add(localDriveItem)
     val group0 = new ButtonGroup
@@ -1568,35 +1523,23 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     localDriveEnabled.addActionListener(_ => enableDrive12(true,None) )
     group0.add(localDriveEnabled)
     localDriveItem.add(localDriveEnabled)
-    // Setting ---------------------------
-    settings.add("drive12-local-path",
-      "Enabled driver 12 to the given local path",
-      SettingsKey.DRIVE_12_PATH,
-      (d10p:String) => {
-        val enabled = d10p != ""
-        enableDrive12(enabled,if (enabled) Some(d10p) else None)
-        localDriveEnabled.setSelected(enabled)
-      },
-      if (device12DriveEnabled) device12Drive.asInstanceOf[LocalDrive].getCurrentDir.toString
-      else ""
-    )
-    // -----------------------------------
+    preferences.add(PREF_DRIVE12LOCALPATH,"Enabled driver 12 to the given local path","") { path =>
+      val enabled = !path.isEmpty
+      enableDrive12(enabled,if (enabled) Some(path) else None)
+      localDriveEnabled.setSelected(enabled)
+    }
+    // ====================================================================================================
 
+    // WRITE-ON-DISK ======================================================================================
     val writeOnDiskCheckItem = new JCheckBoxMenuItem("Write changes on disk")
     writeOnDiskCheckItem.setSelected(true)
-    writeOnDiskCheckItem.addActionListener(e => writeOnDiskSetting(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    writeOnDiskCheckItem.addActionListener(_ => preferences(PREF_WRITEONDISK) = writeOnDiskCheckItem.isSelected )
     fileMenu.add(writeOnDiskCheckItem)
-    // Setting ---------------------------
-    settings.add("write-on-disk",
-      "Tells if the modifications made on disks must be written on file",
-      SettingsKey.WRITE_ON_DISK,
-      (wod:Boolean) => {
-        writeOnDiskCheckItem.setSelected(wod)
-        writeOnDiskSetting(wod)
-      },
-      writeOnDiskCheckItem.isSelected
-    )
-    // -----------------------------------
+    preferences.add(PREF_WRITEONDISK,"Tells if the modifications made on disks must be written on file",true) { wod =>
+      writeOnDiskCheckItem.setSelected(wod)
+      writeOnDiskSetting(wod)
+    }
+    // ====================================================================================================
 
     fileMenu.addSeparator
 
@@ -1617,18 +1560,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
     fileMenu.addSeparator
 
+    // CART ================================================================================================
     val attachCtrItem = new JMenuItem("Attach cartridge ...")
     attachCtrItem.addActionListener(_ => attachCtr )
     fileMenu.add(attachCtrItem)
-    // Setting ---------------------------
-    settings.add("cart",
-      "Attach the given cartridge",
-      SettingsKey.ATTACH_CTR,
-      (cart:String) => if (cart != "") loadCartridgeFile(new File(cart))
-      ,
-      ExpansionPort.currentCartFileName
-    )
-    // -----------------------------------
+    preferences.add(PREF_CART,"Attach the given cartridge","") { cart =>
+      if (cart != "") loadCartridgeFile(new File(cart))
+    }
+    // ====================================================================================================
 
     detachCtrItem.setEnabled(false)
     detachCtrItem.addActionListener(_ => detachCtr )
@@ -1636,10 +1575,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
     fileMenu.addSeparator
 
+    // PREF-AUTO-SAVE ======================================================================================
     val autoSaveCheckItem = new JCheckBoxMenuItem("Autosave settings on exit")
-    autoSaveCheckItem.setSelected(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
-    autoSaveCheckItem.addActionListener(e => configuration.setProperty(CONFIGURATION_AUTOSAVE,e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected.toString) )
+    autoSaveCheckItem.addActionListener(e => preferences(PREF_PREFAUTOSAVE) = autoSaveCheckItem.isSelected )
     fileMenu.add(autoSaveCheckItem)
+    preferences.add(PREF_PREFAUTOSAVE,"Auto save settings on exit",false) { auto =>
+      autoSaveCheckItem.setSelected(auto)
+    }
+    // ====================================================================================================
 
     val saveSettingsCheckItem = new JMenuItem("Save settings")
     saveSettingsCheckItem.addActionListener(_ => saveSettings(true) )
@@ -1689,17 +1632,6 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     inspectItem.addActionListener(e => inspectDialog.setVisible(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     traceMenu.add(inspectItem)
 
-    settings.add("trace",
-      "Starts the emulator in trace mode",
-      (trace:Boolean) => {
-        this.traceOption = trace
-        if (trace && traceDialog != null) {
-          traceDialog.forceTracing(true)
-          traceDialog.setVisible(true)
-          traceItem.setSelected(true)
-        }
-      }
-    )
   }
 
   protected def setGameMenu(gamesMenu: JMenu) : Unit = {
@@ -1768,93 +1700,80 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setRenderingSettings(parent:JMenu) : Unit = {
+    import Preferences._
+    // RENDERING-TYPE ======================================================================================
     val renderingItem = new JMenu("Rendering")
     parent.add(renderingItem)
     val groupR = new ButtonGroup
     val renderingDefault1Item = new JRadioButtonMenuItem("Default")
-    renderingDefault1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR) )
+    renderingDefault1Item.setSelected(true)
+    renderingDefault1Item.addActionListener(_ => preferences(PREF_RENDERINGTYPE) = "default" )
     renderingItem.add(renderingDefault1Item)
     groupR.add(renderingDefault1Item)
     val renderingBilinear1Item = new JRadioButtonMenuItem("Bilinear")
-    renderingBilinear1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR) )
+    renderingBilinear1Item.addActionListener(_ => preferences(PREF_RENDERINGTYPE) = "bilinear" )
     renderingItem.add(renderingBilinear1Item)
     groupR.add(renderingBilinear1Item)
     val renderingBicubic1Item = new JRadioButtonMenuItem("Bicubic")
-    renderingBicubic1Item.addActionListener(_ => setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC) )
+    renderingBicubic1Item.addActionListener(_ => preferences(PREF_RENDERINGTYPE) = "bicubic" )
     renderingItem.add(renderingBicubic1Item)
     groupR.add(renderingBicubic1Item)
 
+    preferences.add(PREF_RENDERINGTYPE,"Set the rendering type (default,bilinear,bicubic)","",Set("default","bilinear","bicubic")) { rt =>
+      rt match {
+        case "bilinear" =>
+          setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+          renderingBilinear1Item.setSelected(true)
+        case "bicubic" =>
+          setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+          renderingBicubic1Item.setSelected(true)
+        case "default" | "" =>
+          setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
+          renderingDefault1Item.setSelected(true)
+      }
+    }
+    // =====================================================================================================
+
+    // VIC-PALETTE =========================================================================================
     val paletteItem = new JMenu("Palette")
     parent.add(paletteItem)
     val groupP = new ButtonGroup
     val vicePalItem = new JRadioButtonMenuItem("VICE")
-    vicePalItem.addActionListener(_ => Palette.setPalette(PaletteType.VICE) )
+    vicePalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "vice" )
     paletteItem.add(vicePalItem)
     groupP.add(vicePalItem)
     val brightPalItem = new JRadioButtonMenuItem("Bright")
-    brightPalItem.addActionListener(_ => Palette.setPalette(PaletteType.BRIGHT) )
+    brightPalItem.setSelected(true)
+    brightPalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "bright" )
     paletteItem.add(brightPalItem)
     groupP.add(brightPalItem)
     val peptoPalItem = new JRadioButtonMenuItem("Pepto")
-    peptoPalItem.addActionListener(_ => Palette.setPalette(PaletteType.PEPTO) )
+    peptoPalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "pepto" )
     paletteItem.add(peptoPalItem)
     groupP.add(peptoPalItem)
     val colordorePalItem = new JRadioButtonMenuItem("Colodore")
-    colordorePalItem.addActionListener(_ => Palette.setPalette(PaletteType.COLORDORE) )
+    colordorePalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "colodore" )
     paletteItem.add(colordorePalItem)
     groupP.add(colordorePalItem)
 
-    // Setting ---------------------------
-    settings.add("vic-palette",
-      "Set the palette type (bright,vice,pepto,colodore)",
-      SettingsKey.PALETTE,
-      (dt:String) => {
-        dt match {
-          case "bright"|"" =>
-            Palette.setPalette(PaletteType.BRIGHT)
-            brightPalItem.setSelected(true)
-          case "vice" =>
-            Palette.setPalette(PaletteType.VICE)
-            vicePalItem.setSelected(true)
-          case "pepto" =>
-            Palette.setPalette(PaletteType.PEPTO)
-            peptoPalItem.setSelected(true)
-          case "colodore" =>
-            Palette.setPalette(PaletteType.COLORDORE)
-            colordorePalItem.setSelected(true)
-          case _ =>
-        }
-      },
-      if (brightPalItem.isSelected) "bright"
-      else if (vicePalItem.isSelected) "vice"
-      else if (peptoPalItem.isSelected) "pepto"
-      else if (colordorePalItem.isSelected) "colodore"
-      else "bright"
-    )
-    settings.add("rendering-type",
-      "Set the rendering type (default,bilinear,bicubic)",
-      SettingsKey.RENDERING_TYPE,
-      (dt:String) => {
-        dt match {
-          case "bilinear" =>
-            setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-            renderingBilinear1Item.setSelected(true)
-          case "bicubic" =>
-            setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-            renderingBicubic1Item.setSelected(true)
-          case "default"|"" =>
-            setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
-            renderingDefault1Item.setSelected(true)
-          case _ =>
-        }
-      },
-      if (renderingDefault1Item.isSelected) "default"
-      else
-        if (renderingBilinear1Item.isSelected) "bilinear"
-        else
-          if (renderingBicubic1Item.isSelected) "bicubic"
-          else "default"
-    )
+    preferences.add(PREF_VICPALETTE,"Set the palette type (bright,vice,pepto,colodore)","",Set("bright","vice","pepto","colodore")) { pal =>
+      pal match {
+        case "bright"|"" =>
+          Palette.setPalette(PaletteType.BRIGHT)
+          brightPalItem.setSelected(true)
+        case "vice" =>
+          Palette.setPalette(PaletteType.VICE)
+          vicePalItem.setSelected(true)
+        case "pepto" =>
+          Palette.setPalette(PaletteType.PEPTO)
+          peptoPalItem.setSelected(true)
+        case "colodore" =>
+          Palette.setPalette(PaletteType.COLORDORE)
+          colordorePalItem.setSelected(true)
+        case _ =>
+      }
+    }
+    // =====================================================================================================
   }
 
   protected def setFullScreenSettings(parent:JMenu) : Unit = {
@@ -1923,33 +1842,33 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setPrinterSettings(parent:JMenu) : Unit = {
+    import Preferences._
+    // PRINTER-ENABLED =====================================================================================
     val printerPreviewItem = new JMenuItem("Printer preview ...")
     printerPreviewItem.addActionListener(_ => showPrinterPreview )
     parent.add(printerPreviewItem)
 
     val printerEnabledItem = new JCheckBoxMenuItem("Printer enabled")
     printerEnabledItem.setSelected(false)
-    printerEnabledItem.addActionListener(e => { printerEnabled = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected ; printer.setActive(printerEnabled) } )
+    printerEnabledItem.addActionListener(_ => preferences(PREF_PRINTERENABLED) = printerEnabledItem.isSelected )
     parent.add(printerEnabledItem)
-    // Setting ---------------------------
-    settings.add("printer-enabled",
-      "Enable printer",
-      SettingsKey.PRINTER_ENABLED,
-      (pe:Boolean) => {
-        enablePrinter(pe)
-        printerEnabledItem.setSelected(pe)
-      },
-      printerEnabledItem.isSelected
-    )
+    preferences.add(PREF_PRINTERENABLED,"Enable printer",false) { pe =>
+      enablePrinter(pe)
+      printerEnabledItem.setSelected(pe)
+    }
+
     // reset setting
     resetSettingsActions = (() => {
       printerEnabledItem.setSelected(false)
       printerEnabled = false
       printer.setActive(false)
     }) :: resetSettingsActions
+    // =====================================================================================================
   }
 
   protected def setSIDSettings(parent:JMenu) : Unit = {
+    import Preferences._
+    // SID-8580 ============================================================================================
     val sidItem = new JMenu("SID")
     parent.add(sidItem)
     val group7 = new ButtonGroup
@@ -1957,24 +1876,21 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     sidItem.add(sidTypeItem)
     val sid6581Item = new JRadioButtonMenuItem("MOS 6581")
     sid6581Item.setSelected(true)
-    sid6581Item.addActionListener(_ => sid.setModel(true) )
+    sid6581Item.addActionListener(_ => preferences(PREF_SID8580) = true )
     sidTypeItem.add(sid6581Item)
     group7.add(sid6581Item)
     val sid8580Item = new JRadioButtonMenuItem("MOS 8580")
     sid8580Item.setSelected(false)
-    sid8580Item.addActionListener(_ => sid.setModel(false) )
+    sid8580Item.addActionListener(_ => preferences(PREF_SID8580) = false )
     sidTypeItem.add(sid8580Item)
     group7.add(sid8580Item)
-    // Setting ---------------------------
-    settings.add("sid-8580",
-      "Enable sid 8580 type",
-      SettingsKey.SID_8580,
-      (sid8580:Boolean) => {
-        sid.setModel(!sid8580)
-        sid8580Item.setSelected(sid8580)
-      },
-      sid8580Item.isSelected
-    )
+    preferences.add(PREF_SID8580,"Enable sid 8580 type",false) { sid8580 =>
+      sid.setModel(!sid8580)
+      sid8580Item.setSelected(sid8580)
+    }
+    // =====================================================================================================
+
+    // DUAL-SID ============================================================================================
     val sid2Item = new JMenu("Dual SID")
     sidItem.add(sid2Item)
     val group8 = new ButtonGroup
@@ -1987,52 +1903,34 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       val sid2AdrItem = new JRadioButtonMenuItem(adr)
       sid2Item.add(sid2AdrItem)
       sid2AdrItem.setSelected(false)
-      sid2AdrItem.addActionListener(_ => setDualSID(Some(Integer.parseInt(adr,16))) )
+      sid2AdrItem.addActionListener(_ => preferences(PREF_DUALSID) = adr )
       group8.add(sid2AdrItem)
       adr -> sid2AdrItem
     }).toMap
-    // Setting ---------------------------
-    settings.add("dual-sid",
-      s"Enable dual sid on the given address. Valid addresses are: ${addressMap.keys.mkString(",")}",
-      SettingsKey.DUAL_SID,
-      (adr:String) => if (adr != null && adr != "") {
-        addressMap get adr match {
-          case Some(item) =>
-            item.setSelected(true)
-            setDualSID(Some(Integer.parseInt(adr,16)))
-          case None =>
-            throw new IllegalArgumentException(s"Invalid dual sid address: $adr")
-        }
-      },
-      if (nosid2Item.isSelected) ""
-      else {
-        addressMap filter { kv => kv._2.isSelected } headOption match {
-          case Some((a,_)) => a
-          case None => ""
-        }
+    preferences.add(PREF_DUALSID,s"Enable dual sid on the given address. Valid addresses are: ${addressMap.keys.mkString(",")}","",addressMap.keySet) { adr =>
+      addressMap get adr match {
+        case Some(item) =>
+          item.setSelected(true)
+          setDualSID(Some(Integer.parseInt(adr,16)))
+        case None =>
+          throw new IllegalArgumentException(s"Invalid dual sid address: $adr")
       }
-    )
+    }
+    // =====================================================================================================
+
+    // SID-CYCLE-EXACT =====================================================================================
     val sidCycleExactItem = new JCheckBoxMenuItem("SID cycle exact emulation")
     sidCycleExactItem.setSelected(false)
-    sidCycleExactItem.addActionListener(_ => {
-      sidCycleExact = sidCycleExactItem.isSelected
-      sid.setCycleExact(sidCycleExactItem.isSelected)
-    }
-    )
+    sidCycleExactItem.addActionListener(_ => preferences(PREF_SIDCYCLEEXACT) = sidCycleExactItem.isSelected )
     sidItem.add(sidCycleExactItem)
-    // Setting ---------------------------
-    settings.add("sid-cycle-exact",
-      "With this option enabled the SID emulation is more accurate with a decrease of performance",
-      SettingsKey.SID_CYCLE_EXACT,
-      (sce:Boolean) => {
-        clock.pause
-        sidCycleExact = sce
-        sid.setCycleExact(sidCycleExact)
-        sidCycleExactItem.setSelected(sidCycleExact)
-        clock.play
-      },
-      sidCycleExact
-    )
+    preferences.add(PREF_SIDCYCLEEXACT,"With this option enabled the SID emulation is more accurate with a decrease of performance",false) { sce =>
+      clock.pause
+      sidCycleExact = sce
+      sid.setCycleExact(sidCycleExact)
+      sidCycleExactItem.setSelected(sidCycleExact)
+      clock.play
+    }
+    // =====================================================================================================
     // reset setting
     resetSettingsActions = (() => {
       sid6581Item.setSelected(true)
@@ -2043,39 +1941,27 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setDrivesSettings : Unit = {
+    import Preferences._
     for(drive <- 0 until TOTAL_DRIVES) {
-      // Setting ---------------------------
-      settings.add(s"drive${drive + 8}-type",
-        "Set the driver's type (1541,1571,1581)",
-        SettingsKey.DRIVE_X_TYPE(drive),
-        (dt: String) => {
-          dt match {
-            case "1541" =>
-              setDriveType(drive,DriveType._1541, true)
-            case "1571" =>
-              setDriveType(drive,DriveType._1571, true)
-            case "1581" =>
-              setDriveType(drive,DriveType._1581, true)
-            case _ =>
-          }
-        },
-        if (drives(drive).driveType == DriveType._1541) "1541"
-        else if (drives(drive).driveType == DriveType._1571) "1571"
-        else if (drives(drive).driveType == DriveType._1581) "1581"
-        else "1571"
-      )
-
-      settings.add(s"drive${drive + 8}-file",
-        s"Attach a file to drive ${drive + 8}",
-        SettingsKey.DRIVE_X_FILE(drive),
-        (df: String) => {
-          if (df != "") attachDiskFile(drive, new File(df), false, None)
-        },
-        {
-          if (drive == 0 && disk8LoadedAsPRG) ""
-          else floppyComponents(drive).drive.getFloppy.file
+      // DRIVE-X-TYPE ========================================================================================
+      preferences.add(PREF_DRIVE_X_TYPE(drive),"Set the driver's type (1541,1571,1581)","",Set("1541","1571","1581")) { dt =>
+        dt match {
+          case "1541" =>
+            setDriveType(drive,DriveType._1541, true)
+          case "1571" =>
+            setDriveType(drive,DriveType._1571, true)
+          case "1581" =>
+            setDriveType(drive,DriveType._1581, true)
+          case _ =>
         }
-      )
+      }
+      // =====================================================================================================
+
+      // DRIVE-X-FILE ========================================================================================
+      preferences.add(PREF_DRIVE_X_FILE(drive),s"Attach a file to drive ${drive + 8}","") { df =>
+        if (df != "") attachDiskFile(drive, new File(df), false, None)
+      }
+      // =====================================================================================================
     }
   }
 
@@ -2096,35 +1982,37 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setREUSettings(parent:JMenu) : Unit = {
+    import Preferences._
+    // REU-TYPE ============================================================================================
     val reuItem = new JMenu("REU")
     val group5 = new ButtonGroup
     val noReuItem = new JRadioButtonMenuItem("None")
     noReuItem.setSelected(true)
-    noReuItem.addActionListener(_ => setREU(None,None) )
+    noReuItem.addActionListener(_ => preferences(PREF_REUTYPE) = "none" )
     group5.add(noReuItem)
     reuItem.add(noReuItem)
     val reu128Item = new JRadioButtonMenuItem("128K")
-    reu128Item.addActionListener(_ => setREU(Some(REU.REU_1700),None) )
+    reu128Item.addActionListener(_ => preferences(PREF_REUTYPE) = REU.REU_1700.toString )
     group5.add(reu128Item)
     reuItem.add(reu128Item)
     val reu256Item = new JRadioButtonMenuItem("256K")
-    reu256Item.addActionListener(_ => setREU(Some(REU.REU_1764),None) )
+    reu256Item.addActionListener(_ => preferences(PREF_REUTYPE) = REU.REU_1764.toString )
     group5.add(reu256Item)
     reuItem.add(reu256Item)
     val reu512Item = new JRadioButtonMenuItem("512K")
-    reu512Item.addActionListener(_ => setREU(Some(REU.REU_1750),None) )
+    reu512Item.addActionListener(_ => preferences(PREF_REUTYPE) = REU.REU_1750.toString )
     group5.add(reu512Item)
     reuItem.add(reu512Item)
     val reu1MItem = new JRadioButtonMenuItem("1M")
-    reu1MItem.addActionListener(_ => setREU(Some(REU.REU_1M),None) )
+    reu1MItem.addActionListener(_ => preferences(PREF_REUTYPE) = REU.REU_1M.toString )
     group5.add(reu1MItem)
     reuItem.add(reu1MItem)
     val reu2MItem = new JRadioButtonMenuItem("2M")
-    reu2MItem.addActionListener(_ => setREU(Some(REU.REU_2M),None) )
+    reu2MItem.addActionListener(_ => preferences(PREF_REUTYPE) = REU.REU_2M.toString )
     group5.add(reu2MItem)
     reuItem.add(reu2MItem)
     val reu4MItem = new JRadioButtonMenuItem("4M")
-    reu4MItem.addActionListener(_ => setREU(Some(REU.REU_4M),None) )
+    reu4MItem.addActionListener(_ => preferences(PREF_REUTYPE) = REU.REU_4M.toString )
     group5.add(reu4MItem)
     reuItem.add(reu4MItem)
     val reu16MItem = new JRadioButtonMenuItem("16M ...")
@@ -2133,48 +2021,35 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     reuItem.add(reu16MItem)
     parent.add(reuItem)
 
-    settings.add("reu-type",
-      "Set the reu type (none,128,256,512,1024,2048,4096,16384)",
-      SettingsKey.REU_TYPE,
-      (reu:String) => {
-        val reuPars = reu.split(",")
-        if (reuPars(0) == "" || reuPars(0) == "none") setREU(None,None)
-        else
-          reuPars(0).toInt match {
-            case REU.REU_1700 =>
-              setREU(Some(REU.REU_1700),None)
-              reu128Item.setSelected(true)
-            case REU.REU_1750 =>
-              setREU(Some(REU.REU_1750),None)
-              reu512Item.setSelected(true)
-            case REU.REU_1764 =>
-              setREU(Some(REU.REU_1764),None)
-              reu256Item.setSelected(true)
-            case REU.REU_1M =>
-              setREU(Some(REU.REU_1M),None)
-              reu1MItem.setSelected(true)
-            case REU.REU_2M =>
-              setREU(Some(REU.REU_2M),None)
-              reu2MItem.setSelected(true)
-            case REU.REU_4M =>
-              setREU(Some(REU.REU_4M),None)
-              reu4MItem.setSelected(true)
-            case REU.REU_16M =>
-              setREU(Some(REU.REU_16M),if (reuPars.length == 2 && reuPars(1) != "null") Some(reuPars(1)) else None)
-              reu16MItem.setSelected(true)
-          }
-      },
-      if (noReuItem.isSelected) "none"
+    preferences.add(PREF_REUTYPE,"Set the reu type (none,128,256,512,1024,2048,4096,16384). With 16384 the syntax is: 16384[,<reu file to load>]","none") { reu =>
+      val reuPars = reu.split(",")
+      if (reuPars(0) == "" || reuPars(0) == "none") setREU(None,None)
       else
-        if (reu128Item.isSelected) "128"
-        else
-          if (reu256Item.isSelected) "256"
-          else
-            if (reu512Item.isSelected) "512"
-            else
-              if (reu16MItem.isSelected) "16384," + REU.attached16MFileName
-              else "none"
-    )
+        reuPars(0).toInt match {
+          case REU.REU_1700 =>
+            setREU(Some(REU.REU_1700),None)
+            reu128Item.setSelected(true)
+          case REU.REU_1750 =>
+            setREU(Some(REU.REU_1750),None)
+            reu512Item.setSelected(true)
+          case REU.REU_1764 =>
+            setREU(Some(REU.REU_1764),None)
+            reu256Item.setSelected(true)
+          case REU.REU_1M =>
+            setREU(Some(REU.REU_1M),None)
+            reu1MItem.setSelected(true)
+          case REU.REU_2M =>
+            setREU(Some(REU.REU_2M),None)
+            reu2MItem.setSelected(true)
+          case REU.REU_4M =>
+            setREU(Some(REU.REU_4M),None)
+            reu4MItem.setSelected(true)
+          case REU.REU_16M =>
+            setREU(Some(REU.REU_16M),if (reuPars.length == 2 && reuPars(1) != "null") Some(reuPars(1)) else None)
+            reu16MItem.setSelected(true)
+        }
+    }
+
     // reset setting
     resetSettingsActions = (() => {
       noReuItem.setSelected(true)
@@ -2183,43 +2058,38 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setGEORamSettings(parent:JMenu) : Unit = {
+    import Preferences._
+    // GEO-RAM =============================================================================================
     val geoItem = new JMenu("GeoRAM")
     val groupgeo = new ButtonGroup
     val noGeoItem = new JRadioButtonMenuItem("None")
     noGeoItem.setSelected(true)
-    noGeoItem.addActionListener(_ => setGeoRAM(false) )
+    noGeoItem.addActionListener(_ => preferences(PREF_GEORAM) = "none" )
     groupgeo.add(noGeoItem)
     geoItem.add(noGeoItem)
     val _256kGeoItem = new JRadioButtonMenuItem("256K")
-    _256kGeoItem.addActionListener(_ => setGeoRAM(true,256) )
+    _256kGeoItem.addActionListener(_ => preferences(PREF_GEORAM) = "256" )
     groupgeo.add(_256kGeoItem)
     geoItem.add(_256kGeoItem)
     val _512kGeoItem = new JRadioButtonMenuItem("512K")
-    _512kGeoItem.addActionListener(_ => setGeoRAM(true,512) )
+    _512kGeoItem.addActionListener(_ => preferences(PREF_GEORAM) = "512" )
     groupgeo.add(_512kGeoItem)
     geoItem.add(_512kGeoItem)
 
     parent.add(geoItem)
-    // Setting ---------------------------
-    settings.add("geo-ram",
-      "Set the georam size (none,256,512)",
-      SettingsKey.GEO_RAM,
-      (geo:String) => {
-        if (geo == "512") {
-          _512kGeoItem.setSelected(true)
-          setGeoRAM(true,512)
-        }
-        else
-          if (geo == "256") {
-            _256kGeoItem.setSelected(true)
-            setGeoRAM(true,256)
-          }
-      },
-      if (_512kGeoItem.isSelected) "512"
+    preferences.add(PREF_GEORAM,"Set the georam size (none,256,512)","none",Set("none","256","512")) { geo =>
+      if (geo == "512") {
+        _512kGeoItem.setSelected(true)
+        setGeoRAM(true,512)
+      }
       else
-        if (_256kGeoItem.isSelected) "256"
-        else "none"
-    )
+      if (geo == "256") {
+        _256kGeoItem.setSelected(true)
+        setGeoRAM(true,256)
+      }
+      else setGeoRAM(false)
+    }
+
     // reset setting
     resetSettingsActions = (() => {
       noGeoItem.setSelected(true)
@@ -2228,6 +2098,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setDigiMAXSettings(parent:JMenu) : Unit = {
+    // DIGI-MAX ============================================================================================
     val digimaxItem = new JMenu("DigiMAX")
     parent.add(digimaxItem)
     val digiMaxSampleRateItem  = new JMenuItem("DigiMax sample rate ...")
@@ -2251,6 +2122,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     digimaxDF00Item.addActionListener(_ => setDigiMax(true,Some(0xDF00)) )
     group6.add(digimaxDF00Item)
     digimaxItem.add(digimaxDF00Item)
+    // TODO: preferences
     // reset setting
     resetSettingsActions = (() => {
       digimaxDisabledItem.setSelected(true)
@@ -2259,20 +2131,16 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setCPMSettings(parent:JMenu) : Unit = {
+    import Preferences._
+    // CPM64-ENABLED =======================================================================================
     val cpmItem = new JCheckBoxMenuItem("CP/M Cartridge")
-    cpmItem.addActionListener(e => enableCPMCart(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    cpmItem.addActionListener(e => preferences(PREF_CPMCARTENABLED) = cpmItem.isSelected )
     parent.add(cpmItem)
-    settings.add("cpm64-enabled",
-      s"Attach the CP/M cart",
-      SettingsKey.CPM64,
-      (cpm: Boolean) => {
-        if (cpm) {
-          enableCPMCart(true)
-          cpmItem.setSelected(true)
-        }
-      },
-      ExpansionPort.getExpansionPort.isInstanceOf[CPMCartridge]
-    )
+    preferences.add(PREF_CPMCARTENABLED,"Attach the CP/M cart",false) { cpm =>
+      enableCPMCart(cpm)
+      cpmItem.setSelected(cpm)
+    }
+
     // reset setting
     resetSettingsActions = (() => {
       cpmItem.setSelected(false)
@@ -2281,6 +2149,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setFlyerSettings(parent:JMenu) : Unit = {
+    // FLYED-ENABLED =======================================================================================
     val flyerItem = new JMenu("Flyer internet modem")
     parent.add(flyerItem)
     val fylerEnabledItem = new JCheckBoxMenuItem("Flyer enabled on 7")
@@ -2290,6 +2159,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     val flyerDirectoryItem = new JMenuItem("Set disks repository ...")
     flyerItem.add(flyerDirectoryItem)
     flyerDirectoryItem.addActionListener(_ => chooseFlyerDir )
+    // TODO : preferences
     // reset setting
     resetSettingsActions = (() => {
       fylerEnabledItem.setSelected(false)
@@ -2298,28 +2168,22 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setBeamRacerSettings(parent:JMenu) : Unit = {
+    import Preferences._
+    // BEAM-RACER-ENABLED ==================================================================================
     val brItem = new JCheckBoxMenuItem("Beam Racer installed")
     brItem.setSelected(false)
     parent.add(brItem)
-    brItem.addActionListener( e => {
-      val selected = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected
-      vicChip.setCoprocessor(if (selected) new VASYL(vicChip,cpu,dmaSwitcher.setLine(Switcher.EXT,_)) else null)
-    })
+    brItem.addActionListener( _ => preferences(PREF_BEAMRACERENABLED) = brItem.isSelected )
 
-    settings.add("beam-racer-enabled",
-      s"Install Beam Racer VIC's coprocessor",
-      SettingsKey.BEAMRACER,
-      (br: Boolean) => {
-        if (br) {
-          vicChip.setCoprocessor(new VASYL(vicChip,cpu,dmaSwitcher.setLine(Switcher.EXT,_)))
-          brItem.setSelected(true)
-        }
-      },
-      brItem.isSelected
-    )
+    preferences.add(PREF_BEAMRACERENABLED,"Install Beam Racer VIC's coprocessor",false) { br =>
+      vicChip.setCoprocessor(if (br) new VASYL(vicChip,cpu,dmaSwitcher.setLine(Switcher.EXT,_)) else null)
+      brItem.setSelected(true)
+    }
   }
 
   protected def setVICModel(parent:JMenu) : Unit = {
+    import Preferences._
+    // NTSC ================================================================================================
     val vicModelItem = new JMenu("VIC model")
     val group = new ButtonGroup
     val palItem = new JRadioButtonMenuItem("PAL (6569)")
@@ -2328,42 +2192,33 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     group.add(ntscItem)
     vicModelItem.add(palItem)
     vicModelItem.add(ntscItem)
-    palItem.addActionListener( _ => setVICModel(VICType.PAL,false,true) )
+    palItem.addActionListener( _ => preferences(PREF_NTSC) = false )
     palItem.setSelected(true)
-    ntscItem.addActionListener( _ => setVICModel(VICType.NTSC,false,true) )
+    ntscItem.addActionListener( _ => preferences(PREF_NTSC) = true )
     parent.add(vicModelItem)
 
-    settings.add("ntsc",
-      s"Set ntsc video standard",
-      SettingsKey.VIDEO_NTSC,
-      (set: Boolean) => {
-        if (set) {
-          setVICModel(VICType.NTSC,true,false)
-          ntscItem.setSelected(true)
-        }
-      },
-      ntscItem.isSelected
-    )
+    preferences.add(PREF_NTSC,"Set ntsc video standard",false) { ntsc =>
+      val adjusting = preferences.get(PREF_NTSC).get.isAdjusting
+      if (ntsc) setVICModel(VICType.NTSC,adjusting,!adjusting) else setVICModel(VICType.PAL,adjusting,!adjusting)
+      ntscItem.setSelected(ntsc)
+    }
   }
 
   protected def setVICBorderMode(parent:JMenu) : Unit = {
+    import Preferences._
+    // VIC-BORDER-OFF ======================================================================================
     val borderItem = new JMenu("Border mode")
     val borderOnItem = new JCheckBoxMenuItem("Draw border")
     borderOnItem.setSelected(true)
     borderItem.add(borderOnItem)
-    borderOnItem.addActionListener( _ => vicChip.setDrawBorder(borderOnItem.isSelected) )
+    borderOnItem.addActionListener( _ => preferences(PREF_VICBORDEROFF) = !borderOnItem.isSelected )
     parent.add(borderItem)
     borderOnItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_B,java.awt.event.InputEvent.ALT_DOWN_MASK))
 
-    settings.add("vic-border-off",
-      s"Doesn't draw VIC's borders",
-      SettingsKey.VIC_BORDER_MODE,
-      (on: Boolean) => {
-        vicChip.setDrawBorder(!on)
-        borderOnItem.setSelected(!on)
-      },
-      !borderOnItem.isSelected
-    )
+    preferences.add(PREF_VICBORDEROFF,"Disable VIC's borders",false) { borderoff =>
+      vicChip.setDrawBorder(!borderoff)
+      borderOnItem.setSelected(!borderoff)
+    }
   }
 
   protected def setOneFrameMode(parent:JMenu,display: => Display,shortKey:Int,maskKey:Int = java.awt.event.InputEvent.ALT_DOWN_MASK) : Unit = {
@@ -2458,8 +2313,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
 
   protected def setDefaultProperties(configuration:Properties) : Unit = {
-    configuration.setProperty(SettingsKey.RENDERING_TYPE,"default")
-    configuration.setProperty(SettingsKey.WRITE_ON_DISK,"true")
+    import Preferences._
+    configuration.setProperty(PREF_RENDERINGTYPE,"default")
+    configuration.setProperty(PREF_WRITEONDISK,"true")
+    configuration.setProperty(PREF_VICPALETTE,"bright")
   }
 
   protected def saveConfigurationFile : Unit = {
