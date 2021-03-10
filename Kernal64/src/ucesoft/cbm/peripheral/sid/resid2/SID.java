@@ -260,7 +260,9 @@ public class SID implements SIDChip,SIDConstant {
     public void loadState(ObjectInputStream in) {
         try {
             int[] regs = (int[])in.readObject();
-            for(int i = 0;i < register.length;i++) register[i] = regs[i];
+            for(int i = 0;i < register.length;i++) {
+                write(i,regs[i]);
+            }
             bus_value = in.readInt();
             bus_clock = in.readLong();
             for (final Voice voice : voices) {
