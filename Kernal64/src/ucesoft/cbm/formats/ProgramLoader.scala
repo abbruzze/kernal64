@@ -9,7 +9,7 @@ import ucesoft.cbm.cpu.{CPU65xx, Memory}
 object ProgramLoader {
   var cpu : CPU65xx = _
   private[this] var loadingWithWarp = false
-  var loadingWithWarpEnabled = true
+  var loadingWithWarpEnabled = false
   var warpModeListener : (Boolean) => Unit = _
 
   def checkLoadingInWarpMode(c64Mode:Boolean): Unit = {
