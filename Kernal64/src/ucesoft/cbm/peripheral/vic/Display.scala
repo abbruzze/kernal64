@@ -46,7 +46,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   private[this] var remote : ucesoft.cbm.remote.RemoteC64 = _
   private[this] var showRemotingLabel = true
   private[this] var interlaced = false
-  private[this] var renderingHints = RenderingHints.VALUE_INTERPOLATION_BILINEAR
+  private[this] var renderingHints = RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
 
   private[this] var rotationAngleRad = 0.0
   private[this] var flipX,flipY = false
