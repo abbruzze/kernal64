@@ -1557,6 +1557,9 @@ final class VIC(mem: VICMemory,
     out.writeObject(vml_c)
     out.writeInt(lastBackground)
     out.writeBoolean(isNewVICModel)
+    out.writeObject(shadowBackgroundColor)
+    out.writeInt(backgroundColorChangedIndex)
+    out.writeInt(shadowBorderColor)
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     videoMatrixAddress = in.readInt
@@ -1614,6 +1617,9 @@ final class VIC(mem: VICMemory,
     loadMemory[Int](vml_c,in)
     lastBackground = in.readInt
     isNewVICModel = in.readBoolean
+    loadMemory[Int](shadowBackgroundColor,in)
+    backgroundColorChangedIndex = in.readInt
+    shadowBorderColor = in.readInt
   }
   protected def allowsStateRestoring : Boolean = true
 
