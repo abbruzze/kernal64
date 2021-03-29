@@ -56,7 +56,7 @@
 
 		<echo message="Building version ${version}"/>
 		<mkdir dir="${build.dir}"/>
-		<javac source="1.8" target="1.8" srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/cbm/peripheral/sid/resid/*.java ucesoft/cbm/misc/*.java">
+		<javac source="1.8" target="1.8" srcdir="${sources.dir}" destdir="${build.dir}" includes="ucesoft/cbm/Tickable.java ucesoft/cbm/peripheral/sid/SIDChip.java ucesoft/cbm/peripheral/sid/resid/*.java ucesoft/cbm/peripheral/sid/resid2/*.java ucesoft/cbm/misc/*.java">
 			<classpath refid="kernal.lib"/>
 		</javac>
 		<mkdir dir="${dist.dir}"/>

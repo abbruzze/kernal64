@@ -1,6 +1,6 @@
 package ucesoft.cbm.peripheral.sid.resid2;
 
-import ucesoft.cbm.Clock;
+import ucesoft.cbm.Tickable;
 import ucesoft.cbm.peripheral.sid.SIDChip;
 
 import java.io.ObjectInputStream;
@@ -18,9 +18,9 @@ public class SID implements SIDChip,SIDConstant {
     private long bus_clock;
     public int type;
     public static boolean rs;
-    private final Clock clk;
+    private final Tickable clk;
 
-    public SID() {
+    public SID(Tickable clk) {
         voices = new Voice[3];
         register = new int[32];
         filter = new SIDfilter();
@@ -33,7 +33,7 @@ public class SID implements SIDChip,SIDConstant {
         voices[1].setSYNCsource(voices[0]);
         voices[2].setSYNCsource(voices[1]);
         setModel(type);
-        clk = Clock.systemClock();
+        this.clk = clk;
     }
 
     final public void clock() {

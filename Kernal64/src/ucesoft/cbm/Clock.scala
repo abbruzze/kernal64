@@ -2,8 +2,6 @@ package ucesoft.cbm
 
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
-
-import javax.swing.JFrame
 import ucesoft.cbm.misc.TestCart
 
 class ClockEvent (val id : String,val when : Long,val execute: (Long) => Unit,val subid : Int = 0) {
@@ -11,7 +9,7 @@ class ClockEvent (val id : String,val when : Long,val execute: (Long) => Unit,va
   override def toString = s"${id}(${when} canceled=$canceled)"
 }
 
-object Clock extends App {
+object Clock {
   private var clock : Clock = null
   def systemClock = clock
   def isAvailable = clock != null
@@ -31,7 +29,7 @@ object Clock extends App {
   }
 }
 
-class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clock")(mainLoop: (Long) => Unit) extends Thread(name) with CBMComponent {
+class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clock")(mainLoop: (Long) => Unit) extends Thread(name) with CBMComponent with Tickable {
   val componentID = "System Clock"
   val componentType = CBMComponentType.CHIP
 
@@ -100,7 +98,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
 
   private[this] var cycles = 0L
 
-  final def currentCycles = cycles
+  override final def currentCycles = cycles
   final def nextCycles = cycles + 1
 
   def maximumSpeed = _maximumSpeed

@@ -25,7 +25,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   val isActive = true
   
   private[this] val sid : SIDChip = {
-    val sid = new RESID
+    val sid = new RESID(Clock.systemClock)
     sid.setModel(0)
     sid
   }
