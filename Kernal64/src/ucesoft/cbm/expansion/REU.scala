@@ -129,22 +129,18 @@ object REU {
     }
 
     private def ramInitPattern : Unit = {
-      val invValue = 0xFF
-      var value = 0xFF
+      var s = 0xFF
       var m = 0
-      while (m < reuMem.length) {
-        // 128K block
-        val block = m + 0x20000
-        reuMem(m) = value
-        value ^= invValue
-        m += 1
-        while (m < reuMem.length && m < block) {
-          reuMem(m) = value
-          if (m + 1 < reuMem.length) reuMem(m + 1) = value
-          m += 2
-          value ^= invValue
+      var i = 0
+      while (i < reuMem.length) {
+        for(_ <- 0 until 64) {
+          reuMem(i) = s ; i += 1
+          reuMem(i) = m ; i += 1
+          reuMem(i) = m ; i += 1
+          reuMem(i) = s ; i += 1
         }
-        value ^= invValue
+        s ^= 0xFF
+        m ^= 0xFF
       }
     }
 
@@ -273,12 +269,12 @@ object REU {
 
     @inline private def readFromREU : Int = {
       val r = if (IS_256 && reuBank > 3) {
-        if (clk.currentCycles > floatingBusValueDecayCycle) floatingBusValue = 0xFF
+        //if (clk.currentCycles > floatingBusValueDecayCycle) floatingBusValue = 0xFF
         //floatingBusValueDecayCycle = clk.currentCycles + FLOATING_BUS_VALUE_DECAY_CYCLES
         floatingBusValue
       }
       else reuMem(reuAddress)
-      floatingBusValueDecayCycle = clk.currentCycles + FLOATING_BUS_VALUE_DECAY_CYCLES
+      //floatingBusValueDecayCycle = clk.currentCycles + FLOATING_BUS_VALUE_DECAY_CYCLES
       r
     }
 
@@ -289,7 +285,7 @@ object REU {
       else reuMem(reuAddress) = value
 
       floatingBusValue = value
-      floatingBusValueDecayCycle = clk.currentCycles + FLOATING_BUS_VALUE_DECAY_CYCLES
+      //floatingBusValueDecayCycle = clk.currentCycles + FLOATING_BUS_VALUE_DECAY_CYCLES
     }
 
     private def exchangeOperation  : Unit = {
@@ -304,6 +300,7 @@ object REU {
           writeToREU(exchangeTmp1)
           incrementAddresses
           if (transferRegister == 0x01) {
+            floatingBusValue = readFromREU
             statusRegister |= STATUS_END_OF_BLOCK
             clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation))
           }

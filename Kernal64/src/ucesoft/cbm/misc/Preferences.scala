@@ -4,7 +4,7 @@ import java.util.Properties
 import scala.collection.mutable
 
 object Preferences {
-  val TOTALDRIVES             = 4
+  final val TOTALDRIVES       = 4
   // KEYS ========================================================
   val PREF_WARP               = "warp"
   val PREF_HEADLESS           = "headless"
@@ -89,12 +89,13 @@ object Preferences {
     val consume = 0
   }
 
-  case class Preference[T](cmdLine:String,description:String,var value:T,enumerated:Set[T] = Set.empty[T])(listener : T => Unit)(implicit prefConv:PreferenceConv[T]) {
+  case class Preference[T](cmdLine:String,description:String,var value:T,enumerated:Set[T] = Set.empty[T],canBeSaved : Boolean = true)(listener : T => Unit)(implicit prefConv:PreferenceConv[T]) {
     private var listeners : List[PreferenceChangeListener] = Nil
     private[Preferences] var adjusting = true
     private var loaded = false
 
     def isAdjusting : Boolean = adjusting
+    def isLoaded : Boolean = loaded
 
     listeners ::= new PreferenceChangeListener {
       override def preferenceHasChanged(pref: Preference[_]): Unit = listener(value)
@@ -126,7 +127,7 @@ object Preferences {
     }
 
     def save(p:Properties) : Unit = {
-      if (loaded) p.setProperty(cmdLine,if (value != null) value.toString else "")
+      if (loaded && canBeSaved) p.setProperty(cmdLine,if (value != null) value.toString else "")
     }
 
     def consume : Int = prefConv.consume
@@ -138,8 +139,8 @@ class Preferences {
 
   private[this] val prefs = new collection.mutable.ListBuffer[Preference[_]]
 
-  def add[T](cmdLine:String,description:String,value:T,enumerated:Set[T] = Set.empty[T])(listener : T => Unit)(implicit prefConv:PreferenceConv[T]) : Preference[T] = {
-    val p = Preference(cmdLine,description,value,enumerated)(listener)
+  def add[T](cmdLine:String,description:String,value:T,enumerated:Set[T] = Set.empty[T],canBeSaved:Boolean = true)(listener : T => Unit)(implicit prefConv:PreferenceConv[T]) : Preference[T] = {
+    val p = Preference(cmdLine,description,value,enumerated,canBeSaved)(listener)
     prefs += p
     p
   }
@@ -152,7 +153,12 @@ class Preferences {
     prefs.find(_.cmdLine == cmdLine).foreach( prefs -= _ )
   }
 
-  def apply[T](cmdLine:String) : Option[T] = prefs.find(_.cmdLine == cmdLine).map(_.value.asInstanceOf[T]).headOption
+  def apply[T](cmdLine:String) : Option[T] = {
+    prefs.find(_.cmdLine == cmdLine) match {
+      case Some(p) if p.isLoaded => Some(p.value.asInstanceOf[T])
+      case _ => None
+    }
+  }
 
   def get[T](cmdLine:String) : Option[Preference[T]] = prefs.find(_.cmdLine == cmdLine).asInstanceOf[Option[Preference[T]]]
 
