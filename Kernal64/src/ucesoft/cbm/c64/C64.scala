@@ -57,7 +57,7 @@ class C64 extends CBMComputer {
     initializedDrives(DriveType._1541)
     // -----------------------
     ProgramLoader.cpu = cpu
-    ProgramLoader.warpModeListener = warpMode _
+    ProgramLoader.warpModeListener = warpMode(_,true)
     add(clock)
     add(mmu)
     add(cpu)
@@ -140,45 +140,6 @@ class C64 extends CBMComputer {
     // GIF Recorder
     gifRecorder = GIFPanel.createGIFPanel(displayFrame,Array(display),Array("VIC"))
   }
-
-  private def loadSettings(args:Array[String]) : Unit = {
-    def loadFile(fn:String) : Unit = {
-      val cmd = s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar
-      clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,true) ))
-    }
-    //settings.load(configuration)
-    // AUTOPLAY
-    preferences.parseAndLoad(args,configuration) match {
-      case None =>
-        // run the given file name
-        preferences[String](Preferences.PREF_RUNFILE) match {
-          case Some(fn) if fn != null && fn != "" =>
-            loadFile(fn)
-          case _ =>
-        }
-      case Some(f) =>
-        preferences[String](Preferences.PREF_DRIVE_X_FILE(0)) match {
-          case None =>
-            handleDND(new File(f),false,true)
-          case Some(_) =>
-            // here we have both drive8 and PRG set: we load the given PRG file from disk 8
-            val fn = new File(f).getName
-            val dot = fn.indexOf('.')
-            val cbmFile = if (dot > 0) fn.substring(0,dot) else f
-            loadFile(cbmFile)
-        }
-    }
-    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,true),attachDiskFile(_,_,_,None),drivesEnabled)
-  }
-  
-  override def afterInitHook  : Unit = {
-	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)    
-    // deactivate drives > 8
-    for(d <- 1 until TOTAL_DRIVES) {
-      drives(d).setActive(false)
-      driveLeds(d).setVisible(false)
-    }
-  }
   
   protected def mainLoop(cycles:Long) : Unit = {
     // VIC PHI1
@@ -225,17 +186,9 @@ class C64 extends CBMComputer {
 
   // ======================================== Settings ==============================================
   override protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
-    drivesEnabled(id) = enabled
-    drives(id).setActive(enabled)
-    driveLeds(id).setVisible(enabled)
+    super.enableDrive(id,enabled,updateFrame)
     if (updateFrame) adjustRatio
   }
-
-  protected def setDisplayRendering(hints:java.lang.Object) : Unit = {
-    display.setRenderingHints(hints)
-  }
-
-
   
   private def adjustRatio  : Unit = {
     val dim = display.asInstanceOf[java.awt.Component].getSize
@@ -253,61 +206,6 @@ class C64 extends CBMComputer {
     }
   }
 
-  protected def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String],emulateInserting:Boolean = true) : Unit = {
-    try {   
-      if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
-      if (!file.isDirectory) {
-        val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
-        if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
-      }
-      val isD64 = file.getName.toUpperCase.endsWith(".D64") || file.isDirectory
-
-      val disk = if (file.isDirectory) D64LocalDirectory.createDiskFromLocalDir(file) else Diskette(file.toString)
-      disk.canWriteOnDisk = canWriteOnDisk
-      disk.flushListener = diskFlusher
-      drives(driveID).getFloppy.close
-      if (traceDialog != null && !traceDialog.isTracing) clock.pause
-      drives(driveID).setDriveReader(disk,emulateInserting)
-      preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID),file.toString)
-      clock.play
-            
-      loadFileItems(driveID).setEnabled(isD64)
-      configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
-      val drive = driveID + 8
-      fileToLoad match {
-        case Some(fn) =>
-          val cmd = s"""LOAD"$fn",$drive,1""" + 13.toChar + (if (autorun) "RUN" + 13.toChar else "")
-          Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,true)
-        case None if autorun =>
-          Keyboard.insertSmallTextIntoKeyboardBuffer(s"""LOAD"*",$drive,1""" + 13.toChar + "RUN" + 13.toChar,mmu,true)
-        case _ =>
-      }
-      driveLeds(driveID).setToolTipText(disk.toString)
-    }
-    catch {
-      case t:Throwable =>
-        t.printStackTrace
-        
-        showError("Disk attaching error",t.toString)
-    }
-  }
-  
-  protected def savePrg : Unit = {
-    val fc = new JFileChooser
-    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-    fc.setFileFilter(new FileFilter {
-      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".PRG")
-      def getDescription = "PRG files"
-    })
-    fc.showSaveDialog(displayFrame) match {
-      case JFileChooser.APPROVE_OPTION =>
-        configuration.setProperty(CONFIGURATION_LASTDISKDIR,fc.getSelectedFile.getParentFile.toString)
-        val (start,end) = ProgramLoader.savePRG(fc.getSelectedFile,mmu,true)
-        Log.info(s"BASIC program saved from $start to $end")
-      case _ =>
-    }
-  }
-
   private def takeSnapshot  : Unit = {
     val fc = new JFileChooser
     fc.showSaveDialog(displayFrame) match {
@@ -315,15 +213,6 @@ class C64 extends CBMComputer {
         val file = if (fc.getSelectedFile.getName.toUpperCase.endsWith(".PNG")) fc.getSelectedFile else new File(fc.getSelectedFile.toString + ".png")
       	display.saveSnapshot(file)
       case _ =>
-    }
-  }
-  
-  protected def paste : Unit = {
-    val clipboard = Toolkit.getDefaultToolkit.getSystemClipboard
-    val contents = clipboard.getContents(null)
-    if (contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
-      val str = contents.getTransferData(DataFlavor.stringFlavor).toString
-      Keyboard.insertTextIntoKeyboardBuffer(str,mmu,true)
     }
   }
   
@@ -493,14 +382,6 @@ class C64 extends CBMComputer {
     super.setGlobalCommandLineOptions
     // CUSTOM-GLUE-LOGIC ==================================================================================
     preferences.add(PREF_CUSTOMGLUELOGIC,"Set internal glue logic to custom (C64C)",false) { vicMemory.setCustomGlueLogic(_) }
-  }
-
-  def turnOff  : Unit = {
-    if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
-    for(d <- drives)
-      d.getFloppy.close
-    shutdownComponent
-    sys.exit(0)
   }
   
   protected def saveSettings(save:Boolean) : Unit = {

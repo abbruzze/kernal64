@@ -860,7 +860,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     out.writeInt(vic_clkrate_reg)
     out.writeInt(_0)
     out.writeInt(_1)
-    out.write(data_out)
+    out.writeInt(data_out)
     out.writeInt(c64MemConfig)
     out.writeBoolean(ULTIMAX)
     out.writeInt(videoBank)

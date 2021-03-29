@@ -5,7 +5,7 @@ import java.awt.event.{WindowAdapter, WindowEvent}
 import java.awt.{BorderLayout, Color, Cursor, FlowLayout}
 import java.io.{File, FileInputStream, InputStream, PrintWriter, StringReader, StringWriter}
 import java.text.SimpleDateFormat
-import java.util.Scanner
+import java.util.{Properties, Scanner}
 import javax.swing.table.AbstractTableModel
 import javax.swing.text.DefaultCaret
 import javax.swing.{BorderFactory, JButton, JCheckBox, JCheckBoxMenuItem, JComponent, JDialog, JFileChooser, JFrame, JMenu, JMenuBar, JMenuItem, JOptionPane, JPanel, JScrollPane, JSplitPane, JTable, JTextArea, JTextField, JToggleButton, KeyStroke, SwingUtilities, TransferHandler}
@@ -14,6 +14,7 @@ import org.fife.ui.rtextarea.{RTextScrollPane, SearchContext, SearchEngine}
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.cpu.asm.AsmEvaluator.Evaluator
 import ucesoft.cbm.cpu.asm.AsmParser.{Patch, Statement, Virtual}
+import ucesoft.cbm.misc.Preferences
 import ucesoft.cbm.trace.{BreakSet, NoBreak, TraceDialog, TracingListener}
 
 import javax.swing.event.{DocumentEvent, DocumentListener}
@@ -159,7 +160,7 @@ object Assembler {
   }
 
   def main(args:Array[String]) : Unit = {
-    val settings = new ucesoft.cbm.misc.Settings
+    val settings = new Preferences
     importDir = "./"
     val symbols = new mutable.LinkedHashMap[String,String]
     var log : String => Unit = s => print(s)
@@ -168,50 +169,25 @@ object Assembler {
     var fileName : Option[String] = None
     var outFormat = FORMAT_BINARY
 
-    settings.add("include-dir",
-      "Sets the directory where the include files will be searched in",
-      "INCLUDE",
-      (id:String) => importDir = id,
-      ""
-    )
-    settings.add("silent",
-      "Log errors only",
-      "SILENT",
-      (sil:Boolean) => if (sil) log = _ => {},
-      false
-    )
-    settings.add("prg",
-      "Writes to the given PRG file",
-      "PRG",
-      (prg:String) => {
-        out = Some(prg)
-        outFormat = FORMAT_PRG
-      },
-      ""
-    )
-    settings.add("bin",
-      "Writes to the given raw file",
-      "BIN",
-      (bin:String) => {
-        out = Some(bin)
-        outFormat = FORMAT_BINARY
-      },
-      ""
-    )
-    settings.add("D",
-      "Defines a symbol. If followed by =<value> defines a string or int symbol, otherwise a boolean symbol",
-      "SYMBOL",
-      (sym:String) => {
-        sym.split("=") match {
-          case Array(symbol,value) =>
-            symbols += symbol -> value
-          case Array(symbol) =>
-            symbols += symbol -> ""
-          case _ => throw new IllegalArgumentException(s"Invalid symbol's value $sym")
-        }
-      },
-      ""
-    )
+    settings.add("include-dir","Sets the directory where the include files will be searched in","") { importDir = _ }
+    settings.add("silent","Log errors only",false) { sil => if (sil) log = _ => {} }
+    settings.add("prg","Writes to the given PRG file","") { prg =>
+      out = Some(prg)
+      outFormat = FORMAT_PRG
+    }
+    settings.add("bin","Writes to the given raw file","") { bin =>
+      out = Some(bin)
+      outFormat = FORMAT_BINARY
+    }
+    settings.add("D","Defines a symbol. If followed by =<value> defines a string or int symbol, otherwise a boolean symbol","") { sym =>
+      sym.split("=") match {
+        case Array(symbol,value) =>
+          symbols += symbol -> value
+        case Array(symbol) =>
+          symbols += symbol -> ""
+        case _ => throw new IllegalArgumentException(s"Invalid symbol's value $sym")
+      }
+    }
 
     if (settings.checkForHelp(args) || args.length == 0) {
       println(s"K64Assembler ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
@@ -219,7 +195,7 @@ object Assembler {
       sys.exit(0)
     }
 
-    settings.parseAndLoad(args) match {
+    settings.parseAndLoad(args,new Properties) match {
       case Some(src) =>
         val f = new File(src)
         if (!f.exists() || !f.isFile) {

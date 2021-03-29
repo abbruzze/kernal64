@@ -304,7 +304,7 @@ object SCPUC64MMU {
       Log.debug("Initializing static & SIMM ram ...")
       initSIMMMemory(fastram)
       initSIMMMemory(simmram)
-      //setSIMMSize(16)
+      setSIMMSize(16)
     }
 
     private def initSIMMMemory(ram:Array[Int]) : Unit = {

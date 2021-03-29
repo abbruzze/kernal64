@@ -12,13 +12,11 @@ import ucesoft.cbm.peripheral.bus.BusSnoop
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.vic.VICType
-import ucesoft.cbm.trace.{InspectPanel, TraceDialog}
+import ucesoft.cbm.trace.TraceDialog
 
-import java.awt.datatransfer.DataFlavor
-import java.awt.{Toolkit, _}
+import java.awt._
 import java.io._
 import javax.swing._
-import javax.swing.filechooser.FileFilter
 
 object SCPUC64 extends App {
   CBMComputer.turnOn(new SCPUC64,args)
@@ -34,7 +32,7 @@ class SCPUC64 extends CBMComputer {
 
   protected val keybMapper: keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)), "/resources/default_keyboard_c64")
 
-  protected val mmu = new SCPUC64MMU.SCPU_MMU(cpuFastMode _, simmUsage _)
+  override protected val mmu = new SCPUC64MMU.SCPU_MMU(cpuFastMode _, simmUsage _)
   override protected lazy val cpu = new CPU65816(mmu)
   protected val busSnooper = new BusSnoop(bus)
   protected var busSnooperActive = false
@@ -70,7 +68,7 @@ class SCPUC64 extends CBMComputer {
     initializedDrives(DriveType._1541)
     // -----------------------
     ProgramLoader.cpu = cpu
-    ProgramLoader.warpModeListener = warpMode _
+    ProgramLoader.warpModeListener = warpMode(_,true)
     add(clock)
     add(mmu)
     add(cpu)
@@ -157,44 +155,6 @@ class SCPUC64 extends CBMComputer {
     gifRecorder = GIFPanel.createGIFPanel(displayFrame,Array(display),Array("VIC"))
   }
 
-  private def loadSettings(args:Array[String]) : Unit = {
-    def loadFile(fn:String) : Unit = {
-      val cmd = s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar
-      clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,true) ))
-    }
-    // AUTOPLAY
-    preferences.parseAndLoad(args,configuration) match {
-      case None =>
-        // run the given file name
-        preferences[String](Preferences.PREF_RUNFILE) match {
-          case None =>
-          case Some(fn) =>
-            loadFile(fn)
-        }
-      case Some(f) =>
-        preferences[String](Preferences.PREF_DRIVE_X_FILE(0)) match {
-          case None =>
-            handleDND(new File(f),false,true)
-          case Some(_) =>
-            // here we have both drive8 and PRG set: we load the given PRG file from disk 8
-            val fn = new File(f).getName
-            val dot = fn.indexOf('.')
-            val cbmFile = if (dot > 0) fn.substring(0,dot) else f
-            loadFile(cbmFile)
-        }
-    }
-    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,true),attachDiskFile(_,_,_,None),drivesEnabled)
-  }
-
-  override def afterInitHook : Unit = {
-    inspectDialog = InspectPanel.getInspectDialog(displayFrame, this)
-    // deactivate drives > 8
-    for(d <- 1 until TOTAL_DRIVES) {
-      drives(d).setActive(false)
-      driveLeds(d).setVisible(false)
-    }
-  }
-
   protected def mainLoop(cycles: Long) : Unit = {
     // VIC PHI1
     vicChip.clock
@@ -253,16 +213,9 @@ class SCPUC64 extends CBMComputer {
 
   // ======================================== Settings ==============================================
   override protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
-    drivesEnabled(id) = enabled
-    drives(id).setActive(enabled)
-    driveLeds(id).setVisible(enabled)
+    super.enableDrive(id,enabled,updateFrame)
     if (updateFrame) adjustRatio
   }
-
-  protected def setDisplayRendering(hints: java.lang.Object) : Unit = {
-    display.setRenderingHints(hints)
-  }
-
 
   private def adjustRatio : Unit = {
     val dim = display.asInstanceOf[java.awt.Component].getSize
@@ -280,59 +233,6 @@ class SCPUC64 extends CBMComputer {
     }
   }
 
-  protected def attachDiskFile(driveID: Int, file: File, autorun: Boolean, fileToLoad: Option[String], emulateInserting: Boolean = true) : Unit = {
-    try {
-      if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
-      val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
-      if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
-      val isD64 = file.getName.toUpperCase.endsWith(".D64")
-      val disk = Diskette(file.toString)
-      disk.canWriteOnDisk = canWriteOnDisk
-      disk.flushListener = diskFlusher
-      drives(driveID).getFloppy.close
-      if (!traceDialog.isTracing) clock.pause
-      drives(driveID).setDriveReader(disk, emulateInserting)
-      preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID),file.toString)
-      clock.play
-
-      loadFileItems(driveID).setEnabled(isD64)
-      configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
-      val drive = driveID + 8
-      fileToLoad match {
-        case Some(fn) =>
-          val cmd = s"""LOAD"$fn",$drive,1""" + 13.toChar + (if (autorun) "RUN" + 13.toChar else "")
-          Keyboard.insertTextIntoKeyboardBuffer(cmd, mmu, true)
-        case None if autorun =>
-          Keyboard.insertSmallTextIntoKeyboardBuffer(s"""LOAD"*",$drive,1""" + 13.toChar + "RUN" + 13.toChar, mmu, true)
-        case _ =>
-      }
-      driveLeds(driveID).setToolTipText(disk.toString)
-    }
-    catch {
-      case t: Throwable =>
-        t.printStackTrace
-
-        showError("Disk attaching error", t.toString)
-    }
-  }
-
-  protected def savePrg: Unit = {
-    val fc = new JFileChooser
-    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR, "./")))
-    fc.setFileFilter(new FileFilter {
-      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".PRG")
-
-      def getDescription = "PRG files"
-    })
-    fc.showSaveDialog(displayFrame) match {
-      case JFileChooser.APPROVE_OPTION =>
-        configuration.setProperty(CONFIGURATION_LASTDISKDIR, fc.getSelectedFile.getParentFile.toString)
-        val (start, end) = ProgramLoader.savePRG(fc.getSelectedFile, mmu, true)
-        Log.info(s"BASIC program saved from $start to $end")
-      case _ =>
-    }
-  }
-
   private def takeSnapshot : Unit = {
     val fc = new JFileChooser
     fc.showSaveDialog(displayFrame) match {
@@ -340,15 +240,6 @@ class SCPUC64 extends CBMComputer {
         val file = if (fc.getSelectedFile.getName.toUpperCase.endsWith(".PNG")) fc.getSelectedFile else new File(fc.getSelectedFile.toString + ".png")
         display.saveSnapshot(file)
       case _ =>
-    }
-  }
-
-  protected def paste: Unit = {
-    val clipboard = Toolkit.getDefaultToolkit.getSystemClipboard
-    val contents = clipboard.getContents(null)
-    if (contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
-      val str = contents.getTransferData(DataFlavor.stringFlavor).toString
-      Keyboard.insertTextIntoKeyboardBuffer(str, mmu, true)
     }
   }
 
@@ -523,6 +414,7 @@ class SCPUC64 extends CBMComputer {
     scpuRamItem.add(scpu8MRAMItem)
     val scpu16MRAMItem = new JRadioButtonMenuItem("16M")
     scpu16MRAMItem.addActionListener(_ => preferences(PREF_SCPURAM) = "16" )
+    scpu16MRAMItem.setSelected(true)
     groupscpu.add(scpu16MRAMItem)
     scpuRamItem.add(scpu16MRAMItem)
     preferences.add(PREF_SCPURAM,"super ram size: none,1,4,8,16","none",Set("none","1","4","8","16")) { size =>
@@ -539,14 +431,6 @@ class SCPUC64 extends CBMComputer {
       mmu.setJiffyDOS(jiffyEnabled)
       mmuStatusPanel.enableJiffyDOS(jiffyEnabled)
     }
-  }
-
-  def turnOff : Unit = {
-    if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE, "false").toBoolean)
-    for (d <- drives)
-      d.getFloppy.close
-    shutdownComponent
-    sys.exit(0)
   }
 
   protected def saveSettings(save: Boolean): Unit = {

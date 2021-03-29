@@ -1,6 +1,6 @@
 package ucesoft.cbm
 
-import java.awt.{BorderLayout, Color, Dimension, FlowLayout}
+import java.awt.{BorderLayout, Color, Dimension, FlowLayout, Toolkit}
 import java.awt.event._
 import java.io._
 import java.util.zip.{GZIPInputStream, GZIPOutputStream}
@@ -28,8 +28,9 @@ import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 import ucesoft.cbm.peripheral.vic.coprocessor.VASYL
 import ucesoft.cbm.peripheral.{controlport, keyboard, vic}
 import ucesoft.cbm.remote.RemoteC64
-import ucesoft.cbm.trace.{InspectPanelDialog, TraceDialog, TraceListener}
+import ucesoft.cbm.trace.{InspectPanel, InspectPanelDialog, TraceDialog, TraceListener}
 
+import java.awt.datatransfer.DataFlavor
 import scala.util.{Failure, Success}
 
 object CBMComputer {
@@ -41,7 +42,7 @@ object CBMComputer {
       cbm.turnOn(args)
     }
     catch {
-      case i:Settings.SettingIllegalArgumentException =>
+      case i:Preferences.PreferenceIllegalArgumentException =>
         println(s"Bad command line argument: ${i.getMessage}")
         sys.exit(100)
       case t:Throwable =>
@@ -59,7 +60,6 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected val CONFIGURATION_FRAME_DIM = "frame.dim"
   protected val CONFIGURATION_KEYB_MAP_FILE = "keyb.map.file"
   protected val CONFIGURATION_GMOD2_FILE = "gmod2.file"
-  protected val CONFIGURATION_AUTOSAVE = "autosave"
 
   protected def PRG_RUN_DELAY_CYCLES = 2200000
   protected var lastLoadedPrg : Option[File] = None
@@ -146,7 +146,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected var inspectDialog : InspectPanelDialog = _
   protected var traceItem,traceDiskItem : JCheckBoxMenuItem = _
   // -------------------- DISK -----------------
-  final protected val TOTAL_DRIVES = SettingsKey.TOTAL_DRIVES
+  final protected val TOTAL_DRIVES = Preferences.TOTALDRIVES
   protected val drivesRunning = Array.fill[Boolean](TOTAL_DRIVES)(true)
   protected val drivesEnabled = Array.fill[Boolean](TOTAL_DRIVES)(true)
   protected lazy val diskFlusher = new FloppyFlushUI(displayFrame)
@@ -250,12 +250,28 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def initComputer : Unit = {
     ExpansionPort.setExpansionPortStateHandler(expansionPortStateHandler _)
   }
+
+  override def afterInitHook : Unit = {
+    inspectDialog = InspectPanel.getInspectDialog(displayFrame, this)
+    // deactivate drives > 8
+    for(d <- 1 until TOTAL_DRIVES) {
+      drives(d).setActive(false)
+      driveLeds(d).setVisible(false)
+    }
+  }
   // -----------------------------------------------------------
 
   protected def isC64Mode : Boolean = true
 
   def turnOn(args:Array[String]) : Unit
-  def turnOff : Unit
+
+  def turnOff : Unit = {
+    if (!headless) saveSettings(preferences[Boolean](Preferences.PREF_PREFAUTOSAVE).getOrElse(false))
+    for (d <- drives)
+      d.getFloppy.close
+    shutdownComponent
+    sys.exit(0)
+  }
 
   protected val tapeAllowed = true
 
@@ -287,21 +303,40 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     if (play) clock.play
   }
 
-  protected def savePrg : Unit
-
   protected def loadPRGFile(file:File,autorun:Boolean) : Unit
-
-  protected def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String],emulateInserting:Boolean = true) : Unit
 
   protected def saveSettings(save:Boolean) : Unit
 
-  protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit
-
-  protected def paste : Unit
-
   protected def setSettingsMenu(optionsMenu:JMenu) : Unit
 
-  protected def setDisplayRendering(hints:java.lang.Object) : Unit
+  protected def paste : Unit = {
+    val clipboard = Toolkit.getDefaultToolkit.getSystemClipboard
+    val contents = clipboard.getContents(null)
+    if (contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+      val str = contents.getTransferData(DataFlavor.stringFlavor).toString
+      Keyboard.insertTextIntoKeyboardBuffer(str,mmu,isC64Mode)
+    }
+  }
+
+  protected def setDisplayRendering(hints:java.lang.Object) : Unit = {
+    display.setRenderingHints(hints)
+  }
+
+  protected def savePrg : Unit = {
+    val fc = new JFileChooser
+    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+    fc.setFileFilter(new FileFilter {
+      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".PRG")
+      def getDescription = "PRG files"
+    })
+    fc.showSaveDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        configuration.setProperty(CONFIGURATION_LASTDISKDIR,fc.getSelectedFile.getParentFile.toString)
+        val (start,end) = ProgramLoader.savePRG(fc.getSelectedFile,mmu,isC64Mode)
+        Log.info(s"BASIC program saved from $start to $end")
+      case _ =>
+    }
+  }
 
   protected def errorHandler(t:Throwable) : Unit = {
     import CPU65xx.CPUJammedException
@@ -334,6 +369,81 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         //trace(true,true)
         reset(true)
     }
+  }
+
+  protected def loadSettings(args:Array[String]) : Unit = {
+    def loadFile(fn:String) : Unit = {
+      val cmd = if (isC64Mode) s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar else s"""RUN"$fn"""" + 13.toChar
+      clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,isC64Mode) ))
+    }
+    // AUTOPLAY
+    preferences.parseAndLoad(args,configuration) match {
+      case None =>
+        // run the given file name
+        preferences[String](Preferences.PREF_RUNFILE) match {
+          case Some(fn) if fn != null && fn != "" =>
+            loadFile(fn)
+          case _ =>
+        }
+      case Some(f) =>
+        preferences[String](Preferences.PREF_DRIVE_X_FILE(0)) match {
+          case None =>
+            handleDND(new File(f),false,true)
+          case Some(_) =>
+            // here we have both drive8 and PRG set: we load the given PRG file from disk 8
+            val fn = new File(f).getName
+            val dot = fn.indexOf('.')
+            val cbmFile = if (dot > 0) fn.substring(0,dot) else f
+            loadFile(cbmFile)
+        }
+    }
+    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,isC64Mode),attachDiskFile(_,_,_,None),drivesEnabled)
+  }
+
+  protected def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String],emulateInserting:Boolean = true) : Unit = {
+    try {
+      if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
+      if (!file.isDirectory) {
+        val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
+        if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
+      }
+      val isD64 = file.getName.toUpperCase.endsWith(".D71") || file.getName.toUpperCase.endsWith(".D64") || file.isDirectory
+
+      val disk = if (file.isDirectory) D64LocalDirectory.createDiskFromLocalDir(file) else Diskette(file.toString)
+      disk.canWriteOnDisk = canWriteOnDisk
+      disk.flushListener = diskFlusher
+      drives(driveID).getFloppy.close
+      if (traceDialog != null && !traceDialog.isTracing) clock.pause
+      drives(driveID).setDriveReader(disk,emulateInserting)
+      preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID),file.toString)
+      clock.play
+
+      loadFileItems(driveID).setEnabled(isD64)
+      configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
+      val drive = driveID + 8
+      fileToLoad match {
+        case Some(fn) =>
+          val cmd = s"""LOAD"$fn",$drive,1""" + 13.toChar + (if (autorun) "RUN" + 13.toChar else "")
+          Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,isC64Mode)
+        case None if autorun =>
+          Keyboard.insertSmallTextIntoKeyboardBuffer(s"""LOAD"*",$drive,1""" + 13.toChar + "RUN" + 13.toChar,mmu,isC64Mode)
+        case _ =>
+      }
+      driveLeds(driveID).setToolTipText(disk.toString)
+    }
+    catch {
+      case t:Throwable =>
+        t.printStackTrace
+
+        showError("Disk attaching error",t.toString)
+    }
+  }
+
+  protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
+    drivesEnabled(id) = enabled
+    drives(id).setActive(enabled)
+    driveLeds(id).setVisible(enabled)
+    preferences(Preferences.PREF_DRIVE_X_ENABLED(id)) = enabled
   }
 
   protected def makeInfoPanel(includeTape:Boolean) : JPanel = {
@@ -985,12 +1095,12 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     kbef.setVisible(true)
   }
 
-  protected def warpMode(warpOn:Boolean): Unit = {
+  protected def warpMode(warpOn:Boolean,play:Boolean = true): Unit = {
     maxSpeedItem.setSelected(warpOn)
     clock.maximumSpeed = warpOn
-    clock.pause
+    if (play) clock.pause
     sid.setFullSpeed(warpOn)
-    clock.play
+    if (play) clock.play
   }
 
   protected def setLightPen(setting:Int): Unit = {
@@ -1326,7 +1436,10 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   protected def setGlobalCommandLineOptions : Unit = {
     import Preferences._
     // non-saveable settings
-    preferences.add(PREF_WARP,"Run warp mode",false) { warpMode(_) }
+    preferences.add(PREF_WARP,"Run warp mode",false) { w =>
+      val isAdjusting = preferences.get(PREF_WARP).get.isAdjusting
+      warpMode(w,!isAdjusting)
+    }
     preferences.add(PREF_HEADLESS,"Activate headless mode",false) { headless = _ }
     preferences.add(PREF_TESTCART,"Activate testcart mode",false) { TestCart.enabled = _ }
     preferences.add(PREF_LIMITCYCLES,"Run at most the number of cycles specified","") { cycles =>
@@ -1362,12 +1475,12 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     }
     preferences.add(PREF_FULLSCREEN,"Starts the emulator in full screen mode",false) { fullScreenAtBoot = _ }
     preferences.add(PREF_IGNORE_CONFIG_FILE,"Ignore configuration file and starts emulator with default configuration",false) { ignoreConfig = _ }
-    preferences.add(PREF_KERNEL,"Set kernel rom path","") { file => if (file != "") reloadROM(ROM.C64_KERNAL_ROM_PROP,file) }
-    preferences.add(PREF_BASIC,"Set basic rom path","") { file => if (file != "") reloadROM(ROM.C64_BASIC_ROM_PROP,file) }
-    preferences.add(PREF_CHARROM,"Set char rom path","") { file => if (file != "") reloadROM(ROM.C64_CHAR_ROM_PROP,file) }
-    preferences.add(PREF_1541DOS,"Set 1541 dos rom path","") { file => if (file != "") reloadROM(ROM.D1541_DOS_ROM_PROP,file) }
-    preferences.add(PREF_1571DOS,"Set 1571 dos rom path","") { file => if (file != "") reloadROM(ROM.D1571_DOS_ROM_PROP,file) }
-    preferences.add(PREF_1581DOS,"Set 1581 dos rom path","") { file => if (file != "") reloadROM(ROM.D1581_DOS_ROM_PROP,file) }
+    preferences.add(PREF_KERNEL,"Set kernel rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.C64_KERNAL_ROM_PROP,file) }
+    preferences.add(PREF_BASIC,"Set basic rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.C64_BASIC_ROM_PROP,file) }
+    preferences.add(PREF_CHARROM,"Set char rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.C64_CHAR_ROM_PROP,file) }
+    preferences.add(PREF_1541DOS,"Set 1541 dos rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.D1541_DOS_ROM_PROP,file) }
+    preferences.add(PREF_1571DOS,"Set 1571 dos rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.D1571_DOS_ROM_PROP,file) }
+    preferences.add(PREF_1581DOS,"Set 1581 dos rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.D1581_DOS_ROM_PROP,file) }
     preferences.add(PREF_VICIINEW,"Set VICII new model",false) { vicChip.setNEWVICModel(_) }
 
     preferences.add(PREF_TRACE,"Starts the emulator in trace mode",false) { trace =>
@@ -2199,7 +2312,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
 
     preferences.add(PREF_NTSC,"Set ntsc video standard",false) { ntsc =>
       val adjusting = preferences.get(PREF_NTSC).get.isAdjusting
-      if (ntsc) setVICModel(VICType.NTSC,adjusting,!adjusting) else setVICModel(VICType.PAL,adjusting,!adjusting)
+      if (ntsc) setVICModel(VICType.NTSC,false,!adjusting) else setVICModel(VICType.PAL,false,!adjusting)
       ntscItem.setSelected(ntsc)
     }
   }

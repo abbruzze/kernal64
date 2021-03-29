@@ -1,7 +1,6 @@
 package ucesoft.cbm.c128
 
 import java.awt._
-import java.awt.datatransfer.DataFlavor
 import java.awt.event._
 import java.io._
 import javax.swing._
@@ -39,7 +38,7 @@ class C128 extends CBMComputer with MMUChangeListener {
 
   protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c128")
   private[this] var vdcEnabled = true // used with --vdc-disabled
-  protected val mmu = new C128MMU(this)
+  override protected val mmu = new C128MMU(this)
   private[this] val z80 = new Z80(mmu,mmu)
   override protected val irqSwitcher = new Switcher("IRQ",irqRequest _)
   private[this] var cpuFrequency = 1
@@ -89,7 +88,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     initializedDrives(DriveType._1571)
     // -----------------------
     ProgramLoader.cpu = cpu
-    ProgramLoader.warpModeListener = warpMode _
+    ProgramLoader.warpModeListener = warpMode(_,true)
     //clock.setClockHz(1000000)
     mmu.setKeyboard(keyb)
     mmu.setCPU(cpu)
@@ -212,9 +211,7 @@ class C128 extends CBMComputer with MMUChangeListener {
             reset(true)
           // warp-mode
           case java.awt.event.KeyEvent.VK_W if e.isAltDown =>
-            clock.maximumSpeed = !clock.maximumSpeed
-            sid.setFullSpeed(clock.maximumSpeed)
-            maxSpeedItem.setSelected(clock.maximumSpeed)
+            warpMode(!clock.maximumSpeed)
           // adjust ratio
           case java.awt.event.KeyEvent.VK_D if e.isAltDown =>
             adjustRatio(false,true)
@@ -265,43 +262,9 @@ class C128 extends CBMComputer with MMUChangeListener {
     // clock freq change listener
     clock.addChangeFrequencyListener(f => z80ScaleFactor = 2000000 / f)
   }
-
-  private def loadSettings(args:Array[String]) : Unit = {
-    def loadFile(fn:String) : Unit = {
-      val cmd = if (isC64Mode) s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar else s"""RUN"$fn"""" + 13.toChar
-      clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,isC64Mode) ))
-    }
-    // AUTOPLAY
-    preferences.parseAndLoad(args,configuration) match {
-      case None =>
-        // run the given file name
-        preferences[String](Preferences.PREF_RUNFILE) match {
-          case None =>
-          case Some(fn) =>
-            loadFile(fn)
-        }
-      case Some(f) =>
-        preferences[String](Preferences.PREF_DRIVE_X_FILE(0)) match {
-          case None =>
-            handleDND(new File(f),false,true)
-          case Some(_) =>
-            // here we have both drive8 and PRG set: we load the given PRG file from disk 8
-            val fn = new File(f).getName
-            val dot = fn.indexOf('.')
-            val cbmFile = if (dot > 0) fn.substring(0,dot) else f
-            loadFile(cbmFile)
-        }
-    }
-    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,c64Mode),attachDiskFile(_,_,_,None),drivesEnabled)
-  }
   
   override def afterInitHook  : Unit = {
-	  inspectDialog = InspectPanel.getInspectDialog(displayFrame,this)
-    // deactivate drives > 8
-    for(d <- 1 until TOTAL_DRIVES) {
-      drives(d).setActive(false)
-      driveLeds(d).setVisible(false)
-    }
+	  super.afterInitHook
     // set the correct CPU configuration
     cpuChanged(false)
   }
@@ -400,16 +363,14 @@ class C128 extends CBMComputer with MMUChangeListener {
   // ======================================== Settings ==============================================
 
   override protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
-    drivesEnabled(id) = enabled
-    drives(id).setActive(enabled)
-    driveLeds(id).setVisible(enabled)
+    super.enableDrive(id,enabled,updateFrame)
     if (updateFrame) adjustRatio()
   }
 
   private def enableVDC80(enabled:Boolean) : Unit = {
     keyb.set4080Pressed(enabled)
   }
-  private def enabledVDC(enabled:Boolean) : Unit = {
+  private def enableVDC(enabled:Boolean) : Unit = {
     if (enabled) vdc.play else vdc.pause
     vdcDisplayFrame.setVisible(enabled)
   }
@@ -417,8 +378,8 @@ class C128 extends CBMComputer with MMUChangeListener {
     mmuStatusPanel.setVisible(enabled)
   }
 
-  protected def setDisplayRendering(hints:java.lang.Object) : Unit = {
-    display.setRenderingHints(hints)
+  override protected def setDisplayRendering(hints:java.lang.Object) : Unit = {
+    super.setDisplayRendering(hints)
     vdcDisplay.setRenderingHints(hints)
   }
 
@@ -511,61 +472,11 @@ class C128 extends CBMComputer with MMUChangeListener {
     }
   }
 
-  protected def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String],emulateInserting:Boolean = true) : Unit = {
-    try {
-      if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
-      val validExt = drives(driveID).formatExtList.exists { ext => file.toString.toUpperCase.endsWith(ext) }
-      if (!validExt) throw new IllegalArgumentException(s"$file cannot be attached to disk, format not valid")
-      val isG64 = file.getName.toUpperCase.endsWith(".G64")
-      val disk = Diskette(file.toString)
-      disk.canWriteOnDisk = canWriteOnDisk
-      disk.flushListener = diskFlusher
-      drives(driveID).getFloppy.close
-      if (traceDialog != null && !traceDialog.isTracing) clock.pause
-      drives(driveID).setDriveReader(disk,emulateInserting)
-      preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID),file.toString)
-      clock.play
-
-      loadFileItems(driveID).setEnabled(!isG64)
-      configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
-      fileToLoad match {
-        case Some(fn) =>
-          val cmd = s"""LOAD"$fn",8,1""" + 13.toChar + (if (autorun) "RUN" + 13.toChar else "")
-          Keyboard.insertTextIntoKeyboardBuffer(cmd,mmu,c64Mode)
-        case None if autorun =>
-          Keyboard.insertSmallTextIntoKeyboardBuffer("LOAD\"*\",8,1" + 13.toChar + "RUN" + 13.toChar,mmu,c64Mode)
-        case _ =>
-      }
-      driveLeds(driveID).setToolTipText(disk.toString)
-    }
-    catch {
-      case t:Throwable =>
-        t.printStackTrace
-        showError("Disk attaching error",t.toString)
-    }
-  }
-
   private def updateVDCScreenDimension(dim:Dimension): Unit = {
     vdcDisplay.setPreferredSize(dim)
     vdcDisplay.invalidate
     vdcDisplay.repaint()
     vdcDisplayFrame.pack
-  }
-  
-  protected def savePrg : Unit = {
-    val fc = new JFileChooser
-    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-    fc.setFileFilter(new javax.swing.filechooser.FileFilter {
-      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".PRG")
-      def getDescription = "PRG files"
-    })
-    fc.showSaveDialog(displayFrame) match {
-      case JFileChooser.APPROVE_OPTION =>
-        configuration.setProperty(CONFIGURATION_LASTDISKDIR,fc.getSelectedFile.getParentFile.toString)
-        val (start,end) = ProgramLoader.savePRG(fc.getSelectedFile,mmu,c64Mode)
-        Log.info(s"BASIC program saved from $start to $end")
-      case _ =>
-    }
   }
 
   private def takeSnapshot(vic:Boolean) : Unit = {
@@ -578,15 +489,6 @@ class C128 extends CBMComputer with MMUChangeListener {
           case false => vdcDisplay.saveSnapshot(file)
         }
       case _ =>
-    }
-  }
-
-  protected def paste : Unit = {
-    val clipboard = Toolkit.getDefaultToolkit.getSystemClipboard
-    val contents = clipboard.getContents(null)
-    if (contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
-      val str = contents.getTransferData(DataFlavor.stringFlavor).toString
-      Keyboard.insertTextIntoKeyboardBuffer(str,mmu,c64Mode)
     }
   }
 
@@ -613,11 +515,12 @@ class C128 extends CBMComputer with MMUChangeListener {
     val vdcEnabled = new JCheckBoxMenuItem("VDC enabled")
     vdcEnabled.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_E,java.awt.event.InputEvent.ALT_DOWN_MASK))
     vdcEnabled.setSelected(true)
-    vdcEnabled.addActionListener(_ => preferences(PREF_VDCDISABLED) = vdcEnabled.isSelected )
+    vdcEnabled.addActionListener(_ => preferences(PREF_VDCDISABLED) = !vdcEnabled.isSelected )
     vdcMenu.add(vdcEnabled)
     preferences.add(PREF_VDCDISABLED,"Disable VDC monitor",false) { vdcE =>
       this.vdcEnabled &= !vdcE
       vdcEnabled.setSelected(!vdcE)
+      enableVDC(!vdcE)
     }
     // ====================================================================================================
 
@@ -867,21 +770,13 @@ class C128 extends CBMComputer with MMUChangeListener {
     // VDC-FULLSCREEN =====================================================================================
     preferences.add(PREF_VDCFULLSCREEN,"Starts the emulator with VDC in full screen mode",false) { vdcFullScreenAtBoot = _ }
     // KERNEL128 ==========================================================================================
-    preferences.add(PREF_KERNEL128,"Set kernel 128 rom path","") { kp =>
+    preferences.add(PREF_KERNEL128,"Set kernel 128 rom path","",Set.empty,false) { kp =>
       if (kp != "") reloadROM(ROM.C128_KERNAL_ROM_PROP,kp)
     }
     // CHARROM128 =========================================================================================
-    preferences.add(PREF_CHARROM128,"Set char rom 128 path","") { cp =>
+    preferences.add(PREF_CHARROM128,"Set char rom 128 path","",Set.empty,false) { cp =>
       if (cp != "") reloadROM(ROM.C128_CHAR_ROM_PROP,cp)
     }
-  }
-  
-  def turnOff  : Unit = {
-    if (!headless) saveSettings(configuration.getProperty(CONFIGURATION_AUTOSAVE,"false").toBoolean)
-    for(d <- drives)
-      d.getFloppy.close
-    shutdownComponent
-    sys.exit(0)
   }
   
   protected def saveSettings(save:Boolean) : Unit = {
@@ -933,8 +828,9 @@ class C128 extends CBMComputer with MMUChangeListener {
   protected def getCharROM = mmu.CHAR_ROM
 
   override protected def setDefaultProperties(configuration:Properties) : Unit = {
+    import Preferences._
     super.setDefaultProperties(configuration)
-    configuration.setProperty(SettingsKey.RENDERING_TYPE,"bilinear")
+    configuration.setProperty(PREF_RENDERINGTYPE,"bilinear")
   }
 
   def turnOn(args:Array[String]) : Unit = {
