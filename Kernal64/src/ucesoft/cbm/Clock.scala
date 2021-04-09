@@ -169,7 +169,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       val expectedCycles = timeDiff * C64_CLOCK_HZ_DIV_1000
       if (cyclesDiff > expectedCycles) {
         val waitTime = (C64_CLOCK_HZ_INV_BY_1000 * (cyclesDiff - expectedCycles)).asInstanceOf[Int]
-        Thread.sleep(waitTime)
+        Thread.sleep(if (waitTime == 0) 1 else waitTime)
       }
     }
     if (skipThrottle || System.currentTimeMillis > nextPerformanceMeasurementTime) {

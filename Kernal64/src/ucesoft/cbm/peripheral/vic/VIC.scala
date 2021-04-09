@@ -565,9 +565,9 @@ final class VIC(mem: VICMemory,
 
         var i = 0
         while (i < 8) {
-          val color = if (i < 1) {
+          val color = /*if (i < 1) {
             if (shadowBorderColor == -1) borderColor else shadowBorderColor
-          } else borderColor
+          } else*/ borderColor
           val hasBorder = checkBorderFF(xcoord)
           pixels(i) = if (hasBorder) {
             if (isVICIIe && i == 0 && lastColorReg == 0xFA) 0x0F else color
@@ -652,7 +652,7 @@ final class VIC(mem: VICMemory,
         mcFlop = 0
       }
 
-      val backgroundColor = if (counter < 1) shadowBackgroundColor else VIC.this.backgroundColor
+      val backgroundColor = /*if (counter < 1) shadowBackgroundColor else*/ VIC.this.backgroundColor
 
       val pixel = if (isBlank || gdata < 0) PIXEL_BLACK
       else if (!bmm) { // text mode
