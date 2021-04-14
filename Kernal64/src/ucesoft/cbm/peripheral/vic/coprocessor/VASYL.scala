@@ -369,6 +369,17 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
       fetchOp = true
     }
   }
+
+  private def deactivate : Unit = {
+    portWriteRepsEnabled(0) = false
+    portWriteRepsEnabled(1) = false
+    seq_active = false
+    dlistOnPendingOnNextCycle = false
+    dlistOnPendingOnNextFrame = false
+    dlistExecutionActive = false
+    executeNextNow = false
+    beamRacerActiveState = 0
+  }
   // ----------------------------------------------------------------------
 
   final def writeReg(_reg:Int,value:Int) = writeReg(_reg,value,false)
@@ -409,8 +420,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
       reg match {
         case 0x2E =>
           if ((value & 0x40) > 0) { // un-knock
-            beamRacerActiveState = 0
-            dlistExecutionActive = false // to be checked
+            deactivate
           }
         case 0x32 =>
           if (debug) println(s"DLISTL = ${value.toHexString}, execution address = ${(value | regs(0x33) << 8).toHexString}")
