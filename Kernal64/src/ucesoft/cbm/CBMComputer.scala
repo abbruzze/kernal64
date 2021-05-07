@@ -1440,19 +1440,19 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       val isAdjusting = preferences.get(PREF_WARP).get.isAdjusting
       warpMode(w,!isAdjusting)
     }
-    preferences.add(PREF_HEADLESS,"Activate headless mode",false) { headless = _ }
-    preferences.add(PREF_TESTCART,"Activate testcart mode",false) { TestCart.enabled = _ }
-    preferences.add(PREF_LIMITCYCLES,"Run at most the number of cycles specified","") { cycles =>
+    preferences.add(PREF_HEADLESS,"Activate headless mode",false,Set(),false) { headless = _ }
+    preferences.add(PREF_TESTCART,"Activate testcart mode",false,Set(),false) { TestCart.enabled = _ }
+    preferences.add(PREF_LIMITCYCLES,"Run at most the number of cycles specified","",Set(),false) { cycles =>
       if (cycles != "" && cycles.toLong > 0) clock.limitCyclesTo(cycles.toLong)
     }
-    preferences.add(PREF_RUNFILE,"Run the given file taken from the attached disk",null:String) { file => }
+    preferences.add(PREF_RUNFILE,"Run the given file taken from the attached disk",null:String,Set(),false) { file => }
     preferences.add(PREF_SCREENSHOT,"Take a screenshot of VIC screen and save it on the given file path. Used with --testcart only.","") { file =>
       if (file != "") {
         TestCart.screenshotFile = Some(file)
         TestCart.screeshotHandler = display.waitFrameSaveSnapshot _
       }
     }
-    preferences.add(PREF_CPUJAMCONTINUE,"On cpu jam continue execution",false) { cpujamContinue = _ }
+    preferences.add(PREF_CPUJAMCONTINUE,"On cpu jam continue execution",false,Set(),false) { cpujamContinue = _ }
     preferences.add(PREF_CIAMODEL,
          "Set the CIA model (both cia1 and cia2). 6526 for old cia, 8521 for the new one. Default is 6526.",
              "6526",Set("6526","8521")) { model =>
@@ -1460,7 +1460,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       cia1.setCIAModel(cm)
       cia2.setCIAModel(cm)
     }
-    preferences.add(PREF_LOADSTATE,"Load a previous saved state.","") { file =>
+    preferences.add(PREF_LOADSTATE,"Load a previous saved state.","",Set(),false) { file =>
       if (file != "") {
         try {
           loadStateFromOptions = true
@@ -1469,12 +1469,12 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         finally loadStateFromOptions = false
       }
     }
-    preferences.add(PREF_SCREENDIM,"Zoom factor. Valued accepted are 1 and 2",0,Set(1,2)) { dim =>
+    preferences.add(PREF_SCREENDIM,"Zoom factor. Valued accepted are 1 and 2",0,Set(1,2),false) { dim =>
       vicZoom(dim)
       zoomOverride = true
     }
-    preferences.add(PREF_FULLSCREEN,"Starts the emulator in full screen mode",false) { fullScreenAtBoot = _ }
-    preferences.add(PREF_IGNORE_CONFIG_FILE,"Ignore configuration file and starts emulator with default configuration",false) { ignoreConfig = _ }
+    preferences.add(PREF_FULLSCREEN,"Starts the emulator in full screen mode",false,Set(),false) { fullScreenAtBoot = _ }
+    preferences.add(PREF_IGNORE_CONFIG_FILE,"Ignore configuration file and starts emulator with default configuration",false,Set(),false) { ignoreConfig = _ }
     preferences.add(PREF_KERNEL,"Set kernel rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.C64_KERNAL_ROM_PROP,file) }
     preferences.add(PREF_BASIC,"Set basic rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.C64_BASIC_ROM_PROP,file) }
     preferences.add(PREF_CHARROM,"Set char rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.C64_CHAR_ROM_PROP,file) }
@@ -1483,7 +1483,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     preferences.add(PREF_1581DOS,"Set 1581 dos rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.D1581_DOS_ROM_PROP,file) }
     preferences.add(PREF_VICIINEW,"Set VICII new model",false) { vicChip.setNEWVICModel(_) }
 
-    preferences.add(PREF_TRACE,"Starts the emulator in trace mode",false) { trace =>
+    preferences.add(PREF_TRACE,"Starts the emulator in trace mode",false,Set(),false) { trace =>
       traceOption = trace
       if (trace && traceDialog != null) {
         traceDialog.forceTracing(true)
