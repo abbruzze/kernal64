@@ -1,19 +1,17 @@
 package ucesoft.cbm.trace
 
 import javax.swing._
-
 import ucesoft.cbm.cpu.Memory
+
 import java.awt.{BorderLayout, Color, FlowLayout}
-
 import ucesoft.cbm.Log
-import java.io.FileOutputStream
 
+import java.io.FileOutputStream
 import ucesoft.cbm.peripheral.vic.Display
 import ucesoft.cbm.peripheral.vic.VIC
+
 import java.io._
-
 import javax.swing.JSpinner.DefaultEditor
-
 import scala.collection.mutable.ListBuffer
 
 object TraceDialog {
@@ -68,9 +66,30 @@ class TraceDialog private (title:String,
       case None =>
         _regs.registers
     }
-    traceSR.setText(regs)
+    traceSR.setText(regs2HTML(regs))
     // notify listeners
     for(t <- tracingListeners) t.stepInto(_regs.pc)
+  }
+
+  private def regs2HTML(regs:String) : String = {
+    val sb = new StringBuilder
+    val cols = regs.split(" ")
+    sb.append(
+      """<html>
+        |<table>
+        |<tr>
+        |""".stripMargin
+    )
+    val kv = cols map { _.split("=") }
+    for(c <- kv) {
+      sb.append(s"<th><b>${c(0)}</b></th>")
+    }
+    sb.append("</tr><tr>")
+    for(c <- kv) {
+      sb.append(s"<th>${c(1)}</th>")
+    }
+    sb.append("</tr></table></body></html>")
+    sb.toString
   }
   
   def forceTracing(on:Boolean) : Unit = {
@@ -310,7 +329,7 @@ class TraceDialog private (title:String,
   clearBreaks.addActionListener( _ => setBrk(NoBreak) )
 
   tracePanel.add("North", buttonPanel)
-  val pcsrPanel = new JPanel
+  val pcsrPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
   pcsrPanel.add(traceSR)
   traceSR.setForeground(Color.BLUE)
   tracePanel.add("South", pcsrPanel)
