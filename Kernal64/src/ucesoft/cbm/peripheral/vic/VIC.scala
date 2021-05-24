@@ -250,6 +250,7 @@ final class VIC(mem: VICMemory,
   private[this] var spriteDMAon = 0
 
   // PIPELINE =============================================================================
+  /*
   private[this] var dataToDrawPipe = 0L
   private[this] var vmliToDrawPipe = 0
   private[this] var rasterCycleToDrawPipe = 0
@@ -258,6 +259,8 @@ final class VIC(mem: VICMemory,
   final private[this] val shadowBackgroundColor = Array(0, 0, 0, 0)
   private[this] var backgroundColorChangedIndex = -1
   private[this] var shadowBorderColor = -1
+
+   */
   // ======================================================================================
 
   // ---------------------------- PIXELS --------------------------------------------------
@@ -363,7 +366,8 @@ final class VIC(mem: VICMemory,
     }
 
     final def producePixels : Unit = {
-      var xcoord = xCoord(rasterCycleToDraw)
+      //var xcoord = xCoord(rasterCycleToDraw) // TODO: PIPE
+      var xcoord = xCoord(rasterCycle)
       var i = 0
       var finished = false
 
@@ -559,15 +563,19 @@ final class VIC(mem: VICMemory,
       if (!drawBorderOpt) return
 
       if (!isBlank) {
-        var xcoord = xCoord(rasterCycleToDraw)
+        //var xcoord = xCoord(rasterCycleToDraw) // TODO : PIPE
+        var xcoord = xCoord(rasterCycle)
 
         checkVertical
 
         var i = 0
         while (i < 8) {
+          /*
           val color = if (i < 1) {
             if (shadowBorderColor == -1) borderColor else shadowBorderColor
           } else borderColor
+           */ // TODO : PIPE
+          val color = borderColor
           val hasBorder = checkBorderFF(xcoord)
           pixels(i) = if (hasBorder) {
             if (isVICIIe && i == 0 && lastColorReg == 0xFA) 0x0F else color
@@ -652,7 +660,8 @@ final class VIC(mem: VICMemory,
         mcFlop = 0
       }
 
-      val backgroundColor = if (counter < 1) shadowBackgroundColor else VIC.this.backgroundColor
+      //val backgroundColor = if (counter < 1) shadowBackgroundColor else VIC.this.backgroundColor // TODO : PIPE
+      val backgroundColor = VIC.this.backgroundColor
 
       val pixel = if (isBlank || gdata < 0) PIXEL_BLACK
       else if (!bmm) { // text mode
@@ -753,11 +762,14 @@ final class VIC(mem: VICMemory,
       var xcoord = 0
       var lpx = 0
       var baseX = 0
-      val checkLP = lightPenEnabled && displayLineToDraw == display.getLightPenY
+      //val checkLP = lightPenEnabled && displayLineToDraw == display.getLightPenY // TODO : PIPE
+      val checkLP = lightPenEnabled && displayLine == display.getLightPenY
       if (checkLP) {
-        xcoord = xCoord(rasterCycleToDraw)
+        //xcoord = xCoord(rasterCycleToDraw) // TODO : PIPE
+        xcoord = xCoord(rasterCycle)
         lpx = display.getLightPenX
-        baseX = rasterCycleToDraw << 3
+        // baseX = rasterCycleToDraw << 3 // TODO : PIPE
+        baseX = rasterCycle << 3
       }
       var counter = 0
       while (counter < 8) {
@@ -865,11 +877,12 @@ final class VIC(mem: VICMemory,
     firstModPixelX = -1//model.BLANK_LEFT_CYCLE << 3
     firstModPixelY = 0
     lastBackground = 0
+    /*
     dataToDrawPipe = 0
     displayLineToDrawPipe = 0
     rasterCycleToDrawPipe = 0
     vmliToDrawPipe = 0
-
+    */ // TODO : PIPE
     if (coprocessor != null) coprocessor.reset
   }
 
@@ -1077,13 +1090,13 @@ final class VIC(mem: VICMemory,
         //Log.fine("Sprite X expansion set to " + Integer.toBinaryString(spriteXExpansion))
         case 30 | 31 => // can't be written
         case 32 =>
-          shadowBorderColor = borderColor
+          // shadowBorderColor = borderColor // TODO : PIPE
           borderColor = value & 0x0F
           lastColorReg = 0xFA // value for border reg
         //Log.debug("VIC border color set to " + borderColor)
         case 33 | 34 | 35 | 36 =>
-          shadowBackgroundColor(offset - 33) = backgroundColor(offset - 33)
-          backgroundColorChangedIndex = offset - 33
+          // shadowBackgroundColor(offset - 33) = backgroundColor(offset - 33) // TODO : PIPE
+          // backgroundColorChangedIndex = offset - 33 // TODO : PIPE
           backgroundColor(offset - 33) = value & 0x0F
           lastColorReg = offset - 33
         //Log.debug("VIC background color #%d set to %d".format(offset - 33,value))
@@ -1134,6 +1147,7 @@ final class VIC(mem: VICMemory,
 
     drawCycle
 
+    /*
     if (backgroundColorChangedIndex != -1) {
       shadowBackgroundColor(backgroundColorChangedIndex) = backgroundColor(backgroundColorChangedIndex)
       backgroundColorChangedIndex = -1
@@ -1141,6 +1155,7 @@ final class VIC(mem: VICMemory,
     if (shadowBorderColor != -1) {
       shadowBorderColor = -1
     }
+    */ // TODO : PIPE
 
     if (rasterCycle == model.RASTER_CYCLES) {
       rasterCycle = 0
@@ -1152,8 +1167,10 @@ final class VIC(mem: VICMemory,
 
     if (showDebug) display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
 
-    var dataToDraw = -1
-    vmliToDrawPipe = vmliToDrawPipe << 8 | vmli
+    // var dataToDraw = -1 // TODO : PIPE
+    dataToDraw = -1
+    // vmliToDrawPipe = vmliToDrawPipe << 8 | vmli // TODO : PIPE
+    vmliToDraw = vmli
 
     if (rasterLine == 0x30) denOn30 |= den
 
@@ -1261,10 +1278,11 @@ final class VIC(mem: VICMemory,
     if (coprocessor != null && coprocessor.isActive) coprocessor.cycle(rasterLine,rasterCycle)
 
     // PIPELINE
+    /*
     dataToDrawPipe = dataToDrawPipe << 32 | (dataToDraw & 0xFFFFFFFFL)
     displayLineToDrawPipe = displayLineToDrawPipe << 16 | displayLine
     rasterCycleToDrawPipe = rasterCycleToDrawPipe << 8 | rasterCycle
-
+    */ // TODO : PIPE
     bmmDelay = bmm
     ecmDelay = ecm
   }
@@ -1325,21 +1343,26 @@ final class VIC(mem: VICMemory,
 
   @inline private def drawCycle : Unit = {
     // PIPELINE ===================
+    /*
     rasterCycleToDraw = (rasterCycleToDrawPipe >> 8) & 0xFF
     displayLineToDraw = (displayLineToDrawPipe >> 16) & 0xFFFF
     dataToDraw = ((dataToDrawPipe >> 32) & 0xFFFFFFFF).toInt
     vmliToDraw = (vmliToDrawPipe >> 8) & 0xFF
+     */ // TODO : PIPE
     // ============================
     val almostOneSprite = spritesDisplayedMask > 0
 
-    val outOfYScreen = displayLineToDraw <= model.BLANK_TOP_LINE || displayLineToDraw >= model.BLANK_BOTTOM_LINE
+    // val outOfYScreen = displayLineToDraw <= model.BLANK_TOP_LINE || displayLineToDraw >= model.BLANK_BOTTOM_LINE // TODO : PIPE
+    val outOfYScreen = displayLine <= model.BLANK_TOP_LINE || displayLine >= model.BLANK_BOTTOM_LINE
     isBlank = outOfYScreen
     if (outOfYScreen) return
-    val outOfXScreen = rasterCycleToDraw < model.BLANK_LEFT_CYCLE || rasterCycleToDraw > model.BLANK_RIGHT_CYCLE
+    // val outOfXScreen = rasterCycleToDraw < model.BLANK_LEFT_CYCLE || rasterCycleToDraw > model.BLANK_RIGHT_CYCLE // TODO : PIPE
+    val outOfXScreen = rasterCycle < model.BLANK_LEFT_CYCLE || rasterCycle > model.BLANK_RIGHT_CYCLE
     isBlank |= outOfXScreen
 
     val y = displayLine
-    val x = (rasterCycleToDraw - 1) << 3
+    //val x = (rasterCycleToDraw - 1) << 3 // TODO : PIPE
+    val x = (rasterCycle - 1) << 3
     var index = y * SCREEN_WIDTH + x
     var s, i = 0
 
@@ -1557,9 +1580,11 @@ final class VIC(mem: VICMemory,
     out.writeObject(vml_c)
     out.writeInt(lastBackground)
     out.writeBoolean(isNewVICModel)
+    /*
     out.writeObject(shadowBackgroundColor)
     out.writeInt(backgroundColorChangedIndex)
     out.writeInt(shadowBorderColor)
+     */ // TODO : PIPE
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     videoMatrixAddress = in.readInt
@@ -1617,9 +1642,11 @@ final class VIC(mem: VICMemory,
     loadMemory[Int](vml_c,in)
     lastBackground = in.readInt
     isNewVICModel = in.readBoolean
+    /*
     loadMemory[Int](shadowBackgroundColor,in)
     backgroundColorChangedIndex = in.readInt
     shadowBorderColor = in.readInt
+     */ // TODO : PIPE
   }
   protected def allowsStateRestoring : Boolean = true
 
