@@ -3,7 +3,7 @@
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
 
-Kernal64 ver 1.7.0_b15
+Kernal64 ver 1.7.1_b14
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -21,6 +21,33 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.7.1_b14 (May 24th 2021)
+- General
+  - Rollback of VIC's pipeline function: unfortunately it's not yet full functional; more VICE's testbench tests passed but more demos broken.
+  - Debugger: registers are now shown in a table
+  - REU: changed floatingBus emulation, still something to fix.
+  - Fixed --warp option: now disables audio output
+  - Added --custom-glue-logic option
+  - Fixed handling of undocumented opcodes when operate in decimal mode.
+  - Fixed state saving: included PAL/NTSC VIC'state
+  - Fixed handling of CPU port's fading bits (6,7 for C64, 7 for C128)
+  - Added external -Dkernal64.config property to specify the configuration directory.
+  - Added new --viciinew option.
+  - Added 1024,2048,4096 sizes to --reu-type option.
+  - Fixed handling of warp mode: now when switching back to normal speed ther's no freeze time to wait for.
+  - CIA: fixed light-pen handling
+  - new SID (resid) implementation
+  - REU: when REU asserts DMA, AEC is high, and every pending writes are lost.
+  - Datassette: fixed counter on recording
+  - GMOD3 cartridge implementation
+  - New KCS cart
+- C128
+  - VDC: fixed cursor handling introduced with graphic line buffer. Now the cursor is checked on every line.
+  - Fixed REU handling: when REU is performing DMA bit 6,7 of D506 set which bank is involved.
+  - Removed MMU registers from c64 mode: they are not visible.
+- BeamRacer
+  - Fixed deactivation, when writing to register 0x2E
 
 ### What's new in 1.7.0_b15 (Jan 22th 2021)
 - General
