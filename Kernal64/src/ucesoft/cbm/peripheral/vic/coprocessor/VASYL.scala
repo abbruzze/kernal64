@@ -628,7 +628,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     //=========================================================
     // sequencer stop check
     if (seq_active && rasterCycle == seq_cycle_stop + 1) {
-      seq_bitmap_pointer += seq_padding
+      seq_bitmap_pointer = (seq_bitmap_pointer + seq_padding) & 0xFFFF
       if (seq_update_mode == 1) regs(0x44) = seq_bitmap_pointer & 0xFF // PBS_CONTROL_UPDATE_EOL
     }
     //=========================================================
