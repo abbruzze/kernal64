@@ -469,7 +469,8 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
           if (debug) println(s"DLIST2H = ${value.toHexString}, execution address = ${(value << 8| regs(0x41)).toHexString}")
         case 0x43 if isVasylWriting =>
           dlistOnPendingOnNextCycle = true
-          if ((value & 0x80) > 0) {
+          pc = regs(0x41) | regs(0x42) << 8
+          if ((value & 0x8) > 0) {
             currentBank = value & 7
             mem = banks(currentBank)
           }
