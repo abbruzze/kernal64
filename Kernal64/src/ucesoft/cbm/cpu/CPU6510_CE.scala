@@ -2029,7 +2029,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
       data = mem.read(PC)
       PC = (PC + 1) & 0xFFFF
       if (flag) {
-        ar = PC + data.asInstanceOf[Byte]
+        ar = (PC + data.asInstanceOf[Byte]) & 0xFFFF
         if ((ar >> 8) != (PC >> 8)) {
           if ((data & 0x80) > 0) state = O_BRANCH_BP else state = O_BRANCH_FP
         } else state = O_BRANCH_NP
