@@ -1833,7 +1833,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
         // ASL/ORA group
         case O_SLO => () => {
           if ((rdbuf & 0x80) > 0) sec else clc
-          rdbuf <<= 1
+          rdbuf = (rdbuf << 1) & 0xFF
           if (!dma) mem.write(ar, rdbuf)
           A |= rdbuf
           set_nz(A)
