@@ -23,7 +23,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   private[this] val INSTRUCTION_SET : Array[() => Unit] = buildInstructionSet
   private[this] val banks = Array.ofDim[Int](8,65536)
   private[this] var currentBank = 0
-  private[this] var mem : Array[Int] = banks(currentBank)
+  private[this] var portMem,prgMem : Array[Int] = banks(currentBank)
   private[this] val regs = Array.ofDim[Int](0x4D)
 
   private[this] var dlistOnPendingOnNextFrame,dlistOnPendingOnNextCycle,dlistExecutionActive = false
@@ -106,7 +106,8 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   override def reset: Unit = {
     currentBank = 0
-    mem = banks(currentBank)
+    portMem = banks(currentBank)
+    prgMem = portMem
     java.util.Arrays.fill(regs,0)
     dlistOnPendingOnNextCycle = false
     dlistOnPendingOnNextFrame = false
@@ -180,7 +181,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   }
 
   private def BRA : Unit = {
-    val offset = mem(pc).toByte
+    val offset = prgMem(pc).toByte
     pc = (pc + 1 + offset) & 0xFFFF
     if (trace) tracedInstr = s"BRA ${offset.toHexString}"
   }
@@ -194,7 +195,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   private def DELAYH : Unit = {
     if (fetchOp) {
       fetchOp = false
-      val arg = mem(pc)
+      val arg = prgMem(pc)
       pc = (pc + 1) & 0xFFFF
       h_arg = arg & 63
       v_arg = (arg >> 6) & 3
@@ -214,7 +215,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   private def DELAYV : Unit = {
     if (fetchOp) {
-      val arg = mem(pc)
+      val arg = prgMem(pc)
       pc = (pc + 1) & 0xFFFF
       v_arg = arg | (lastOpcode & 1) << 8
 
@@ -239,7 +240,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   }
 
   private def MASKH : Unit = {
-    val arg = mem(pc)
+    val arg = prgMem(pc)
     pc = (pc + 1) & 0xFFFF
     maskh = arg & 63
     clearMaskhOnNext = (lastOpcode & 2) == 0
@@ -247,7 +248,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   }
 
   private def MASKV : Unit = {
-    val arg = mem(pc)
+    val arg = prgMem(pc)
     pc = (pc + 1) & 0xFFFF
     maskv = arg & 63
     clearMaskvOnNext = (lastOpcode & 2) == 0
@@ -256,7 +257,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   private def MOV(reg_offset:Int)() : Unit = {
     if (fetchOp) {
-      x_arg = mem(pc)
+      x_arg = prgMem(pc)
       r_arg = (lastOpcode & 63) + reg_offset
       pc = (pc + 1) & 0xFFFF
 
@@ -278,7 +279,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   }
 
   private def SET(counter:Int)() : Unit = {
-    counters(counter) = mem(pc)
+    counters(counter) = prgMem(pc)
     pc = (pc + 1) & 0xFFFF
     if (trace) tracedInstr = s"SET${'A' + counter}"
   }
@@ -295,7 +296,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   private def WAIT : Unit = {
     if (fetchOp) {
-      v_arg = mem(pc) | (lastOpcode & 1) << 8
+      v_arg = prgMem(pc) | (lastOpcode & 1) << 8
       h_arg = (lastOpcode >> 1) & 63
       pc = (pc + 1) & 0xFFFF
 
@@ -351,8 +352,8 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   private def XFER : Unit = {
     if (fetchOp) {
-      r_arg = mem(pc) & 63
-      p_arg = (mem(pc) >> 7) & 1
+      r_arg = prgMem(pc) & 63
+      p_arg = (prgMem(pc) >> 7) & 1
       pc = (pc + 1) & 0xFFFF
 
       if (r_arg > 0x30) { // VASYL registers
@@ -401,7 +402,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
             regs(0x31) = value
 
             currentBank = value & 7
-            mem = banks(currentBank)
+            portMem = banks(currentBank)
 
             portsBind = (value & 0x40) > 0
 
@@ -415,7 +416,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     }
     else
     if (beamRacerActiveState == 2) { // beamracer active
-      if ((reg > 0x30 && reg < 0x40) || (reg >= 0x40 && isVasylWriting)) regs(reg) = value
+      if ((reg > 0x30 && reg < 0x40) || (reg >= 0x40 && reg < 0x4D && isVasylWriting)) regs(reg) = value
 
       reg match {
         case 0x2E =>
@@ -472,7 +473,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
           pc = regs(0x41) | regs(0x42) << 8
           if ((value & 0x8) > 0) {
             currentBank = value & 7
-            mem = banks(currentBank)
+            //prgMem = banks(currentBank)
           }
         case 0x44 if isVasylWriting =>
           if (debug) println(s"S_BASEL = ${value.toHexString}, bitmap pointer = ${(value | regs(0x45) << 8).toHexString}")
@@ -506,14 +507,14 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   }
 
   private def writePort(port:Int,value:Int) : Unit = {
-    mem(addressPort(port)) = value
+    portMem(addressPort(port)) = value
     if (debug) println(s"Writing $value to ${addressPort(port).toHexString}")
     incPortAddress(port)
     lastPortWriteValue(port) = value
   }
 
   private def readPort(port:Int) : Int = {
-    val value = mem(addressPort(port))
+    val value = portMem(addressPort(port))
     if (debug) println(s"Reading from ${addressPort(port).toHexString} = $value")
     incPortAddress(port)
     value
@@ -574,6 +575,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   private def activateListExecution : Unit = {
     dlistExecutionActive = true
+    prgMem = banks(currentBank)
     reloadPcFromRegs
     if (debug) println(s"VASYL list execution started at ${pc.toHexString}")
   }
@@ -663,7 +665,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
         if (fetchOp) {
           oldPC = pc
           lastOpAccessingVIC = false
-          lastOpcode = mem(pc)
+          lastOpcode = prgMem(pc)
           pc = (pc + 1) & 0xFFFF
           lastInstr = INSTRUCTION_SET(lastOpcode)
           if (lastInstr == null) {
@@ -675,7 +677,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
         }
         else lastInstr() // execute opcode
         if (trace && Log.isDebug) {
-          val bytes = s"%02x".format(lastOpcode) + (if (pc - oldPC > 1) s" %02x".format(mem((oldPC + 1) & 0xFFFF)) else "")
+          val bytes = s"%02x".format(lastOpcode) + (if (pc - oldPC > 1) s" %02x".format(prgMem((oldPC + 1) & 0xFFFF)) else "")
           val disa = s"[VASYL] %04x $bytes $tracedInstr".format(oldPC)
           Log.debug(disa)
         }
@@ -803,7 +805,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   override protected def loadState(in: ObjectInputStream): Unit = {
     currentBank = in.readInt()
     loadMemory(banks,in)
-    mem = banks(currentBank)
+    portMem = banks(currentBank)
     loadMemory(regs,in)
     dlistOnPendingOnNextCycle = in.readBoolean()
     dlistOnPendingOnNextFrame = in.readBoolean()

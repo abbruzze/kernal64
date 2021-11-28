@@ -70,7 +70,7 @@ class CSDBSpi extends GameProvider {
                     if (img.size() > 0) {
                       imgLink = s"https://csdb.dk/${img.get(0).attr("src")}"
                     }
-                    val download = game.select("""b:matches(Download :)~table tr a:matches(http://csdb.*(PRG|prg|ZIP|zip|CRT|crt|(d|D)(64|71|81)))""")
+                    val download = game.select("""b:matches(Download :)~table tr a:matches(https?://csdb.*(PRG|prg|ZIP|zip|CRT|crt|(d|D)(64|71|81)))""")
                     if (download.size() > 0) {
                       downLink = download.get(0).text().replaceAll(" ", "%20")
                     }

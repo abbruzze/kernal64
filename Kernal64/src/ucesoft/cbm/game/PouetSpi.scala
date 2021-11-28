@@ -11,8 +11,8 @@ abstract class PouetSpi(genre:String) extends GameProvider {
     override def toString = s"Last added"
   }  
   
-  val url = Some(new URL("http://www.pouet.net/"))
-  val iconURL = Some(new URL("http://content.pouet.net/logos/ewery_pouet2.png"))
+  val url = Some(new URL("https://www.pouet.net/"))
+  val iconURL = Some(new URL("https://content.pouet.net/logos/ewery_pouet2.png"))
   val gameIconPreferredSize = new Dimension(384,272)
   val version = "N/A"
   lazy val repository = new Repository(this)
@@ -28,7 +28,7 @@ abstract class PouetSpi(genre:String) extends GameProvider {
   
   def setProgressListener(l:GameLoadingProgressListener) = progressListener = Some(l)
   
-  private def makeUrl(page:Int) = s"http://www.pouet.net/prodlist.php?type%5B%5D=$genre&order=release&platform%5B%5D=Commodore+64&page=$page"
+  private def makeUrl(page:Int) = s"https://www.pouet.net/prodlist.php?type%5B%5D=$genre&order=release&platform%5B%5D=Commodore+64&page=$page"
   
   private def openURL[T](url:String)(action: Iterator[String] => T) : T = {
     val src = io.Source.fromURL(url,"UTF-8")
@@ -111,7 +111,7 @@ abstract class PouetSpi(genre:String) extends GameProvider {
                         case _ =>
                       }
                     }
-                    val gameURL = s"http://www.pouet.net/$location"
+                    val gameURL = s"https://www.pouet.net/$location"
                     try {
                       buffer += makeGame(name,gameURL,group,date)
                     }
