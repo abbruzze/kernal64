@@ -3,7 +3,7 @@
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
 
-Kernal64 ver 1.7.1_b14
+Kernal64 ver 1.7.2_b1
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -21,6 +21,14 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.7.2_b1 (Nov 29th 2021)
+- General
+  - CPU: Fixed wrapping for branch instructions
+  - CPU: Fixed SLO: shift left could overflow
+  - Fixed CSDB and Pouet spi: changed http to https references
+- BeamRacer
+  - Two memory pointers are now used: one for running program and one for ports
 
 ### What's new in 1.7.1_b14 (May 24th 2021)
 - General
