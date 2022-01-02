@@ -111,8 +111,12 @@
 		<copy todir="${dist.dir}/pack/kernal64">
 			<fileset dir="${basedir}/build" includes="*.bat *.sh"/>
 		</copy>
+		<fixcrlf srcdir="${dist.dir}/pack/kernal64" includes="*.sh" eol="unix"/>
+		<fixcrlf srcdir="${dist.dir}/pack/kernal64" includes="*.bat" eol="dos"/>
 		<mkdir dir="${dist.dir}/pack/kernal64/roms"/>
-		<zip destfile="${c64.install}" basedir="${dist.dir}/pack"/>
+		<zip destfile="${c64.install}" basedir="${dist.dir}/pack" excludes="**/*.sh">
+			<zipfileset dir="${dist.dir}/pack" includes="kernal64/*.sh" filemode="755"/>
+		</zip>
 		<delete dir="${dist.dir}/pack"/>
 	</target>
 		
