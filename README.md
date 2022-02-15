@@ -3,7 +3,7 @@
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
 
-Kernal64 ver 1.7.2_b1
+Kernal64 ver 1.7.3b4 (BETA)
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -21,6 +21,17 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new in 1.7.3b4 (Feb 15th 2022) BETA
+- C64 & C128
+  - **WiC64 emulation**: new dialog from Settings -> I/O. Visit https://www.wic64.de/ for more information or https://www.forum64.de/. The emulation covers the firmware release 3.0 and some other undocumented feature like streaming. The firmware is still under development, so be patient...
+  - Fixed video cache (black line on last video line)
+- C128
+  - Fixed page 0 & 1 redirection for common memory.
+- Beam Racer
+  -  Fixed handling of bank pointers.  
+
+To download the BETA version go to https://github.com/abbruzze/kernal64/releases/tag/v1.7.3b4
 
 ### What's new in 1.7.2_b1 (Nov 29th 2021)
 - General
