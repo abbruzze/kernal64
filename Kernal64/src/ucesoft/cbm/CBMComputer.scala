@@ -244,7 +244,9 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
   }
   // ------------------------------------ Drag and Drop ----------------------------
   protected val DNDHandler = new DNDHandler(handleDND(_,true,true))
-  // ------------------- INITIALIZATION ------------------------
+  // ----------------------WiC64 ---------------------------------------------------
+  protected var wic64Panel : WiC64Panel = _
+  // ------------------- INITIALIZATION --------------------------------------------
   initComputer
 
   protected def initComputer : Unit = {
@@ -1366,6 +1368,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
     if (vicChip.VISIBLE_SCREEN_WIDTH == dim.width && vicChip.VISIBLE_SCREEN_HEIGHT == dim.height) vicZoomFactor = 1
     else
     if (vicChip.VISIBLE_SCREEN_WIDTH * 2 == dim.width && vicChip.VISIBLE_SCREEN_HEIGHT * 2 == dim.height) vicZoomFactor = 2
+    else
+    if (vicChip.VISIBLE_SCREEN_WIDTH * 3 == dim.width && vicChip.VISIBLE_SCREEN_HEIGHT * 3 == dim.height) vicZoomFactor = 3
     else vicZoomFactor = 0 // undefined
   }
 
@@ -1469,7 +1473,7 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         finally loadStateFromOptions = false
       }
     }
-    preferences.add(PREF_SCREENDIM,"Zoom factor. Valued accepted are 1 and 2",0,Set(1,2),false) { dim =>
+    preferences.add(PREF_SCREENDIM,"Zoom factor. Valued accepted are 1,2,3",0,Set(1,2,3),false) { dim =>
       vicZoom(dim)
       zoomOverride = true
     }
@@ -2259,6 +2263,14 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       cpmItem.setSelected(false)
       enableCPMCart(false)
     }) :: resetSettingsActions
+  }
+
+  protected def setWiC64Settings(parent:JMenu): Unit = {
+    val wic64Item = new JMenuItem("WiC64 panel ...")
+    parent.add(wic64Item)
+    wic64Item.addActionListener(_ => {
+      wic64Panel.dialog.setVisible(true)
+    })
   }
 
   protected def setFlyerSettings(parent:JMenu) : Unit = {

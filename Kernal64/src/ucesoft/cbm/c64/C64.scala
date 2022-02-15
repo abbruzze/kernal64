@@ -96,6 +96,10 @@ class C64 extends CBMComputer {
     				   cia2CP2,
     				   nmiSwitcher.setLine(Switcher.CIA,_),
                idle => cia12Running(1) = !idle)
+    WiC64.flag2Action = cia2.setFlagLow _
+    wic64Panel = new WiC64Panel(displayFrame)
+    WiC64.setListener(wic64Panel)
+    add(WiC64)
     rs232.setCIA12(cia1,cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
@@ -249,12 +253,13 @@ class C64 extends CBMComputer {
     val zoomItem = new JMenu("Zoom")
     val groupZ = new ButtonGroup
     optionMenu.add(zoomItem)
-    for(z <- 1 to 2) {
+    for(z <- 1 to 3) {
       val zoom1Item = new JRadioButtonMenuItem(s"Zoom x $z")
       zoom1Item.addActionListener(_ => vicZoom(z) )
       val kea = z match {
         case 1 => java.awt.event.KeyEvent.VK_1
         case 2 => java.awt.event.KeyEvent.VK_2
+        case 3 => java.awt.event.KeyEvent.VK_3
       }
       zoom1Item.setAccelerator(KeyStroke.getKeyStroke(kea,java.awt.event.InputEvent.ALT_DOWN_MASK))
       zoomItem.add(zoom1Item)
@@ -342,6 +347,8 @@ class C64 extends CBMComputer {
     IOItem.addSeparator
 
     setFlyerSettings(IOItem)
+
+    setWiC64Settings(IOItem)
 
     setREUSettings(IOItem)
 
