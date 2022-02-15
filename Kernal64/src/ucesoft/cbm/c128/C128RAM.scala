@@ -197,6 +197,15 @@ private[c128] class C128RAM extends RAMComponent {
 
     address
   }
+
+  @inline private def page2_0_1(_address:Int) : Int = {
+    var address = _address
+    if ((address & 0xFF00) == 0) address |= page_0 << 8 | page_0_bank << 16
+    else if ((address & 0xFF00) == 0x100) address = page_1 << 8 | address & 0xFF | page_1_bank << 16
+    else if ((address & 0xFF00) == (page_0 << 8) && processorBank == page_0_bank) address &= 0xFF
+    else if ((address & 0xFF00) == (page_1 << 8) && processorBank == page_1_bank) address = address & 0xFF | 0x100
+    address
+  }
   
   final def read(address:Int,bank:Int) : Int = mem(bank)(address)
   final def write(address:Int,bank:Int,value:Int) = mem(bank)(address) = value
@@ -205,10 +214,12 @@ private[c128] class C128RAM extends RAMComponent {
     if (chipID == ChipID.VIC) return mem(VICbank)(_address)
 
     if (dma) return mem(VICbank)(_address) // to be investigated if it's correct
-    
-    val address = page_0_1(_address) & 0xFFFF
-    if (_address < 0x100) return mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_0_bank)(address)
-    if (_address < 0x200) return mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_1_bank)(address)
+
+    val pagedAddress = page2_0_1(_address)
+    val address = pagedAddress & 0xFFFF
+    val bank = pagedAddress >> 16
+    if (_address < 0x100) return mem(if (commonArea == BOTTOM_COMMON_RAM || commonArea == TOP_BOTTOM_COMMON_RAM) 0 else bank)(address)
+    if (_address < 0x200) return mem(if (commonArea == BOTTOM_COMMON_RAM || commonArea == TOP_BOTTOM_COMMON_RAM) 0 else bank)(address)
     
     commonArea match {
       case BOTTOM_COMMON_RAM => 
@@ -230,9 +241,11 @@ private[c128] class C128RAM extends RAMComponent {
       mem(VICbank)(_address) = value
       return
     }
-    val address = page_0_1(_address) & 0xFFFF
-    if (_address < 0x100) mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_0_bank)(address) = value
-    else if (_address < 0x200) mem(if (commonArea == BOTTOM_COMMON_RAM) 0 else page_1_bank)(address) = value
+    val pagedAddress = page2_0_1(_address)
+    val address = pagedAddress & 0xFFFF
+    val bank = pagedAddress >> 16
+    if (_address < 0x100) mem(if (commonArea == BOTTOM_COMMON_RAM || commonArea == TOP_BOTTOM_COMMON_RAM) 0 else bank)(address) = value
+    else if (_address < 0x200) mem(if (commonArea == BOTTOM_COMMON_RAM || commonArea == TOP_BOTTOM_COMMON_RAM) 0 else bank)(address) = value
     else {
       commonArea match {
         case BOTTOM_COMMON_RAM => 
