@@ -1314,7 +1314,7 @@ final class VIC(mem: VICMemory,
     if (displayLine == 0) {
       denOn30 = false
       canUpdateLightPenCoords = true
-      display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY)
+      display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY + 1)
       firstModPixelX = -1
       ref = 0xFF
       vcbase = 0
