@@ -280,12 +280,13 @@ class SCPUC64 extends CBMComputer {
     val zoomItem = new JMenu("Zoom")
     val groupZ = new ButtonGroup
     optionMenu.add(zoomItem)
-    for (z <- 1 to 2) {
+    for(z <- 1 to 3) {
       val zoom1Item = new JRadioButtonMenuItem(s"Zoom x $z")
-      zoom1Item.addActionListener(_ => vicZoom(z))
+      zoom1Item.addActionListener(_ => vicZoom(z) )
       val kea = z match {
         case 1 => java.awt.event.KeyEvent.VK_1
         case 2 => java.awt.event.KeyEvent.VK_2
+        case 3 => java.awt.event.KeyEvent.VK_3
       }
       zoom1Item.setAccelerator(KeyStroke.getKeyStroke(kea, java.awt.event.InputEvent.ALT_DOWN_MASK))
       zoomItem.add(zoom1Item)
