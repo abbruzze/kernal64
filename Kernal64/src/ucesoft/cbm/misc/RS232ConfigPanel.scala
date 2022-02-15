@@ -33,6 +33,7 @@ object RS232ConfigPanel {
 
   private def initConfigPanel(parent:JFrame) : JDialog = {
     val dialog = new JDialog(parent,"RS232 Configuration panel")
+    dialog.setIconImage(new ImageIcon(getClass.getResource("/resources/commodore.png")).getImage)
     val pane = dialog.getContentPane
     val group = new ButtonGroup
     val conf = new JTextField(30)
