@@ -22,8 +22,8 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   private[this] val INSTRUCTION_SET : Array[() => Unit] = buildInstructionSet
   private[this] val banks = Array.ofDim[Int](8,65536)
-  private[this] var currentBank = 0
-  private[this] var portMem,prgMem : Array[Int] = banks(currentBank)
+  private[this] var displayListFetchBank,portBank = 0
+  private[this] var portMem,prgMem : Array[Int] = banks(0)
   private[this] val regs = Array.ofDim[Int](0x4D)
 
   private[this] var dlistOnPendingOnNextFrame,dlistOnPendingOnNextCycle,dlistExecutionActive = false
@@ -105,8 +105,9 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   }
 
   override def reset: Unit = {
-    currentBank = 0
-    portMem = banks(currentBank)
+    displayListFetchBank = 0
+    portBank = 0
+    portMem = banks(0)
     prgMem = portMem
     java.util.Arrays.fill(regs,0)
     dlistOnPendingOnNextCycle = false
@@ -401,17 +402,23 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
           case 2 =>
             regs(0x31) = value
 
-            currentBank = value & 7
-            portMem = banks(currentBank)
+            dlistOnPendingOnNextFrame = (value & 8) > 0
+
+            portBank = value & 7
+            portMem = banks(portBank)
+
+            if (!dlistOnPendingOnNextFrame) {
+              displayListFetchBank = portBank
+              prgMem = banks(displayListFetchBank)
+            }
 
             portsBind = (value & 0x40) > 0
 
-            dlistOnPendingOnNextFrame = (value & 8) > 0
             if (!dlistOnPendingOnNextFrame) dlistExecutionActive = false
 
             // TODO: grey dot kill
 
-            if (debug) println(s"Control register: currentBank = $currentBank, dlistOnPendingOnNextFrame = $dlistOnPendingOnNextFrame, dlistExecutionActive = $dlistExecutionActive portsBind = $portsBind")
+            if (debug) println(s"Control register: portBank = $portBank, dlistOnPendingOnNextFrame = $dlistOnPendingOnNextFrame, dlistExecutionActive = $dlistExecutionActive portsBind = $portsBind")
         }
     }
     else
@@ -472,8 +479,8 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
           dlistOnPendingOnNextCycle = true
           pc = regs(0x41) | regs(0x42) << 8
           if ((value & 0x8) > 0) {
-            currentBank = value & 7
-            //prgMem = banks(currentBank)
+            displayListFetchBank = value & 7
+            prgMem = banks(displayListFetchBank)
           }
         case 0x44 if isVasylWriting =>
           if (debug) println(s"S_BASEL = ${value.toHexString}, bitmap pointer = ${(value | regs(0x45) << 8).toHexString}")
@@ -575,7 +582,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   private def activateListExecution : Unit = {
     dlistExecutionActive = true
-    prgMem = banks(currentBank)
+    //prgMem = banks(currentBank)
     reloadPcFromRegs
     if (debug) println(s"VASYL list execution started at ${pc.toHexString}")
   }
@@ -755,7 +762,8 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   private def revPairs(i:Int) : Int = (i & 1) << 6 | (i & 2) << 6 | (i & 4) << 2 | (i & 8) << 2 | (i & 16) >> 2 | (i & 32) >> 2 | (i & 64) >> 6 | (i & 128) >> 6
 
   override protected def saveState(out: ObjectOutputStream): Unit = {
-    out.writeInt(currentBank)
+    out.writeInt(displayListFetchBank)
+    out.writeInt(portBank)
     out.writeObject(banks)
     out.writeObject(regs)
     out.writeBoolean(dlistOnPendingOnNextCycle)
@@ -803,9 +811,11 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   }
 
   override protected def loadState(in: ObjectInputStream): Unit = {
-    currentBank = in.readInt()
+    displayListFetchBank = in.readInt()
+    portBank = in.readInt()
     loadMemory(banks,in)
-    portMem = banks(currentBank)
+    portMem = banks(portBank)
+    prgMem = banks(displayListFetchBank)
     loadMemory(regs,in)
     dlistOnPendingOnNextCycle = in.readBoolean()
     dlistOnPendingOnNextFrame = in.readBoolean()
