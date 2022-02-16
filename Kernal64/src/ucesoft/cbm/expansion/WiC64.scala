@@ -287,6 +287,8 @@ object WiC64 extends CBMComponent with Runnable {
   }
 
   private def encodeURL(urlString:String): String = {
+    urlString
+    /*
     val url = new URL(urlString)
     val queryPos = urlString.lastIndexOf("?")
     if (queryPos == -1) return urlString
@@ -301,6 +303,7 @@ object WiC64 extends CBMComponent with Runnable {
 
     }
     urlString.substring(0, queryPos) + "?" + parameters.mkString("&")
+     */
   }
 
   private def en_code(s:String): String = {
