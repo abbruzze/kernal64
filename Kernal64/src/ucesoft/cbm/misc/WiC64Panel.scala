@@ -9,7 +9,7 @@ import java.net.NetworkInterface
 import javax.swing._
 import javax.swing.text.{Style, StyleConstants, StyleContext}
 
-class WiC64Panel(frame:JFrame) extends JPanel with WiC64.WiC64Listener {
+class WiC64Panel(frame:JFrame,pref:Preferences) extends JPanel with WiC64.WiC64Listener {
   private class Led(colorOn:Color) extends JComponent {
     var on = false
     setPreferredSize(new Dimension(15,15))
@@ -29,13 +29,6 @@ class WiC64Panel(frame:JFrame) extends JPanel with WiC64.WiC64Listener {
     import scala.jdk.CollectionConverters._
     val nw = NetworkInterface.getNetworkInterfaces.asScala.toArray
     val combo = new JComboBox[String](nw.map(_.getName))
-    nw.zipWithIndex.find(z => z._1.getName.startsWith("wlan")) match {
-      case None =>
-        WiC64.setNetworkInterface(nw(0))
-      case Some((n,i)) =>
-        combo.setSelectedIndex(i)
-        WiC64.setNetworkInterface(n)
-    }
     combo.setEditable(false)
     combo
   }
@@ -87,10 +80,27 @@ class WiC64Panel(frame:JFrame) extends JPanel with WiC64.WiC64Listener {
     d
   }
 
+  def setNetwork(n:String): Unit = {
+    import scala.jdk.CollectionConverters._
+    val nw = NetworkInterface.getNetworkInterfaces.asScala.toArray
+    nw.zipWithIndex.find(z =>
+      if (n.isEmpty) z._1.getName.startsWith("wlan") || z._1.getInetAddresses.asScala.map(_.getHostAddress).exists(_.startsWith("192.168."))
+      else z._1.getName.startsWith(n)
+    ) match {
+      case None =>
+        WiC64.setNetworkInterface(nw(0))
+      case Some((n,i)) =>
+        networks.setSelectedIndex(i)
+        networks.repaint()
+        WiC64.setNetworkInterface(n)
+        pref.updateWithoutNotify(Preferences.PREF_WIC64_NETWORK,n.getName)
+        update()
+    }
+  }
+
   private def init(): Unit = {
     newFirmwareLabel.setForeground(Color.RED)
     newFirmwareLabel.setVisible(false)
-    newFirmwareLabel.setToolTipText("<html>Warning: a new REAL firmware version is available.</html>")
     newFirmwareLabel.setBorder(BorderFactory.createLineBorder(Color.RED))
     val font = newFirmwareLabel.getFont
     newFirmwareLabel.setFont(new Font(font.getName,Font.BOLD,font.getSize))
@@ -122,6 +132,7 @@ class WiC64Panel(frame:JFrame) extends JPanel with WiC64.WiC64Listener {
       import scala.jdk.CollectionConverters._
       val nw = NetworkInterface.getNetworkInterfaces.asScala.toArray
       WiC64.setNetworkInterface(nw(networks.getSelectedIndex))
+      pref.updateWithoutNotify(Preferences.PREF_WIC64_NETWORK,nw(networks.getSelectedIndex).getName)
       update()
     })
 
@@ -190,5 +201,12 @@ class WiC64Panel(frame:JFrame) extends JPanel with WiC64.WiC64Listener {
     logPanel.setCaretPosition(logPanel.getText().length())
   }
 
-  override def newFirmwareAvaiilable(): Unit = newFirmwareLabel.setVisible(true)
+  override def newFirmwareAvaiilable(ver:Int,current:Int): Unit = {
+    newFirmwareLabel.setVisible(true)
+    val maj = ver / 10
+    val min = ver % 10
+    val curMaj = current / 10
+    val curMin = current % 10
+    newFirmwareLabel.setToolTipText(s"<html>Warning: a new REAL firmware version is available: $maj.$min, current is $curMaj.$curMin</html>")
+  }
 }

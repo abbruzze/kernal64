@@ -15,6 +15,7 @@ import javax.swing.SwingUtilities
 abstract class ControlPort extends CBMComponent {
   val componentType = CBMComponentType.INPUT_DEVICE
   val componentID = "ControlPort"
+  val isConnected = true
     
   private[this] var emulatedBit = 0
   private[this] var lightPenEmulationEnabled = false
@@ -31,6 +32,8 @@ abstract class ControlPort extends CBMComponent {
   }
   
   def readPort = read & (~emulatedBit & 0xFF)
+
+  def consumeKey(e:KeyEvent): Boolean = false
   
   protected def read : Int	// 4 bits
 
@@ -65,7 +68,8 @@ object ControlPort {
   val CONFIGURATION_UD_JOYSTICK_FIRE = "joy.ud.key.fire"
   
   private abstract class AbstractControlPort extends ControlPort with MouseListener with KeyListener {
-    private[this] var mask = 0
+    protected var mask = 0
+
     protected def getKeyMask(e:KeyEvent) : Int
     def mouseClicked(e:MouseEvent) : Unit = {}
     def mouseEntered(e:MouseEvent) : Unit = {}
@@ -96,6 +100,7 @@ object ControlPort {
   }
   
   val emptyControlPort : ControlPort with MouseListener = new AbstractControlPort {
+    override val isConnected = false
     protected def getKeyMask(e:KeyEvent) : Int = 0
     override def mousePressed(e:MouseEvent): Unit = {
       if (isMouse1351EmulationEnabled) super.mousePressed(e)
@@ -108,15 +113,24 @@ object ControlPort {
    * Joystick emulation via KeyPad
    */
   def keypadControlPort : ControlPort with MouseListener with KeyListener = new AbstractControlPort {
-    
+    override def consumeKey(e:KeyEvent): Boolean = {
+      import KeyEvent._
+      if (e.getKeyLocation == KEY_LOCATION_NUMPAD) {
+        e.getKeyCode match {
+          case VK_NUMPAD8 | VK_UP | VK_NUMPAD2 | VK_DOWN | VK_NUMPAD4 | VK_LEFT | VK_NUMPAD6 | VK_RIGHT | VK_NUMPAD9 | VK_NUMPAD3 | VK_NUMPAD7 | VK_NUMPAD1 | VK_NUMPAD0 | VK_INSERT => true
+          case _ => false
+        }
+      }
+      else false
+    }
     protected def getKeyMask(e:KeyEvent) = {
       import KeyEvent._
       if (e.getKeyLocation == KEY_LOCATION_NUMPAD) {
         e.getKeyCode match {
-          case VK_NUMPAD8|VK_UP => 1 // up
-          case VK_NUMPAD2|VK_DOWN => 2 // down
-          case VK_NUMPAD4|VK_LEFT => 4 // left
-          case VK_NUMPAD6|VK_RIGHT => 8 // right
+          case VK_NUMPAD8|VK_UP if (mask & 2) == 0 => 1 // up
+          case VK_NUMPAD2|VK_DOWN if (mask & 1) == 0 => 2 // down
+          case VK_NUMPAD4|VK_LEFT if (mask & 8) == 0 => 4 // left
+          case VK_NUMPAD6|VK_RIGHT if (mask & 4) == 0 => 8 // right
           case VK_NUMPAD9 => 9 // up+right
           case VK_NUMPAD3 => 10// down+right
           case VK_NUMPAD7 => 5 // up+left
@@ -144,19 +158,28 @@ object ControlPort {
 
     updateConfiguration
 
+    override def consumeKey(e:KeyEvent): Boolean = {
+      import KeyEvent._
+      if (e.getKeyLocation != KEY_LOCATION_NUMPAD) {
+        val k = e.getKeyCode
+        k == upKey || k == downKey || k == leftKey || k == rightKey || k == upRightKey || k == upLeftKey || k == downLeftKey || k == downRightKey || k == fireKey
+      }
+      else false
+    }
+
     protected def getKeyMask(e:KeyEvent) = {
       import KeyEvent._
       if (e.getKeyLocation != KEY_LOCATION_NUMPAD) {
         val keyCode = e.getKeyCode
-        if (keyCode == upKey)             1 // up
-        else if (keyCode == downKey)      2 // down
-        else if (keyCode == leftKey)      4 // left
-        else if (keyCode == rightKey)     8 // right
-        else if (keyCode == upRightKey)   9 // up+right
-        else if (keyCode == downRightKey) 10// down+right
-        else if (keyCode == upLeftKey)    5 // up+left
-        else if (keyCode == downLeftKey)  6 // down+left
-        else if (keyCode == fireKey)      16// fire
+        if (keyCode == upKey && (mask & 2) == 0)             1 // up
+        else if (keyCode == downKey && (mask & 1) == 0)      2 // down
+        else if (keyCode == leftKey && (mask & 8) == 0)      4 // left
+        else if (keyCode == rightKey && (mask & 4) == 0)     8 // right
+        else if (keyCode == upRightKey)                      9 // up+right
+        else if (keyCode == downRightKey)                    10// down+right
+        else if (keyCode == upLeftKey)                       5 // up+left
+        else if (keyCode == downLeftKey)                     6 // down+left
+        else if (keyCode == fireKey)                         16// fire
         else 0
       }
       else 0

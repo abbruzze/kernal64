@@ -17,7 +17,7 @@ object WiC64 extends CBMComponent with Runnable {
     def onCMD(cmdDescr:String): Unit
     def turnGreenLed(on:Boolean): Unit
     def log(info:String): Unit
-    def newFirmwareAvaiilable(): Unit
+    def newFirmwareAvaiilable(newVer:Int,oldVer:Int): Unit
   }
 
   var flag2Action : () => Unit = _
@@ -140,7 +140,7 @@ object WiC64 extends CBMComponent with Runnable {
       sendHttp("http://sk.sx-64.de/wic64/version.txt")
       if (buffer != null && buffer.length == 4) {
         val version = buffer.map(_.toChar).mkString.substring(2).toInt
-        if (version > WIC64_REAL_FIRMWARE_VERSION && listener != null) listener.newFirmwareAvaiilable()
+        if (version > WIC64_REAL_FIRMWARE_VERSION && listener != null) listener.newFirmwareAvaiilable(version,WIC64_REAL_FIRMWARE_VERSION)
       }
     }
   }

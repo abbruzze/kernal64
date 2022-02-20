@@ -1,15 +1,7 @@
 package ucesoft.cbm
 
-import java.awt.{BorderLayout, Color, Dimension, FlowLayout, Toolkit}
-import java.awt.event._
-import java.io._
-import java.util.zip.{GZIPInputStream, GZIPOutputStream}
-import java.util.{Properties, ServiceLoader}
-import javax.swing._
-import javax.swing.filechooser.FileFilter
 import ucesoft.cbm.cpu.{CPU65xx, Memory, ROM}
 import ucesoft.cbm.expansion._
-import ucesoft.cbm.expansion.cpm.CPMCartridge
 import ucesoft.cbm.formats._
 import ucesoft.cbm.formats.cart.{EasyFlash, GMOD3}
 import ucesoft.cbm.game.{GamePlayer, GameUI}
@@ -23,14 +15,21 @@ import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.printer.{MPS803, MPS803GFXDriver, MPS803ROM}
 import ucesoft.cbm.peripheral.rs232._
-import ucesoft.cbm.peripheral.vic.{Display, Palette, VICType, VIC_NTSC, VIC_PAL}
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 import ucesoft.cbm.peripheral.vic.coprocessor.VASYL
+import ucesoft.cbm.peripheral.vic._
 import ucesoft.cbm.peripheral.{controlport, keyboard, vic}
 import ucesoft.cbm.remote.RemoteC64
 import ucesoft.cbm.trace.{InspectPanel, InspectPanelDialog, TraceDialog, TraceListener}
 
 import java.awt.datatransfer.DataFlavor
+import java.awt.event._
+import java.awt.{BorderLayout, Color, Dimension, FlowLayout, Toolkit}
+import java.io._
+import java.util.zip.{GZIPInputStream, GZIPOutputStream}
+import java.util.{Properties, ServiceLoader}
+import javax.swing._
+import javax.swing.filechooser.FileFilter
 import scala.util.{Failure, Success}
 
 object CBMComputer {
@@ -52,7 +51,7 @@ object CBMComputer {
   }
 }
 
-trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
+trait CBMComputer extends CBMComponent with GamePlayer with KeyListener { cbmComputer =>
   protected val APPLICATION_NAME : String
   protected val CONFIGURATION_FILENAME : String
   protected val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
@@ -260,6 +259,22 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
       drives(d).setActive(false)
       driveLeds(d).setVisible(false)
     }
+  }
+
+  // ---------------- KEY LISTENER -----------------------------
+  override def keyTyped(e: KeyEvent): Unit = {}
+  private def isKeyForJoystick(e:KeyEvent): Boolean = controlPortA.isConnected && controlPortA.consumeKey(e) || controlPortB.isConnected && controlPortB.consumeKey(e)
+  override def keyPressed(e: KeyEvent): Unit = {
+    keypadControlPort.keyPressed(e)
+    keyboardControlPort.keyPressed(e)
+    // check if the key pressed is in charge of joysticks: in this case it does not forward the event to keyboard
+    if (!isKeyForJoystick(e)) keyb.keyPressed(e)
+  }
+  override def keyReleased(e: KeyEvent): Unit = {
+    keypadControlPort.keyReleased(e)
+    keyboardControlPort.keyReleased(e)
+    // check if the key pressed is in charge of joysticks: in this case it does not forward the event to keyboard
+    if (!isKeyForJoystick(e)) keyb.keyReleased(e)
   }
   // -----------------------------------------------------------
 
@@ -1495,6 +1510,8 @@ trait CBMComputer extends CBMComponent with GamePlayer { cbmComputer =>
         traceItem.setSelected(true)
       }
     }
+    // WiC64
+    preferences.add(PREF_WIC64_NETWORK,"Sets the network interface of WiC64","") { wic64Panel.setNetwork(_) }
   }
 
   protected def setFileMenu(fileMenu:JMenu) : Unit = {

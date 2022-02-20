@@ -120,9 +120,7 @@ class SCPUC64 extends CBMComputer {
     display.setPreferredSize(new java.awt.Dimension(vicChip.VISIBLE_SCREEN_WIDTH, vicChip.VISIBLE_SCREEN_HEIGHT))
     vicChip.setDisplay(display)
     displayFrame.getContentPane.add("Center", display)
-    displayFrame.addKeyListener(keyb)
-    displayFrame.addKeyListener(keypadControlPort)
-    displayFrame.addKeyListener(keyboardControlPort)
+    displayFrame.addKeyListener(this)
     display.addMouseListener(keypadControlPort)
     display.addMouseListener(controlport.ControlPort.emptyControlPort)
     val lightPen = new LightPenButtonListener

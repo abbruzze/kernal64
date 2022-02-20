@@ -83,7 +83,7 @@ object BasicListExplorer {
       0xc9 -> "RIGHT$",
       0xca -> "MID$",
       0xcb -> "GO",
-      0xff -> "PI",
+      0xff -> "{pi}",
       0xcc -> "RGR",
       0xcd -> "RCLR",
       0xce -> "*PREFIX*",
@@ -201,23 +201,54 @@ object BasicListExplorer {
       case Some(t) => t -> 1
     }
   }
-  
+  // taken from C64Studio
   private def mapChar(c:Int) : String = {
     c match {
       case 5 => "{white}"
       case 10 => "\n"
-      case 17 => "{crsr-up}"
-      case 18 => "{rvs-off}"
-      case 19 => "{clr-home}"
-      case 20 => "{inst-del}"
+      case 17 => "{down}"
+      case 18 => "{rvon}"
+      case 19 => "{home}"
+      case 20 => "{del}"
       case 28 => "{red}"
-      case 29 => "{crsr-right}"
+      case 29 => "{right}"
       case 30 => "{green}"
-      case 31 => "{red}" // TODO
-      case 92 => "{lira}"
+      case 31 => "{blue}"
+      case 92 => "{pound}"
       case 94 => "^"
+      case 95 => "{Shift-ArrowLeft}"
+      case 96 => "{Shift-*}"
+      case 97 => "{Shift-A}"
+      case 98 => "{Shift-B}"
+      case 99 => "{Shift-C}"
+      case 100 => "{Shift-D}"
+      case 101 => "{Shift-E}"
+      case 102 => "{Shift-F}"
+      case 103 => "{Shift-G}"
+      case 104 => "{Shift-H}"
+      case 105 => "{Shift-I}"
+      case 106 => "{Shift-J}"
+      case 107 => "{Shift-K}"
+      case 108 => "{Shift-L}"
+      case 109 => "{Shift-M}"
+      case 110 => "{Shift-N}"
+      case 111 => "{Shift-O}"
+      case 112 => "{Shift-P}"
+      case 113 => "{Shift-Q}"
+      case 114 => "{Shift-R}"
+      case 115 => "{Shift-S}"
+      case 116 => "{Shift-T}"
+      case 117 => "{Shift-U}"
+      case 118 => "{Shift-V}"
+      case 119 => "{Shift-W}"
+      case 120 => "{Shift-X}"
+      case 121 => "{Shift-Y}"
+      case 122 => "{Shift-Z}"
+      case 123 => "{Shift-+}"
+      case 124 => "{CBM--}"
+      case 125 => "{Shift--}"
+      case 127 => "{CBM-*}"
       case 129 => "{orange}"
-      case 95 => "{left-arrow}"
       case 133 => "{F1}"
       case 134 => "{F3}"
       case 135 => "{F5}"
@@ -227,33 +258,65 @@ object BasicListExplorer {
       case 139 => "{F6}"
       case 140 => "{F8}"
       case 144 => "{black}"
-      case 145 => "{crsr-down}"
-      case 146 => "{rvs-off}"
-      case 147 => "{clr-home}"
-      case 148 => "{inst-del}"
+      case 145 => "{up}"
+      case 146 => "{rvof}"
+      case 147 => "{clr}"
+      case 148 => "{ins}"
       case 149 => "{brown}"
-      case 150 => "{light red}"
-      case 151 => "{dark gray}"
-      case 152 => "{gray}"
-      case 153 => "{light green}"
-      case 154 => "{light blue}"
-      case 155 => "{light gray}" // TODO
-      case 157 => "{crsr-left}"
+      case 150 => "{lred}"
+      case 151 => "{gry1}"
+      case 152 => "{gry2}"
+      case 153 => "{lgrn}"
+      case 154 => "{lblu}"
+      case 155 => "{gry3}"
+      case 156 => "{purple}"
+      case 157 => "{left}"
       case 158 => "{yellow}"
-      case 159 => "{cyan}"
+      case 159 => "{cyn}"
+      case 161 => "{CBM-K}"
+      case 162 => "{CBM-I}"
+      case 163 => "{CBM-T}"
+      case 164 => "{CBM-@}"
+      case 165 => "{CBM-G}"
+      case 166 => "{CBM-+}"
+      case 167 => "{CBM-N}"
+      case 168 => "{CBM-£}"
+      case 169 => "{Shift-£}"
+      case 170 => "{CBM-M}"
+      case 171 => "{CBM-Q}"
+      case 172 => "{CBM-D}"
+      case 173 => "{CBM-Z}"
+      case 174 => "{CBM-S}"
+      case 175 => "{CBM-P}"
+      case 176 => "{CBM-A}"
+      case 177 => "{CBM-E}"
+      case 178 => "{CBM-R}"
+      case 179 => "{CBM-W}"
+      case 180 => "{CBM-H}"
+      case 181 => "{CBM-J}"
+      case 182 => "{CBM-L}"
+      case 183 => "{CBM-Y}"
+      case 184 => "{CBM-U}"
+      case 185 => "{CBM-O}"
+      case 187 => "{CBM-F}"
+      case 188 => "{CBM-C}"
+      case 189 => "{CBM-X}"
+      case 190 => "{CBM-V}"
+      case 191 => "{CBM-B}"
+      case 255 => "{Shift-Arrowup}"
       case p if p >= 32 && p < 95 => p.toChar.toString
       case x => s"{$x}"
     }
   }
-  
-  def list(ram:Memory,startAddress:Int) : Unit = {
+
+  def createSource(ram:Memory,startAddress:Int): StringBuilder = {
     val sb = new StringBuilder
     var adr = startAddress
-    
+
     var keepListing = true
     while (keepListing && adr < 0x10000) {
-      val nextAdr = ram.read(adr) | ram.read(adr + 1) << 8      
-      adr += 2     
+      val nextAdr = ram.read(adr) | ram.read(adr + 1) << 8
+      adr += 2
       keepListing = nextAdr != 0
       if (keepListing) {
         val line = ram.read(adr) | ram.read(adr + 1) << 8
@@ -262,7 +325,7 @@ object BasicListExplorer {
         sb.append(s"$line ")
         var token = ram.read(adr)
         while (token != 0 && adr < 0x10000) {
-          if (token == 0x22) stringMode = !stringMode 
+          if (token == 0x22) stringMode = !stringMode
           val nextByte = ram.read(adr + 1)
           if (!stringMode && (token & 0x80) > 0) {
             val (text,length) = findToken(token,nextByte)
@@ -279,6 +342,11 @@ object BasicListExplorer {
         sb.append("\n")
       }
     }
+    sb
+  }
+  
+  def list(ram:Memory,startAddress:Int) : Unit = {
+    val sb = createSource(ram, startAddress)
     if (Desktop.isDesktopSupported) {
       val file = java.io.File.createTempFile("kernal64",".txt")
       file.deleteOnExit

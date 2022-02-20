@@ -10,13 +10,11 @@ import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.vic.VICType
-import ucesoft.cbm.trace.{InspectPanel, TraceDialog}
+import ucesoft.cbm.trace.TraceDialog
 
-import java.awt.datatransfer.DataFlavor
-import java.awt.{Toolkit, _}
+import java.awt._
 import java.io._
 import javax.swing._
-import javax.swing.filechooser.FileFilter
 
 object C64 extends App {
   CBMComputer.turnOn(new C64,args)
@@ -97,7 +95,7 @@ class C64 extends CBMComputer {
     				   nmiSwitcher.setLine(Switcher.CIA,_),
                idle => cia12Running(1) = !idle)
     WiC64.flag2Action = cia2.setFlagLow _
-    wic64Panel = new WiC64Panel(displayFrame)
+    wic64Panel = new WiC64Panel(displayFrame,preferences)
     WiC64.setListener(wic64Panel)
     add(WiC64)
     rs232.setCIA12(cia1,cia2)
@@ -112,9 +110,7 @@ class C64 extends CBMComputer {
     display.setPreferredSize(new java.awt.Dimension(vicChip.VISIBLE_SCREEN_WIDTH,vicChip.VISIBLE_SCREEN_HEIGHT))
     vicChip.setDisplay(display)
     displayFrame.getContentPane.add("Center",display)
-    displayFrame.addKeyListener(keyb)
-    displayFrame.addKeyListener(keypadControlPort)
-    displayFrame.addKeyListener(keyboardControlPort)
+    displayFrame.addKeyListener(this)
     display.addMouseListener(keypadControlPort)
     display.addMouseListener(controlport.ControlPort.emptyControlPort)
     val lightPen = new LightPenButtonListener

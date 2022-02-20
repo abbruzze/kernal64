@@ -60,6 +60,7 @@ object Preferences {
   val PREF_CHARROM128         = "charrom128"
   val PREF_SCPURAM            = "scpu-ram"
   val PREF_SCPUJIFFYDOSENABLED= "scpu-jiffydos-enabled"
+  val PREF_WIC64_NETWORK      = "wic64-network-name"
   // =============================================================
   class PreferenceIllegalArgumentException(msg:String) extends Exception(msg)
 

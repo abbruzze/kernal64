@@ -1,4 +1,5 @@
 package ucesoft.cbm.peripheral.controlport
+import java.awt.event.KeyEvent
 
 class ControlPortBridge(var controlPort:ControlPort,override val componentID : String) extends ControlPort {
   override def readPort = controlPort.readPort
@@ -15,4 +16,6 @@ class ControlPortBridge(var controlPort:ControlPort,override val componentID : S
   override def isLightPenEmulationEnabled = controlPort.isLightPenEmulationEnabled
   override def setMouse1351Emulation(enabled:Boolean) = controlPort.setMouse1351Emulation(enabled)
   override def isMouse1351EmulationEnabled = controlPort.isMouse1351EmulationEnabled
+
+  override def consumeKey(e: KeyEvent): Boolean = controlPort.consumeKey(e)
 }
