@@ -121,13 +121,7 @@ class WiC64Panel(frame:JFrame,pref:Preferences) extends JPanel with WiC64.WiC64L
     large = doc.addStyle("large", regular)
     StyleConstants.setFontSize(large, 24)
 
-    enabledCheck.addActionListener(_ => {
-      WiC64.enabled = enabledCheck.isSelected
-      textPane.setEnabled(enabledCheck.isSelected)
-      networks.setEnabled(enabledCheck.isSelected)
-      logButton.setEnabled(enabledCheck.isSelected)
-      updateCmd.setEnabled(enabledCheck.isSelected)
-    })
+    enabledCheck.addActionListener(_ => setWiC64Enabled(enabledCheck.isSelected))
     networks.addActionListener(_ => {
       import scala.jdk.CollectionConverters._
       val nw = NetworkInterface.getNetworkInterfaces.asScala.toArray
@@ -166,6 +160,17 @@ class WiC64Panel(frame:JFrame,pref:Preferences) extends JPanel with WiC64.WiC64L
     add("North",northPanel)
     add("South",southPanel)
     update()
+  }
+
+  def setWiC64Enabled(enabled:Boolean): Unit = {
+    enabledCheck.setSelected(enabled)
+    WiC64.enabled = enabled
+    textPane.setEnabled(enabled)
+    networks.setEnabled(enabled)
+    logButton.setEnabled(enabled)
+    updateCmd.setEnabled(enabled)
+    enabledCheck.setSelected(enabled)
+    pref.updateWithoutNotify(Preferences.PREF_WIC64_ENABLED,enabled)
   }
 
   private def update(): Unit = {

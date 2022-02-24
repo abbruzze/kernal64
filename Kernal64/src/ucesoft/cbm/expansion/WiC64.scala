@@ -344,7 +344,7 @@ object WiC64 extends CBMComponent with Runnable {
     else Option(networkif.getHardwareAddress)
 
     ni match {
-      case Some(addr) => addr.map(_.toInt & 0xFF).map(_.toHexString).mkString(":")
+      case Some(addr) => addr.map(_.toInt & 0xFF).map(a => if (a > 0x0F) a.toHexString else s"0${a.toHexString}").mkString(":")
       case None => "N/A"
     }
   }

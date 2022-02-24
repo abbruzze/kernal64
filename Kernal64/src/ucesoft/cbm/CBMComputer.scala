@@ -1512,6 +1512,10 @@ trait CBMComputer extends CBMComponent with GamePlayer with KeyListener { cbmCom
     }
     // WiC64
     preferences.add(PREF_WIC64_NETWORK,"Sets the network interface of WiC64","") { wic64Panel.setNetwork(_) }
+    preferences.add(PREF_WIC64_ENABLED,"Enables/disables WiC64 at startup",false) { enabled =>
+      wic64Panel.setWiC64Enabled(enabled)
+      if (!headless) wic64Panel.dialog.setVisible(true)
+    }
   }
 
   protected def setFileMenu(fileMenu:JMenu) : Unit = {
