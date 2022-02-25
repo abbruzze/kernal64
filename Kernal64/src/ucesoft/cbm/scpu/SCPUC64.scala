@@ -108,6 +108,10 @@ class SCPUC64 extends CBMComputer {
       cia2CP2,
       nmiSwitcher.setLine(Switcher.CIA,_),
       idle => cia12Running(1) = !idle)
+    WiC64.flag2Action = cia2.setFlagLow _
+    wic64Panel = new WiC64Panel(displayFrame,preferences)
+    WiC64.setListener(wic64Panel)
+    add(WiC64)
     rs232.setCIA12(cia1, cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
@@ -359,6 +363,8 @@ class SCPUC64 extends CBMComputer {
     IOItem.addSeparator
 
     setFlyerSettings(IOItem)
+
+    setWiC64Settings(IOItem)
 
     setREUSettings(IOItem)
 
