@@ -234,17 +234,18 @@ object WiC64 extends CBMComponent with Runnable {
 
   private def sendHttp(target:String,streaming:Boolean = false): Unit = {
     log(s"Opening connection: $target")
-    val url = new URL(target)
-    val connection = url.openConnection().asInstanceOf[HttpURLConnection]
-    connection.setRequestMethod("GET")
-    connection.setInstanceFollowRedirects(true)
-    connection.setRequestProperty("User-Agent","ESP32HTTPClient")
     try {
+      val url = new URL(target)
+      val connection = url.openConnection().asInstanceOf[HttpURLConnection]
+      connection.setRequestMethod("GET")
+      connection.setInstanceFollowRedirects(true)
+      connection.setRequestProperty("User-Agent","ESP32HTTPClient")
       connection.connect()
       val rcode = connection.getResponseCode
       log(s"HTTP code=$rcode")
       if (rcode != 200 && rcode != 201) {
         log("Returning error code")
+        sendMode = SENDING_MODE_WAITING_DUMMY
         buffer = "!0".toArray.map(_.toInt)
       }
       else {
@@ -281,8 +282,10 @@ object WiC64 extends CBMComponent with Runnable {
       sendMode = SENDING_MODE_WAITING_DUMMY
     }
     catch {
-      case io:IOException =>
+      case io:Exception =>
         log(s"Http I/O error: $io")
+        sendMode = SENDING_MODE_WAITING_DUMMY
+        buffer = "!0".toArray.map(_.toInt)
     }
   }
 
@@ -333,9 +336,12 @@ object WiC64 extends CBMComponent with Runnable {
   }
 
   private def resolve(urlString:String): String = {
-    var url = urlString
-    if (url.charAt(0) == '!') url = server + urlString.substring(1)
-    url.replaceAll("%mac",MAC_ADDRESS.replaceAll(":","") + token).replaceAll("%ser",server)
+    if (urlString.nonEmpty) {
+      var url = urlString
+      if (url.charAt(0) == '!') url = server + urlString.substring(1)
+      url.replaceAll("%mac", MAC_ADDRESS.replaceAll(":", "") + token).replaceAll("%ser", server)
+    }
+    else urlString
   }
 
   private def getMacAddress(): String = {
