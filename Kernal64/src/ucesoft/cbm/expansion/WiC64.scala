@@ -1,13 +1,13 @@
 package ucesoft.cbm.expansion
 
 import org.apache.commons.net.telnet.TelnetClient
-import ucesoft.cbm.{CBMComponent, CBMComponentType, Log}
+import ucesoft.cbm.{CBMComponent, CBMComponentType, Clock, ClockEvent, Log}
 
-import java.io.{IOException, InputStream, ObjectInputStream, ObjectOutputStream}
+import java.io.{BufferedInputStream, IOException, InputStream, ObjectInputStream, ObjectOutputStream}
 import java.net._
 import java.text.SimpleDateFormat
 import java.util.Properties
-import java.util.concurrent.LinkedBlockingDeque
+import java.util.concurrent.{CountDownLatch, Executors, LinkedBlockingDeque}
 
 object WiC64 extends CBMComponent with Runnable {
   override val componentID: String = "WiC64"
@@ -21,6 +21,7 @@ object WiC64 extends CBMComponent with Runnable {
   }
 
   var flag2Action : () => Unit = _
+  var flag2Clear : () => Unit = _
 
   private var _enabled = false
 
@@ -54,7 +55,7 @@ object WiC64 extends CBMComponent with Runnable {
   private var bufferLen = 0
   private var adjustBufferLenForPRG = 0
   private var recCmd = 0
-  private var buffer : Array[Int] = _
+  @volatile private var buffer,responseBuffer : Array[Int] = _
   private var bufferIndex = 0
 
   private final val TOKEN_NAME = "sectokenname"
@@ -69,6 +70,7 @@ object WiC64 extends CBMComponent with Runnable {
   private var udp : DatagramSocket = _
   private var udpThread : Thread = _
   private var udpThreadRunning = false
+  private var udpThreadShutdown = new CountDownLatch(1)
   private case class UDPPacket(from:Array[Byte],data:Array[Byte])
   private val udpReceivedQueue = new LinkedBlockingDeque[UDPPacket](10)
 
@@ -80,6 +82,11 @@ object WiC64 extends CBMComponent with Runnable {
   private var logEnabled = false
 
   private var streamingIn : InputStream = _
+
+  private val executor = Executors.newSingleThreadExecutor()
+  //private val clk = Clock.systemClock
+
+  //private final val CMD_CLOCKS_WAIT = (clk.PAL_CLOCK_HZ / 1000).toInt
 
   private final val CMD_DESCR = Map(
     0x0 -> "get FW version",
@@ -138,9 +145,9 @@ object WiC64 extends CBMComponent with Runnable {
     if (!on) reset
     else {
       // check firmware version
-      sendHttpGET("http://sk.sx-64.de/wic64/version.txt")
-      if (buffer != null && buffer.length == 4) {
-        val version = buffer.map(_.toChar).mkString.substring(2).toInt
+      sendHttpGET("http://sk.sx-64.de/wic64/version.txt",false)
+      if (responseBuffer != null && responseBuffer.length == 4) {
+        val version = responseBuffer.map(_.toChar).mkString.substring(2).toInt
         if (version > WIC64_REAL_FIRMWARE_VERSION && listener != null) listener.newFirmwareAvaiilable(version,WIC64_REAL_FIRMWARE_VERSION)
       }
     }
@@ -188,19 +195,27 @@ object WiC64 extends CBMComponent with Runnable {
   }
 
   def setMode(mode:Int): Unit = {
-    this.mode = mode
-    //println(s"Mode: $mode")
-    recMode = RECEIVING_MODE_WAITING_W
-    sendMode = SENDING_MODE_WAITING_DUMMY
-    if (listener != null) listener.turnGreenLed(mode == RECEIVING_MODE)
+    if (mode != this.mode) {
+      this.mode = mode
+      recMode = RECEIVING_MODE_WAITING_W
+      sendMode = SENDING_MODE_WAITING_DUMMY
+      if (listener != null) listener.turnGreenLed(mode == RECEIVING_MODE)
+    }
+  }
+
+  private def background(task: => Unit): Unit = {
+    executor.submit(new Runnable() {
+      override def run(): Unit = task
+    })
   }
 
   def write(byte:Int): Unit = {
-    flag2Action()
     if (mode != RECEIVING_MODE) {
       //println("NOT IN RECEIVING MODE ...")
       return
     }
+
+    flag2Action()
 
     //println(s"WRITE: ${byte.toHexString} '${byte.toChar}' recMode = $recMode bufferIndex=$bufferIndex len=$bufferLen")
 
@@ -212,6 +227,7 @@ object WiC64 extends CBMComponent with Runnable {
         recMode = RECEIVING_MODE_WAITING_LEN_HI
       case RECEIVING_MODE_WAITING_LEN_HI =>
         bufferLen = (bufferLen | byte << 8) - 4
+        if (bufferLen < 0) bufferLen = 0
         buffer = Array.ofDim[Int](bufferLen)
         bufferIndex = 0
         recMode = RECEIVING_MODE_WAITING_CMD
@@ -222,22 +238,36 @@ object WiC64 extends CBMComponent with Runnable {
         }
         else recMode = RECEIVING_MODE_WAITING_DATA
       case RECEIVING_MODE_WAITING_DATA =>
-        buffer(bufferIndex) = byte
-        bufferIndex += 1
-        if (bufferIndex == bufferLen) executeCmd() //recMode = RECEIVING_MODE_WAITING_LAST
-      case RECEIVING_MODE_WAITING_LAST =>
-        executeCmd()
+        if (bufferIndex < buffer.length) {
+          buffer(bufferIndex) = byte
+          bufferIndex += 1
+          if (bufferIndex == bufferLen) {
+            //clk.schedule(new ClockEvent("WiC64_CMD", clk.currentCycles + CMD_CLOCKS_WAIT, _ => executeCmd()))
+            executeCmd()
+          }
+        }
       case _ =>
     }
   }
 
+  private def prepareResponse(resp:String): Unit = {
+    sendMode = SENDING_MODE_WAITING_DUMMY
+    responseBuffer = resp.toArray.map(_.toInt)
+    flag2Action()
+  }
+  private def prepareResponse(resp:Array[Int]): Unit = {
+    sendMode = SENDING_MODE_WAITING_DUMMY
+    responseBuffer = resp
+    flag2Action()
+  }
+
   @inline private def log(s:String): Unit = if (logEnabled && listener != null) listener.log(s)
 
-  private def checkHttpResponse(rcode:Int): Unit = {
+  private def checkHttpResponse(rcode:Int,content:Array[Int]): Option[String] = {
     if (rcode == 201) {
       // search var name and value
       var retCode = "0"
-      buffer.map(_.toChar).mkString.split("\\u0001") match {
+      content.map(_.toChar).mkString.split("\\u0001") match {
         case Array(_, name, value, rtCode) =>
           prefMap.setProperty(name, value)
           log(s"PREF $name = $value")
@@ -249,8 +279,10 @@ object WiC64 extends CBMComponent with Runnable {
           }
         case _ =>
       }
-      buffer = retCode.toArray.map(_.toInt)
+      //responseBuffer = retCode.toArray.map(_.toInt)
+      Some(retCode)
     }
+    else None
   }
 
   private def dump(toDump:Array[Int]): Unit = {
@@ -289,21 +321,33 @@ object WiC64 extends CBMComponent with Runnable {
     log("-" * (16 * 4 + 5))
   }
 
-  private def sendHttpPOST(target:String,postContent:Array[Int],streaming:Boolean = false): Unit = {
-    log(s"Opening connection[POST/${postContent.length} bytes]: $target")
+  private def sendHttpPOST(target:String,fileName:Option[String],postContent:Array[Int],streaming:Boolean = false): Unit = {
+    log(s"Opening connection[POST/${postContent.length} bytes ${fileName.getOrElse("")} ${if (streaming) " streaming" else ""}]: $target")
     try {
       val url = new URL(target)
       val connection = url.openConnection().asInstanceOf[HttpURLConnection]
       connection.setRequestMethod("POST")
       connection.setInstanceFollowRedirects(true)
       connection.setRequestProperty("User-Agent","ESP32HTTPClient")
+      if (fileName.isDefined)
+        connection.setRequestProperty("Content-Type","multipart/form-data; boundary=--jamaica")
       connection.setDoOutput(true)
       val out = connection.getOutputStream
       val buf = postContent.map(_.toByte)
+      fileName match {
+        case Some(fn) =>
+          out.write("----jamaica\r\n".getBytes)
+          out.write(s"""Content-Disposition: form-data; name="imageFile"; filename="$fn"\r\n""".getBytes)
+          out.write("Content-Type: application/octet-stream\r\n\r\n".getBytes)
+        case None =>
+      }
       out.write(buf)
+      if (fileName.isDefined)
+        out.write("\r\n----jamaica\r\n".getBytes)
       out.close()
       //connection.connect()
       val rcode = connection.getResponseCode
+      log(s"HTTP code=$rcode")
       if (rcode != 200 && rcode != 201) {
         log(s"Returning error code for http result code: $rcode")
         sendMode = SENDING_MODE_WAITING_DUMMY
@@ -312,31 +356,35 @@ object WiC64 extends CBMComponent with Runnable {
       else {
         val in = connection.getInputStream
         if (streaming) {
-          streamingIn = in
+          streamingIn = new BufferedInputStream(in)
+          prepareResponse(null:Array[Int])
           return
         }
-        buffer = in.readAllBytes().map(_.toInt & 0xFF)
+
+        var content = in.readAllBytes().map(_.toInt & 0xFF)
+        log(s"HTTP POST response[${content.length}]:")
+        dump(content)
+        checkHttpResponse(rcode,content) match {
+          case None =>
+          case Some(code) => content = code.toArray.map(_.toInt)
+        }
+        in.close()
         if (target.endsWith(".prg")) {
           adjustBufferLenForPRG = 2
           log("Adjusting PRG size ...")
         }
-        log(s"HTTP POST response[${buffer.length}]:")
-        dump(buffer)
-        checkHttpResponse(rcode)
-        in.close()
+        prepareResponse(content)
       }
-      sendMode = SENDING_MODE_WAITING_DUMMY
     }
     catch {
       case io:Exception =>
         log(s"Http post I/O error: $io")
-        sendMode = SENDING_MODE_WAITING_DUMMY
-        buffer = "!0".toArray.map(_.toInt)
+        prepareResponse("!0")
     }
   }
 
   private def sendHttpGET(target:String,streaming:Boolean = false): Unit = {
-    log(s"Opening connection[GET]: $target")
+    log(s"Opening connection[GET${if (streaming) " streaming" else ""}]: $target")
     try {
       val url = new URL(target)
       val connection = url.openConnection().asInstanceOf[HttpURLConnection]
@@ -348,33 +396,35 @@ object WiC64 extends CBMComponent with Runnable {
       log(s"HTTP code=$rcode")
       if (rcode != 200 && rcode != 201) {
         log(s"Returning error code for http result code: $rcode")
-        sendMode = SENDING_MODE_WAITING_DUMMY
-        buffer = "!0".toArray.map(_.toInt)
+        prepareResponse("!0")
       }
       else {
         val in = connection.getInputStream
         if (streaming) {
-          streamingIn = in
+          streamingIn = new BufferedInputStream(in)
+          prepareResponse(null:Array[Int])
           return
         }
-        buffer = in.readAllBytes().map(_.toInt & 0xFF)
+
+        var content = in.readAllBytes().map(_.toInt & 0xFF)
+        log(s"HTTP GET response[${content.length}]:")
+        dump(content)
+        checkHttpResponse(rcode,content) match {
+          case None =>
+          case Some(code) => content = code.toArray.map(_.toInt)
+        }
+        in.close()
         if (target.endsWith(".prg")) {
           adjustBufferLenForPRG = 2
           log("Adjusting PRG size ...")
         }
-        //log(s"HTTP [${buffer.length}]:\n${buffer.map(c => if (c >= 32 && c < 127) c.toChar else '.').mkString}\n${buffer.map(_.toHexString).mkString(" ")}")
-        log(s"HTTP GET response[${buffer.length}]:")
-        dump(buffer)
-        checkHttpResponse(rcode)
-        in.close()
+        prepareResponse(content)
       }
-      sendMode = SENDING_MODE_WAITING_DUMMY
     }
     catch {
       case io:Exception =>
         log(s"Http get I/O error: $io")
-        sendMode = SENDING_MODE_WAITING_DUMMY
-        buffer = "!0".toArray.map(_.toInt)
+        prepareResponse("!0")
     }
   }
 
@@ -438,7 +488,6 @@ object WiC64 extends CBMComponent with Runnable {
       }
     }
   }
-
   private def executeCmd(): Unit = {
     totalCmdIssued += 1
 
@@ -450,29 +499,27 @@ object WiC64 extends CBMComponent with Runnable {
 
     adjustBufferLenForPRG = 0
     recMode = RECEIVING_MODE_WAITING_W
-    //log(s"CMD=[${recCmd.toHexString} ${CMD_DESCR.getOrElse(recCmd,"???")}] BUFFER RECEIVED: ${if (bufferLen > 0) buffer.map(_.toHexString).mkString(" ") else "EMPTY"}")
+    responseBuffer = null
+    //flag2Clear()
     log(s"CMD=[${recCmd.toHexString} ${CMD_DESCR.getOrElse(recCmd,"???")}]: ${if (bufferLen == 0) "EMPTY" else ""}")
     if (bufferLen > 0) dump(buffer)
-    //log(s"> ${buffer.map(_.toChar).mkString}")
     recCmd match {
       case 0 => // GET FIRMWARE VERSION
-        buffer = FIRMWARE_VERSION.toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse(FIRMWARE_VERSION)
       case 1 => // LOAD HTTP / HTTPS
-        sendHttpGET(encodeURL(resolve(buffer.map(_.toChar).mkString)))
+        flag2Clear() // TODO: to check why
+        background {
+          sendHttpGET(encodeURL(resolve(buffer.map(_.toChar).mkString)))
+        }
       case 2 => // CONFIG WIFI
         log(s"CONFIG WIFI: ${buffer.map(_.toChar).mkString}")
-        buffer = "Wlan config not changed".toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse("Wlan config not changed")
       case 3|4|5 => // FIRMWARE UPDATE STANDARD/DEVELOPER/ESP32 DEVELOPER
-        buffer = "OK".toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse("OK")
       case 6 => // GET IP ADDRESS OF WIC64
-        buffer = getIPAddress().toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse(getIPAddress())
       case 7 => // GET FIRMWARE VERSION STATUS
-        buffer = s"${ucesoft.cbm.Version.BUILD_DATE} ${ucesoft.cbm.Version.VERSION}".toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse(s"${ucesoft.cbm.Version.BUILD_DATE} ${ucesoft.cbm.Version.VERSION}")
       case 8 => // SET DEFAULT SERVER
         server = String.valueOf(buffer.map(_.toChar))
         prefMap.setProperty("server",server)
@@ -485,24 +532,20 @@ object WiC64 extends CBMComponent with Runnable {
         if (buffer.length > 4) {
           val ip = s"${buffer(0)}.${buffer(1)}.${buffer(2)}.${buffer(3)}"
           val data = buffer.drop(4)
-          //log(s"UDP SEND to $ip data = ${data.map(_.toHexString).mkString(" ")}")
           log(s"UDP SEND to $ip data:")
           dump(data)
           val ipAddress = Array(buffer(0).toByte,buffer(1).toByte,buffer(2).toByte,buffer(3).toByte)
-          sendUDP(ipAddress,udpPort,data)
+          sendUDP(ipAddress, udpPort, data)
         }
       case 0xC => // WLAN SCAN SSID
         val scan = s"0\u0001${SSID}\u0001255\u0001"
-        buffer = scan.toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse(scan)
       case 0xD => // CONFIG WLAN SCAN SSID
         log(s"CONFIG WIFI (SCAN): ${buffer.map(_.toChar).mkString}")
-        buffer = "Wlan config not changed".toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse("Wlan config not changed")
       case 0xE => // CHANGE UDP PORT
         if (buffer.length == 2) {
           udpPort = buffer(0) | buffer(1) << 8
-          if (udp != null) udp.close()
           try {
             checkUDP()
             log(s"UDP PORT set to $udpPort")
@@ -514,49 +557,45 @@ object WiC64 extends CBMComponent with Runnable {
           }
         }
       case 0xF => // HTTP STRING CONVERSION FOR HTTP CHAT
-        sendHttpGET(encodeURL(resolve(en_code(buffer.map(_.toChar).mkString))))
+        flag2Clear() // TODO: to check why
+        background {
+          sendHttpGET(encodeURL(resolve(en_code(buffer.map(_.toChar).mkString))))
+        }
       case 0x10 => // GET ACTUAL CONNECTED SSID
-        buffer = SSID.toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse(SSID)
       case 0x11 => // GET ACTUAL WIFI SIGNAL RSSI
-        buffer = "255".toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse("255")
       case 0x12 => // GET DEFAULT SERVER
-        buffer = server.toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse(server)
       case 0x13 => // GET EXTERNAL IP OF WIC64 INTERNET CONNECTION
-        sendHttpGET("http://sk.sx-64.de/wic64/ip.php")
+        flag2Clear() // TODO: to check why
+        background {
+          sendHttpGET("http://sk.sx-64.de/wic64/ip.php")
+        }
       case 0x14 => // GET MAC ADDRESS OF WIC64
-        buffer = MAC_ADDRESS.toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse(MAC_ADDRESS)
       case 0x15 => // GET TIME AND DATE FROM NTP SERVER
-        buffer = dateFormatter.format(new java.util.Date).toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse(dateFormatter.format(new java.util.Date))
       case 0x16 => // SET TIMEZONE OF NTP SERVER
         log(s"TIME ZONE: ${buffer.mkString(",")}")
-        buffer = "Time zone set".toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse("Time zone set")
       case 0x17 => // GET TIMEZONE OF NTP SERVER
-        buffer = Array(2,0) // European
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse(Array(2,0))
       case 0x18 => // CHECK IF DEVELOPER/STANDARD FIRMWARE UPDATE IS AVAILABLE
-        buffer = Array('0'.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse(Array('0'.toInt))
       case 0x19 => // READ PREFS STRING FROM EEPROM
         // TODO CHECK IF MUST BE SKIPPED SEPARATOR (1)
         val prefName = buffer.map(_.toChar).mkString
         val value = prefMap.getProperty(prefName,"")
         log(s"READING PREF $prefName = '$value'")
-        buffer = value.toArray.map(_.toInt)
-        sendMode = SENDING_MODE_WAITING_DUMMY
+        prepareResponse(value)
       case 0x1A => // SAVE PREFS STRING TO EEPROM
         val pref = buffer.map(_.toChar).mkString
         pref.split("\u00001") match {
           case Array(_,name,value,retVal) =>
             log(s"WRITING PREF $name = '$value")
             prefMap.setProperty(name,value)
-            buffer = retVal.toArray.map(_.toInt)
-            sendMode = SENDING_MODE_WAITING_DUMMY
+            prepareResponse(retVal)
           case _ =>
             log(s"WRITING PREF ERROR: $pref")
         }
@@ -564,20 +603,23 @@ object WiC64 extends CBMComponent with Runnable {
       // case 0x1F => // SEND TCP
       // case 0x20 => // SET TCP PORT
       case 0x21 => // CONNECT TO SERVER:PORT VIA TCP (TELNET)
-        if (telnetClient != null && telnetClient.isConnected) telnetClient.disconnect()
-        telnetClient = new TelnetClient
-        telnetClient.setDefaultTimeout(5000)
-        val Array(h,p) = buffer.map(_.toChar).mkString.split(":")
-        try {
-          telnetClient.connect(h, p.toInt)
-          buffer = "0".toArray.map(_.toInt)
-          sendMode = SENDING_MODE_WAITING_DUMMY
-        }
-        catch {
-          case e:Exception =>
-            log(s"Telnet error: $e")
-            buffer = "!E".toArray.map(_.toInt)
-            sendMode = SENDING_MODE_WAITING_DUMMY
+        background {
+          if (telnetClient != null && telnetClient.isConnected) telnetClient.disconnect()
+          telnetClient = new TelnetClient
+          telnetClient.setDefaultTimeout(5000)
+          val (h, p) = buffer.map(_.toChar).mkString.split(":") match {
+            case Array(h,p) => (h,p)
+            case Array(h) => (h,"23")
+          }
+          try {
+            telnetClient.connect(h, p.toInt)
+            prepareResponse("0")
+          }
+          catch {
+            case e: Exception =>
+              log(s"Telnet error: $e")
+              prepareResponse("!E")
+          }
         }
       case 0x22 => // GET DATA FROM TCP CONNECTION
         try {
@@ -586,14 +628,12 @@ object WiC64 extends CBMComponent with Runnable {
           if (av > 0xFFFF) av = 0xFFFF
           val bf = Array.ofDim[Byte](av)
           in.read(bf)
-          buffer = bf.map(_.toInt & 0xFF)
-          sendMode = SENDING_MODE_WAITING_DUMMY
+          prepareResponse(bf.map(_.toInt & 0xFF))
         }
         catch {
-          case e:Exception =>
+          case e: Exception =>
             log(s"Telnet error: $e")
-            buffer = Array()
-            sendMode = SENDING_MODE_WAITING_DUMMY
+            prepareResponse(Array[Int]())
         }
       case 0x23 =>
         val out = telnetClient.getOutputStream
@@ -601,14 +641,12 @@ object WiC64 extends CBMComponent with Runnable {
         try {
           out.write(bf)
           out.flush()
-          buffer = "0".toArray.map(_.toInt)
-          sendMode = SENDING_MODE_WAITING_DUMMY
+          prepareResponse("0")
         }
         catch {
-          case e:Exception =>
+          case e: Exception =>
             log(s"Telnet error: $e")
-            buffer = "!E".toArray.map(_.toInt)
-            sendMode = SENDING_MODE_WAITING_DUMMY
+            prepareResponse("!E")
         }
       case 0x24 => // HTTP POST
         // find url
@@ -623,15 +661,28 @@ object WiC64 extends CBMComponent with Runnable {
           }
         }
         if (!found) {
-          buffer = "!0".toArray.map(_.toInt) // TODO: CHECK
-          sendMode = SENDING_MODE_WAITING_DUMMY
+          prepareResponse("!0")
         }
         else {
           val postContent = buffer.drop(i + 1)
-          sendHttpPOST(url.toString(),postContent)
+          // extract filename
+          val mark = url.indexOf('?')
+          val (fn,target) = mark match {
+            case -1 =>
+              (None,url.toString())
+            case mark =>
+              (Some(url.substring(mark + 1)),url.substring(0,mark))
+          }
+          flag2Clear() // TODO: to check why
+          background {
+            sendHttpPOST(target, fn, postContent) // http://sk.sx-64.de:80/up/up.php http://10.42.145.148:8000
+          }
         }
       case 0x25 => // STREAMING
-        sendHttpGET(encodeURL(resolve(buffer.map(_.toChar).mkString)),true)
+        flag2Clear() // TODO: to check why
+        background {
+          sendHttpGET(encodeURL(resolve(buffer.map(_.toChar).mkString)), true)
+        }
       case 99 =>
         reset
       case _ =>
@@ -649,7 +700,7 @@ object WiC64 extends CBMComponent with Runnable {
 
     var rd = 0
 
-    if (buffer != null || streamingIn != null) {
+    if (responseBuffer != null || streamingIn != null) {
       sendMode match {
         case SENDING_MODE_WAITING_DUMMY =>
           if (streamingIn != null) sendMode = SENDING_MODE_STREAMING else sendMode = SENDING_MODE_HI
@@ -657,21 +708,20 @@ object WiC64 extends CBMComponent with Runnable {
           flag2Action()
         case SENDING_MODE_HI =>
           sendMode = SENDING_MODE_LO
-          rd = (buffer.length - adjustBufferLenForPRG) >> 8
+          rd = (responseBuffer.length - adjustBufferLenForPRG) >> 8
           flag2Action()
         case SENDING_MODE_LO =>
           sendMode = SENDING_MODE_WAITING_END
-          rd = (buffer.length - adjustBufferLenForPRG) & 0xFF
+          rd = (responseBuffer.length - adjustBufferLenForPRG) & 0xFF
           flag2Action()
         case SENDING_MODE_WAITING_END =>
-          if (bufferIndex < buffer.length) {
-            rd = buffer(bufferIndex)
+          if (bufferIndex < responseBuffer.length) {
+            rd = responseBuffer(bufferIndex)
             bufferIndex += 1
-            if (bufferIndex == buffer.length) {
+            if (bufferIndex == responseBuffer.length) {
               sendMode = SENDING_MODE_WAITING_DUMMY
-              buffer = null
+              responseBuffer = null
             }
-            //println(s"Sending '${rd.toChar}'")
             else flag2Action()
           }
         case SENDING_MODE_STREAMING =>
@@ -679,7 +729,7 @@ object WiC64 extends CBMComponent with Runnable {
           if (rd == -1) {
             streamingIn.close()
             streamingIn = null
-            buffer = null
+            responseBuffer = null
             sendMode = SENDING_MODE_WAITING_DUMMY
             rd = 0
           }
@@ -692,13 +742,18 @@ object WiC64 extends CBMComponent with Runnable {
 
   private def checkUDP(): DatagramSocket = {
     if (udp == null || udp.getPort != udpPort) {
+      if (udpThread != null) {
+        udpThreadRunning = false
+        udp.close()
+        udpThreadShutdown.await()
+        udpThreadShutdown = new CountDownLatch(1)
+      }
+
       if (udp != null) udp.close()
       udp = new DatagramSocket(udpPort)
-      if (udpThread != null) udpThread.interrupt()
-      else {
-        udpThread = new Thread(this,"WiC64UDP")
-        udpThread.start()
-      }
+
+      udpThread = new Thread(this,"WiC64UDP")
+      udpThread.start()
     }
 
     udp
@@ -707,6 +762,7 @@ object WiC64 extends CBMComponent with Runnable {
   private def sendUDP(ip: Array[Byte], port: Int, data:Array[Int]): Unit = {
     val packet = new DatagramPacket(data.map(_.toByte),data.length,InetAddress.getByAddress(ip),port)
     try {
+      checkUDP()
       udp.send(packet)
     }
     catch {
@@ -718,25 +774,25 @@ object WiC64 extends CBMComponent with Runnable {
   private def receiveUDP(): Unit = {
     val head = udpReceivedQueue.poll()
     if (head != null) {
-      buffer = Array.ofDim[Int](4 + head.data.length)
+      val buf = Array.ofDim[Int](4 + head.data.length)
       var i = 0
       while (i < 4) {
-        buffer(i) = head.from(i).toInt & 0xFF
+        buf(i) = head.from(i).toInt & 0xFF
         i += 1
       }
       i = 0
       while (i < head.data.length) {
-        buffer(4 + i) = head.data(i).toInt & 0xFF
+        buf(4 + i) = head.data(i).toInt & 0xFF
         i += 1
       }
       //log(s"UDP received from ${head.from.map(_.toInt & 0xFF).mkString(".")} : ${head.data.map(_.toInt & 0xFF).mkString(" ")}")
       log(s"UDP received from ${head.from.map(_.toInt & 0xFF).mkString(".")}:")
       dump(head.data.map(_.toInt & 0xFF))
+      prepareResponse(buf)
     }
     else {
-      buffer = Array()
+      prepareResponse(Array[Int]())
     }
-    sendMode = SENDING_MODE_WAITING_DUMMY
   }
 
   override def run(): Unit = {
@@ -754,10 +810,13 @@ object WiC64 extends CBMComponent with Runnable {
         }
       }
       catch {
-        case _:InterruptedException =>
+        case t:SocketException =>
+          udpThreadRunning = false
+          log(s"Unexpected error while receiving data: $t")
       }
     }
     udpThread = null
+    udpThreadShutdown.countDown()
     log("UPD Thread stopped")
   }
 
