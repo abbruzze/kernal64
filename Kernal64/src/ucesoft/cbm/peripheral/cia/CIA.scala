@@ -389,6 +389,10 @@ class CIA(val name:String,
     irqHandling(IRQ_FLAG)
     idleAction(false)
   }
+
+  def setFlagHigh: Unit = {
+    icr &= ~IRQ_FLAG
+  }
   
   final def irqHandling(bit:Int) : Unit = {
     // handle TimerB bug for old cias when reading ICR "near" underflow: the bit is not set
