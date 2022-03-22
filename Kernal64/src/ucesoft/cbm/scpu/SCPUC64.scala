@@ -109,7 +109,6 @@ class SCPUC64 extends CBMComputer {
       nmiSwitcher.setLine(Switcher.CIA,_),
       idle => cia12Running(1) = !idle)
     WiC64.flag2Action = cia2.setFlagLow _
-    WiC64.flag2Clear = cia2.setFlagHigh _
     wic64Panel = new WiC64Panel(displayFrame,preferences)
     WiC64.setListener(wic64Panel)
     add(WiC64)

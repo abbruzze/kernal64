@@ -145,7 +145,6 @@ class C128 extends CBMComputer with MMUChangeListener {
     				   cia2CP2,
     				   nmiSwitcher.setLine(Switcher.CIA,_),idle => cia12Running(1) = !idle)
     WiC64.flag2Action = cia2.setFlagLow _
-    WiC64.flag2Clear = cia2.setFlagHigh _
     wic64Panel = new WiC64Panel(displayFrame,preferences)
     WiC64.setListener(wic64Panel)
     rs232.setCIA12(cia1,cia2)

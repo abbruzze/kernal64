@@ -1,9 +1,9 @@
 package ucesoft.cbm.expansion
 
 import org.apache.commons.net.telnet.TelnetClient
-import ucesoft.cbm.{CBMComponent, CBMComponentType, Clock, ClockEvent, Log}
+import ucesoft.cbm.{CBMComponent, CBMComponentType, Clock, ClockEvent}
 
-import java.io.{BufferedInputStream, IOException, InputStream, ObjectInputStream, ObjectOutputStream}
+import java.io.{BufferedInputStream, InputStream, ObjectInputStream, ObjectOutputStream}
 import java.net._
 import java.text.SimpleDateFormat
 import java.util.Properties
@@ -21,7 +21,6 @@ object WiC64 extends CBMComponent with Runnable {
   }
 
   var flag2Action : () => Unit = _
-  var flag2Clear : () => Unit = _
 
   private var _enabled = false
 
@@ -56,7 +55,7 @@ object WiC64 extends CBMComponent with Runnable {
   private var adjustBufferLenForPRG = 0
   private var recCmd = 0
   @volatile private var buffer,responseBuffer : Array[Int] = _
-  private var bufferIndex = 0
+  private var writeIndex,readIndex = 0
 
   private final val TOKEN_NAME = "sectokenname"
   private var token = ""
@@ -83,10 +82,10 @@ object WiC64 extends CBMComponent with Runnable {
 
   private var streamingIn : InputStream = _
 
-  private val executor = Executors.newSingleThreadExecutor()
-  //private val clk = Clock.systemClock
+  //private val executor = Executors.newSingleThreadExecutor()
+  private val clk = Clock.systemClock
 
-  //private final val CMD_CLOCKS_WAIT = (clk.PAL_CLOCK_HZ / 1000).toInt
+  private final val CMD_CLOCKS_WAIT = (clk.PAL_CLOCK_HZ / 1000).toInt
 
   private final val CMD_DESCR = Map(
     0x0 -> "get FW version",
@@ -197,53 +196,66 @@ object WiC64 extends CBMComponent with Runnable {
   def setMode(mode:Int): Unit = {
     if (mode != this.mode) {
       this.mode = mode
+      //println(s"SET MODE = $mode")
+
       recMode = RECEIVING_MODE_WAITING_W
       sendMode = SENDING_MODE_WAITING_DUMMY
+
       if (listener != null) listener.turnGreenLed(mode == RECEIVING_MODE)
     }
   }
 
+  /*
   private def background(task: => Unit): Unit = {
     executor.submit(new Runnable() {
       override def run(): Unit = task
     })
   }
+   */
 
   def write(byte:Int): Unit = {
+    //println(s"WRITE: ${byte.toHexString} '${byte.toChar}' recMode = $recMode writeIndex=$writeIndex len=$bufferLen")
     if (mode != RECEIVING_MODE) {
       //println("NOT IN RECEIVING MODE ...")
       return
     }
 
-    flag2Action()
-
-    //println(s"WRITE: ${byte.toHexString} '${byte.toChar}' recMode = $recMode bufferIndex=$bufferIndex len=$bufferLen")
+    //println(s"WRITE: ${byte.toHexString} '${byte.toChar}' recMode = $recMode writeIndex=$writeIndex len=$bufferLen")
 
     recMode match {
       case RECEIVING_MODE_WAITING_W if byte == 0x57 =>
         recMode = RECEIVING_MODE_WAITING_LEN_LO
+        flag2Action()
       case RECEIVING_MODE_WAITING_LEN_LO =>
         bufferLen = byte
         recMode = RECEIVING_MODE_WAITING_LEN_HI
+        flag2Action()
       case RECEIVING_MODE_WAITING_LEN_HI =>
         bufferLen = (bufferLen | byte << 8) - 4
         if (bufferLen < 0) bufferLen = 0
         buffer = Array.ofDim[Int](bufferLen)
-        bufferIndex = 0
+        writeIndex = 0
         recMode = RECEIVING_MODE_WAITING_CMD
+        flag2Action()
       case RECEIVING_MODE_WAITING_CMD =>
-        recCmd = byte
         if (bufferLen == 0) {
-          executeCmd()
+          recCmd = byte
+          flag2Action()
+          bufferLen = -1
+          clk.schedule(new ClockEvent("WiC64",clk.currentCycles + CMD_CLOCKS_WAIT,_ => executeCmd()))
         }
-        else recMode = RECEIVING_MODE_WAITING_DATA
+        else if (bufferLen > 0) {
+          recCmd = byte
+          recMode = RECEIVING_MODE_WAITING_DATA
+          flag2Action()
+        }
       case RECEIVING_MODE_WAITING_DATA =>
-        if (bufferIndex < buffer.length) {
-          buffer(bufferIndex) = byte
-          bufferIndex += 1
-          if (bufferIndex == bufferLen) {
-            //clk.schedule(new ClockEvent("WiC64_CMD", clk.currentCycles + CMD_CLOCKS_WAIT, _ => executeCmd()))
-            executeCmd()
+        if (writeIndex < buffer.length) {
+          flag2Action()
+          buffer(writeIndex) = byte
+          writeIndex += 1
+          if (writeIndex == bufferLen) {
+            clk.schedule(new ClockEvent("WiC64",clk.currentCycles + CMD_CLOCKS_WAIT,_ => executeCmd()))
           }
         }
       case _ =>
@@ -500,17 +512,15 @@ object WiC64 extends CBMComponent with Runnable {
     adjustBufferLenForPRG = 0
     recMode = RECEIVING_MODE_WAITING_W
     responseBuffer = null
-    //flag2Clear()
     log(s"CMD=[${recCmd.toHexString} ${CMD_DESCR.getOrElse(recCmd,"???")}]: ${if (bufferLen == 0) "EMPTY" else ""}")
     if (bufferLen > 0) dump(buffer)
     recCmd match {
       case 0 => // GET FIRMWARE VERSION
         prepareResponse(FIRMWARE_VERSION)
       case 1 => // LOAD HTTP / HTTPS
-        flag2Clear() // TODO: to check why
-        background {
+        //background {
           sendHttpGET(encodeURL(resolve(buffer.map(_.toChar).mkString)))
-        }
+        //}
       case 2 => // CONFIG WIFI
         log(s"CONFIG WIFI: ${buffer.map(_.toChar).mkString}")
         prepareResponse("Wlan config not changed")
@@ -557,10 +567,9 @@ object WiC64 extends CBMComponent with Runnable {
           }
         }
       case 0xF => // HTTP STRING CONVERSION FOR HTTP CHAT
-        flag2Clear() // TODO: to check why
-        background {
+        //background {
           sendHttpGET(encodeURL(resolve(en_code(buffer.map(_.toChar).mkString))))
-        }
+        //}
       case 0x10 => // GET ACTUAL CONNECTED SSID
         prepareResponse(SSID)
       case 0x11 => // GET ACTUAL WIFI SIGNAL RSSI
@@ -568,10 +577,9 @@ object WiC64 extends CBMComponent with Runnable {
       case 0x12 => // GET DEFAULT SERVER
         prepareResponse(server)
       case 0x13 => // GET EXTERNAL IP OF WIC64 INTERNET CONNECTION
-        flag2Clear() // TODO: to check why
-        background {
+        //background {
           sendHttpGET("http://sk.sx-64.de/wic64/ip.php")
-        }
+        //}
       case 0x14 => // GET MAC ADDRESS OF WIC64
         prepareResponse(MAC_ADDRESS)
       case 0x15 => // GET TIME AND DATE FROM NTP SERVER
@@ -603,7 +611,7 @@ object WiC64 extends CBMComponent with Runnable {
       // case 0x1F => // SEND TCP
       // case 0x20 => // SET TCP PORT
       case 0x21 => // CONNECT TO SERVER:PORT VIA TCP (TELNET)
-        background {
+        //background {
           if (telnetClient != null && telnetClient.isConnected) telnetClient.disconnect()
           telnetClient = new TelnetClient
           telnetClient.setDefaultTimeout(5000)
@@ -620,7 +628,7 @@ object WiC64 extends CBMComponent with Runnable {
               log(s"Telnet error: $e")
               prepareResponse("!E")
           }
-        }
+        //}
       case 0x22 => // GET DATA FROM TCP CONNECTION
         try {
           val in = telnetClient.getInputStream
@@ -632,6 +640,7 @@ object WiC64 extends CBMComponent with Runnable {
         }
         catch {
           case e: Exception =>
+            e.printStackTrace()
             log(s"Telnet error: $e")
             prepareResponse(Array[Int]())
         }
@@ -673,16 +682,14 @@ object WiC64 extends CBMComponent with Runnable {
             case mark =>
               (Some(url.substring(mark + 1)),url.substring(0,mark))
           }
-          flag2Clear() // TODO: to check why
-          background {
+          //background {
             sendHttpPOST(target, fn, postContent) // http://sk.sx-64.de:80/up/up.php http://10.42.145.148:8000
-          }
+          //}
         }
       case 0x25 => // STREAMING
-        flag2Clear() // TODO: to check why
-        background {
+        //background {
           sendHttpGET(encodeURL(resolve(buffer.map(_.toChar).mkString)), true)
-        }
+        //}
       case 99 =>
         reset
       case _ =>
@@ -704,21 +711,28 @@ object WiC64 extends CBMComponent with Runnable {
       sendMode match {
         case SENDING_MODE_WAITING_DUMMY =>
           if (streamingIn != null) sendMode = SENDING_MODE_STREAMING else sendMode = SENDING_MODE_HI
-          bufferIndex = 0
+          readIndex = 0
           flag2Action()
         case SENDING_MODE_HI =>
           sendMode = SENDING_MODE_LO
           rd = (responseBuffer.length - adjustBufferLenForPRG) >> 8
           flag2Action()
         case SENDING_MODE_LO =>
-          sendMode = SENDING_MODE_WAITING_END
           rd = (responseBuffer.length - adjustBufferLenForPRG) & 0xFF
-          flag2Action()
+          if (responseBuffer.length > 0) {
+            sendMode = SENDING_MODE_WAITING_END
+            flag2Action()
+          }
+          else {
+            sendMode = SENDING_MODE_WAITING_DUMMY
+            responseBuffer = null
+          }
         case SENDING_MODE_WAITING_END =>
-          if (bufferIndex < responseBuffer.length) {
-            rd = responseBuffer(bufferIndex)
-            bufferIndex += 1
-            if (bufferIndex == responseBuffer.length) {
+          if (readIndex < responseBuffer.length) {
+            rd = responseBuffer(readIndex)
+            //println(s"READ $readIndex/${responseBuffer.length - 1}")
+            readIndex += 1
+            if (readIndex == responseBuffer.length) {
               sendMode = SENDING_MODE_WAITING_DUMMY
               responseBuffer = null
             }
@@ -738,6 +752,7 @@ object WiC64 extends CBMComponent with Runnable {
     }
 
     rd
+
   }
 
   private def checkUDP(): DatagramSocket = {
