@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/abbruzze/kernal64.svg?branch=master)](https://travis-ci.org/abbruzze/kernal64)
+[![Build Status](https://travis-ci.com/abbruzze/kernal64.svg?branch=master)](https://travis-ci.com/abbruzze/kernal64)
 [![Release](https://img.shields.io/github/v/release/abbruzze/kernal64)](https://github.com/abbruzze/kernal64/releases)
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
