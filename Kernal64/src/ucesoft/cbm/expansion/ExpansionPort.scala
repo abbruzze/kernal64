@@ -109,6 +109,7 @@ object ExpansionPort {
     final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = expansionPort.read(address, chipID)
     final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = expansionPort.write(address, value, chipID)
     final override def reset = expansionPort.reset
+    final override def hardReset: Unit = expansionPort.hardReset
     final override def init = expansionPort.init
     final override def isEmpty = expansionPort.isEmpty
     final override def setBaLow(baLow:Boolean) = expansionPort.setBaLow(baLow)

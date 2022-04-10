@@ -2153,13 +2153,17 @@ trait CBMComputer extends CBMComponent with GamePlayer with KeyListener { cbmCom
     reu4MItem.addActionListener(_ => preferences(PREF_REUTYPE) = REU.REU_4M.toString )
     group5.add(reu4MItem)
     reuItem.add(reu4MItem)
+    val reu8MItem = new JRadioButtonMenuItem("8M")
+    reu8MItem.addActionListener(_ => preferences(PREF_REUTYPE) = REU.REU_8M.toString )
+    group5.add(reu8MItem)
+    reuItem.add(reu8MItem)
     val reu16MItem = new JRadioButtonMenuItem("16M ...")
     reu16MItem.addActionListener(_ => choose16MREU )
     group5.add(reu16MItem)
     reuItem.add(reu16MItem)
     parent.add(reuItem)
 
-    preferences.add(PREF_REUTYPE,"Set the reu type (none,128,256,512,1024,2048,4096,16384). With 16384 the syntax is: 16384[,<reu file to load>]","none") { reu =>
+    preferences.add(PREF_REUTYPE,"Set the reu type (none,128,256,512,1024,2048,4096,8192,16384). With 16384 the syntax is: 16384[,<reu file to load>]","none") { reu =>
       val reuPars = reu.split(",")
       if (reuPars(0) == "" || reuPars(0) == "none") setREU(None,None)
       else
@@ -2182,6 +2186,9 @@ trait CBMComputer extends CBMComponent with GamePlayer with KeyListener { cbmCom
           case REU.REU_4M =>
             setREU(Some(REU.REU_4M),None)
             reu4MItem.setSelected(true)
+          case REU.REU_8M =>
+            setREU(Some(REU.REU_8M),None)
+            reu8MItem.setSelected(true)
           case REU.REU_16M =>
             setREU(Some(REU.REU_16M),if (reuPars.length == 2 && reuPars(1) != "null") Some(reuPars(1)) else None)
             reu16MItem.setSelected(true)
