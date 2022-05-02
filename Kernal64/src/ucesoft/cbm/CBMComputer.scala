@@ -1516,6 +1516,9 @@ trait CBMComputer extends CBMComponent with GamePlayer with KeyListener { cbmCom
       wic64Panel.setWiC64Enabled(enabled)
       if (!headless) wic64Panel.dialog.setVisible(true)
     }
+    preferences.add(PREF_MOUSE_DELAY_MILLIS,"Sets the mouse delay parameter in millis",20) { delay =>
+      MouseCage.setRatioMillis(delay)
+    }
   }
 
   protected def setFileMenu(fileMenu:JMenu) : Unit = {
@@ -1956,11 +1959,30 @@ trait CBMComputer extends CBMComponent with GamePlayer with KeyListener { cbmCom
   }
 
   protected def setMouseSettings(parent:JMenu) : Unit = {
+    val mouseMenu = new JMenu("Mouse")
+    parent.add(mouseMenu)
     val mouseEnabledItem = new JCheckBoxMenuItem("Mouse 1351 enabled on port 1")
+    mouseMenu.setEnabled(MouseCage.isMouseSupported)
     mouseEnabledItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_M,java.awt.event.InputEvent.ALT_DOWN_MASK))
     mouseEnabledItem.setSelected(false)
     mouseEnabledItem.addActionListener(e => enableMouse(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected,display) )
-    parent.add(mouseEnabledItem)
+    mouseMenu.add(mouseEnabledItem)
+    val mouseRatioItem = new JMenuItem("Mouse calibration settings ...")
+    mouseRatioItem.addActionListener(_ => {
+      Option(JOptionPane.showInputDialog(displayFrame,"Select mouse delay in millis",MouseCage.getRatioMillis.toString)) match {
+        case None =>
+        case Some(mr) =>
+          try {
+            MouseCage.setRatioMillis(mr.toInt)
+            preferences.update(Preferences.PREF_MOUSE_DELAY_MILLIS,mr.toInt)
+          }
+          catch {
+            case _:NumberFormatException =>
+              JOptionPane.showMessageDialog(displayFrame,s"Invalid integer value: $mr","Invalid input",JOptionPane.ERROR_MESSAGE)
+          }
+      }
+    })
+    mouseMenu.add(mouseRatioItem)
     // reset setting
     resetSettingsActions = (() => {
       mouseEnabledItem.setSelected(false)

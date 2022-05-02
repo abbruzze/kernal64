@@ -62,6 +62,7 @@ object Preferences {
   val PREF_SCPUJIFFYDOSENABLED= "scpu-jiffydos-enabled"
   val PREF_WIC64_NETWORK      = "wic64-network-name"
   val PREF_WIC64_ENABLED      = "wic64-enabled"
+  val PREF_MOUSE_DELAY_MILLIS = "mouse-delay-millis"
   // =============================================================
   class PreferenceIllegalArgumentException(msg:String) extends Exception(msg)
 

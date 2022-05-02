@@ -12,9 +12,15 @@ object MouseCage extends MouseAdapter {
   private val robot : Robot = Try(new Robot).getOrElse(null)
   private var component : JComponent = _
   private var lastMoveTs = 0L
+  private var ratioMillis = 20
 
-  def x = if (robot != null) mousePointer.x else MouseInfo.getPointerInfo.getLocation.x
-  def y = if (robot != null) mousePointer.y else MouseInfo.getPointerInfo.getLocation.y
+  def getRatioMillis : Int = ratioMillis
+  def setRatioMillis(rm:Int) : Unit = ratioMillis = rm
+
+  def isMouseSupported : Boolean = robot != null
+
+  def x: Int = if (robot != null) mousePointer.x else MouseInfo.getPointerInfo.getLocation.x
+  def y: Int = if (robot != null) mousePointer.y else MouseInfo.getPointerInfo.getLocation.y
 
   @inline private def robotMove(p:Point) : Unit = {
     if (robot != null) robot.mouseMove(p.x, p.y)
@@ -51,7 +57,7 @@ object MouseCage extends MouseAdapter {
     val moveTs = System.currentTimeMillis()
     val deltaT = moveTs - lastMoveTs
     lastMoveTs = moveTs
-    val factor = math.ceil(20.0 / deltaT)
+    val factor = math.ceil(ratioMillis.toDouble / (if (deltaT > 0) deltaT else 1))
     val compCenter = center
     mousePointer.x += ((e.getXOnScreen - compCenter.x) / factor).toInt
     mousePointer.y += ((e.getYOnScreen - compCenter.y) / factor).toInt
