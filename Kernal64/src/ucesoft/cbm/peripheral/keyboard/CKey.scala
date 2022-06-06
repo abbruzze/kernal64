@@ -2,6 +2,7 @@ package ucesoft.cbm.peripheral.keyboard
 
 object CKey extends Enumeration {
 	  type Key = Value
+		// ============================ C64 =============================
 	  // row 0
 	  val INST_DEL 	= Value(0x00)
 	  val RETURN	= Value(0x01)
@@ -74,6 +75,7 @@ object CKey extends Enumeration {
 	  val CBM		= Value(0x75)
 	  val Q			= Value(0x76)
 	  val RUN_STOP	= Value(0x77)
+		// ============================ C128 ============================
 	  // C128 rows, add an offset 0x100
 	  // row 0
 	  val HELP = Value(0x100)
@@ -107,10 +109,112 @@ object CKey extends Enumeration {
 	  val CAPS_LOCK = Value(0x129)
 	  
 	  val RESTORE 	= Value(0xFF)
+
+		// ============================ CBM2 ============================
+		// CBM2 rows, add an offset 0x200
+		// A
+		val CBM2_F1      		= Value(0x200)
+		val CBM2_F2      		= Value(0x201)
+		val CBM2_F3      		= Value(0x202)
+		val CBM2_F4      		= Value(0x203)
+		val CBM2_F5      		= Value(0x204)
+		val CBM2_F6      		= Value(0x205)
+		val CBM2_F7      		= Value(0x206)
+		val CBM2_F8      		= Value(0x207)
+		val CBM2_F9      		= Value(0x208)
+		val CBM2_F10     		= Value(0x209)
+		val CBM2_DOWN    		= Value(0x20A)
+		val CBM2_UP		   		= Value(0x20B)
+		val CBM2_HOME 			= Value(0x20C)
+		val CBM2_RVS	  		= Value(0x20D)
+		val CBM2_GRAPH		  = Value(0x20E)
+		val CBM2_STOP   		= Value(0x20F)
+		// B
+		val CBM2_ESC     		= Value(0x210)
+		val CBM2_1      		= Value(0x211)
+		val CBM2_2      		= Value(0x212)
+		val CBM2_3      		= Value(0x213)
+		val CBM2_4      		= Value(0x214)
+		val CBM2_5      		= Value(0x215)
+		val CBM2_7      		= Value(0x216)
+		val CBM2_8      		= Value(0x217)
+		val CBM2_9      		= Value(0x218)
+		val CBM2_0 	    		= Value(0x219)
+		val CBM2_EQUAL   		= Value(0x21A)
+		val CBM2_LEFT	   		= Value(0x21B)
+		val CBM2_KP_?		 		= Value(0x21C)
+		val CBM2_KP_CE  		= Value(0x21D)
+		val CBM2_KP_*			  = Value(0x21E)
+		val CBM2_KP_/ 	  	= Value(0x21F)
+		// C
+		val CBM2_TAB     		= Value(0x220)
+		val CBM2_Q      		= Value(0x221)
+		val CBM2_W      		= Value(0x222)
+		val CBM2_E      		= Value(0x223)
+		val CBM2_R      		= Value(0x224)
+		val CBM2_6      		= Value(0x225)
+		val CBM2_U      		= Value(0x226)
+		val CBM2_I      		= Value(0x227)
+		val CBM2_O      		= Value(0x228)
+		val CBM2_- 	    		= Value(0x229)
+		val CBM2_BARROW  		= Value(0x22A)
+		val CBM2_RIGHT   		= Value(0x22B)
+		val CBM2_KP_7		 		= Value(0x22C)
+		val CBM2_KP_8	  		= Value(0x22D)
+		val CBM2_KP_9			  = Value(0x22E)
+		val CBM2_KP_- 	  	= Value(0x22F)
+		// D
+		val CBM2_A      		= Value(0x231)
+		val CBM2_S      		= Value(0x232)
+		val CBM2_D      		= Value(0x233)
+		val CBM2_T      		= Value(0x234)
+		val CBM2_Y      		= Value(0x235)
+		val CBM2_J      		= Value(0x236)
+		val CBM2_K      		= Value(0x237)
+		val CBM2_L      		= Value(0x238)
+		val CBM2_P 	    		= Value(0x239)
+		val CBM2_CL_SQ_BR		= Value(0x23A)
+		val CBM2_DEL	   		= Value(0x23B)
+		val CBM2_KP_4		 		= Value(0x23C)
+		val CBM2_KP_5	  		= Value(0x23D)
+		val CBM2_KP_6			  = Value(0x23E)
+		val CBM2_KP_+ 	  	= Value(0x23F)
+		// E
+		val CBM2_SHIFT   		= Value(0x240)
+		val CBM2_Z      		= Value(0x241)
+		val CBM2_X      		= Value(0x242)
+		val CBM2_F      		= Value(0x243)
+		val CBM2_G      		= Value(0x244)
+		val CBM2_H      		= Value(0x245)
+		val CBM2_M      		= Value(0x246)
+		val CBM2_COMMA   		= Value(0x247)
+		val CBM2_SEMICOL 		= Value(0x248)
+		val CBM2_OP_SQ_BR		= Value(0x249)
+		val CBM2_RETURN	   	= Value(0x24A)
+		val CBM2_COMMODORE	= Value(0x24B)
+		val CBM2_KP_1		 		= Value(0x24C)
+		val CBM2_KP_2	  		= Value(0x24D)
+		val CBM2_KP_3			  = Value(0x24E)
+		val CBM2_KP_ENTER  	= Value(0x24F)
+		// F
+		val CBM2_CONTROL 		= Value(0x250)
+		val CBM2_C      		= Value(0x252)
+		val CBM2_V      		= Value(0x253)
+		val CBM2_B      		= Value(0x254)
+		val CBM2_N      		= Value(0x255)
+		val CBM2_SPACE   		= Value(0x256)
+		val CBM2_DOT	   		= Value(0x257)
+		val CBM2_/			 		= Value(0x258)
+		val CBM2_DB_QUOTE		= Value(0x259)
+		val CBM2_PI			   	= Value(0x25A)
+		val CBM2_KP_0		 		= Value(0x25C)
+		val CBM2_KP_DOT  		= Value(0x25D)
+		val CBM2_KP_00		  = Value(0x25E)
+
+	  def is128Key(k:Key): Boolean = (k.id & 0x100) > 0
+		def isCBM2Key(k:Key): Boolean = (k.id & 0x200) > 0
 	  
-	  def is128Key(k:Key) = k.id > 0xFF
-	  
-	  def getRowCol(k:Key) = {
+	  def getRowCol(k:Key): (Int,Int) = {
 	    val id = k.id
 	    val col = id & 0xf
 	    val row = (id >> 4) & 0xf

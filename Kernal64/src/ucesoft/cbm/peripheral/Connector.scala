@@ -47,3 +47,9 @@ abstract class Connector extends CBMComponent {
   }
   protected def allowsStateRestoring : Boolean = true
 }
+
+object EmptyConnector extends Connector {
+  override val componentID: String = "EmptyConnector"
+  override def read : Int = 0xFF
+  override protected def performWrite(data: Int): Unit = {}
+}

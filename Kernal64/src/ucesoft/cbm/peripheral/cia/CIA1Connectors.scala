@@ -1,11 +1,11 @@
 package ucesoft.cbm.peripheral.cia
 
-import ucesoft.cbm.peripheral.keyboard.Keyboard
+import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.controlport.ControlPort
 import ucesoft.cbm.peripheral.Connector
 
 object CIA1Connectors {
-	class PortAConnector(kb:Keyboard,ctrlPort:ControlPort) extends Connector {
+	class PortAConnector(kb:HomeKeyboard, ctrlPort:ControlPort) extends Connector {
 	  val componentID = "CIA1 Port A Connector"
 	  final def read = {
 	    val port = ctrlPort.readPort
@@ -17,7 +17,7 @@ object CIA1Connectors {
 	  }
 	}
 	
-	class PortBConnector(kb:Keyboard,ctrlPort:ControlPort,lightPenTriggerHandler : () => Unit) extends Connector {
+	class PortBConnector(kb:HomeKeyboard, ctrlPort:ControlPort, lightPenTriggerHandler : () => Unit) extends Connector {
 	  val componentID = "CIA1 Port B Connector"
 	  private[this] var lastLPOn = false
 	  final def read = {

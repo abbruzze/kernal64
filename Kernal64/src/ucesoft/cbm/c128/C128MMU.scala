@@ -6,7 +6,7 @@ import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortConfigurationListener}
 import ucesoft.cbm.misc.TestCart
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.cia.CIA
-import ucesoft.cbm.peripheral.keyboard.Keyboard
+import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.sid.SID
 import ucesoft.cbm.peripheral.vdc.VDC
 import ucesoft.cbm.peripheral.vic.{VIC, VICMemory}
@@ -83,7 +83,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   final private[this] val VIC_CLKRATE_REG = 0x30
   private[this] var vic_xscan_reg,vic_clkrate_reg = 0
   // 0/1 CAPSLOCK & 40/80 senses ==============================================================
-  private[this] var keyboard : Keyboard = _
+  private[this] var keyboard : HomeKeyboard = _
   // 0/1 datassette lines =====================================================================
   private[this] var datassette : Datassette = _
   // ==========================================================================================
@@ -128,7 +128,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     properties
   }
   
-  def setKeyboard(keyboard:Keyboard) : Unit = {
+  def setKeyboard(keyboard:HomeKeyboard) : Unit = {
     this.keyboard = keyboard
   }
   

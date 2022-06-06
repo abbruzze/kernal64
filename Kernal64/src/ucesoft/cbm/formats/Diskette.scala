@@ -15,10 +15,35 @@ import java.nio.file.StandardCopyOption
 object Diskette {
   object FileType extends Enumeration {
     val DEL, SEQ, PRG, USR, REL, CBM = Value
+
+    def fromString(s:String): FileType.Value = {
+      if (s == null) PRG
+      else
+      s.toUpperCase() match {
+        case null|"P"|"PRG" => PRG
+        case "D"|"DEL" => DEL
+        case "S"|"SEQ" => SEQ
+        case "R"|"REL" => REL
+        case "U"|"USR" => USR
+      }
+    }
+  }
+  object FileMode extends Enumeration {
+    val READ ,WRITE, APPEND = Value
+
+    def fromString(s:String): FileMode.Value = {
+      if (s == null) READ
+      else
+      s.toUpperCase() match {
+        case "R" => READ
+        case "W" => WRITE
+        case "A" => APPEND
+      }
+    }
   }
   case class DirEntry(fileType: FileType.Value, fileName: String, t: Int, s: Int, sizeInSectors: Int,entryTrack:Int,entrySector:Int,entryPos:Int)
   case class BamInfo(diskName: String, diskID: String, dosType: String,singleSide:Boolean,freeSectors:Int)
-  case class FileData(fileName: String, startAddress: Int, data: Array[Int]) {
+  case class FileData(fileName: String, startAddress: Int, data: Array[Int],fileType:FileType.Value) {
     def iterator = {
       val buffer = if (startAddress != -1) Array.ofDim[Int](data.length + 2) else data
       if (startAddress != -1) {
@@ -40,6 +65,24 @@ object Diskette {
           index = pos
         }
       }
+    }
+  }
+
+  sealed trait FileName
+  case class StandardFileName(name:String,fileType:FileType.Value,mode:FileMode.Value,overwrite:Boolean) extends FileName
+  case class DirectoryFileName(pattern:Option[String],filterOnType:Option[FileType.Value]) extends FileName
+
+  private val FILENAME_RE = """(@?\d:)?([^,]+)(,(s|seq|S|SEQ|p|prg|P|PRG|u|usr|U|USR|r|rel|R|REL))?(,(r|w|a|R|W|A))?""".r
+  private val DIRECTORY_RE = """\$(\d:([^=]+)(=([s|S|r|R|p|P|u|U]))?)?""".r
+
+  def parseFileName(fn:String): Option[FileName] = {
+    fn match {
+      case DIRECTORY_RE(_,pattern,_,ftype) =>
+        Some(DirectoryFileName(Option(pattern),Option(ftype).map(FileType.fromString)))
+      case FILENAME_RE(ovr,pattern,_,ftype,_,mode) =>
+        Some(StandardFileName(pattern,FileType.fromString(ftype),FileMode.fromString(mode),ovr != null && ovr.startsWith("@")))
+      case _ =>
+        None
     }
   }
   
@@ -97,9 +140,9 @@ abstract class Diskette extends Floppy {
   import Diskette._
   
   protected val BYTES_PER_SECTOR = 256
-  protected val DIR_TRACK = 18
-  protected val DIR_SECTOR = 1
-  protected val BAM_SECTOR = 0
+  protected def DIR_TRACK = 18
+  protected def DIR_SECTOR = 1
+  protected def BAM_SECTOR = 0
   
   val canBeEmulated : Boolean
   protected val disk : RandomAccessFile
@@ -126,7 +169,7 @@ abstract class Diskette extends Floppy {
   def directories : List[DirEntry] = {
     var t = DIR_TRACK
     var s = DIR_SECTOR
-    var dirs = new ListBuffer[DirEntry]
+    val dirs = new ListBuffer[DirEntry]
     var readNextSector = true
     val buffer = Array.ofDim[Byte](0x20)
     while (readNextSector) {
@@ -171,7 +214,7 @@ abstract class Diskette extends Floppy {
   // =======================================================================
   def loadInMemory(mem: Memory, fileName: String, relocate: Boolean,c64Mode:Boolean,drive:Int) : Unit = {
     load(fileName) match {
-      case FileData(fn, startAddress, data) =>
+      case FileData(fn, startAddress, data,_) =>
         val (start,end) = ProgramLoader.loadPRG(mem,data,if (relocate) Some(startAddress) else None,c64Mode,drive,fileName)
         println(s"Loaded $fn from $start to $end")
       case _ =>
@@ -204,7 +247,7 @@ abstract class Diskette extends Floppy {
         chunkIndex += 1
       }
     }
-    FileData(entry.fileName, startAddress, data.toArray)
+    FileData(entry.fileName, startAddress, data.toArray,entry.fileType)
   }
   
   protected def loadSEQ(entry: DirEntry) = {
@@ -227,33 +270,54 @@ abstract class Diskette extends Floppy {
         chunkIndex += 1
       }
     }
-    FileData(entry.fileName, -1, data.toArray)
+    FileData(entry.fileName, -1, data.toArray,entry.fileType)
   }
   
   def load(fileName: String,fileType:FileType.Value = FileType.PRG) = {
-    if (fileName.startsWith("$")) formatDirectoriesAsPRG(fileName)
+    if (fileName.startsWith("$")) formatDirectoriesAsPRG(DirectoryFileName(Some(fileName),None))
     else {
       val dpos = fileName.indexOf(":")
       val st = new StringTokenizer(if (dpos != -1) fileName.substring(dpos + 1) else fileName,",")
-      val fn = st.nextToken
+      val fn = {
+        val fname = st.nextToken
+        if (fname.length < 17) fname else fname.substring(0,16)
+      }
       val ft = if (st.hasMoreTokens && st.nextToken == "S") FileType.SEQ else fileType
       
       directories find { e =>
-        ft == e.fileType && fileNameMatch(fn,e.fileName)
+        /*ft == e.fileType &&*/ fileNameMatch(fn,e.fileName)
       } match {
         case None => throw new FileNotFoundException(fileName)
         case Some(entry) =>
-          entry.fileType match {
+          ft match {
             case FileType.PRG => loadPRG(entry)
             case FileType.SEQ => loadSEQ(entry)
             case _ => throw new IOException("Bad file type: " + entry.fileType)
           }
       }
     }
-  }  
+  }
+
+  def load(fileName:FileName): Option[FileData] = {
+    fileName match {
+      case StandardFileName(name, fileType, mode, overwrite) =>
+        val fn = if (name.length < 17) name else name.substring(0,16)
+        directories.find(e => fileNameMatch(fn,e.fileName)).map { e =>
+          fileType match {
+            case FileType.PRG => loadPRG(e)
+            case FileType.SEQ => loadSEQ(e)
+            case _ => throw new IOException("Bad file type: " + e.fileType)
+          }
+        }
+      case d@DirectoryFileName(_,_) =>
+        Some(formatDirectoriesAsPRG(d))
+    }
+  }
+
+  protected def getDirectoryStartAddress: Int = 0x801
   
-  private def formatDirectoriesAsPRG(fileName:String) = {
-    val colonPos = fileName.indexOf(":")
+  protected def formatDirectoriesAsPRG(dir:DirectoryFileName,showDEL:Boolean = false) = {
+    /*val colonPos = fileName.indexOf(":")
     val dirs = if (colonPos == -1) directories else {
       val filter = fileName.substring(colonPos + 1)
       val asteriskPos = filter.indexOf('*')
@@ -261,11 +325,31 @@ abstract class Diskette extends Floppy {
         if (asteriskPos == -1) fn.fileName == filter else fn.fileName.startsWith(filter.substring(0,asteriskPos))
       }      
     }
+     */
+    val dirs = directories filter { d =>
+      dir.pattern match {
+        case Some(p) =>
+          fileNameMatch(p,d.fileName)
+        case None =>
+          true
+      }
+    } filter { d =>
+      dir.filterOnType match {
+        case Some(t) =>
+          d.fileType == t
+        case None =>
+          true
+      }
+    } filter { d =>
+      if (!showDEL && d.fileType == FileType.DEL) false
+      else true
+    }
+
     val out = new ListBuffer[Int]
     val _bam = bam
     
     // set start address to $0801
-    var ptr = 0x801
+    var ptr = getDirectoryStartAddress
     // write next line address
     ptr += 30
     out.append(ptr & 0xFF) 	// L
@@ -286,6 +370,7 @@ abstract class Diskette extends Floppy {
     out.append(_bam.dosType(0))
     out.append(_bam.dosType(1))
     out.append(0x00)	// EOL
+    //val filteredDirs = if (showDEL) dirs else dirs.filterNot(_.fileType == FileType.DEL)
     for(dir <- dirs) {
       val blanks = if (dir.sizeInSectors < 10) 3 
       	else
@@ -326,6 +411,6 @@ abstract class Diskette extends Floppy {
     
     out.append(0x00)
     out.append(0x00)
-    FileData("$",0x801,out.toArray)
+    FileData("$",getDirectoryStartAddress,out.toArray,FileType.PRG)
   }
 }

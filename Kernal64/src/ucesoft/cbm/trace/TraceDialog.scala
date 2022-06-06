@@ -21,6 +21,7 @@ object TraceDialog {
     dialog.pack
     dialog
   }
+
   def getTraceDialog(title:String,displayFrame: JFrame, mem: Memory, traceListener: TraceListener): TraceDialog = {
     val dialog = new TraceDialog(title,displayFrame, mem, traceListener,None,None)
     dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE)
@@ -301,7 +302,7 @@ class TraceDialog private (title:String,
   buttonPanel.add(read)
   buttonPanel.add(write)
   buttonPanel.add(notrace)
-  if (vic.isDefined) buttonPanel.add(traceFile)
+  /*if (vic.isDefined)*/ buttonPanel.add(traceFile)
   buttonPanel.add(disa)
   buttonPanel.add(asm)
   buttonPanel.add(clear)

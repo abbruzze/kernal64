@@ -15,6 +15,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   private[this] var baLow = false
   private[this] var dma = false
   private[this] var ready = true
+  private[this] var disassembling = false
   // ------------- Tracing --------------------
   private[this] var tracing, tracingOnFile = false
   private[this] var tracingFile: PrintWriter = _
@@ -68,6 +69,8 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     this.dma = dma
     ready = !this.baLow && !dma
   }
+
+  final def isExecuting(opcode:Int) : Boolean = !disassembling && executing && op == opcode
 
   final def getPC = PC
 
@@ -233,6 +236,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   private[this] var op = 0
   private[this] var state = 0
   private[this] var ar, ar2, data, rdbuf = 0
+  private[this] var executing = false
 
   // RESET
   final private[this] val RESET = 0x02
@@ -531,10 +535,12 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   @inline private[this] def Execute  : Unit = {
     state = OP_TAB(op)
+    executing = true
   }
 
   @inline private[this] def Last  : Unit = {
     state = 0
+    executing = false
   }
 
   private def initStates  : Unit = {
@@ -2184,7 +2190,13 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   def isFetchingInstruction: Boolean = state == 0
 
-  protected def formatDebug = s"[${id.toString}] ${CPU65xx.disassemble(mem, if (tracingCycleMode) tracingCyclePC else PC).toString} ${if (tracingCycleMode) s"\t-- C$instructionCycle/${state.toHexString.toUpperCase}" else ""} ${if (state >= IRQ_STATE && state <= NMI_STATE_7) s"IRQ" else ""} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
+  protected def formatDebug = {
+    disassembling = true
+    try
+      s"[${id.toString}] ${CPU65xx.disassemble(mem, if (tracingCycleMode) tracingCyclePC else PC).toString} ${if (tracingCycleMode) s"\t-- C$instructionCycle/${state.toHexString.toUpperCase}" else ""} ${if (state >= IRQ_STATE && state <= NMI_STATE_7) s"IRQ" else ""} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
+    finally
+      disassembling = false
+  }
 
   // state
   protected def saveState(out: ObjectOutputStream) : Unit = {

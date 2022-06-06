@@ -38,7 +38,7 @@ object QKeyListenerTest extends App with KeyListener {
     val code = if (e.getKeyCode != 0) e.getKeyCode else e.getExtendedKeyCode
     if (code != lastCode) {
       lastCode = code
-      println(s + " " + code + " " + KeyEvent.getKeyText(code))
+      println(s + " " + code + " " + KeyEvent.getKeyText(code) + " " + e)
     }
   }
   

@@ -81,6 +81,7 @@ object WiC64 extends CBMComponent with Runnable {
   private var logEnabled = false
 
   private var streamingIn : InputStream = _
+  private var streamingSize = 0
 
   //private val executor = Executors.newSingleThreadExecutor()
   private val clk = Clock.systemClock
@@ -414,6 +415,8 @@ object WiC64 extends CBMComponent with Runnable {
         val in = connection.getInputStream
         if (streaming) {
           streamingIn = new BufferedInputStream(in)
+          streamingSize = connection.getContentLength
+          log(s"HTTP Streaming Content length: $streamingSize")
           prepareResponse(null:Array[Int])
           return
         }
@@ -740,12 +743,13 @@ object WiC64 extends CBMComponent with Runnable {
           }
         case SENDING_MODE_STREAMING =>
           rd = streamingIn.read()
-          if (rd == -1) {
+          streamingSize -= 1
+          if (streamingSize == 0) {
             streamingIn.close()
             streamingIn = null
             responseBuffer = null
             sendMode = SENDING_MODE_WAITING_DUMMY
-            rd = 0
+            //rd = 0
           }
           flag2Action()
       }

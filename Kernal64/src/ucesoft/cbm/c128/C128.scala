@@ -12,7 +12,7 @@ import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
 import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
 import ucesoft.cbm.peripheral.drive._
-import ucesoft.cbm.peripheral.keyboard.Keyboard
+import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.vdc.VDC
 import ucesoft.cbm.peripheral.vic.VICType
 import ucesoft.cbm.trace._
@@ -23,7 +23,9 @@ object C128 extends App {
   CBMComputer.turnOn(new C128,args)
 }
 
-class C128 extends CBMComputer with MMUChangeListener {
+class C128 extends CBMHomeComputer with MMUChangeListener {
+  override protected val cbmModel = C128Model
+
   val componentID = "Commodore 128"
   val componentType = CBMComponentType.INTERNAL
 
@@ -90,7 +92,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     ProgramLoader.cpu = cpu
     ProgramLoader.warpModeListener = warpMode(_,true)
     //clock.setClockHz(1000000)
-    mmu.setKeyboard(keyb)
+    mmu.setKeyboard(keyb.asInstanceOf[HomeKeyboard])
     mmu.setCPU(cpu)
     add(clock)
     add(mmu)
@@ -108,8 +110,8 @@ class C128 extends CBMComputer with MMUChangeListener {
     ExpansionPort.addConfigurationListener(mmu)    
     import cia._
     // control ports
-    val cia1CP1 = new CIA1Connectors.PortAConnector(keyb,controlPortA)
-    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb,controlPortB,() => { vicChip.triggerLightPen ; vdc.triggerLightPen })
+    val cia1CP1 = new CIA1Connectors.PortAConnector(keyb.asInstanceOf[HomeKeyboard],controlPortA)
+    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb.asInstanceOf[HomeKeyboard],controlPortB,() => { vicChip.triggerLightPen ; vdc.triggerLightPen })
     add(cia1CP1)
     add(cia1CP2)    
     
@@ -369,7 +371,7 @@ class C128 extends CBMComputer with MMUChangeListener {
   }
 
   private def enableVDC80(enabled:Boolean) : Unit = {
-    keyb.set4080Pressed(enabled)
+    keyb.asInstanceOf[HomeKeyboard].set4080Pressed(enabled)
   }
   private def enableVDC(enabled:Boolean) : Unit = {
     if (enabled) vdc.play else vdc.pause
@@ -469,7 +471,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     Log.info(s"BASIC program loaded from $start to $end")
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
     if (autorun) {
-      Keyboard.insertSmallTextIntoKeyboardBuffer("RUN" + 13.toChar,mmu,c64Mode)
+      HomeKeyboard.insertSmallTextIntoKeyboardBuffer("RUN" + 13.toChar,mmu,c64Mode)
     }
   }
 
@@ -548,7 +550,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     
     val enableKeypadItem = new JCheckBoxMenuItem("Keypad enabled")
     enableKeypadItem.setSelected(true)
-    enableKeypadItem.addActionListener(e => keyb.enableKeypad(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    enableKeypadItem.addActionListener(e => keyb.asInstanceOf[HomeKeyboard].enableKeypad(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     keybMenu.add(enableKeypadItem)
     
     val keybEditorItem = new JMenuItem("Keyboard editor ...")

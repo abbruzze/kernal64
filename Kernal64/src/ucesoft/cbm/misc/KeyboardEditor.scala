@@ -1,6 +1,8 @@
 package ucesoft.cbm.misc
 
+import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, CBMIIModel}
 import ucesoft.cbm.peripheral.keyboard.{CKey, Keyboard, KeyboardMapper, KeyboardMapperStore}
+
 import javax.swing._
 import java.awt.FlowLayout
 import java.awt.GridLayout
@@ -12,7 +14,7 @@ import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Font
 
-class KeyboardEditor(keyboard:Keyboard,keybm:KeyboardMapper,isC64:Boolean) extends JPanel with ActionListener with KeyListener {
+class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerModel) extends JPanel with ActionListener with KeyListener {
   private val map = {
     val m = new collection.mutable.HashMap[CKey.Key,Int]
     for(kv <- keybm.map) m += ((kv._2,kv._1))
@@ -31,7 +33,17 @@ class KeyboardEditor(keyboard:Keyboard,keybm:KeyboardMapper,isC64:Boolean) exten
     }
   }
   
-  private val keys = (CKey.values filter { k => if (isC64) !CKey.is128Key(k) else true } filterNot { k => k == CKey.L_SHIFT || k == CKey.R_SHIFT } toArray) sortBy { k => k.toString }
+  private val keys = {
+    model match {
+      case C64Model =>
+        (CKey.values filter { k => !CKey.is128Key(k) && !CKey.isCBM2Key(k) } filterNot { k => k == CKey.L_SHIFT || k == CKey.R_SHIFT } toArray) sortBy { k => k.toString }
+      case C128Model =>
+        (CKey.values filter { k => !CKey.isCBM2Key(k) } filterNot { k => k == CKey.L_SHIFT || k == CKey.R_SHIFT } toArray) sortBy { k => k.toString }
+      case CBMIIModel =>
+        (CKey.values filter { k => CKey.isCBM2Key(k) } filterNot { k => k == CKey.CBM2_SHIFT } toArray) sortBy { k => k.toString }
+    }
+  }
+
   private val maxKeyLen = keys map { _.toString.length } max
   private val keyButtons : Array[ButtonKey] = keys map { k =>
     findKeyCode(k) match {
@@ -119,7 +131,7 @@ class KeyboardEditor(keyboard:Keyboard,keybm:KeyboardMapper,isC64:Boolean) exten
     }
 
     if (e.getKeyLocation == KeyEvent.KEY_LOCATION_NUMPAD) {
-      if (isC64) JOptionPane.showMessageDialog(this,"Keypad must be used in C128 mode only","Error",JOptionPane.ERROR_MESSAGE,null)
+      if (model == C64Model) JOptionPane.showMessageDialog(this,"Keypad must be used in C128 mode only","Error",JOptionPane.ERROR_MESSAGE,null)
       else keypad_map(keys(waitingIndex)) = e.getKeyCode
     }
     else {

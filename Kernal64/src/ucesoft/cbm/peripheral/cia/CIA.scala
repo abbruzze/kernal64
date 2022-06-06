@@ -206,8 +206,10 @@ class CIA(val name:String,
         f match {
           case clk.PAL_CLOCK_HZ =>
             TICK_CYCLES = PAL_TICK
-          case _ =>
+          case clk.NTSC_CLOCK_HZ =>
             TICK_CYCLES = NTSC_TICK
+          case f =>
+            TICK_CYCLES = (f / 10).toInt
         }
       })
       reset

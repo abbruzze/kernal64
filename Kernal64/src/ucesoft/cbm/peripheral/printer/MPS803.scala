@@ -8,10 +8,7 @@ import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import javax.swing.JFrame
 
-class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevice(bus,device) with CBMComponent {
-  val componentID = "Commodore MPS803"
-  val componentType = CBMComponentType.PRINTER 
-  
+class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevice(bus,device) with CBMComponent with Printer {
   val busid = "MPS803"
     
   private[this] var active = false
@@ -19,7 +16,7 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
   // register itself to bus
   bus.registerListener(this)
   
-  def setActive(active:Boolean) = this.active = active
+  override def setActive(active:Boolean) = this.active = active
   protected def isDeviceReady = active
   protected def loadData(fileName:String) = None
   
@@ -39,12 +36,4 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
     channels(channel).clear
     driver.print(byte)
   }
-  // state
-  protected def saveState(out:ObjectOutputStream) : Unit = {
-    out.writeBoolean(active)
-  }
-  protected def loadState(in:ObjectInputStream) : Unit = {
-    active = in.readBoolean
-  }
-  protected def allowsStateRestoring : Boolean = true
 }

@@ -10,7 +10,7 @@ import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
 import ucesoft.cbm.peripheral.bus.BusSnoop
 import ucesoft.cbm.peripheral.drive._
-import ucesoft.cbm.peripheral.keyboard.Keyboard
+import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.vic.VICType
 import ucesoft.cbm.trace.TraceDialog
 
@@ -22,7 +22,9 @@ object SCPUC64 extends App {
   CBMComputer.turnOn(new SCPUC64,args)
 }
 
-class SCPUC64 extends CBMComputer {
+class SCPUC64 extends CBMHomeComputer {
+  override protected val cbmModel = C64Model
+
   val componentID = "Commodore 64 SCPU"
   val componentType = CBMComponentType.INTERNAL
 
@@ -85,8 +87,8 @@ class SCPUC64 extends CBMComputer {
     ExpansionPort.addConfigurationListener(vicMemory)
     import cia._
     // control ports
-    val cia1CP1 = new CIA1Connectors.PortAConnector(keyb, controlPortA)
-    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb, controlPortB, () => vicChip.triggerLightPen)
+    val cia1CP1 = new CIA1Connectors.PortAConnector(keyb.asInstanceOf[HomeKeyboard], controlPortA)
+    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb.asInstanceOf[HomeKeyboard], controlPortB, () => vicChip.triggerLightPen)
     add(cia1CP1)
     add(cia1CP2)
     add(irqSwitcher)
@@ -231,7 +233,7 @@ class SCPUC64 extends CBMComputer {
     Log.info(s"BASIC program loaded from $start to $end")
     configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
     if (autorun) {
-      Keyboard.insertSmallTextIntoKeyboardBuffer("RUN" + 13.toChar, mmu, true)
+      HomeKeyboard.insertSmallTextIntoKeyboardBuffer("RUN" + 13.toChar, mmu, true)
     }
   }
 

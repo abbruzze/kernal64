@@ -45,7 +45,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
                                      ---
                               total 1366
    */
-  private[this] final val TRACK_ALLOCATION = // Key = #track => Value = #sectors per track
+  protected lazy val TRACK_ALLOCATION = // Key = #track => Value = #sectors per track
     if (file.toUpperCase.endsWith(".D64"))
       (for (t <- 0 to 42) yield {
         if (t <= 17) (t, 21)
@@ -98,7 +98,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     }    
   }
   
-  private def TOTAL_TRACKS = disk.length match {
+  protected def TOTAL_TRACKS = disk.length match {
     case DISK_SIZE_35_TRACKS|DISK_SIZE_35_TRACKS_WITH_ERRORS => 35
     case DISK_SIZE_40_TRACKS|DISK_SIZE_40_TRACKS_WITH_ERRORS => 40
     case DISK_SIZE_42_TRACKS|DISK_SIZE_42_TRACKS_WITH_ERRORS => 42
@@ -113,7 +113,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   
   private def gcrImageOf(t:Int,s:Int) = if (t == 0 || t > GCRImage.length) GCR.EMPTY_GCR_SECTOR else GCRImage(t - 1)(s)
   
-  @inline private def getSectorError(t:Int,s:Int) : Option[Int] = {
+  protected def getSectorError(t:Int,s:Int) : Option[Int] = {
     disk.length match {
       case DISK_SIZE_35_TRACKS|DISK_SIZE_40_TRACKS|DISK_SIZE_42_TRACKS => None
       case DISK_SIZE_35_TRACKS_WITH_ERRORS =>
@@ -174,7 +174,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     disk.close
   }
   
-  private def bamInfo = {    
+  protected def bamInfo = {
     //disk.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 3)
     val singleSide = file.toUpperCase.endsWith(".D64")// || disk.read != 0x80
     disk.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)
@@ -519,7 +519,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
 
   private def makeFreeSector(bam:Array[Byte],t:Int,s:Int) : Unit = {
     def asByte(p:Int) : Int = bam(p).toInt & 0xFF
-    val pos = 4 + (track - 1) * 4
+    val pos = 4 + (t - 1) * 4
     bam(pos) = (bam(pos) + 1).toByte
     val sectorsMap = asByte(pos + 1) | asByte(pos + 2) << 8 | asByte(pos + 3) << 16
     val modSectorsMap = sectorsMap | 1 << s
