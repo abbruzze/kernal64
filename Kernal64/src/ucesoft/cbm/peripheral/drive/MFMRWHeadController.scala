@@ -3,7 +3,7 @@ package ucesoft.cbm.peripheral.drive
 import ucesoft.cbm.formats.MFM
 
 class MFMRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedListener) extends RWHeadController(_floppy,ledListener) {
-  val componentID = name + "MFM rw head controller"
+  val componentID: String = name + "MFM rw head controller"
   
   canSetByteReady = true
   

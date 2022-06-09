@@ -1,18 +1,16 @@
 package ucesoft.cbm.misc
 
-import java.awt.{GridBagConstraints, GridBagLayout, Insets}
-import java.io.{File, FileOutputStream}
+import ucesoft.cbm.peripheral.vic.Display
 
+import java.awt.{GridBagConstraints, GridBagLayout, Insets}
 import javax.swing._
 import javax.swing.event.{ChangeEvent, ChangeListener}
-import javax.swing.filechooser.FileFilter
-import ucesoft.cbm.peripheral.vic.Display
 
 class DisplayEffectPanel(display:Display) extends JPanel with ChangeListener {
   private val rotationSlider = new JSlider(-180,180,0)
   private val angleLabel = new JLabel("+000")
 
-  private def init : Unit = {
+  private def init() : Unit = {
     val flipXCheck = new JCheckBox("Horizontal mirroring")
     val flipYCheck = new JCheckBox("Vertical mirroring")
     rotationSlider.setLabelTable(rotationSlider.createStandardLabels(45))
@@ -46,7 +44,7 @@ class DisplayEffectPanel(display:Display) extends JPanel with ChangeListener {
     add(comp,c)
   }
 
-  def stateChanged(e:ChangeEvent) = /*if (!rotationSlider.getValueIsAdjusting)*/ {
+  def stateChanged(e:ChangeEvent): Unit = /*if (!rotationSlider.getValueIsAdjusting)*/ {
     display.setRotationAngle(rotationSlider.getValue)
     angleLabel.setText("%3d".format(rotationSlider.getValue))
   }
@@ -63,7 +61,7 @@ object DisplayEffectPanel {
 
         dep.init
         dialog.getContentPane.add("Center", dep)
-        dialog.pack
+        dialog.pack()
         mapDialog += name -> dialog
         dialog
       case Some(dialog) =>

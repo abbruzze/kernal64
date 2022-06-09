@@ -4,19 +4,19 @@ import ucesoft.cbm.Log
 
 object IEEE488Bus {
   object LineType extends Enumeration {
-    val EOI = Value(0)    // End Or Identify
-    val REN = Value(1)    // Remote Enable
-    val DAV = Value(2)    // Data Valid
-    val NRFD= Value(3)    // Not Ready For Data
-    val NDAC= Value(4)    // No Data Accepted
-    val IFC = Value(5)    // Interface Clear
-    val SRQ = Value(6)    // Service Request
-    val ATN = Value(7)    // Attention
+    val EOI: LineType.Value = Value(0)    // End Or Identify
+    val REN: LineType.Value = Value(1)    // Remote Enable
+    val DAV: LineType.Value = Value(2)    // Data Valid
+    val NRFD: LineType.Value = Value(3)    // Not Ready For Data
+    val NDAC: LineType.Value = Value(4)    // No Data Accepted
+    val IFC: LineType.Value = Value(5)    // Interface Clear
+    val SRQ: LineType.Value = Value(6)    // Service Request
+    val ATN: LineType.Value = Value(7)    // Attention
   }
 
   object LineValue extends Enumeration {
-    val RELEASED = Value(0)
-    val PULLED = Value(1)
+    val RELEASED: LineValue.Value = Value(0)
+    val PULLED: LineValue.Value = Value(1)
 
     def intValue(lv:LineValue.Value): Int = 1 - lv.id
     def fromValue(value:Long): LineValue.Value = value match {

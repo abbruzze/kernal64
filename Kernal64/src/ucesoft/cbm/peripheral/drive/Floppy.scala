@@ -1,33 +1,27 @@
 package ucesoft.cbm.peripheral.drive
 
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import java.io.DataInputStream
-import java.io.FileInputStream
-import java.io.File
-import java.io.FileOutputStream
-import java.io.DataOutputStream
 import ucesoft.cbm.formats.Diskette
 import ucesoft.cbm.misc.FloppyFlushListener
 
+import java.io._
+
 object Floppy {
   def load(in:ObjectInputStream) : Option[Floppy] = {
-    in.readBoolean match {
-      case true =>
-        val file = in.readObject.asInstanceOf[String]
-        val content = in.readObject.asInstanceOf[Array[Byte]]
-        val tmpFile = new File(new File(System.getProperty("java.io.tmpdir")),new File(file).getName)
-        tmpFile.deleteOnExit
-        val out = new DataOutputStream(new FileOutputStream(tmpFile))
-        out.write(content)
-        out.close
-        val fileName = file.toUpperCase
-        val floppy : Floppy = Diskette(tmpFile.toString)
-        floppy.load(in)
-        Some(floppy)
-      case false =>
-        None
-    }    
+    if (in.readBoolean) {
+      val file = in.readObject.asInstanceOf[String]
+      val content = in.readObject.asInstanceOf[Array[Byte]]
+      val tmpFile = new File(new File(System.getProperty("java.io.tmpdir")), new File(file).getName)
+      tmpFile.deleteOnExit()
+      val out = new DataOutputStream(new FileOutputStream(tmpFile))
+      out.write(content)
+      out.close()
+      val fileName = file.toUpperCase
+      val floppy: Floppy = Diskette(tmpFile.toString)
+      floppy.load(in)
+      Some(floppy)
+    } else {
+      None
+    }
   }  
   def save(out:ObjectOutputStream,floppy:Option[Floppy]) : Unit = {
     floppy match {
@@ -58,7 +52,7 @@ trait Floppy {
   def isOnIndexHole : Boolean = false
   
   def minTrack = 1
-  def maxTrack = totalTracks
+  def maxTrack: Int = totalTracks
   
   def side : Int = 0
   def side_=(newSide:Int) : Unit = {}
@@ -72,7 +66,7 @@ trait Floppy {
   def currentSector : Option[Int]
   def changeTrack(trackSteps:Int) : Unit
   def setTrackChangeListener(l:TrackListener) : Unit
-  def notifyTrackSectorChangeListener : Unit
+  def notifyTrackSectorChangeListener() : Unit
     
   def defaultZoneFor(track:Int) : Int = {
     if (track <= 17) 0
@@ -81,9 +75,9 @@ trait Floppy {
     else 3
   }
   
-  def flush : Unit = {}
-  def close : Unit
-  def reset : Unit
+  def flush() : Unit = {}
+  def close() : Unit
+  def reset() : Unit
   // state
   def save(out:ObjectOutputStream) : Unit
   def load(in:ObjectInputStream) : Unit
@@ -99,7 +93,7 @@ trait Floppy {
       out.writeObject(content)
     }
     finally {
-      f.close
+      f.close()
     }
   }
 }
@@ -119,8 +113,8 @@ class EmptyFloppy extends Floppy {
   def nextByte = 0
   def writeNextByte(b:Int) : Unit = {}
   
-  def currentTrack = track
-  def currentSector = None
+  def currentTrack: Int = track
+  def currentSector: Option[Int] = None
   def changeTrack(trackSteps:Int) : Unit = {
     val isOnTrack = (trackSteps & 1) == 0
     if (isOnTrack) {
@@ -128,7 +122,7 @@ class EmptyFloppy extends Floppy {
     }
     notifyTrackSectorChangeListener
   }
-  def setTrackChangeListener(l:TrackListener) = listener = l
+  def setTrackChangeListener(l:TrackListener): Unit = listener = l
   def notifyTrackSectorChangeListener : Unit = {
     if (listener != null) listener(track,false,None)
   }

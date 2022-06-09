@@ -33,7 +33,7 @@ object MOS6525 {
 class MOS6525(name:String,pa:MOS6525.PortAB,pb:MOS6525.PortAB,pc:MOS6525.PortC,irqLow: Boolean => Unit) {
   import MOS6525._
 
-  val regs = Array.ofDim[Int](8)
+  val regs: Array[Int] = Array.ofDim[Int](8)
   private var ca,cb = 0
   private var irqStack = 0
   private var irqPrevious = 0xFF

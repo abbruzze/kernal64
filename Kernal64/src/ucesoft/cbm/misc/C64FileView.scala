@@ -1,14 +1,13 @@
 package ucesoft.cbm.misc
 
 import java.io.File
-
-import javax.swing.ImageIcon
 import javax.swing.filechooser.FileView
+import javax.swing.{Icon, ImageIcon}
 
 class C64FileView extends FileView {
   private val icon = new ImageIcon(getClass.getResource("/resources/commodore_file.png"))
   
-  override def getTypeDescription(f:File) = {
+  override def getTypeDescription(f:File): String = {
     if (f.getName.toUpperCase.endsWith(".D64") || f.getName.toUpperCase.endsWith(".D71")) "Commodore 64 disk image"
     else
     if (f.getName.toUpperCase.endsWith(".G64")) "Commodore 64 GCR disk image"
@@ -24,7 +23,7 @@ class C64FileView extends FileView {
     if (f.getName.toUpperCase.endsWith(".REU")) "Commodore 64 ram expansion unit file"
     else null
   }
-  override def getIcon(f:File) = {
+  override def getIcon(f:File): Icon = {
     val name = f.getName.toUpperCase
     if (name.endsWith(".D64") || 
         name.endsWith(".D71") ||

@@ -1,10 +1,9 @@
 package ucesoft.cbm.formats
 
-import ucesoft.cbm.peripheral.drive.Floppy
-import java.io.RandomAccessFile
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
 import ucesoft.cbm.formats.Diskette._
+import ucesoft.cbm.peripheral.drive.Floppy
+
+import java.io.{ObjectInputStream, ObjectOutputStream, RandomAccessFile}
 import scala.collection.mutable.ListBuffer
 
 object G64 {
@@ -19,7 +18,7 @@ object G64 {
 private[formats] class G64(val file:String) extends Diskette {
   import G64._
 
-  val isReadOnly = !new java.io.File(file).canWrite
+  val isReadOnly: Boolean = !new java.io.File(file).canWrite
   private[this] var tracks : Array[Array[Int]] = _
   private[this] var trackOffsets : Array[Int] = _
   private[this] var speedZones : Array[Int] = _
@@ -35,7 +34,7 @@ private[formats] class G64(val file:String) extends Diskette {
   
   loadTracks
   val canBeEmulated = false  
-  lazy val totalTracks = tracks.length
+  lazy val totalTracks: Int = tracks.length
   
   private[this] var trackChangeListener : Floppy#TrackListener = null
 
@@ -117,7 +116,7 @@ private[formats] class G64(val file:String) extends Diskette {
     dirs.toList
   }
   
-  private def loadTracks  : Unit = {
+  private def loadTracks()  : Unit = {
     val header = Array.ofDim[Byte](0x0C)
     disk.readFully(header)
     val magic = "GCR-1541".toArray
@@ -187,13 +186,13 @@ private[formats] class G64(val file:String) extends Diskette {
     }
   }
   
-  final def nextBit = {
+  final def nextBit: Int = {
     val b = (tracks(track)(trackIndex) >> (8 - bit)) & 1
     if (bit == 8) rotate else bit += 1
     checkSector(b)
     b
   }
-  private def writeNewTrack : Unit = {
+  private def writeNewTrack() : Unit = {
     val trackLen = DEFAULT_TRACK_LENGTH(track >> 1)
     tracks(track) = Array.fill[Int](trackLen)(0x55)
     if (canWriteOnDisk) {
@@ -223,9 +222,9 @@ private[formats] class G64(val file:String) extends Diskette {
     if (bit == 8) rotate else bit += 1
   }
   final def nextByte : Int = tracks(track)(trackIndex)
-  def writeNextByte(b:Int) = tracks(track)(trackIndex) = b & 0xFF
+  def writeNextByte(b:Int): Unit = tracks(track)(trackIndex) = b & 0xFF
   
-  @inline private def rotate  : Unit = {
+  @inline private def rotate()  : Unit = {
     bit = 1
     if (trackIndexModified && canWriteOnDisk) {
       trackIndexModified = false
@@ -238,17 +237,17 @@ private[formats] class G64(val file:String) extends Diskette {
   def notifyTrackSectorChangeListener  : Unit = {
     if (trackChangeListener != null) trackChangeListener((track >> 1) + 1,(track & 1) == 1,sector)
   }
-  def currentTrack = track + 1
-  def currentSector = sector
+  def currentTrack: Int = track + 1
+  def currentSector: Option[Int] = sector
   def changeTrack(trackSteps:Int) : Unit = {
     track = trackSteps - 2
     trackIndex = trackIndex % tracks(track).length
     bit = 1
     notifyTrackSectorChangeListener
   }
-  def setTrackChangeListener(l:TrackListener) = trackChangeListener = l
+  def setTrackChangeListener(l:TrackListener): Unit = trackChangeListener = l
     
-  def close = disk.close
+  def close: Unit = disk.close()
   
   override def toString = s"G64 $file total tracks=$totalTracks"
   // state

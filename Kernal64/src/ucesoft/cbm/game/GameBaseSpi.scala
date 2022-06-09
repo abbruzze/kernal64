@@ -1,11 +1,11 @@
 package ucesoft.cbm.game
 
-import io.Source
-import concurrent._
-import concurrent.ExecutionContext.Implicits.global
+import java.awt.Dimension
 import java.net.URL
 import java.util.concurrent.atomic.AtomicInteger
-import java.awt.Dimension
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent._
+import scala.io.Source
 
 class GameBaseSpi extends GameProvider {
   private case class Games(index:String,pages:Int,games:Future[List[Game]])
@@ -13,8 +13,8 @@ class GameBaseSpi extends GameProvider {
     override def toString = s"Group $letter"
   }
   
-  val url = Some(new URL("http://www.gb64.com"))
-  val iconURL = Some(new URL("http://www.gb64.com/images/c64top/gamebase64.jpg"))
+  val url: Option[URL] = Some(new URL("http://www.gb64.com"))
+  val iconURL: Option[URL] = Some(new URL("http://www.gb64.com/images/c64top/gamebase64.jpg"))
   val name = "GameBase"   
   val gameIconPreferredSize = new Dimension(320,200)
   private val MAX_PER_PAGE = 45
@@ -24,7 +24,7 @@ class GameBaseSpi extends GameProvider {
   private val pages = (65 to 90).toList ++ List(48)
   private val constraints : List[SyncConstraint] = SyncAll :: (pages map { l => LetterConstraint(l.toChar) })
   
-  lazy val version = {
+  lazy val version: String = {
     try getVersion.getOrElse("??")
     catch {
       case t:Throwable =>
@@ -41,7 +41,7 @@ class GameBaseSpi extends GameProvider {
   @volatile private var interrupted = false
   
   def existsNewerVersion : Boolean = {
-    def ver(v:String) = v.split("""\.""").reverse.zipWithIndex.foldLeft(0)((acc,e) => acc + math.pow(e._1.toInt,e._2.toInt + 1).toInt)
+    def ver(v:String) = v.split("""\.""").reverse.zipWithIndex.foldLeft(0)((acc,e) => acc + math.pow(e._1.toInt,e._2 + 1).toInt)
     try {
       ver(repository.currentVersion) < ver(version)
     }
@@ -49,7 +49,7 @@ class GameBaseSpi extends GameProvider {
       case t:NumberFormatException => t.printStackTrace() ; false
     }
   }
-  def setProgressListener(l:GameLoadingProgressListener) = progressListener = Some(l)
+  def setProgressListener(l:GameLoadingProgressListener): Unit = progressListener = Some(l)
   
   private def url(index:String,page:Int) = s"$gamebaseUrl/search.php?a=4&l=$index&d=45&h=0&p=$page"
   private def getVersion : Option[String] = {

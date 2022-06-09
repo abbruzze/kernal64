@@ -64,10 +64,10 @@ class D64LocalDirectory(override val file:String,val dir:File) extends D64_D71(f
   override def close: Unit = {
     flush
     if (diskModified) syncWithLocalDir
-    disk.close
+    disk.close()
   }
 
-  private def syncWithLocalDir : Unit = {
+  private def syncWithLocalDir() : Unit = {
     val dirEntries = directories
     val toDelete = initialDirEntries filter { e => !dirEntries.contains(e) }
     val toModify = dirEntries
@@ -104,6 +104,6 @@ class D64LocalDirectory(override val file:String,val dir:File) extends D64_D71(f
       }
       while (t != 0)
     }
-    finally out.close
+    finally out.close()
   }
 }

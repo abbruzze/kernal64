@@ -1,8 +1,9 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import ucesoft.cbm.{CBMComponent, CBMComponentType}
+import ucesoft.cbm.CBMComponentType
+import ucesoft.cbm.CBMComponentType.Type
 
-import java.awt.event.{KeyEvent, KeyListener}
+import java.awt.event.KeyEvent
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
 object BKeyboard {
@@ -10,7 +11,7 @@ object BKeyboard {
 
   import KeyEvent._
 
-  val DEF_CBM2_KEYMAPPER = new KeyboardMapper {
+  val DEF_CBM2_KEYMAPPER: KeyboardMapper = new KeyboardMapper {
     override val map: Map[Int, Key] = Map(
       // A
       VK_F1 -> CBM2_F1, VK_F2 -> CBM2_F2, VK_F3 -> CBM2_F3, VK_F4 -> CBM2_F4, VK_F5 -> CBM2_F5, VK_F6 -> CBM2_F6, VK_F7 -> CBM2_F7, VK_F8 -> CBM2_F8, VK_F9 -> CBM2_F9, VK_F10 -> CBM2_F10,VK_DOWN -> CBM2_DOWN,VK_UP -> CBM2_UP,VK_HOME -> CBM2_HOME,VK_F11 -> CBM2_RVS,VK_F12 -> CBM2_GRAPH,VK_INSERT -> CBM2_STOP,
@@ -43,7 +44,7 @@ object BKeyboard {
 
 class BKeyboard(private var km:KeyboardMapper) extends Keyboard {
   val componentID = "Keyboard"
-  val componentType = CBMComponentType.INPUT_DEVICE
+  val componentType: Type = CBMComponentType.INPUT_DEVICE
 
   private val keysPressed = collection.mutable.Set.empty[CKey.Key]
   private var keyMap = km.map

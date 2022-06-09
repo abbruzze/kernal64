@@ -2,10 +2,10 @@ package ucesoft.cbm.peripheral.vic
 
 object Palette {
   object PaletteType extends Enumeration {
-    val VICE = Value
-    val BRIGHT = Value
-    val PEPTO = Value
-    val COLORDORE = Value
+    val VICE: PaletteType.Value = Value
+    val BRIGHT: PaletteType.Value = Value
+    val PEPTO: PaletteType.Value = Value
+    val COLORDORE: PaletteType.Value = Value
   }
 
   private[this] val WINVICE_RGB = Array(

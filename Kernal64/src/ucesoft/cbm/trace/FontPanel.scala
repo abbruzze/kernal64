@@ -1,18 +1,17 @@
 package ucesoft.cbm.trace
 
-import javax.swing._
 import ucesoft.cbm.cpu.Memory
-import java.awt.event.ActionListener
-import java.awt.BorderLayout
-import java.awt.GridLayout
-import java.awt.event.ActionEvent
+
+import java.awt.{BorderLayout, GridLayout}
+import java.awt.event.{ActionEvent, ActionListener}
+import javax.swing._
 
 object FontPanel {
-  def getFontDialog(displayFrame:JFrame,mem:Memory) = {
+  def getFontDialog(displayFrame:JFrame,mem:Memory): JDialog = {
     val dialog = new JDialog(displayFrame,"Character viewer")
     dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
     dialog.getContentPane.add("Center",new FontPanel(mem))
-    dialog.pack
+    dialog.pack()
     dialog
   }  
 }
@@ -23,7 +22,7 @@ class FontPanel(mem:Memory) extends JPanel with ActionListener {
   
   init
   
-  private def init : Unit = {
+  private def init() : Unit = {
     setLayout(new BorderLayout)
     val northPanel = new JPanel
     northPanel.add(new JLabel("Address:"))
@@ -44,7 +43,7 @@ class FontPanel(mem:Memory) extends JPanel with ActionListener {
     add("Center",matrixPanel)
   }
   
-  private def updateMatrix : Unit = {
+  private def updateMatrix() : Unit = {
     val address = addressTextField.getText.toInt
     for(r <- 0 to 7) {      
       val ch = mem.read(address + r)

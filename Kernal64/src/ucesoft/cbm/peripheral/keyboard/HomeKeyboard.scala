@@ -1,23 +1,20 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import java.awt.event.KeyListener
-import java.awt.event.KeyEvent
-
-import CKey._
-import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.CBMComponentType
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-
-import javax.swing.JFrame
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.peripheral.keyboard.CKey._
+
+import java.awt.event.KeyEvent
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 object HomeKeyboard {
   private var keybThread : KeyboardThread = _
   private var keybThreadRunning = false
 
   private class KeyboardThread(txt:String,mem:Memory,c64Mode:Boolean) extends Thread {
-    override def run : Unit = {
+    override def run() : Unit = {
       keybThreadRunning = true
       val maxLenAddr = if (c64Mode) 649 else 2592
       val bufferAddr = if (c64Mode) 631 else 842
@@ -51,13 +48,13 @@ object HomeKeyboard {
   def insertTextIntoKeyboardBuffer(txt:String,mem:Memory,c64Mode:Boolean): Unit = {
     if (keybThreadRunning) keybThreadRunning = false
     keybThread = new KeyboardThread(txt,mem,c64Mode)
-    keybThread.start
+    keybThread.start()
   }
 }
 
 class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) => Unit = x => {}, c128 : Boolean = false) extends Keyboard {
   val componentID = "Keyboard"
-  val componentType = CBMComponentType.INPUT_DEVICE
+  val componentType: Type = CBMComponentType.INPUT_DEVICE
 
   private[this] val keysPressed = collection.mutable.Set.empty[CKey.Key]
   private[this] var keyMap = keyMapper.map
@@ -81,9 +78,9 @@ class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) =
 
   override def getKeyboardMapper : KeyboardMapper = keyMapper
 
-  def isCapsLockPressed = c128_CapsLockPressed
-  def is4080Pressed = c128_40_80_Pressed
-  def set4080Pressed(pressed:Boolean) = c128_40_80_Pressed = pressed
+  def isCapsLockPressed: Boolean = c128_CapsLockPressed
+  def is4080Pressed: Boolean = c128_40_80_Pressed
+  def set4080Pressed(pressed:Boolean): Unit = c128_40_80_Pressed = pressed
 
   def init : Unit = {}
   def reset : Unit = {
@@ -94,7 +91,7 @@ class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) =
     HomeKeyboard.keybThreadRunning = false
   }
     
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Number of key pressed",keysPressed.size.toString)
     properties
   }
@@ -142,7 +139,7 @@ class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) =
       }
     }
   }
-  final def keyReleased(e: KeyEvent) = synchronized {
+  final def keyReleased(e: KeyEvent): Unit = synchronized {
     if (e.getKeyLocation == KeyEvent.KEY_LOCATION_NUMPAD) {
       if (keypadEnabled)
       keyPadMap get e.getKeyCode match {
@@ -174,11 +171,11 @@ class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) =
     }
   }
   
-  final def selectRow(value:Int) = select(value,rowSelector)
-  final def selectC128ExtendedRow(value:Int) = select(value,c128ExtendedRowSelector)
-  final def selectCol(value:Int) = select(value,colSelector)
-  final def readCol = read(rowSelector) & read(c128ExtendedRowSelector)  
-  final def readRow = read(colSelector)
+  final def selectRow(value:Int): Unit = select(value,rowSelector)
+  final def selectC128ExtendedRow(value:Int): Unit = select(value,c128ExtendedRowSelector)
+  final def selectCol(value:Int): Unit = select(value,colSelector)
+  final def readCol: Int = read(rowSelector) & read(c128ExtendedRowSelector)
+  final def readRow: Int = read(colSelector)
 
   private final def read(selector:Array[Boolean]) = synchronized {
     if (enabled) {

@@ -1,14 +1,5 @@
 package ucesoft.cbm.cpu.asm
 
-import java.awt.datatransfer.{Clipboard, DataFlavor}
-import java.awt.event.{WindowAdapter, WindowEvent}
-import java.awt.{BorderLayout, Color, Cursor, FlowLayout}
-import java.io.{File, FileInputStream, InputStream, PrintWriter, StringReader, StringWriter}
-import java.text.SimpleDateFormat
-import java.util.{Properties, Scanner}
-import javax.swing.table.AbstractTableModel
-import javax.swing.text.DefaultCaret
-import javax.swing.{BorderFactory, JButton, JCheckBox, JCheckBoxMenuItem, JComponent, JDialog, JFileChooser, JFrame, JMenu, JMenuBar, JMenuItem, JOptionPane, JPanel, JScrollPane, JSplitPane, JTable, JTextArea, JTextField, JToggleButton, KeyStroke, SwingUtilities, TransferHandler}
 import org.fife.ui.rsyntaxtextarea.{RSyntaxTextArea, SyntaxConstants}
 import org.fife.ui.rtextarea.{RTextScrollPane, SearchContext, SearchEngine}
 import ucesoft.cbm.cpu.Memory
@@ -17,7 +8,16 @@ import ucesoft.cbm.cpu.asm.AsmParser.{Patch, Statement, Virtual}
 import ucesoft.cbm.misc.Preferences
 import ucesoft.cbm.trace.{BreakSet, NoBreak, TraceDialog, TracingListener}
 
+import java.awt.datatransfer.{Clipboard, DataFlavor}
+import java.awt.event.{WindowAdapter, WindowEvent}
+import java.awt.{BorderLayout, Color, Cursor, FlowLayout}
+import java.io._
+import java.text.SimpleDateFormat
+import java.util.{Properties, Scanner}
+import javax.swing._
 import javax.swing.event.{DocumentEvent, DocumentListener}
+import javax.swing.table.AbstractTableModel
+import javax.swing.text.DefaultCaret
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.io.Source
@@ -43,7 +43,7 @@ object Assembler {
     assembler.setParent(dialog)
     dialog.getContentPane.add("Center",assembler)
     dialog.setJMenuBar(assembler.getMenuBar)
-    dialog.pack
+    dialog.pack()
     dialog.addWindowListener(new WindowAdapter {
       override def windowClosing(e: WindowEvent): Unit = assembler.close
     })
@@ -156,7 +156,7 @@ object Assembler {
       out.write(asmEncoding.org >> 8)
     }
     out.write(asmEncoding.mem)
-    out.close
+    out.close()
   }
 
   def main(args:Array[String]) : Unit = {
@@ -253,7 +253,7 @@ private class SymbolPanel(map:collection.mutable.LinkedHashMap[String,String]) e
   private val delButton = new JButton("Delete")
   init
 
-  def init : Unit = {
+  def init() : Unit = {
     setLayout(new BorderLayout())
     val scrollPane = new JScrollPane(table)
     table.setFillsViewportHeight(true)
@@ -269,18 +269,18 @@ private class SymbolPanel(map:collection.mutable.LinkedHashMap[String,String]) e
     table.getSelectionModel.addListSelectionListener(e => delButton.setEnabled(table.getSelectedRowCount > 0))
   }
 
-  private def delSymbols : Unit = {
+  private def delSymbols() : Unit = {
     for(i <- table.getSelectedRows.sorted.reverse) symbols.remove(i)
     model.fireTableStructureChanged()
   }
 
-  private def addSymbol : Unit = {
+  private def addSymbol() : Unit = {
     symbols += Array(s"NewSymbol$symbolCounter","")
     symbolCounter += 1
     model.fireTableStructureChanged()
   }
 
-  def updateSymbols : Unit = {
+  def updateSymbols() : Unit = {
     map.clear()
     for(s <- symbols) map += s(0) -> s(1)
   }
@@ -321,7 +321,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
 
   init
 
-  def close : Unit = traceDialog.removeListener(this)
+  def close() : Unit = traceDialog.removeListener(this)
 
   def getMenuBar : JMenuBar = {
     val menu = new JMenuBar
@@ -453,15 +453,15 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     }
   }
 
-  private def clearSearch : Unit = {
+  private def clearSearch() : Unit = {
     textArea.removeAllLineHighlights()
   }
 
-  def reqFocus : Unit = {
+  def reqFocus() : Unit = {
     textArea.requestFocusInWindow
   }
 
-  private def init : Unit = {
+  private def init() : Unit = {
     setLayout(new BorderLayout)
     textArea.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_ASSEMBLER_6502)
     rsp.setBorder(BorderFactory.createTitledBorder("noname.asm"))
@@ -522,7 +522,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
 
   private def log(msg:String) : Unit = messageArea.append(s"${df.format(new java.util.Date)} $msg")
 
-  private def findCommentedCode : Unit = {
+  private def findCommentedCode() : Unit = {
     Option(JOptionPane.showInputDialog(parentDialog,"Enter a regular expression with a (group) embracing line address","^([a-f|A-F|0-9]{4})")) match {
       case Some(regex) =>
         try {
@@ -544,7 +544,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
             }
           }
           lastByteCodeBlocks = List(bcb)
-          JOptionPane.showMessageDialog(this, s"Found ${matches} matches","Text analyzed",JOptionPane.INFORMATION_MESSAGE)
+          JOptionPane.showMessageDialog(this, s"Found $matches matches","Text analyzed",JOptionPane.INFORMATION_MESSAGE)
         }
         catch {
           case e:Exception =>
@@ -554,7 +554,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     }
   }
 
-  private def setBreak : Unit = {
+  private def setBreak() : Unit = {
     val line = textArea.getCaretLineNumber + 1
     val found = (lastByteCodeBlocks.view map { _.asmStatements } flatten) find { asm =>
       asm.source.line == line
@@ -602,12 +602,12 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     }
   }
 
-  private def openSymbolDialog : Unit = {
+  private def openSymbolDialog() : Unit = {
     val dialog = new JDialog(parentDialog,"Symbol table",true)
     val panel = new SymbolPanel(symbolTable)
     dialog.getContentPane.add("Center",panel)
     dialog.setLocationRelativeTo(parentDialog)
-    dialog.pack
+    dialog.pack()
     dialog.setVisible(true)
     panel.updateSymbols
   }
@@ -619,7 +619,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
         out.print(textArea.getText)
       }
       finally {
-        out.close
+        out.close()
       }
     }
 
@@ -644,7 +644,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     }
   }
 
-  private def load : Unit = {
+  private def load() : Unit = {
     if (fileChanged) {
       JOptionPane.showConfirmDialog(this,s"File ${currentFileName.getOrElse("noname.asm")} has changed. Do you want to save it ?","Confirm",JOptionPane.YES_NO_CANCEL_OPTION) match {
         case JOptionPane.YES_OPTION =>
@@ -663,7 +663,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     }
   }
 
-  private def gotoLine : Unit = {
+  private def gotoLine() : Unit = {
     Option(JOptionPane.showInputDialog(parentDialog,"Go to line:","")) match {
       case Some(line) =>
         try {
@@ -677,7 +677,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     }
   }
 
-  private def removeLastHighlight : Unit = {
+  private def removeLastHighlight() : Unit = {
     if (lastHighlightID != null) {
       textArea.removeLineHighlight(lastHighlightID)
       lastHighlightID = null
@@ -713,7 +713,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     }
   }
 
-  private def setImportDir : Unit = {
+  private def setImportDir() : Unit = {
     val fc = new JFileChooser(importDir)
     fc.setDialogTitle("Choose import directory")
     fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
@@ -724,7 +724,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     }
   }
 
-  private def uploadInMemory : Unit = {
+  private def uploadInMemory() : Unit = {
     log(f"Uploading from memory ${asmEncoding.org}%04X ...\n")
     for(i <- 0 until asmEncoding.mem.length) {
       mem.write(asmEncoding.org + i,asmEncoding.mem(i) & 0xFF)
@@ -732,7 +732,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     uploadInMemoryItem.setEnabled(false)
   }
 
-  private def compile : Unit = {
+  private def compile() : Unit = {
     setCursor(new java.awt.Cursor(Cursor.WAIT_CURSOR))
     uploadInMemoryItem.setEnabled(false)
     saveAsPRGItem.setEnabled(false)
@@ -740,9 +740,9 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
     compileItem.setEnabled(false)
 
     new Thread {
-      override def run : Unit = {
+      override def run(): Unit = {
         try {
-          compileSource(textArea.getText,currentFileName,symbolTable)(log _,log _) match {
+          compileSource(textArea.getText, currentFileName, symbolTable)(log _, log _) match {
             case Some(CompilationResult(blocks, enc)) =>
               lastByteCodeBlocks = blocks
               asmEncoding = enc
@@ -757,6 +757,6 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
           setCursor(new java.awt.Cursor(Cursor.DEFAULT_CURSOR))
         }
       }
-    }.start
+    }.start()
   }
 }

@@ -1,18 +1,12 @@
 package ucesoft.cbm.misc
 
-import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, CBMIIModel}
+import ucesoft.cbm.peripheral.keyboard.CKey.Key
 import ucesoft.cbm.peripheral.keyboard.{CKey, Keyboard, KeyboardMapper, KeyboardMapperStore}
+import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, CBMIIModel}
 
+import java.awt._
+import java.awt.event.{ActionEvent, ActionListener, KeyEvent, KeyListener}
 import javax.swing._
-import java.awt.FlowLayout
-import java.awt.GridLayout
-import java.awt.event.ActionListener
-import java.awt.event.ActionEvent
-import java.awt.event.KeyListener
-import java.awt.event.KeyEvent
-import java.awt.BorderLayout
-import java.awt.Color
-import java.awt.Font
 
 class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerModel) extends JPanel with ActionListener with KeyListener {
   private val map = {
@@ -27,7 +21,7 @@ class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerM
   }
   
   private case class ButtonKey(key:CKey.Key,keyCode:Option[Int]) {
-    override def toString = keyCode match {
+    override def toString: String = keyCode match {
       case Some(kc) => KeyboardMapperStore.getKey(kc)
       case None => "EMPTY"
     }
@@ -70,10 +64,10 @@ class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerM
   }
   private val tiles = for(k <- keys.zip(buttons)) yield new JPanel {
     setLayout(new FlowLayout(FlowLayout.LEFT))
-    val lab = k._1.toString + (" " * (maxKeyLen - k._1.toString.length))
+    val lab: String = k._1.toString + (" " * (maxKeyLen - k._1.toString.length))
     val jlabel = new JLabel(lab)
     add(jlabel)
-    val f = jlabel.getFont
+    val f: Font = jlabel.getFont
     jlabel.setFont(new Font("Monospaced",f.getStyle,f.getSize))
     add(k._2)
   }
@@ -114,7 +108,7 @@ class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerM
     for(b <- buttons) b.setEnabled(false)
     statusLabel.setText(s"Press a key to redefine C= key $key")
     statusLabel.setForeground(Color.RED)
-    requestFocus
+    requestFocus()
   }
   
   def keyPressed(e:KeyEvent) : Unit = {
@@ -149,20 +143,20 @@ class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerM
   def keyTyped(e:KeyEvent) : Unit = {}
   
   private def makeKeyboardMapper : KeyboardMapper = new KeyboardMapper {
-    val map = KeyboardEditor.this.map map { kv => (kv._2,kv._1) } toMap
-    val keypad_map = KeyboardEditor.this.keypad_map map { kv => (kv._2,kv._1) } toMap
+    val map: Map[Int, Key] = KeyboardEditor.this.map map { kv => (kv._2,kv._1) } toMap
+    val keypad_map: Map[Int, Key] = KeyboardEditor.this.keypad_map map { kv => (kv._2,kv._1) } toMap
   }
   
-  private def save  : Unit = {
+  private def save()  : Unit = {
     val fc = new JFileChooser
     fc.setDialogTitle("Choose where to save this keyboard configuration")
-    val fn = fc.showSaveDialog(this) match {
+    val fn: Unit = fc.showSaveDialog(this) match {
       case JFileChooser.APPROVE_OPTION =>
         val kbm = makeKeyboardMapper
         import java.io._
         val pw = new PrintWriter(new FileOutputStream(fc.getSelectedFile))
         KeyboardMapperStore.store(kbm,pw)
-        pw.close
+        pw.close()
       case _ =>
     }
   }

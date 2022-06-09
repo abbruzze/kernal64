@@ -1,8 +1,10 @@
 package ucesoft.cbm.misc
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
-
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.{CBMComponent, CBMComponentType}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 object Switcher {
   final val VIC = 0x01
@@ -14,11 +16,11 @@ object Switcher {
 
 class Switcher(name:String,handler: (Boolean) => Unit) extends CBMComponent {
   val componentID = s"$name Switcher"
-  val componentType = CBMComponentType.INTERNAL
+  val componentType: Type = CBMComponentType.INTERNAL
 
   private[this] var bus = 0
 
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty(componentID,bus.toBinaryString)
     properties
   }

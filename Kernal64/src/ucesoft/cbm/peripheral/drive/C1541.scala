@@ -1,24 +1,18 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.peripheral.bus.IECBus
-import ucesoft.cbm.Log
-import ucesoft.cbm.cpu.CPU65xx
-import ucesoft.cbm.ChipID
-import ucesoft.cbm.Clock
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm._
+import ucesoft.cbm.cpu.{CPU65xx, Memory}
+import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
 import ucesoft.cbm.trace.{BreakType, CpuStepInfo, TraceListener}
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.CBMComponent
-import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
 
-import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.peripheral.bus.IECBusListener
-import ucesoft.cbm.peripheral.bus.IECBusLine
-import ucesoft.cbm.ClockEvent
+import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
+import java.util.Properties
 
 class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends TraceListener with Drive {
-  val driveType = DriveType._1541
-  val componentID = "C1541 Disk Drive " + (jackID + 8)
-  val formatExtList = List("D64","D71","G64")
+  val driveType: DriveType.Value = DriveType._1541
+  val componentID: String = "C1541 Disk Drive " + (jackID + 8)
+  val formatExtList: List[String] = List("D64","D71","G64")
   override val MIN_SPEED_HZ = 985248
   override val MAX_SPEED_HZ = 1000000
   
@@ -47,7 +41,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
    ***********************************************************************************************************/
   private[this] val viaBus = new VIA("VIA_IECBus" + jackID,0x1800,IRQSwitcher.viaBusIRQ _) with IECBusListener {
     override lazy val componentID = "VIA1 (Bus)"
-    val busid = name
+    val busid: String = name
     private[this] val IDJACK = jackID & 0x03
     private[this] var driveEnabled = true
     
@@ -58,7 +52,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       super.reset
     }
     
-    def setEnabled(enabled:Boolean) = driveEnabled = enabled
+    def setEnabled(enabled:Boolean): Unit = driveEnabled = enabled
     
     override def atnChanged(oldValue:Int,newValue:Int) : Unit = {
       if (driveEnabled) {
@@ -70,9 +64,9 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       }
     }
     
-    private def onCB1 = irq_set(IRQ_CB1)
+    private def onCB1(): Unit = irq_set(IRQ_CB1)
     
-    override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
+    override def read(address: Int, chipID: ChipID.ID): Int = (address & 0x0F) match {
       case ad@(PA|PA2) =>
         super.read(address,chipID)
         if (jackID == 0 && ParallelCable.enabled) {
@@ -107,7 +101,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     @inline private def data_out = if ((regs(DDRB) & regs(PB) & 0x02) > 0) IECBus.GROUND else IECBus.VOLTAGE
     @inline private def clock_out = if ((regs(DDRB) & regs(PB) & 0x08) > 0) IECBus.GROUND else IECBus.VOLTAGE
     
-    @inline private def autoacknwoledgeData : Unit = {
+    @inline private def autoacknwoledgeData() : Unit = {
       if ((regs(DDRB) & 0x10) > 0) {
         val atna = (regs(DDRB) & regs(PB) & 0x10) > 0
         val dataOut = (bus.atn == IECBus.GROUND) ^ atna
@@ -164,7 +158,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       awake
     }
     
-    override def read(address: Int, chipID: ChipID.ID) = (address & 0x0F) match {
+    override def read(address: Int, chipID: ChipID.ID): Int = (address & 0x0F) match {
       case PB =>
         val wps = if (isDiskChanging) isDiskChanged else RW_HEAD.isWriteProtected
         (super.read(address, chipID) & ~(WRITE_PROTECT_SENSE | SYNC_DETECTION_LINE)) |
@@ -219,7 +213,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       super.write(address, value, chipID)
     }
           
-    final def byteReady : Unit = {
+    final def byteReady() : Unit = {
       cpu.setOverflowFlag
       irq_set(IRQ_CA1)
       
@@ -242,15 +236,15 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     }
   }
   
-  def getFloppy = floppy
+  def getFloppy: Floppy = floppy
 
-  def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) = {
+  def setDriveReader(driveReader: Floppy,emulateInserting:Boolean): Unit = {
     viaDisk.setDriveReader(driveReader,emulateInserting)
     RW_HEAD.setWriteProtected(floppy.isReadOnly)
   }
   override def isRunning : Boolean = running
 
-  override def setActive(active: Boolean) = {
+  override def setActive(active: Boolean): Unit = {
     viaBus.setEnabled(active)
     running = active
     runningListener(active)
@@ -260,7 +254,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     this.canSleep = canSleep
     awake
   }
-  private def awake : Unit = {
+  private def awake() : Unit = {
     running = true
     runningListener(true)
     viaBus.setActive(true)
@@ -274,16 +268,16 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   }
 
   override def isReadOnly: Boolean = RW_HEAD.isWriteProtected
-  override def setReadOnly(readOnly:Boolean) = RW_HEAD.setWriteProtected(readOnly)
+  override def setReadOnly(readOnly:Boolean): Unit = RW_HEAD.setWriteProtected(readOnly)
   
   override def setSpeedHz(speed:Int) : Unit = {
     currentSpeedHz = speed
     CYCLE_ADJ = (speed - MIN_SPEED_HZ) / MIN_SPEED_HZ.toDouble
   }
   
-  override def getSpeedHz = currentSpeedHz
+  override def getSpeedHz: Int = currentSpeedHz
   
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Speed Hz",currentSpeedHz.toString)
     properties.setProperty("Cycle adjustment",CYCLE_ADJ.toString)
     properties.setProperty("Running", running.toString)
@@ -316,17 +310,17 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   
   private object IRQSwitcher extends CBMComponent {
     val componentID = "IRQ Switcher (VIA1,VIA2)"
-    val componentType = CBMComponentType.INTERNAL
+    val componentType: Type = CBMComponentType.INTERNAL
 
     private[this] var viaBusIRQLow = false
     private[this] var viaDiskIRQLow = false
 
-    private def handleIRQ = {
-      Log.debug(s"Handling IRQ viaBusIRQ=${viaBusIRQLow} viaDiskIRQ=${viaDiskIRQLow}")
+    private def handleIRQ(): Unit = {
+      Log.debug(s"Handling IRQ viaBusIRQ=$viaBusIRQLow viaDiskIRQ=$viaDiskIRQLow")
       cpu.irqRequest(viaBusIRQLow || viaDiskIRQLow)
     }
 
-    override def getProperties = {
+    override def getProperties: Properties = {
       properties.setProperty("ViaBus IRQ", viaBusIRQLow.toString)
       properties.setProperty("ViaDisk IRQ", viaDiskIRQLow.toString)
 
@@ -362,7 +356,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     protected def allowsStateRestoring : Boolean = true
   }
 
-  override def getMem = mem
+  override def getMem: Memory = mem
 
   @inline private def checkPC(cycles: Long) : Unit = {
     val pc = cpu.getPC
@@ -398,7 +392,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     }
   }
 
-  private def setFilename : Unit = {
+  private def setFilename() : Unit = {
     var adr = 0x200
     val sb = new StringBuilder
     var c = mem.read(adr)
@@ -415,15 +409,15 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     cpu.setCycleMode(cycleMode)
   }
   def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {/* ignored */}
-  def setTrace(traceOn: Boolean) = {
+  def setTrace(traceOn: Boolean): Unit = {
     tracing = traceOn
     if (tracing) awake
     cpu.setTrace(traceOn)
   }
-  def step(updateRegisters: CpuStepInfo => Unit) = cpu.step(updateRegisters)
-  def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) = cpu.setBreakAt(breakType,callback)
-  def jmpTo(pc: Int) = cpu.jmpTo(pc)
-  def disassemble(mem:Memory,address:Int) = cpu.disassemble(mem, address)
+  def step(updateRegisters: CpuStepInfo => Unit): Unit = cpu.step(updateRegisters)
+  def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit): Unit = cpu.setBreakAt(breakType,callback)
+  def jmpTo(pc: Int): Unit = cpu.jmpTo(pc)
+  def disassemble(mem:Memory,address:Int): (String, Int) = cpu.disassemble(mem, address)
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
     if (ledListener != null) out.writeBoolean(ledListener.isOn)

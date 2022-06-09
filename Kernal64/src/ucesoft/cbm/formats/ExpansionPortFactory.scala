@@ -1,11 +1,11 @@
 package ucesoft.cbm.formats
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortType}
-import java.util.Properties
 
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 import scala.collection.mutable
 
 object ExpansionPortFactory {
@@ -24,12 +24,12 @@ object ExpansionPortFactory {
       val isRom = true
       def isActive = true
       def init  : Unit = {}
-      def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = data(address & 0x1FFF)
+      def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = data(address & 0x1FFF)
 
-      override def toString = s"ROM(${name})[startAddress=${Integer.toHexString(startAddress)} length=${length}]"
+      override def toString = s"ROM($name)[startAddress=${Integer.toHexString(startAddress)} length=$length]"
     }
-    val name = crt.name
-    val crtType = crt.ctrType
+    val name: String = crt.name
+    val crtType: Int = crt.ctrType
     // ROML Banks
     protected val romlBanks : mutable.LinkedHashMap[Int,Memory] = {
       val banks = crt.chips filter { c => c.startingLoadAddress >= 0x8000 && c.startingLoadAddress < 0xA000 } map { c =>
@@ -67,8 +67,8 @@ object ExpansionPortFactory {
     private var _romhBankIndex = 0
     private var romLBank : Memory = null
     private var romHBank : Memory = null
-    protected var game = crt.GAME
-    protected var exrom = crt.EXROM
+    protected var game: Boolean = crt.GAME
+    protected var exrom: Boolean = crt.EXROM
 
     romlBankIndex = 0
     romhBankIndex = 0
@@ -86,12 +86,12 @@ object ExpansionPortFactory {
 
     protected def convertBankNumber(bank: Int): Int = bank
 
-    def GAME = game
-    def EXROM = exrom
-    def ROML = romLBank
-    def ROMH = romHBank
+    def GAME: Boolean = game
+    def EXROM: Boolean = exrom
+    def ROML: Memory = romLBank
+    def ROMH: Memory = romHBank
 
-    override def toString = s"ExpansionPort{crt=${crt} game=${game} exrom=${exrom}\n\tromlBanks=${romlBanks.mkString("<", "\n\t\t", ">")}\n\tromhBanks=${romhBanks.mkString("<", "\n\t\t", ">")}}"
+    override def toString = s"ExpansionPort{crt=$crt game=$game exrom=$exrom\n\tromlBanks=${romlBanks.mkString("<", "\n\t\t", ">")}\n\tromhBanks=${romhBanks.mkString("<", "\n\t\t", ">")}}"
 
     override def saveState(out: ObjectOutputStream): Unit = {
       crt.saveState(out)

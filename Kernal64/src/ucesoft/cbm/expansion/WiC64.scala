@@ -7,7 +7,7 @@ import java.io.{BufferedInputStream, InputStream, ObjectInputStream, ObjectOutpu
 import java.net._
 import java.text.SimpleDateFormat
 import java.util.Properties
-import java.util.concurrent.{CountDownLatch, Executors, LinkedBlockingDeque}
+import java.util.concurrent.{CountDownLatch, LinkedBlockingDeque}
 
 object WiC64 extends CBMComponent with Runnable {
   override val componentID: String = "WiC64"
@@ -821,7 +821,7 @@ object WiC64 extends CBMComponent with Runnable {
     udpThreadRunning = true
     while (udpThreadRunning) {
       try {
-        val socket = udp.receive(packet)
+        val socket: Unit = udp.receive(packet)
         val data = Array.ofDim[Byte](packet.getLength)
         System.arraycopy(packet.getData, 0, data, 0, data.length)
         if (!udpReceivedQueue.offer(UDPPacket(packet.getAddress.getAddress, data))) {

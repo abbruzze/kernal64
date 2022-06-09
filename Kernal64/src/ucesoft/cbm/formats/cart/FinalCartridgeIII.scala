@@ -1,9 +1,9 @@
 package ucesoft.cbm.formats.cart
 
-import ucesoft.cbm.{ChipID, Clock, ClockEvent}
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.formats.Cartridge
 import ucesoft.cbm.formats.ExpansionPortFactory.CartridgeExpansionPort
+import ucesoft.cbm.{ChipID, Clock, ClockEvent}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
@@ -13,7 +13,7 @@ class FinalCartridgeIII(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory)
   game = false
   exrom = false
 
-  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     //romlBanks(romlBankIndex).read((address & 0x1fff) + 0x8000)
     //romlBanks(romlBankIndex).read(0x8000 + 0x1E00 + (address & 0x1FF))
     romlBanks(romlBankIndex).asInstanceOf[ROM].data(0x1E00 + (address & 0x1FF))

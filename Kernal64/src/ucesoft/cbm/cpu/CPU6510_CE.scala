@@ -1,14 +1,11 @@
 package ucesoft.cbm.cpu
 
-import ucesoft.cbm.ChipID
-import ucesoft.cbm.Log
-import ucesoft.cbm.Clock
-import ucesoft.cbm.trace.{BreakType, CpuStepInfo, NoBreak, TraceListener}
-import java.io.PrintWriter
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-
+import ucesoft.cbm.{ChipID, Clock, Log}
 import ucesoft.cbm.cpu.CPU65xx.CPUPostponeReadException
+import ucesoft.cbm.trace.{BreakType, CpuStepInfo, NoBreak}
+
+import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
+import java.util.Properties
 
 class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   override lazy val componentID = "6510_CE"
@@ -72,14 +69,14 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   final def isExecuting(opcode:Int) : Boolean = !disassembling && executing && op == opcode
 
-  final def getPC = PC
+  final def getPC: Int = PC
 
-  final def getCurrentInstructionPC = CURRENT_OP_PC
+  final def getCurrentInstructionPC: Int = CURRENT_OP_PC
 
-  final def getMem(address: Int) = mem.read(address)
+  final def getMem(address: Int): Int = mem.read(address)
 
   final def irqRequest(low: Boolean) : Unit = {
-    if (tracing) Log.debug(s"IRQ request low=${low}")
+    if (tracing) Log.debug(s"IRQ request low=$low")
     if (tracingOnFile && low) tracingFile.println("IRQ low")
     if (low && !irqLow /* && irqFirstCycle == 0*/ ) {
       irqFirstCycle = clk.currentCycles
@@ -101,61 +98,61 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   @inline private[this] def SR = SREG | FLAG_#
 
-  @inline private[this] def SR_=(sr: Int) = SREG = (sr | FLAG_#) & NOT_B_FLAG
+  @inline private[this] def SR_=(sr: Int): Unit = SREG = (sr | FLAG_#) & NOT_B_FLAG
 
-  @inline private[this] def sen : Unit = {
+  @inline private[this] def sen() : Unit = {
     SREG |= N_FLAG
   }
 
-  @inline private[this] def cln : Unit ={
+  @inline private[this] def cln() : Unit ={
     SREG &= (~N_FLAG & 0xFF)
   }
 
-  @inline private[this] def sev : Unit ={
+  @inline private[this] def sev() : Unit ={
     SREG |= V_FLAG
   }
 
-  @inline private[this] def clv : Unit ={
+  @inline private[this] def clv() : Unit ={
     SREG &= (~V_FLAG & 0xFF)
   }
 
-  @inline private[this] def seb : Unit ={
+  @inline private[this] def seb() : Unit ={
     SREG |= B_FLAG
   }
 
-  @inline private[this] def clb : Unit ={
+  @inline private[this] def clb() : Unit ={
     SREG &= (~B_FLAG & 0xFF)
   }
 
-  @inline private[this] def sed : Unit ={
+  @inline private[this] def sed() : Unit ={
     SREG |= D_FLAG
   }
 
-  @inline private[this] def cld : Unit ={
+  @inline private[this] def cld() : Unit ={
     SREG &= (~D_FLAG & 0xFF)
   }
 
-  @inline private[this] def sei : Unit ={
+  @inline private[this] def sei() : Unit ={
     SREG |= I_FLAG
   }
 
-  @inline private[this] def cli : Unit ={
+  @inline private[this] def cli() : Unit ={
     SREG &= (~I_FLAG & 0xFF)
   }
 
-  @inline private[this] def sez : Unit ={
+  @inline private[this] def sez() : Unit ={
     SREG |= Z_FLAG
   }
 
-  @inline private[this] def clz : Unit ={
+  @inline private[this] def clz() : Unit ={
     SREG &= (~Z_FLAG & 0xFF)
   }
 
-  @inline private[this] def sec : Unit ={
+  @inline private[this] def sec() : Unit ={
     SREG |= C_FLAG
   }
 
-  @inline private[this] def clc : Unit ={
+  @inline private[this] def clc() : Unit ={
     SREG &= (~C_FLAG & 0xFF)
   }
 
@@ -176,9 +173,9 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   /**
    * SO of 6502 used by 1541
    */
-  def setOverflowFlag = sev
+  def setOverflowFlag: Unit = sev
 
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("PC", hex4(PC))
     properties.setProperty("A", hex2(A))
     properties.setProperty("X", hex2(X))
@@ -189,7 +186,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     properties
   }
 
-  override def toString = s"PC=${hex4(PC)} AC=${hex2(A)} XR=${hex2(X)} YR=${hex2(Y)} SP=${hex2(SP)} NV#BDIZC=${sr2String}"
+  override def toString = s"PC=${hex4(PC)} AC=${hex2(A)} XR=${hex2(X)} YR=${hex2(Y)} SP=${hex2(SP)} NV#BDIZC=$sr2String"
 
   private[this] def sr2String = (for (b <- 7 to 0 by -1) yield {
     if (b == 5) '#'
@@ -209,12 +206,12 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     tracingFile = if (enabled) out else null
   }
 
-  def setTrace(traceOn: Boolean) = tracing = traceOn
+  def setTrace(traceOn: Boolean): Unit = tracing = traceOn
 
   def step(updateRegisters: CpuStepInfo => Unit) : Unit = {
     stepCallBack = updateRegisters
     syncObject.synchronized {
-      syncObject.notify
+      syncObject.notify()
     }
   }
 
@@ -529,21 +526,21 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     if (value == 0) sez else clz
   }
 
-  @inline private[this] def DoRMW  : Unit = {
+  @inline private[this] def DoRMW()  : Unit = {
     state = RMW_DO_IT
   }
 
-  @inline private[this] def Execute  : Unit = {
+  @inline private[this] def Execute()  : Unit = {
     state = OP_TAB(op)
     executing = true
   }
 
-  @inline private[this] def Last  : Unit = {
+  @inline private[this] def Last()  : Unit = {
     state = 0
     executing = false
   }
 
-  private def initStates  : Unit = {
+  private def initStates()  : Unit = {
     for (s <- 0 until states.length) states(s) =
       s match {
         // Opcode fetch (cycle 0)
@@ -2083,7 +2080,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     A = res & 0xFF
   }
 
-  def init = {
+  def init: Unit = {
     initStates
     reset
   }
@@ -2110,7 +2107,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     Log.info(s"CPU reset! PC = ${hex4(PC)}")
   }
 
-  def disassemble(mem: Memory, address: Int) = {
+  def disassemble(mem: Memory, address: Int): (String, Int) = {
     val dinfo = CPU65xx.disassemble(mem, address)
     (dinfo.toString, dinfo.len)
   }
@@ -2123,7 +2120,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     }
   }
 
-  @inline private def fetchAndExecute  : Unit = {
+  @inline private def fetchAndExecute()  : Unit = {
     readyCycles = readyCycles << 1 | (if (ready) 1 else 0)
 
     if (breakType != null && state == 0 && breakType.isBreak(PC, false, false)) {
@@ -2168,7 +2165,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
       if (tracingNow) {
         stepCallBack(CpuStepInfo(PC,toString))
         syncObject.synchronized {
-          syncObject.wait
+          syncObject.wait()
         }
       }
     }
@@ -2190,7 +2187,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   def isFetchingInstruction: Boolean = state == 0
 
-  protected def formatDebug = {
+  protected def formatDebug: String = {
     disassembling = true
     try
       s"[${id.toString}] ${CPU65xx.disassemble(mem, if (tracingCycleMode) tracingCyclePC else PC).toString} ${if (tracingCycleMode) s"\t-- C$instructionCycle/${state.toHexString.toUpperCase}" else ""} ${if (state >= IRQ_STATE && state <= NMI_STATE_7) s"IRQ" else ""} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"

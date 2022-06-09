@@ -1,12 +1,9 @@
 package ucesoft.cbm.expansion
 
-import ucesoft.cbm.ChipID
+import ucesoft.cbm.{ChipID, Clock, ClockEvent, Log}
 import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.Clock
-import ucesoft.cbm.ClockEvent
-import java.io.{BufferedInputStream, File, FileInputStream, ObjectInputStream, ObjectOutputStream}
 
-import ucesoft.cbm.Log
+import java.io._
 
 object REU {
   val REU_1700 = 128
@@ -35,13 +32,13 @@ object REU {
                         setDMA: (Boolean) => Unit,
                         setIRQ: (Boolean) => Unit) extends ExpansionPort {
     val TYPE : ExpansionPortType.Value = ExpansionPortType.REU
-    override val name = "REU_" + size
+    override val name: String = "REU_" + size
     override val componentID = "REU"
 
     val EXROM = true
     val GAME = true
-    val ROML = null
-    val ROMH = null
+    val ROML: Memory = null
+    val ROMH: Memory = null
 
     final private[this] val IS_256 = size == REU.REU_1764
     private[this] val J1 = if (size != REU.REU_1700) 1 << 4 else 0
@@ -106,7 +103,7 @@ object REU {
           index += read
         }
       }
-      in.close
+      in.close()
     }
 
     override def init : Unit = if (size != REU_16M) ramInitPattern
@@ -128,7 +125,7 @@ object REU {
       reuBank = 0
     }
 
-    private def ramInitPattern : Unit = {
+    private def ramInitPattern() : Unit = {
       var s = 0xFF
       var m = 0
       var i = 0
@@ -149,7 +146,7 @@ object REU {
       if (size != REU_16M) ramInitPattern
     }
 
-    final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+    final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (currentOperation == IDLE_OP && address >= 0xDF00 && address < 0xE000) readREU(address & 0x1F)
       else super.read(address,chipID)
     }
@@ -242,7 +239,7 @@ object REU {
       }
     }
 
-    private def checkOperation  : Unit = {
+    private def checkOperation()  : Unit = {
       ff00 = (commandRegister & 0x90) == 0x80
       if ((commandRegister & 0x90) == 0x90) clk.schedule(new ClockEvent("REUStartOperation",clk.nextCycles,cycles => startOperation))
       if (ff00) {
@@ -252,7 +249,7 @@ object REU {
       else mem.setForwardWriteTo(None)
     }
 
-    private def startOperation  : Unit = {
+    private def startOperation()  : Unit = {
       currentOperation = commandRegister & CMD_TRANSFER_TYPE
       //println(s"Start of operation ${currentOperation} clk=${clk.currentCycles} c64Addr=${Integer.toHexString(c64Address)} reuAddr=${Integer.toHexString(reuAddress)} length=${Integer.toHexString(transferRegister)}")
       setDMA(true)	// DMA request
@@ -288,7 +285,7 @@ object REU {
       //floatingBusValueDecayCycle = clk.currentCycles + FLOATING_BUS_VALUE_DECAY_CYCLES
     }
 
-    private def exchangeOperation  : Unit = {
+    private def exchangeOperation()  : Unit = {
       if (!baLow) { // exchange
         if (exchangeFirstPhase) {
           exchangeTmp1 = mem.read(c64Address)
@@ -314,7 +311,7 @@ object REU {
       else clk.schedule(new ClockEvent("REUExchange",clk.nextCycles,cycles => exchangeOperation))
     }
 
-    private def verifyOperation  : Unit = {
+    private def verifyOperation()  : Unit = {
       if (!baLow) { // verify
         if (mem.read(c64Address) != readFromREU) statusRegister |= STATUS_VERIFY_ERROR
         incrementAddresses
@@ -358,7 +355,7 @@ object REU {
         clk.schedule(new ClockEvent("REUTransfer",clk.nextCycles,cycles => transferOperation(isC64Source)))
     }
 
-    private def checkInterrupt  : Unit = {
+    private def checkInterrupt()  : Unit = {
       if ((interruptMaskRegister & CTRL_IRQ_MASK) > 0) {
         val irq = ((statusRegister & STATUS_END_OF_BLOCK) > 0 && (interruptMaskRegister & CTRL_IRQ_END_OF_BLOCK_MASK) > 0) ||
           ((statusRegister & STATUS_VERIFY_ERROR) > 0 && (interruptMaskRegister & CTRL_IRQ_VERIFY_ERROR_MASK) > 0)
@@ -369,7 +366,7 @@ object REU {
       }
     }
 
-    private def endOperation  : Unit = {
+    private def endOperation()  : Unit = {
       // clear execute bit
       commandRegister &= ~CMD_EXECUTE
       // set FF00 bit
@@ -390,7 +387,7 @@ object REU {
       currentOperation = IDLE_OP
     }
 
-    @inline private def incrementAddresses  : Unit = {
+    @inline private def incrementAddresses()  : Unit = {
       if ((addressControlRegister & 0x80) == 0) c64Address = (c64Address + 1) & 0xFFFF
       if ((addressControlRegister & 0x40) == 0) reuAddress = (reuAddress + 1) & REU_WRAP_ADDRESS
     }

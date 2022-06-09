@@ -1,11 +1,11 @@
 package ucesoft.cbm.misc
 
-import ucesoft.cbm.{Clock, ClockEvent}
 import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.{Clock, ClockEvent}
 
 trait FlashListener {
   def flash(address:Int,value:Int,low:Boolean) : Unit
-  def eraseSector : Unit
+  def eraseSector() : Unit
 }
 
 class AMF29F040(address:Int,low:Boolean,flash : FlashListener) {

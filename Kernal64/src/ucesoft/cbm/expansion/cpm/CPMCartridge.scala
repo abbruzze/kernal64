@@ -1,15 +1,11 @@
 package ucesoft.cbm.expansion.cpm
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
-
+import ucesoft.cbm.{ChipID, Clock, ClockEvent, Log}
+import ucesoft.cbm.cpu.{Memory, Z80}
 import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortType}
-import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.ChipID
-import ucesoft.cbm.Log
-import ucesoft.cbm.Clock
-import ucesoft.cbm.ClockEvent
 import ucesoft.cbm.trace.TraceListener
-import ucesoft.cbm.cpu.Z80
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 class CPMCartridge(mem:Memory,
                    setDMA: (Boolean) => Unit,
@@ -19,8 +15,8 @@ class CPMCartridge(mem:Memory,
   override val componentID = "CP/M"
   val EXROM = true
   val GAME = true
-  val ROML = null
-  val ROMH = null
+  val ROML: Memory = null
+  val ROMH: Memory = null
   
   private[this] var z80Active = false
   private[this] val clk = Clock.systemClock
@@ -33,8 +29,8 @@ class CPMCartridge(mem:Memory,
     def init  : Unit = {}
     val isActive = true
     @inline private def z80Address(address:Int) = (address + 0x1000) & 0xFFFF
-    def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = mem.read(z80Address(address),chipID)
-    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem.write(z80Address(address),value,chipID)
+    def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem.read(z80Address(address),chipID)
+    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = mem.write(z80Address(address),value,chipID)
   }
   
   private[this] val z80 = new Z80(z80Memory)

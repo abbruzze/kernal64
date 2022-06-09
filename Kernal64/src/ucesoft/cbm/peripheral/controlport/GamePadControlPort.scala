@@ -1,10 +1,9 @@
 package ucesoft.cbm.peripheral.controlport
 
+import net.java.games.input.{Component, Controller, ControllerEnvironment}
+import ucesoft.cbm.peripheral.controlport.Joysticks._
+
 import java.util.Properties
-import net.java.games.input.Controller
-import net.java.games.input.ControllerEnvironment
-import net.java.games.input.Component
-import Joysticks._
 
 class GamePadControlPort(configuration:Properties) extends ControlPort {
   private[this] var controller : Option[Controller] = None
@@ -17,7 +16,7 @@ class GamePadControlPort(configuration:Properties) extends ControlPort {
   
   findController
   
-  def findController : Unit = {
+  def findController() : Unit = {
     System.setProperty("jinput.loglevel","SEVERE")
     controllerName = configuration.getProperty(CONFIG_CONTROLLER_NAME)
     controllerFireName = configuration.getProperty(CONFIG_CONTROLLER_FIRE_BUTTON,"1")

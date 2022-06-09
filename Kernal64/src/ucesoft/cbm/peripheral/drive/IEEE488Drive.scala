@@ -2,17 +2,17 @@ package ucesoft.cbm.peripheral.drive
 
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.formats.Diskette
-import ucesoft.cbm.formats.Diskette.{FileMode, FileType, StandardFileName}
+import ucesoft.cbm.formats.Diskette.FileType
 import ucesoft.cbm.peripheral.bus.{IEEE488Bus, IEEE488BusCommand}
 
-import java.io.{FileNotFoundException, ObjectInputStream, ObjectOutputStream}
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE488Bus) extends IEEE488BusCommand(name,deviceID, bus) {
   override val componentType: CBMComponentType.Type = CBMComponentType.DISK
 
   protected case class Status(var st:Int = 0,t:Int = 0,s:Int = 0)
 
-  protected var status = Status()
+  protected var status: Status = Status()
 
   protected final val STATUS_OK = 0
   protected final val STATUS_SYNTAX_ERROR = 30
@@ -20,7 +20,7 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
   protected final val STATUS_FILETYPEMISMATCH = 64
   protected final val STATUS_POWERUP = 73
 
-  protected val STATUS_CODES = Map(
+  protected val STATUS_CODES: Map[Int, String] = Map(
     STATUS_OK -> "OK",
     STATUS_SYNTAX_ERROR -> "SYNTAX ERROR",
     STATUS_FILENOTFOUND -> "FILE NOT FOUND",
@@ -31,7 +31,7 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
   // INIT
   setStatus(STATUS_POWERUP)
 
-  private val d80 = new ucesoft.cbm.formats.D80("""C:\Users\ealeame\OneDrive - Ericsson AB\CBM-II\software\cbugPR05.d80""")
+  private val d80 = new ucesoft.cbm.formats.D80("""C:\Users\ealeame\OneDrive - Ericsson AB\CBM-II\software\test-pass-fail.d80""")
 
   protected def formatST(): String = {
     val text = STATUS_CODES.getOrElse(status.st,"CODE NOT FOUND")
@@ -39,13 +39,13 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
   }
 
   override protected def openChannel(): Unit = {
-    if (secondaryAddress == 15 && channels(15).name.isEmpty) {
+    if (secondaryAddress == 15 && channels(15).name().isEmpty) {
       channels(15).setData(formatST().toArray.map(_.toInt & 0xFF))
     }
   }
 
   override protected def openNamedChannel(): Boolean = {
-    if (secondaryAddress == 15 && channels(15).name.isEmpty) {
+    if (secondaryAddress == 15 && channels(15).name().isEmpty) {
       channels(15).setData(formatST().toArray.map(_.toInt & 0xFF))
       return true
     }

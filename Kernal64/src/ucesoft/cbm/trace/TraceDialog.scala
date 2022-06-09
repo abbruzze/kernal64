@@ -1,31 +1,27 @@
 package ucesoft.cbm.trace
 
-import javax.swing._
+import ucesoft.cbm.Log
 import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.peripheral.vic.{Display, VIC}
 
 import java.awt.{BorderLayout, Color, FlowLayout}
-import ucesoft.cbm.Log
-
-import java.io.FileOutputStream
-import ucesoft.cbm.peripheral.vic.Display
-import ucesoft.cbm.peripheral.vic.VIC
-
 import java.io._
 import javax.swing.JSpinner.DefaultEditor
+import javax.swing._
 import scala.collection.mutable.ListBuffer
 
 object TraceDialog {
   def getTraceDialog(title:String,displayFrame: JFrame, mem: Memory,traceListener: TraceListener, display: Display, vic: VIC): TraceDialog = {
     val dialog = new TraceDialog(title,displayFrame, mem, traceListener,Some(display),Some(vic))
     dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE)
-    dialog.pack
+    dialog.pack()
     dialog
   }
 
   def getTraceDialog(title:String,displayFrame: JFrame, mem: Memory, traceListener: TraceListener): TraceDialog = {
     val dialog = new TraceDialog(title,displayFrame, mem, traceListener,None,None)
     dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE)
-    dialog.pack
+    dialog.pack()
     dialog
   }
 }
@@ -43,7 +39,7 @@ class TraceDialog private (title:String,
   private val notrace = new JButton("Tracing on")
   private val rasterLineSpinner = new JSpinner(new SpinnerNumberModel(0,0,312,1))
   private val traceSR = new JLabel
-  val logPanel = Log.getLogPanel
+  val logPanel: Log.LogPanel = Log.getLogPanel
   private[this] var tracing = false
   private[this] var tracingFile : PrintWriter = _
   private[this] val tracingListeners = new ListBuffer[TracingListener]
@@ -58,7 +54,7 @@ class TraceDialog private (title:String,
   def addListener(tl:TracingListener) : Unit = tracingListeners += tl
   def removeListener(tl:TracingListener) : Unit = tracingListeners -= tl
   
-  def isTracing = tracing
+  def isTracing: Boolean = tracing
 
   private def updateRegs(_regs:CpuStepInfo) : Unit = {
     val regs = vic match {
@@ -130,19 +126,19 @@ class TraceDialog private (title:String,
   }
 
   private def setCycleMode(enabled:Boolean) : Unit = traceListener.setCycleMode(enabled)
-  private def jmpTo : Unit = {
+  private def jmpTo() : Unit = {
     Option(JOptionPane.showInputDialog(this, "Jump to address:")) match {
       case Some(address) =>
         traceListener.jmpTo(s2a(address))
       case _ =>
     }
   }
-  private def stepInto : Unit = {
+  private def stepInto() : Unit = {
     if (tracing) Log.setDebug
     Log.setOutput(logPanel.writer)
     traceListener.step(updateRegs _)
   }
-  private def brkMode : Unit = {
+  private def brkMode() : Unit = {
     Log.setOutput(logPanel.writer)
     Option(JOptionPane.showInputDialog(this, "Break type:")) match {
       case Some(breakType) =>
@@ -150,7 +146,7 @@ class TraceDialog private (title:String,
       case _ =>
     }
   }
-  private def readValues : Unit = {
+  private def readValues() : Unit = {
     Option(JOptionPane.showInputDialog(this, "Address to read:")) match {
       case Some(address) =>
         if (address.startsWith("find")) {
@@ -192,17 +188,17 @@ class TraceDialog private (title:String,
                 ascii.clear
               }
             }
-            if (file != null) file.close
+            if (file != null) file.close()
             if (sb.length > 0) info(sb.toString)
           } else if (address.startsWith("w")) {
             val a = s2a(address.substring(1))
             val word = mem.read(a + 1) * 256 | mem.read(a)
             info(s"ReadWord(${address.substring(1)})=${Integer.toHexString(word)}")
-          } else info(s"Read(${address})=${Integer.toHexString(mem.read(s2a(address)))}")
+          } else info(s"Read($address)=${Integer.toHexString(mem.read(s2a(address)))}")
       case _ =>
     }
   }
-  private def writeValues : Unit = {
+  private def writeValues() : Unit = {
     Option(JOptionPane.showInputDialog(this, "Address to write:")) match {
       case Some(address) =>
         val addressValue = address split " "
@@ -216,11 +212,11 @@ class TraceDialog private (title:String,
       case _ =>
     }
   }
-  private def toggleTrace : Unit = {
+  private def toggleTrace() : Unit = {
     tracing = !tracing
     forceTracing(tracing)
   }
-  private def disass : Unit = {
+  private def disass() : Unit = {
     Option(JOptionPane.showInputDialog(this, "Disassemble from address [to address]:")) match {
       case Some(address) =>
         val addresses = address split " " map s2a
@@ -234,7 +230,7 @@ class TraceDialog private (title:String,
       case _ =>
     }
   }
-  private def assembler : Unit = {
+  private def assembler() : Unit = {
     ucesoft.cbm.cpu.asm.Assembler.getAssemblerDialog(displayFrame,mem,this).setVisible(true)
   }
   private def showRaster(show:Boolean) : Unit = {
@@ -243,7 +239,7 @@ class TraceDialog private (title:String,
   }
   private def traceFile(button:JToggleButton) : Unit = {
     if (!button.isSelected) {
-      tracingFile.close
+      tracingFile.close()
       traceListener.setTraceOnFile(null,false)
     }
     else {

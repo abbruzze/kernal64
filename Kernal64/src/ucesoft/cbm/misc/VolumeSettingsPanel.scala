@@ -1,14 +1,15 @@
 package ucesoft.cbm.misc
 
-import javax.swing._
-import javax.swing.event.{ChangeEvent, ChangeListener}
 import ucesoft.cbm.peripheral.sid.AudioDriverDevice
 
+import javax.swing._
+import javax.swing.event.{ChangeEvent, ChangeListener}
+
 object VolumeSettingsPanel {
-  def getDialog(frame:JFrame,driver:AudioDriverDevice) = {
+  def getDialog(frame:JFrame,driver:AudioDriverDevice): JDialog = {
     val dialog = new JDialog(frame,"Volume settings")
     dialog.getContentPane.add("Center",new VolumeSettingsPanel(driver))
-    dialog.pack
+    dialog.pack()
     dialog.setResizable(false)
     dialog
   }
@@ -31,7 +32,7 @@ class VolumeSettingsPanel(driver:AudioDriverDevice) extends JPanel with ChangeLi
   add(mute)
   add(slider)
   
-  def stateChanged(e:ChangeEvent) = if (!slider.getValueIsAdjusting) {
+  def stateChanged(e:ChangeEvent): Unit = if (!slider.getValueIsAdjusting) {
     if (e.getSource == slider) driver.setMasterVolume(slider.getValue)
     if (e.getSource == mute) driver.setMuted(mute.isSelected)
   }

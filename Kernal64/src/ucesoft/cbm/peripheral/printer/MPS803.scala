@@ -1,12 +1,7 @@
 package ucesoft.cbm.peripheral.printer
 
-import ucesoft.cbm.peripheral.bus.IECBusDevice
-import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
+import ucesoft.cbm.peripheral.bus.{BusDataIterator, IECBus, IECBusDevice}
 
 class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevice(bus,device) with CBMComponent with Printer {
   val busid = "MPS803"
@@ -16,9 +11,9 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
   // register itself to bus
   bus.registerListener(this)
   
-  override def setActive(active:Boolean) = this.active = active
-  protected def isDeviceReady = active
-  protected def loadData(fileName:String) = None
+  override def setActive(active:Boolean): Unit = this.active = active
+  protected def isDeviceReady: Boolean = active
+  protected def loadData(fileName:String): Option[BusDataIterator] = None
   
   def init : Unit = {}
   

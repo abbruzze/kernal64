@@ -1,10 +1,10 @@
 package ucesoft.cbm.scpu
 
-import java.awt.{Color, FlowLayout}
-import java.awt.event.{MouseAdapter, MouseEvent}
-
-import javax.swing.JPanel
 import ucesoft.cbm.c128.LabelledLed
+
+import java.awt.event.{MouseAdapter, MouseEvent}
+import java.awt.{Color, FlowLayout}
+import javax.swing.JPanel
 
 class MMUStatusPanel extends JPanel{
   private val nativeMode = new LabelledLed("native",true)

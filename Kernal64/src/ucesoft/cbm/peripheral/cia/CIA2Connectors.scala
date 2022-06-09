@@ -1,14 +1,13 @@
 package ucesoft.cbm.peripheral.cia
 
-import ucesoft.cbm.peripheral.bus._
-import ucesoft.cbm.peripheral.Connector
-import ucesoft.cbm.peripheral.rs232.RS232
-import ucesoft.cbm.peripheral.drive.ParallelCable
-
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import ucesoft.cbm.peripheral.vic.VICMemory
 import ucesoft.cbm.expansion.{DigiMAX, WiC64}
+import ucesoft.cbm.peripheral.Connector
+import ucesoft.cbm.peripheral.bus._
+import ucesoft.cbm.peripheral.drive.ParallelCable
+import ucesoft.cbm.peripheral.rs232.RS232
+import ucesoft.cbm.peripheral.vic.VICMemory
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 object CIA2Connectors {
   val CIA2_PORTA_BUSID = "CIA2_PortA"
@@ -16,18 +15,18 @@ object CIA2Connectors {
   class PortAConnector(mem:VICMemory,bus:IECBus,rs232:RS232) extends Connector with IECBusListener {
     val componentID = "CIA2 Port A Connector"
     override val isController = true
-    val busid = CIA2_PORTA_BUSID
+    val busid: String = CIA2_PORTA_BUSID
     
     private[this] var bank = 0x03
       
     bus.registerListener(this)
       
     import IECBus._
-    final def read = {
+    final def read: Int = {
       import bus._
       (~((clk << 6) | (data << 7)) & 0xC0) | ((latch | ~ddr) & 0x38) | bank | rs232.getTXD << 2
     }
-    final protected def performWrite(data:Int) = {
+    final protected def performWrite(data:Int): Unit = {
       val value = data | ~ddr // WHY ??
       bank = value & 3
       mem.setVideoBank(bank)
@@ -57,7 +56,7 @@ object CIA2Connectors {
   
   class PortBConnector(rs232:RS232) extends Connector {
     val componentID = "CIA2 Port B Connector"
-    final def read = {
+    final def read: Int = {
       if (WiC64.enabled) WiC64.read()
       else if (ParallelCable.enabled) {
         ParallelCable.onPC

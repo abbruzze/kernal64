@@ -1,8 +1,6 @@
 package ucesoft.cbm.c64
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
-
-import ucesoft.cbm.{CBMComponentType, ChipID, Clock, Log}
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.cpu._
 import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortConfigurationListener, LastByteReadMemory}
 import ucesoft.cbm.misc.TestCart
@@ -10,6 +8,10 @@ import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.sid.SID
 import ucesoft.cbm.peripheral.vic.VIC
+import ucesoft.cbm.{CBMComponentType, ChipID, Clock, Log}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 object C64MMU {
   import ROM._
@@ -24,7 +26,7 @@ object C64MMU {
   class BASIC_ROM(ram: Memory) extends ROM(ram, "BASIC", M_BASIC, 8192, C64_BASIC_ROM_PROP)
 
   class KERNAL_ROM(ram: Memory) extends ROM(ram, "KERNAL", M_KERNAL, 8192,C64_KERNAL_ROM_PROP) {
-    override def getProperties = {
+    override def getProperties: Properties = {
       super.getProperties
       properties.setProperty("Version",read(0xFF80).toString)
       properties
@@ -35,7 +37,7 @@ object C64MMU {
 
   class RAM extends RAMComponent {
     val componentID = "RAM"
-    val componentType = CBMComponentType.MEMORY
+    val componentType: Type = CBMComponentType.MEMORY
     
     val isRom = false
     val name = "RAM"
@@ -102,11 +104,11 @@ object C64MMU {
   
   class COLOR_RAM extends RAMComponent {
     val componentID = "COLOR RAM"
-    val componentType = CBMComponentType.MEMORY
+    val componentType: Type = CBMComponentType.MEMORY
     
     val isRom = false
     val name = "COLOR_RAM"
-    val startAddress = COLOR_RAM
+    val startAddress: Int = COLOR_RAM
     val length = 1024
 
     private[this] val mem = Array.fill(length)(0)
@@ -122,7 +124,7 @@ object C64MMU {
     }
     
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = (lastByteReadMemory.lastByteRead & 0xF0) | (mem(address & 0x3FF) & 0x0F)
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(address & 0x3FF) = value & 0xff
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = mem(address & 0x3FF) = value & 0xff
     // state
     protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeObject(mem)
@@ -135,13 +137,13 @@ object C64MMU {
 
   class MAIN_MEMORY extends RAMComponent with ExpansionPortConfigurationListener {
     val componentID = "Main RAM"
-    val componentType = CBMComponentType.MEMORY
+    val componentType: Type = CBMComponentType.MEMORY
     
     private[this] val ram = new RAM
     val name = "MAIN-RAM"
     val isRom = false
-    val startAddress = ram.startAddress
-    val length = ram.length
+    val startAddress: Int = ram.startAddress
+    val length: Int = ram.length
     val CHAR_ROM = new CHARACTERS_ROM(ram)
     val COLOR_RAM = new COLOR_RAM
     val isActive = true
@@ -179,14 +181,14 @@ object C64MMU {
     
     def getRAM : Memory = ram
     
-    def setDatassette(datassette:Datassette) = this.datassette = datassette
-    def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory) = {
+    def setDatassette(datassette:Datassette): Unit = this.datassette = datassette
+    def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory): Unit = {
       this.lastByteReadMemory = lastByteReadMemory
       ram.lastByteReadMemory = lastByteReadMemory
       COLOR_RAM.setLastByteReadMemory(lastByteReadMemory)
     }
     
-    override def getProperties = {
+    override def getProperties: Properties = {
       super.getProperties
       properties.setProperty("Mem config",MEM_CONFIG(memConfig).toString)
       properties.setProperty("$0",Integer.toHexString(ddr))
@@ -229,7 +231,7 @@ object C64MMU {
       data_read
     }
 
-    @inline private def check0001  : Unit = {
+    @inline private def check0001()  : Unit = {
       val pr = read0001
       // check tape motor
       datassette.setMotor((ddr & 0x20) > 0 && (pr & 0x20) == 0)
@@ -383,7 +385,7 @@ object C64MMU {
       else if (c64MC.romhultimax) ROMH_ULTIMAX.write(address,value) else ram.write(address,value)
     }
     
-    override def toString = ram.toString
+    override def toString: String = ram.toString
     // state
     protected def saveState(out:ObjectOutputStream) : Unit = {
       out.writeBoolean(ULTIMAX)

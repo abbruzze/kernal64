@@ -1,9 +1,9 @@
 package ucesoft.cbm.misc
 
+import ucesoft.cbm.cpu.Memory
+
 import java.io.IOException
 import java.util.Properties
-
-import ucesoft.cbm.cpu.Memory
 
 class AboutCanvas(charRom:Memory,version:String) extends CBMCanvas(charRom) {
   private val WIDTH = 50
@@ -14,7 +14,7 @@ class AboutCanvas(charRom:Memory,version:String) extends CBMCanvas(charRom) {
       case Some(in) =>
         try {
           p.load(in)
-          in.close
+          in.close()
           p.getProperty("version.number")
         }
         catch {

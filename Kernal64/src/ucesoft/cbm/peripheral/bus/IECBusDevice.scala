@@ -1,7 +1,7 @@
 package ucesoft.cbm.peripheral.bus
 
 import scala.collection.mutable.ListBuffer
-import language.postfixOps
+import scala.language.postfixOps
 
 object IECBusDevice {
   private val WAIT_BIT_TIMEOUT = 300
@@ -11,43 +11,43 @@ object IECBusDevice {
   private val DEBUG = false
   
   object Mode extends Enumeration {
-    val IDLE = Value
-    val ATN_SEEN = Value
-    val READ = Value
-    val WRITE = Value
-    val TURNAROUND = Value
-    val INIT_WRITE = Value
+    val IDLE: Mode.Value = Value
+    val ATN_SEEN: Mode.Value = Value
+    val READ: Mode.Value = Value
+    val WRITE: Mode.Value = Value
+    val TURNAROUND: Mode.Value = Value
+    val INIT_WRITE: Mode.Value = Value
   }
   
   private object WriteMode extends Enumeration {
-    val WAIT_LISTENER_READY = Value
-    val WAIT_LISTENER_EOI_HANDSHAKE = Value
-    val WRITE_BIT_CLK1 = Value
-    val WRITE_BIT_CLK2 = Value
-    val WRITE_LAST_BIT = Value
-    val WRITE_END = Value
+    val WAIT_LISTENER_READY: WriteMode.Value = Value
+    val WAIT_LISTENER_EOI_HANDSHAKE: WriteMode.Value = Value
+    val WRITE_BIT_CLK1: WriteMode.Value = Value
+    val WRITE_BIT_CLK2: WriteMode.Value = Value
+    val WRITE_LAST_BIT: WriteMode.Value = Value
+    val WRITE_END: WriteMode.Value = Value
   }
   
   private object ReadMode extends Enumeration {
-    val WAIT_BIT = Value
-    val READ_BIT = Value
+    val WAIT_BIT: ReadMode.Value = Value
+    val READ_BIT: ReadMode.Value = Value
   }
   
   object Role extends Enumeration {
-    val NONE = Value
-    val READY_TO_BE_TALKER = Value
-    val TALKER = Value
-    val LISTENER = Value
+    val NONE: Role.Value = Value
+    val READY_TO_BE_TALKER: Role.Value = Value
+    val TALKER: Role.Value = Value
+    val LISTENER: Role.Value = Value
   }
   
   object Command extends Enumeration {
-    val TALK = Value(0x40)
-    val LISTEN = Value(0x20)
-    val UNTALK = Value(0x5F)
-    val UNLISTEN = Value(0x3F)
-    val OPEN_CHANNEL = Value(0x60)
-    val CLOSE = Value(0xE0)
-    val OPEN = Value(0xF0)
+    val TALK: Command.Value = Value(0x40)
+    val LISTEN: Command.Value = Value(0x20)
+    val UNTALK: Command.Value = Value(0x5F)
+    val UNLISTEN: Command.Value = Value(0x3F)
+    val OPEN_CHANNEL: Command.Value = Value(0x60)
+    val CLOSE: Command.Value = Value(0xE0)
+    val OPEN: Command.Value = Value(0xF0)
   }
   
   protected class Channel {
@@ -57,13 +57,13 @@ object IECBusDevice {
     val fileName = new StringBuilder
     private var opened = false
     
-    def clear  : Unit = {
+    def clear()  : Unit = {
       buffer.clear
       fileName.clear
     }
-    def isOpened = opened
-    def open = opened = true
-    def close = {
+    def isOpened: Boolean = opened
+    def open(): Unit = opened = true
+    def close(): Unit = {
       opened = false
       buffer.clear
       fileName.clear
@@ -71,21 +71,21 @@ object IECBusDevice {
     def addToBuffer(value:Int) : Unit = {
       _buffer += value
     }
-    def buffer = _buffer
-    def bufferToString = buffer map { _.toChar } mkString
+    def buffer: ListBuffer[Int] = _buffer
+    def bufferToString: String = buffer map { _.toChar } mkString
   }
 }
 
 abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener {
-  import IECBusDevice._
-  import Mode._
   import IECBus._
+  import IECBusDevice._
   import IECBusLine._
+  import Mode._
   import ReadMode._
-  import WriteMode._
   import Role._
+  import WriteMode._
   
-  protected val channels = {
+  protected val channels: Array[Channel] = {
     val chs = Array.ofDim[Channel](31)
     for(i <- 0 until chs.length) chs(i) = new Channel
     chs
@@ -99,7 +99,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
   private[this] var readMode = WAIT_BIT
   private[this] var waitTimeout = 0L
   private[this] var isReadingFileName = false
-  protected[this] var role = NONE
+  protected[this] var role: IECBusDevice.Role.Value = NONE
   protected[this] var channel = 0
   private[this] var writeMode = WAIT_LISTENER_READY
   private[this] var byteToSend = 0
@@ -109,7 +109,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
   private[this] var initNextByte = true
   
   protected def setMode(newMode:Mode.Value) : Unit = {
-    if (DEBUG) println(s"${busid} - ${newMode} FROM ${mode}") 
+    if (DEBUG) println(s"$busid - $newMode FROM $mode")
     mode = newMode
   } 
   
@@ -120,15 +120,15 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
   
   protected def byteJustRead(byte:Int,isLast:Boolean) : Unit = {}
   protected def byteJustWritten(isLast:Boolean) : Unit = {}
-  protected def fileNameReceived  : Unit = {}
-  protected def dataNotFound  : Unit = {}
-  protected def listen  : Unit = {}
-  protected def unlisten  : Unit = {}
-  protected def open  : Unit = {}
-  protected def open_channel  : Unit = {}
-  protected def talk  : Unit = {}
-  protected def untalk  : Unit = {}
-  protected def close  : Unit = {}
+  protected def fileNameReceived()  : Unit = {}
+  protected def dataNotFound()  : Unit = {}
+  protected def listen()  : Unit = {}
+  protected def unlisten()  : Unit = {}
+  protected def open()  : Unit = {}
+  protected def open_channel()  : Unit = {}
+  protected def talk()  : Unit = {}
+  protected def untalk()  : Unit = {}
+  protected def close()  : Unit = {}
   protected def onCommand(cmd:Command.Value,secondaryAddress:Int) : Unit = {}
   
   // -------------------------------
@@ -219,7 +219,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     bus.setLine(this,line,value)
   }
   
-  protected def resetSignals  : Unit = {
+  protected def resetSignals()  : Unit = {
     if (DEBUG) println("resetting...")
     initNextByte = true
     setMode(IDLE)
@@ -247,7 +247,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     if (data < OPEN.id + 16) (OPEN.id,data - OPEN.id)
     else throw new IllegalArgumentException("Unknown ATN command: " + data)
     val CMD = Command(cmd)
-    if (DEBUG) println(s"Dev/SecA=${devOrSecAddr} cmd=${CMD}")
+    if (DEBUG) println(s"Dev/SecA=$devOrSecAddr cmd=$CMD")
     
     onCommand(CMD,devOrSecAddr)
     CMD match {

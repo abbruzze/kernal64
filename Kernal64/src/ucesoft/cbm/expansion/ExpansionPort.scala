@@ -1,51 +1,49 @@
 package ucesoft.cbm.expansion
 
-import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.ChipID
-import ucesoft.cbm.Log
-import ucesoft.cbm.cpu.RAMComponent
-import ucesoft.cbm.CBMComponentType
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponentType, ChipID, Log}
+import ucesoft.cbm.cpu.{Memory, RAMComponent}
 import ucesoft.cbm.formats.Cartridge
 
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 object ExpansionPortType extends Enumeration {
-  val EMPTY = Value
-  val CRT = Value
-  val REU = Value
-  val DIGIMAX = Value
-  val SWIFTLINK = Value
-  val DUALSID = Value
-  val CPM = Value
-  val GEORAM = Value
+  val EMPTY: ExpansionPortType.Value = Value
+  val CRT: ExpansionPortType.Value = Value
+  val REU: ExpansionPortType.Value = Value
+  val DIGIMAX: ExpansionPortType.Value = Value
+  val SWIFTLINK: ExpansionPortType.Value = Value
+  val DUALSID: ExpansionPortType.Value = Value
+  val CPM: ExpansionPortType.Value = Value
+  val GEORAM: ExpansionPortType.Value = Value
 }
 
 abstract class ExpansionPort extends RAMComponent {
   def TYPE : ExpansionPortType.Value
   val componentID = "ExpansionPort"
-  val componentType = CBMComponentType.MEMORY 
+  val componentType: Type = CBMComponentType.MEMORY
   val startAddress = 0xDE00
   val length = 512
   val isRom = false
   val isActive = true
   protected[this] var baLow = false
   
-  def setBaLow(baLow:Boolean) = this.baLow = baLow
+  def setBaLow(baLow:Boolean): Unit = this.baLow = baLow
 
   def EXROM: Boolean
   def GAME: Boolean
   def ROML: Memory
   def ROMH: Memory
 
-  final def isUltimax = !GAME && EXROM
+  final def isUltimax: Boolean = !GAME && EXROM
 
   override def init  : Unit = {}
   override def reset  : Unit = {}
-  def eject  : Unit = {}
+  def eject()  : Unit = {}
   def isEmpty = false
 
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("EXROM", EXROM.toString)
     properties.setProperty("GAME", GAME.toString)
     properties.setProperty("ROML", if (ROML != null) ROML.toString else "-")
@@ -54,12 +52,12 @@ abstract class ExpansionPort extends RAMComponent {
     properties
   }
 
-  final def notifyMemoryConfigurationChange = ExpansionPort.updateListeners(GAME,EXROM)
+  final def notifyMemoryConfigurationChange(): Unit = ExpansionPort.updateListeners(GAME,EXROM)
 
-  def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = ExpansionPort.emptyExpansionPort.read(address)
+  def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = ExpansionPort.emptyExpansionPort.read(address)
   def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
   
-  def freezeButton  : Unit = {}
+  def freezeButton()  : Unit = {}
   def isFreezeButtonSupported = false
   def getCRT : Option[Cartridge] = None
   
@@ -89,37 +87,37 @@ object ExpansionPort {
       def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = 0
       def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
     }
-    val TYPE = ExpansionPortType.EMPTY
+    val TYPE: ExpansionPortType.Value = ExpansionPortType.EMPTY
     val name = "Empty Expansion Port"
     val EXROM = true
     val GAME = true
-    val ROML = EmptyROM: Memory
-    val ROMH = EmptyROM: Memory
+    val ROML: Memory = EmptyROM: Memory
+    val ROMH: Memory = EmptyROM: Memory
     override def isEmpty = true
-    override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = memoryForEmptyExpansionPort.lastByteRead
+    override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = memoryForEmptyExpansionPort.lastByteRead
     override protected def allowsStateRestoring : Boolean = true
   }
   private val proxyExpansionPort : ExpansionPort = new ExpansionPort {
     def TYPE : ExpansionPortType.Value = expansionPort.TYPE
     val name = "Proxy Expansion Port"
-    def EXROM = expansionPort.EXROM
-    def GAME = expansionPort.GAME
-    def ROML = expansionPort.ROML
-    def ROMH = expansionPort.ROMH
-    final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = expansionPort.read(address, chipID)
-    final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = expansionPort.write(address, value, chipID)
-    final override def reset = expansionPort.reset
+    def EXROM: Boolean = expansionPort.EXROM
+    def GAME: Boolean = expansionPort.GAME
+    def ROML: Memory = expansionPort.ROML
+    def ROMH: Memory = expansionPort.ROMH
+    final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = expansionPort.read(address, chipID)
+    final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = expansionPort.write(address, value, chipID)
+    final override def reset: Unit = expansionPort.reset
     final override def hardReset: Unit = expansionPort.hardReset
-    final override def init = expansionPort.init
-    final override def isEmpty = expansionPort.isEmpty
-    final override def setBaLow(baLow:Boolean) = expansionPort.setBaLow(baLow)
-    final override def freezeButton = expansionPort.freezeButton
-    final override def isFreezeButtonSupported = expansionPort.isFreezeButtonSupported
+    final override def init: Unit = expansionPort.init
+    final override def isEmpty: Boolean = expansionPort.isEmpty
+    final override def setBaLow(baLow:Boolean): Unit = expansionPort.setBaLow(baLow)
+    final override def freezeButton: Unit = expansionPort.freezeButton
+    final override def isFreezeButtonSupported: Boolean = expansionPort.isFreezeButtonSupported
     final override def getCRT: Option[Cartridge] = expansionPort.getCRT
-    final override def eject = expansionPort.eject
-    final override def shutdown = expansionPort.shutdown
+    final override def eject: Unit = expansionPort.eject
+    final override def shutdown: Unit = expansionPort.shutdown
     // state
-    final override protected def saveState(out:ObjectOutputStream) = {
+    final override protected def saveState(out:ObjectOutputStream): Unit = {
       if (expansionPort.TYPE == ExpansionPortType.EMPTY) out.writeBoolean(false)
       else {
         out.writeBoolean(true)
@@ -127,7 +125,7 @@ object ExpansionPort {
         expansionPort.saveState(out)
       }
     }
-    final override protected def loadState(in:ObjectInputStream) = {
+    final override protected def loadState(in:ObjectInputStream): Unit = {
       if (in.readBoolean) {
         expansionPortStateHandler(in,ExpansionPortType.withName(in.readObject.toString))
         expansionPort.loadState(in)
@@ -150,7 +148,7 @@ object ExpansionPort {
     listeners = l :: listeners
   }
 
-  private def updateListeners(game:Boolean,exrom:Boolean) = {
+  private def updateListeners(game:Boolean,exrom:Boolean): Unit = {
     var ptr = listeners
     while (!ptr.isEmpty) {
       ptr.head.expansionPortConfigurationChanged(game,exrom)
@@ -158,10 +156,10 @@ object ExpansionPort {
     }
   }
 
-  def getExpansionPort = proxyExpansionPort
-  def getInternalExpansionPort = expansionPort
-  def setMemoryForEmptyExpansionPort(mem:LastByteReadMemory) = memoryForEmptyExpansionPort = mem
-  def setExpansionPort(expansionPort: ExpansionPort) = {
+  def getExpansionPort: ExpansionPort = proxyExpansionPort
+  def getInternalExpansionPort: ExpansionPort = expansionPort
+  def setMemoryForEmptyExpansionPort(mem:LastByteReadMemory): Unit = memoryForEmptyExpansionPort = mem
+  def setExpansionPort(expansionPort: ExpansionPort): Unit = {
     this.expansionPort = expansionPort
     expansionPort.init
     Log.info("Setting new expansion port: " + expansionPort.name + " listeners are " + listeners)

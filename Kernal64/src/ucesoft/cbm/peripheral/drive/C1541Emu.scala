@@ -1,23 +1,21 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.peripheral.bus._
-import java.io.FileNotFoundException
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
-import javax.swing.JOptionPane
 import ucesoft.cbm.formats.Diskette
+import ucesoft.cbm.peripheral.bus._
+
+import java.io.{FileNotFoundException, ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 object C1541Emu {
   private val BLINK_TIMEOUT = 100000
   private val DEBUG = false
 
   private object Job extends Enumeration {
-    val LOAD_FILE = Value
-    val SAVE_FILE = Value
-    val LOAD_CHANNEL = Value
-    val SAVE_CHANNEL = Value
-    val EMPTY = Value
+    val LOAD_FILE: Job.Value = Value
+    val SAVE_FILE: Job.Value = Value
+    val LOAD_CHANNEL: Job.Value = Value
+    val SAVE_CHANNEL: Job.Value = Value
+    val EMPTY: Job.Value = Value
   }
 
   private val STATUS_OK = 0
@@ -36,10 +34,10 @@ object C1541Emu {
 }
 
 class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) extends IECBusDevice(bus, device) with Drive {
-  val driveType = DriveType.OTHER
+  val driveType: DriveType.Value = DriveType.OTHER
   val componentID = "C1541 Emu"
-  val formatExtList = List("D64")
-  override val busid = "C1541Emu_" + device
+  val formatExtList: List[String] = List("D64")
+  override val busid: String = "C1541Emu_" + device
 
   // register itself to bus
   bus.registerListener(this)
@@ -53,25 +51,25 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
   private[this] var status = STATUS_WELCOME
   private[this] var errorTimeout = 0L
 
-  override protected def isDeviceReady = driveReader.isDefined
+  override protected def isDeviceReady: Boolean = driveReader.isDefined
 
   override protected def loadData(fileName: String): Option[BusDataIterator] = {
     try {
       if (DEBUG) println("Loading " + fileName)
-      Some(driveReader.get.load(fileName.toString).iterator)
+      Some(driveReader.get.load(fileName).iterator)
     } catch {
       case e: FileNotFoundException => None
     }
   }
 
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Status", status.toString)
     properties
   }
 
   def init : Unit = {}
   
-  def getFloppy = driveReader.getOrElse(EmptyFloppy)
+  def getFloppy: Floppy = driveReader.getOrElse(EmptyFloppy)
 
   def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) : Unit = {
     this.driveReader = Some(driveReader.asInstanceOf[Diskette])
@@ -174,7 +172,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     } else if (DEBUG) println("Loading from #")
   }
 
-  private def handleChannel15 : Unit = {
+  private def handleChannel15() : Unit = {
     val cmd = if (channels(channel).fileName.length > 0) channels(channel).fileName.toString else channels(channel).bufferToString
     if (cmd.length > 0) {
       executeCommand(cmd)
@@ -183,7 +181,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     sendStatus
   }
 
-  private def sendStatus : Unit = {
+  private def sendStatus() : Unit = {
     import BusDataIterator._
     channels(channel).dataToSend = Some(new StringDataIterator("%02d,%s,00,00".format(status, ERROR_CODES(status)) + 13.toChar))
   }
@@ -218,7 +216,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
       }
     } catch {
       case t: Throwable =>
-        t.printStackTrace
+        t.printStackTrace()
         setStatus(STATUS_SYNTAX_ERROR)
     }
   }
@@ -248,7 +246,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
     } else setStatus(STATUS_SYNTAX_ERROR)
   }
 
-  private def initialize : Unit = {
+  private def initialize() : Unit = {
     setStatus(STATUS_OK)
     for (c <- channels) {
       c.close
@@ -263,7 +261,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
       try {
         val channel = st.nextToken.toInt
         val pos = st.nextToken.toInt
-        if (DEBUG) println(s"Buffer pointer on channel=${channel} pos=${pos}")
+        if (DEBUG) println(s"Buffer pointer on channel=$channel pos=$pos")
         if (channel > 15 || !channels(channel).isOpened) setStatus(STATUS_NO_CHANNEL)
         else channels(channel).dataToSend.get.goto(pos)
       } catch {
@@ -280,7 +278,7 @@ class C1541Emu(bus: IECBus, ledListener: DriveLedListener, device: Int = 8) exte
         val drive = st.nextToken.toInt
         val track = st.nextToken.toInt
         val sector = st.nextToken.toInt
-        if (DEBUG) println(s"Memory read on channel=${channel} drive=${drive} track=${track} sector=${sector}")
+        if (DEBUG) println(s"Memory read on channel=$channel drive=$drive track=$track sector=$sector")
         if (channel > 15 || !channels(channel).isOpened) setStatus(STATUS_NO_CHANNEL)
         else if (drive != 0) setStatus(STATUS_DRIVE_NOT_READY)
         else {

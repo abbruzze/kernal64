@@ -4,15 +4,15 @@ object BusDataIterator {
   abstract class DataIterator extends BusDataIterator {
     protected var index = 0
     protected val dataLength : Int
-    override def hasNext = index < dataLength
-    override def isLast = index == dataLength - 1
-    override def getPerc = (100 * index.toFloat / dataLength).toInt
-    override def goto(pos: Int) = index = pos
+    override def hasNext: Boolean = index < dataLength
+    override def isLast: Boolean = index == dataLength - 1
+    override def getPerc: Int = (100 * index.toFloat / dataLength).toInt
+    override def goto(pos: Int): Unit = index = pos
   }
   
   class StringDataIterator(data: String) extends DataIterator {
-    protected val dataLength = data.length
-    override def next = {
+    protected val dataLength: Int = data.length
+    override def next: Int = {
       val c = data.charAt(index).toInt
       index += 1
       c
@@ -20,8 +20,8 @@ object BusDataIterator {
   }
   
   class ArrayDataIterator(data: Array[Byte], sizeLimit: Option[Int] = None) extends DataIterator {
-    protected val dataLength = data.length
-    override def next = {
+    protected val dataLength: Int = data.length
+    override def next: Int = {
       val c = data(index).toInt
       sizeLimit match {
         case None => index += 1
@@ -32,8 +32,8 @@ object BusDataIterator {
   }  
   
   class ArrayIntDataIterator(data: Array[Int]) extends DataIterator {
-    protected val dataLength = data.length
-    override def next = {
+    protected val dataLength: Int = data.length
+    override def next: Int = {
       val c = data(index)
       index += 1
       c

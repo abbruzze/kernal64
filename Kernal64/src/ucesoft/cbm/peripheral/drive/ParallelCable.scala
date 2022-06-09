@@ -1,10 +1,10 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponent, CBMComponentType}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 /**
  * VIA#1  User port plug 
@@ -22,7 +22,7 @@ import javax.swing.JFrame
  */
 object ParallelCable extends CBMComponent {
   val componentID = "Parallel Cable"
-  val componentType = CBMComponentType.CABLE
+  val componentType: Type = CBMComponentType.CABLE
   
   private[this] var cableValue = 0
   
@@ -33,13 +33,13 @@ object ParallelCable extends CBMComponent {
   def init : Unit = {}
   def reset : Unit = { cableValue = 0 }
   
-  def read = cableValue
+  def read: Int = cableValue
   def write(value:Int) : Unit = cableValue = value
   
-  def onPC : Unit = pcCallback()
-  def onCA2 : Unit = ca2Callback()
+  def onPC() : Unit = pcCallback()
+  def onCA2() : Unit = ca2Callback()
   
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Enabled",enabled.toString)
     properties.setProperty("Value",cableValue.toString)
     properties

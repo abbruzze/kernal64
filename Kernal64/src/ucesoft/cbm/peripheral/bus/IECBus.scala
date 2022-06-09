@@ -1,11 +1,10 @@
 package ucesoft.cbm.peripheral.bus
 
-import ucesoft.cbm.Log
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponent, CBMComponentType, Log}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 trait IECBusListener {
   val isController = false
@@ -13,15 +12,15 @@ trait IECBusListener {
   private[bus] var bitmap = 0
   
   def atnChanged(oldValue:Int,newValue:Int) : Unit = {}
-  def srqTriggered  : Unit = {}
+  def srqTriggered()  : Unit = {}
 }
 
 object IECBusLine extends Enumeration {
   type Line = Value
-  val ATN = Value
-  val CLK = Value
-  val DATA = Value
-  val SRQ = Value
+  val ATN: IECBusLine.Value = Value
+  val CLK: IECBusLine.Value = Value
+  val DATA: IECBusLine.Value = Value
+  val SRQ: IECBusLine.Value = Value
 }
 
 object IECBus {
@@ -31,7 +30,7 @@ object IECBus {
 
 class IECBus extends CBMComponent {
   val componentID = "IEC Bus"
-  val componentType = CBMComponentType.CHIP 
+  val componentType: Type = CBMComponentType.CHIP
   
   import IECBus._
   private[this] var ATN : Long = VOLTAGE
@@ -41,7 +40,7 @@ class IECBus extends CBMComponent {
   private[this] var listeners : List[IECBusListener] = Nil
   private[this] var listenersBitMap = 0L
   
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("ATN",normalize(ATN).toString)
     properties.setProperty("CLK",normalize(CLK).toString)
     properties.setProperty("DATA",normalize(DATA).toString)
@@ -126,10 +125,10 @@ class IECBus extends CBMComponent {
     SRQ = VOLTAGE
   }
   
-  final def atn = normalize(ATN)
-  final def clk = normalize(CLK)
-  final def data = normalize(DATA)
-  final def srq = normalize(SRQ)
+  final def atn: Int = normalize(ATN)
+  final def clk: Int = normalize(CLK)
+  final def data: Int = normalize(DATA)
+  final def srq: Int = normalize(SRQ)
   
   override def toString = s"IECBus ATN=$ATN CLK=$CLK DATA=$DATA SRQ=$SRQ"  
   

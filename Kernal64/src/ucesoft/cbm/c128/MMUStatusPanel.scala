@@ -1,13 +1,7 @@
 package ucesoft.cbm.c128
 
+import java.awt._
 import javax.swing._
-import java.awt.Color
-import java.awt.Dimension
-import java.awt.Graphics
-import java.awt.Graphics2D
-import java.awt.Font
-import java.awt.FlowLayout
-import java.awt.Component
 
 class LabelledLed(label:String,labelUp:Boolean,colorON : Color = Color.GREEN,colorOFF : Color = Color.DARK_GRAY,xRatio:Float = 1.0f,yRatio:Float = 1.0f) extends JPanel {
   var on : Boolean = false

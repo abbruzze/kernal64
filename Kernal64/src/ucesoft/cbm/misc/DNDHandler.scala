@@ -1,12 +1,11 @@
 package ucesoft.cbm.misc
 
-import javax.swing.TransferHandler
-import java.awt.datatransfer.DataFlavor
-import java.io.File
-
 import ucesoft.cbm.formats.ZIP
 import ucesoft.cbm.peripheral.drive.DriveType
 
+import java.awt.datatransfer.DataFlavor
+import java.io.File
+import javax.swing.TransferHandler
 import scala.util.Success
 
 class DNDHandler(handleDND:(File) => Unit,extOnly:Option[() => DriveType.Value] = None) extends TransferHandler {

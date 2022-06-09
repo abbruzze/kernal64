@@ -1,5 +1,6 @@
 package ucesoft.cbm.c128
 
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.c64.{ExtendedROM, MemConfig}
 import ucesoft.cbm.cpu.{CPU65xx, Memory, RAMComponent, ROM, Z80}
 import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortConfigurationListener}
@@ -13,6 +14,7 @@ import ucesoft.cbm.peripheral.vic.{VIC, VICMemory}
 import ucesoft.cbm.{CBMComponentType, ChipID, Clock, Log}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 trait MMUChangeListener {
   def frequencyChanged(f:Int) : Unit // 1 or 2
@@ -25,7 +27,7 @@ trait MMUChangeListener {
 class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with ExpansionPortConfigurationListener with VICMemory with Z80.IOMemory {
   import ROM._
   val componentID = "128 MMU"
-  val componentType = CBMComponentType.MEMORY
+  val componentType: Type = CBMComponentType.MEMORY
   
   val isRom = false
   val name = "128_MMU"
@@ -112,13 +114,13 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   def setCPU(cpu:CPU65xx) : Unit = this.cpu = cpu
 
   def getBank0RAM : Memory = ram.getBank0
-  def colorRAM = COLOR_RAM
-  def RAM = ram
-  def CHAR_ROM = CHARACTERS128_ROM
+  def colorRAM: ColorRAM = COLOR_RAM
+  def RAM: C128RAM = ram
+  def CHAR_ROM: ROM = CHARACTERS128_ROM
 
   final def setDMA(dma:Boolean) : Unit = ram.setDMA(dma)
   
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("VIC bank",vicBank.toString)
     properties.setProperty("RAM bank",ramBank.toString)
     properties.setProperty("IO access",ioacc.toString)
@@ -132,7 +134,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     this.keyboard = keyboard
   }
   
-  final def isIOACC = ioacc
+  final def isIOACC: Boolean = ioacc
     
   final def init  : Unit = {
     if (cia_dc00 == null ||
@@ -399,7 +401,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // C000-FFFF --------------------------------------------
     mem_read_0xC000_0xFFFF(address,false)
   }
-  @inline private[this] def write128(address: Int, value: Int) = {  
+  @inline private[this] def write128(address: Int, value: Int): Unit = {
     if (isForwardWrite) forwardWriteTo.write(address,value)
     // 0/1 ports --------------------------------------------
     if (address == 0) { _0 = value ; check128_1 }
@@ -428,7 +430,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     one
   }
   
-  @inline private[this] def check128_1  : Unit = {
+  @inline private[this] def check128_1()  : Unit = {
     val pr = read128_1
     // check color bank
     COLOR_RAM.setProcessorAndVICColorBanks(pr)
@@ -463,7 +465,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     _d505
   }
   // ----------------------------------------------------------------------------
-  def go64  : Unit = {
+  def go64()  : Unit = {
     MMU_D505_write(D500_REGS(5) | 0x41)
   }
   @inline private[this] def MMU_D505_write(value:Int) : Unit = {
@@ -797,7 +799,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
 
     one
   }
-  @inline private[this] def check64_1  : Unit = {
+  @inline private[this] def check64_1()  : Unit = {
     // check tape motor
     val pr = read64_1
     datassette.setMotor((_0 & 0x20) > 0 && (pr & 0x20) == 0)
@@ -807,14 +809,14 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     expansionPortConfigurationChanged(GAME,EXROM)
   }
   // VIC memory ===========================================================================
-  final def getBank = videoBank
+  final def getBank: Int = videoBank
   final def setVideoBank(bank: Int) : Unit = {
     videoBank = ~bank & 3
     vicBaseAddress = videoBank << 14
   }
-  final def lastByteRead = memLastByteRead
+  final def lastByteRead: Int = memLastByteRead
 
-  override def readPCOpcode = ram.read(cpu.getPC)
+  override def readPCOpcode: Int = ram.read(cpu.getPC)
 
   final def isCharROMAddress(address:Int) : Boolean = {
     val realAddress = vicBaseAddress | address

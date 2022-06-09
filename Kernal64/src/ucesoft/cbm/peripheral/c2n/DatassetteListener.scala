@@ -1,11 +1,11 @@
 package ucesoft.cbm.peripheral.c2n
 
 object DatassetteState extends Enumeration {
-  val PLAYING = Value
-  val STOPPED = Value
-  val RECORDING = Value
-  val FORWARD = Value
-  val REWIND = Value
+  val PLAYING: DatassetteState.Value = Value
+  val STOPPED: DatassetteState.Value = Value
+  val RECORDING: DatassetteState.Value = Value
+  val FORWARD: DatassetteState.Value = Value
+  val REWIND: DatassetteState.Value = Value
 }
 
 trait DatassetteListener {

@@ -1,10 +1,12 @@
 package ucesoft.cbm.peripheral.crtc
 
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm._
 import ucesoft.cbm.cpu.RAMComponent
 import ucesoft.cbm.peripheral.vic.Display
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 object CRTC6845 {
   final val SCREEN_HEIGHT = 312 // PAL rows
@@ -12,9 +14,9 @@ object CRTC6845 {
   final val PREFERRED_FRAME_SIZE = new java.awt.Dimension(SCREEN_WIDTH,SCREEN_HEIGHT * 2)
 
   private object VideoMode extends Enumeration {
-    val IDLE = Value
-    val TEXT = Value
-    val BLANK = Value
+    val IDLE: VideoMode.Value = Value
+    val TEXT: VideoMode.Value = Value
+    val BLANK: VideoMode.Value = Value
   }
 }
 
@@ -46,7 +48,7 @@ class CRTC6845(ram:Array[Int],charRom:Array[Int],bytes_per_char:Int,retraceListe
   val isRom = false
   val startAddress = 0xD800
   val length = 0x2
-  val componentType = CBMComponentType.MEMORY
+  val componentType: Type = CBMComponentType.MEMORY
   val isActive = true
 
   final private[this] var X_LEFT_CLIP_COLS = 0 //20 * 8 + 5 * 8
@@ -104,28 +106,28 @@ class CRTC6845(ram:Array[Int],charRom:Array[Int],bytes_per_char:Int,retraceListe
   private[this] final val FOREGROUND_COLOR = 0xFF00FF00
 
   // Clock management ====================================
-  def pause : Unit = {
+  def pause() : Unit = {
     //if (clk != Clock.systemClock) clk.pause
     clk.cancel("CRTC_TICK")
   }
-  def play : Unit = {
+  def play() : Unit = {
     //if (clk != Clock.systemClock) clk.play
     pause
     reschedule
   }
-  @inline private def reschedule : Unit = {
+  @inline private def reschedule() : Unit = {
     cycles_per_line_accu += cycles_per_line
     val next_clk = cycles_per_line_accu >> 16
     cycles_per_line_accu -= next_clk << 16
     clk.schedule(new ClockEvent("CRTC_TICK",clk.currentCycles + next_clk,drawLine _))
   }
-  def setOwnThread : Unit = {
+  def setOwnThread() : Unit = {
     pause
     clk = Clock.makeClock("CRTCClock",Some(errorHandler _))((cycles) => {})
     clk.play
     play
   }
-  def stopOwnThread : Unit = {
+  def stopOwnThread() : Unit = {
     if (clk != Clock.systemClock) {
       clk.halt
       clk = Clock.systemClock
@@ -286,7 +288,7 @@ class CRTC6845(ram:Array[Int],charRom:Array[Int],bytes_per_char:Int,retraceListe
   }
 
   // ============================================================================
-  @inline private def recalculate_xsync : Unit = {
+  @inline private def recalculate_xsync() : Unit = {
     val charWidth = 8
 
     val exact_cycles_per_line = (xchars_total * charWidth) / 7.90 - 1
@@ -301,16 +303,16 @@ class CRTC6845(ram:Array[Int],charRom:Array[Int],bytes_per_char:Int,retraceListe
   // =======================================================================
 
   private def errorHandler(t:Throwable) : Unit = {
-    t.printStackTrace
+    t.printStackTrace()
   }
 
-  @inline private def latch_addresses: Unit = {
+  @inline private def latch_addresses(): Unit = {
     // update video address for the next frame
     ram_adr = regs(12) << 8 | regs(13)
     ram_base_ptr = ram_adr
   }
 
-  @inline private def vsync : Unit = {
+  @inline private def vsync() : Unit = {
     rasterLine = 0
     nextFrame
   }
@@ -386,7 +388,7 @@ class CRTC6845(ram:Array[Int],charRom:Array[Int],bytes_per_char:Int,retraceListe
     }
   }
 
-  @inline private def updateGeometry : Unit = {
+  @inline private def updateGeometry() : Unit = {
     visibleTextRows = regs(6)
     visibleScreenHeightPix = visibleTextRows * (ychars_total + 1)
     val charWidth = 8
@@ -419,12 +421,12 @@ class CRTC6845(ram:Array[Int],charRom:Array[Int],bytes_per_char:Int,retraceListe
     if (borderWidth < 0) borderWidth = 0
     if (geometryUpdateListener != null) {
       val charInfo = s"${charWidth}x${if (interlaceMode) (ychars_total + 1) >> 1 else (ychars_total + 1)}}"
-      geometryUpdateListener(s"Text mode ${regs(1)}x${visibleTextRows} ${charInfo} ${if (interlaceMode) "interlaced" else ""}")
+      geometryUpdateListener(s"Text mode ${regs(1)}x$visibleTextRows $charInfo ${if (interlaceMode) "interlaced" else ""}")
     }
-    if (debug) println(s"VDC: updated geometry. Interlaced=$interlaceMode ${regs(1) * 8}x${visibleScreenHeightPix} new borderWidth=$borderWidth")
+    if (debug) println(s"VDC: updated geometry. Interlaced=$interlaceMode ${regs(1) * 8}x$visibleScreenHeightPix new borderWidth=$borderWidth")
   }
 
-  @inline private def nextFrame : Unit = {
+  @inline private def nextFrame() : Unit = {
     frameBit = (frameBit + 1) & 1
     if (oneLineDrawn) display.showFrame(0,0,screenWidth,screenHeight)
     else display.showFrame(-1,-1,-1,-1)
@@ -457,7 +459,7 @@ class CRTC6845(ram:Array[Int],charRom:Array[Int],bytes_per_char:Int,retraceListe
     else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS * (if (interlaceMode) 2 else 1),screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS * (if (interlaceMode) 2 else 1))
   }
 
-  @inline private def fetchGFX : Unit = {
+  @inline private def fetchGFX() : Unit = {
     var c = 0
     while (c < regs(1) + 1) {
       gfxBuffer(c) = ram((ram_base_ptr + c) % ram.length)
@@ -541,7 +543,7 @@ class CRTC6845(ram:Array[Int],charRom:Array[Int],bytes_per_char:Int,retraceListe
     updateGeometryOnNextFrame = true
   }
 
-  def triggerLightPen : Unit = {
+  def triggerLightPen() : Unit = {
     lpFlag = 0x40
     regs(16) = ypos
     val delta = clk.currentCycles - clkStartLine
@@ -549,7 +551,7 @@ class CRTC6845(ram:Array[Int],charRom:Array[Int],bytes_per_char:Int,retraceListe
   }
 
   // =============== Properties ==========================
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Status",read_status.toString)
     properties.setProperty("Video mode",videoMode.toString)
     properties.setProperty("Cycles per line",cycles_per_line.toString)

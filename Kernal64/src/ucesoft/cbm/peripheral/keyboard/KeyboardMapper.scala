@@ -1,9 +1,10 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import java.io.{BufferedReader, FileInputStream, FileNotFoundException, IOException, InputStreamReader, PrintWriter}
-import java.awt.event.KeyEvent
-
 import ucesoft.cbm.Log
+import ucesoft.cbm.peripheral.keyboard.CKey.Key
+
+import java.awt.event.KeyEvent
+import java.io._
 
 trait KeyboardMapper {
 	val map : Map[Int,CKey.Key]
@@ -45,7 +46,7 @@ object KeyboardMapperStore {
     else {
       try {
         val map = Some(load(new BufferedReader(new InputStreamReader(in))))
-        in.close
+        in.close()
         map
       }
       catch {
@@ -89,8 +90,8 @@ object KeyboardMapperStore {
     e_map += KeyEvent.VK_SHIFT -> CKey.L_SHIFT
     
     new KeyboardMapper {
-      val map = e_map.toMap
-      val keypad_map = e_keypad_map.toMap
+      val map: Map[Int, Key] = e_map.toMap
+      val keypad_map: Map[Int, Key] = e_keypad_map.toMap
     }
   }
   
@@ -132,7 +133,7 @@ object KeyboardMapperStore {
         try {
           val in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))
           val m = load(in)
-          in.close
+          in.close()
           Log.info(s"Loaded keyboard configuration file from $file")
           m
         }

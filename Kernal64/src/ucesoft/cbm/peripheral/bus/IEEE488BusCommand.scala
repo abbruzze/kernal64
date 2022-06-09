@@ -1,13 +1,10 @@
 package ucesoft.cbm.peripheral.bus
 
-import ucesoft.cbm.formats.Diskette.FileType
-
-import java.io.FileNotFoundException
 import scala.collection.mutable.ListBuffer
 
 abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: IEEE488Bus) extends IEEE488BusHandshake(name,bus) {
-  import Role._
   import IEEE488Bus.LineType._
+  import Role._
 
   protected sealed trait Command
 
@@ -88,14 +85,14 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
       buffer.clear()
       bufferIndex = 0
     }
-    def getBuffer(): Array[Int] = buffer.toArray
+    def getBuffer: Array[Int] = buffer.toArray
     def index(): Int = bufferIndex
     def rewind(): Unit = bufferIndex = 0
   }
 
   protected var lastCommand : Command = UNKNOWN
   protected var secondaryAddress = 0
-  protected val channels = Array.fill(16)(new Channel)
+  protected val channels: Array[Channel] = Array.fill(16)(new Channel)
 
 
   protected def closeChannel(channel:Int): Unit = {}
@@ -159,46 +156,45 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
 
   override protected def dataAvailable(): Unit = {
     val data = bus.getDIO() ^ 0xFF
-    atnLow match {
-      case true =>
-        lastCommand = Command.fromByte(data)
-        println(s"Command received: $lastCommand [$role]")
-        lastCommand match {
-          case LISTEN(device) =>
-            if (isThisDevice(device)) role = LISTENER
-          case UNLISTEN =>
-            if (secondaryAddress == 15 && channels(15).isOpened() && channels(15).name().length > 0) executeCommand()
-            role = IDLE
-          case SECONDARY_ADDRESS(sa) =>
-            if (role != IDLE) {
-              secondaryAddress = sa
-              //channels(sa).open()
-              openChannel()
-            }
-            if (role == TALKER_READY) {
-              role = TALKER
-            }
-          case UNTALK =>
-            role = IDLE
-          case OPEN(address) =>
-            if (role != IDLE) {
-              secondaryAddress = address
-              channels(address).open()
-            }
-          case CLOSE(address) =>
-            if (role != IDLE) {
-              channels(address).close()
-              closeChannel(address)
-            }
-          case TALK(device) =>
-            if (isThisDevice(device)) {
-              letsTalk()
-            }
-        }
-      case false =>
-        if (role != IDLE) {
-          receiveData(data)
-        }
+    if (atnLow) {
+      lastCommand = Command.fromByte(data)
+      println(s"Command received: $lastCommand [$role]")
+      lastCommand match {
+        case LISTEN(device) =>
+          if (isThisDevice(device)) role = LISTENER
+        case UNLISTEN =>
+          if (secondaryAddress == 15 && channels(15).isOpened() && channels(15).name().length > 0) executeCommand()
+          role = IDLE
+        case SECONDARY_ADDRESS(sa) =>
+          if (role != IDLE) {
+            secondaryAddress = sa
+            //channels(sa).open()
+            openChannel()
+          }
+          if (role == TALKER_READY) {
+            role = TALKER
+          }
+        case UNTALK =>
+          role = IDLE
+        case OPEN(address) =>
+          if (role != IDLE) {
+            secondaryAddress = address
+            channels(address).open()
+          }
+        case CLOSE(address) =>
+          if (role != IDLE) {
+            channels(address).close()
+            closeChannel(address)
+          }
+        case TALK(device) =>
+          if (isThisDevice(device)) {
+            letsTalk()
+          }
+      }
+    } else {
+      if (role != IDLE) {
+        receiveData(data)
+      }
     }
     //println("----------------------------------------")
   }

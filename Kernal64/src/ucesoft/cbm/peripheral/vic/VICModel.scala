@@ -1,8 +1,8 @@
 package ucesoft.cbm.peripheral.vic
 
 object VICType extends Enumeration {
-  val PAL = Value
-  val NTSC = Value
+  val PAL: VICType.Value = Value
+  val NTSC: VICType.Value = Value
 }
 
 sealed trait VICModel {

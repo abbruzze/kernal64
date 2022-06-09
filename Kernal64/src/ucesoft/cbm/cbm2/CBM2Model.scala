@@ -24,7 +24,7 @@ case object _610PAL extends CBM2Model {
   override val lowProfile = true
   override val charROMName = "chargen.600"
   override val basicROMName = "basic.128"
-  override val crtClip = (25,13,28,0)
+  override val crtClip: (Int, Int, Int, Int) = (25,13,28,0)
 }
 
 case object _610NTSC extends CBM2Model {
@@ -34,7 +34,7 @@ case object _610NTSC extends CBM2Model {
   override val lowProfile = true
   override val charROMName = "chargen.600"
   override val basicROMName = "basic.128"
-  override val crtClip = (21,13,14,0)
+  override val crtClip: (Int, Int, Int, Int) = (21,13,14,0)
 }
 
 case object _620PAL extends CBM2Model {
@@ -44,7 +44,7 @@ case object _620PAL extends CBM2Model {
   override val lowProfile = true
   override val charROMName = "chargen.600"
   override val basicROMName = "basic.256"
-  override val crtClip = (25,13,28,0)
+  override val crtClip: (Int, Int, Int, Int) = (25,13,28,0)
 }
 
 case object _620NTSC extends CBM2Model {
@@ -54,7 +54,7 @@ case object _620NTSC extends CBM2Model {
   override val lowProfile = true
   override val charROMName = "chargen.600"
   override val basicROMName = "basic.256"
-  override val crtClip = (21,13,14,0)
+  override val crtClip: (Int, Int, Int, Int) = (21,13,14,0)
 }
 
 case object _710NTSC extends CBM2Model {
@@ -64,7 +64,7 @@ case object _710NTSC extends CBM2Model {
   override val lowProfile = false
   override val charROMName = "chargen.700"
   override val basicROMName = "basic.128"
-  override val crtClip = (18,0,0,0)
+  override val crtClip: (Int, Int, Int, Int) = (18,0,0,0)
 }
 
 case object _710PAL extends CBM2Model {
@@ -74,7 +74,7 @@ case object _710PAL extends CBM2Model {
   override val lowProfile = false
   override val charROMName = "chargen.700"
   override val basicROMName = "basic.128"
-  override val crtClip = (18,0,0,0)
+  override val crtClip: (Int, Int, Int, Int) = (18,0,0,0)
 }
 
 case object _720NTSC extends CBM2Model {
@@ -84,5 +84,5 @@ case object _720NTSC extends CBM2Model {
   override val lowProfile = false
   override val charROMName = "chargen.700"
   override val basicROMName = "basic.256"
-  override val crtClip = (18,0,0,0)
+  override val crtClip: (Int, Int, Int, Int) = (18,0,0,0)
 }

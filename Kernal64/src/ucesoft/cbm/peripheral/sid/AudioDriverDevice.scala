@@ -8,6 +8,6 @@ trait AudioDriverDevice {
   def isMuted : Boolean
   def isSoundOn : Boolean
   def addSample(sample:Int) : Unit
-  def reset : Unit
-  def discard : Unit
+  def reset() : Unit
+  def discard() : Unit
 }

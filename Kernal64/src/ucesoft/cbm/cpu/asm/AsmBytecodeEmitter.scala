@@ -1,9 +1,10 @@
 package ucesoft.cbm.cpu.asm
 
-import java.io.PrintWriter
-import AsmEvaluator._
 import ucesoft.cbm.cpu.CPU65xx
+import ucesoft.cbm.cpu.asm.AsmEvaluator._
 import ucesoft.cbm.cpu.asm.AsmParser.{Patch, Virtual}
+
+import java.io.PrintWriter
 
 case class AsmEncoding(org:Int,mem:Array[Byte])
 
@@ -78,14 +79,13 @@ class AsmBytecodeEmitter(console:PrintWriter,blocks:List[ByteCodeBlock]) {
             throw new IllegalArgumentException(s"Error on line ${bcs.source.line}: type mismatch on operand")
           case list =>
             for(o <- list) {
-              isByte match {
-                case true =>
-                  mem(pc) = (o & 0xFF).toByte
-                  pc += 1
-                case false =>
-                  mem(pc) = (o & 0xFF).toByte
-                  mem(pc + 1) = (o >> 8).toByte
-                  pc += 2
+              if (isByte) {
+                mem(pc) = (o & 0xFF).toByte
+                pc += 1
+              } else {
+                mem(pc) = (o & 0xFF).toByte
+                mem(pc + 1) = (o >> 8).toByte
+                pc += 2
               }
             }
         }

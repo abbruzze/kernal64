@@ -1,5 +1,6 @@
 package ucesoft.cbm
 
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.cpu.{Memory, ROM}
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.formats._
@@ -8,11 +9,11 @@ import ucesoft.cbm.game.{GamePlayer, GameUI}
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.peripheral.cia.CIA
-import ucesoft.cbm.peripheral.controlport.JoystickSettingDialog
 import ucesoft.cbm.peripheral.controlport.Joysticks._
+import ucesoft.cbm.peripheral.controlport.{ControlPort, JoystickSettingDialog}
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.{HomeKeyboard, Keyboard}
-import ucesoft.cbm.peripheral.printer.{MPS803, MPS803GFXDriver, MPS803ROM, Printer}
+import ucesoft.cbm.peripheral.printer.{MPS803, Printer}
 import ucesoft.cbm.peripheral.rs232._
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 import ucesoft.cbm.peripheral.vic._
@@ -23,7 +24,7 @@ import ucesoft.cbm.trace.{InspectPanel, TraceListener}
 
 import java.awt.datatransfer.DataFlavor
 import java.awt.event._
-import java.awt.{BorderLayout, Color, Dimension, FlowLayout, Toolkit}
+import java.awt.{BorderLayout, Dimension, Toolkit}
 import java.io._
 import java.util.zip.{GZIPInputStream, GZIPOutputStream}
 import java.util.{Properties, ServiceLoader}
@@ -44,7 +45,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected var vicChip : vic.VIC = _
   protected var vicZoomFactor : Int = 1
   protected var cia1,cia2 : CIA = _
-  protected val cia12Running = Array(true,true)
+  protected val cia12Running: Array[Boolean] = Array(true,true)
   protected val sid = new ucesoft.cbm.peripheral.sid.SID
   protected val nmiSwitcher = new Switcher("NMI",cpu.nmiRequest _)//new NMISwitcher(cpu.nmiRequest _)
   protected val irqSwitcher = new Switcher("IRQ",cpu.irqRequest _)//new IRQSwitcher(cpu.irqRequest _)
@@ -54,7 +55,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
   protected val bus = new IECBus
   protected var dma = false
-  protected val expansionPort = ExpansionPort.getExpansionPort
+  protected val expansionPort: ExpansionPort = ExpansionPort.getExpansionPort
 
   protected var resetSettingsActions : List[() => Unit] = Nil
 
@@ -65,7 +66,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected var isFlyerEnabled = false
 
   // ----------------- RS-232 ------------------
-  protected val rs232 = BridgeRS232
+  protected val rs232: BridgeRS232.type = BridgeRS232
   protected val AVAILABLE_RS232 : Array[RS232] = Array(//UP9600,
     TelnetRS232,
     TCPRS232,
@@ -78,19 +79,19 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected lazy val volumeDialog : JDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
   // ------------ Control Port -----------------------
   protected lazy val gameControlPort = new controlport.GamePadControlPort(configuration)
-  protected val keypadControlPort = controlport.ControlPort.keypadControlPort
-  protected lazy val keyboardControlPort = controlport.ControlPort.userDefinedKeyControlPort(configuration)
+  protected val keypadControlPort: ControlPort with MouseListener with KeyListener = controlport.ControlPort.keypadControlPort
+  protected lazy val keyboardControlPort: ControlPort with MouseListener with KeyListener = controlport.ControlPort.userDefinedKeyControlPort(configuration)
   protected val controlPortA = new controlport.ControlPortBridge(keypadControlPort,"Control Port 1")
   protected lazy val controlPortB = new controlport.ControlPortBridge(gameControlPort,"Control port 2")
   // -------------- Light Pen -------------------------
   protected val LIGHT_PEN_NO_BUTTON = 0
   protected val LIGHT_PEN_BUTTON_UP = 1
   protected val LIGHT_PEN_BUTTON_LEFT = 2
-  protected var lightPenButtonEmulation = LIGHT_PEN_NO_BUTTON
+  protected var lightPenButtonEmulation: Int = LIGHT_PEN_NO_BUTTON
 
   protected class LightPenButtonListener extends MouseAdapter with CBMComponent {
     val componentID = "Light pen"
-    val componentType = CBMComponentType.INPUT_DEVICE
+    val componentType: Type = CBMComponentType.INPUT_DEVICE
 
     override def mousePressed(e:MouseEvent) : Unit = {
       lightPenButtonEmulation match {
@@ -163,11 +164,11 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def savePrg : Unit = {
+  protected def savePrg() : Unit = {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new FileFilter {
-      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".PRG")
+      def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".PRG")
       def getDescription = "PRG files"
     })
     fc.showSaveDialog(displayFrame) match {
@@ -241,7 +242,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
     catch {
       case t:Throwable =>
-        t.printStackTrace
+        t.printStackTrace()
 
         showError("Disk attaching error",t.toString)
     }
@@ -270,7 +271,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
           val fc = new JFileChooser
           fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
           fc.setFileFilter(new FileFilter {
-            def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
+            def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
             def getDescription = "Kernal64 state files"
           })
           fc.setDialogTitle("Choose a state file to load")
@@ -314,7 +315,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       }
       catch {
         case dm: DriveIDMismatch =>
-          in.close
+          in.close()
           reset(false)
           val newDriveType = if (dm.expectedDriveComponentID.startsWith("C1541")) DriveType._1541
           else if (dm.expectedDriveComponentID.startsWith("D1571")) DriveType._1571
@@ -326,16 +327,16 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     catch {
       case t:Throwable =>
         showError(s"State loading error",s"Can't load state: ${t.getMessage}")
-        t.printStackTrace
+        t.printStackTrace()
         reset(false)
     }
     finally {
-      if (in != null) in.close
+      if (in != null) in.close()
       clock.play
     }
   }
 
-  protected def resetSettings : Unit = {
+  protected def resetSettings() : Unit = {
     for(a <- resetSettingsActions) a()
   }
 
@@ -353,7 +354,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       fc.setDialogTitle("Choose where to save current state")
       fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
       fc.setFileFilter(new FileFilter {
-        def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
+        def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
         def getDescription = "Kernal64 state files"
       })
       val fn = fc.showSaveDialog(getActiveFrame.get) match {
@@ -367,16 +368,16 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       out.writeObject(ucesoft.cbm.Version.VERSION)
       out.writeLong(System.currentTimeMillis)
       save(out)
-      out.close
+      out.close()
     }
     catch {
       case t:Throwable =>
 
         showError("State saving error","Can't save state. Unexpected error occurred: " + t)
-        t.printStackTrace
+        t.printStackTrace()
     }
     finally {
-      if (out != null) out.close
+      if (out != null) out.close()
       clock.play
     }
   }
@@ -437,7 +438,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     d64.rename("AUTOSTART")
     val in = new java.io.FileInputStream(file)
     val prg = in.readAllBytes()
-    in.close
+    in.close()
     val startAddress = prg(0) | prg(1) << 8
     val content = prg.drop(2)
     val prgName = name.dropRight(4)
@@ -468,11 +469,11 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     if (name.endsWith(".CRT")) loadCartridgeFile(file)
   }
 
-  protected def attachZip  : Unit = {
+  protected def attachZip()  : Unit = {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new FileFilter {
-      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".ZIP")
+      def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".ZIP")
       def getDescription = "ZIP files"
     })
     fc.showOpenDialog(displayFrame) match {
@@ -539,7 +540,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new javax.swing.filechooser.FileFilter {
-      def accept(f:File) = f.isDirectory || drives(driveID).formatExtList.exists { ext => try { f.toString.toUpperCase.endsWith(ext) } catch { case _:Throwable=> false } }
+      def accept(f:File): Boolean = f.isDirectory || drives(driveID).formatExtList.exists { ext => try { f.toString.toUpperCase.endsWith(ext) } catch { case _:Throwable=> false } }
       def getDescription = s"${drives(driveID).formatExtList.mkString(",")} files"
     })
     fc.showOpenDialog(displayFrame) match {
@@ -568,7 +569,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def loadFileFromTape  : Unit = {
+  protected def loadFileFromTape()  : Unit = {
     val fc = new JFileChooser
     val canvas = new T64Canvas(fc,getCharROM,isC64Mode)
     val sp = new javax.swing.JScrollPane(canvas)
@@ -577,7 +578,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new FileFilter {
-      def accept(f:File) = f.isDirectory || f.getName.toUpperCase.endsWith(".T64")
+      def accept(f:File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".T64")
       def getDescription = "T64 files"
     })
     fc.showOpenDialog(displayFrame) match {
@@ -628,7 +629,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def attachTape  : Unit = {
+  protected def attachTape()  : Unit = {
     val fc = new JFileChooser
     val canvas = new TAPCanvas(fc,getCharROM,isC64Mode)
     val sp = new javax.swing.JScrollPane(canvas)
@@ -637,7 +638,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     fc.setFileView(new C64FileView)
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileFilter(new FileFilter {
-      def accept(f:File) = f.isDirectory || f.getName.toUpperCase.endsWith(".TAP")
+      def accept(f:File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".TAP")
       def getDescription = "TAP files"
     })
     fc.showOpenDialog(displayFrame) match {
@@ -659,12 +660,12 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def loadPrg  : Unit = {
+  protected def loadPrg()  : Unit = {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileView(new C64FileView)
     fc.setFileFilter(new FileFilter {
-      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".PRG")
+      def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".PRG")
       def getDescription = "PRG files"
     })
     fc.showOpenDialog(displayFrame) match {
@@ -678,7 +679,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def detachCtr  : Unit = {
+  protected def detachCtr()  : Unit = {
     if (ExpansionPort.getExpansionPort.isEmpty) showError("Detach error","No cartridge attached!")
     else {
       if (Thread.currentThread != Clock.systemClock) clock.pause
@@ -695,12 +696,12 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     ExpansionPort.currentCartFileName = ""
   }
 
-  protected def attachCtr  : Unit = {
+  protected def attachCtr()  : Unit = {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileView(new C64FileView)
     fc.setFileFilter(new FileFilter {
-      def accept(f:File) = f.isDirectory || f.getName.toUpperCase.endsWith(".CRT")
+      def accept(f:File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".CRT")
       def getDescription = "CRT files"
     })
     fc.showOpenDialog(displayFrame) match {
@@ -817,13 +818,13 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     controlPortB.setLightPenEmulation(setting != LIGHT_PEN_NO_BUTTON)
   }
 
-  protected def choose16MREU: Unit = {
+  protected def choose16MREU(): Unit = {
     import Preferences._
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileView(new C64FileView)
     fc.setFileFilter(new javax.swing.filechooser.FileFilter {
-      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".REU")
+      def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".REU")
       def getDescription = "REU files"
     })
     fc.showOpenDialog(displayFrame) match {
@@ -859,7 +860,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
             val remote = new ucesoft.cbm.remote.RemoteC64Server(listeningPort.toString.toInt,keyboardControlPort :: keyb :: keypadControlPort :: Nil,display.displayMem,vicChip.SCREEN_WIDTH,vicChip.SCREEN_HEIGHT,clip._1.x,clip._1.y,clip._2.x,clip._2.y)
             this.remote = Some(remote)
             display.setRemote(this.remote)
-            remote.start
+            remote.start()
           }
           catch {
             case io:IOException =>
@@ -885,7 +886,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     isFlyerEnabled = enabled
   }
 
-  protected def chooseFlyerDir: Unit = {
+  protected def chooseFlyerDir(): Unit = {
     val fc = new JFileChooser
     fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
     fc.setCurrentDirectory(flyerIEC.getFloppyRepository)
@@ -912,7 +913,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def chooseDigiMaxSampleRate: Unit = {
+  protected def chooseDigiMaxSampleRate(): Unit = {
     Option(JOptionPane.showInputDialog(displayFrame,"DigiMax sample rate Hz",DigiMAX.getSampleRate.toString)) match {
       case None =>
       case Some(rate) =>
@@ -920,7 +921,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def chooseGMod2: Unit = {
+  protected def chooseGMod2(): Unit = {
     var gmod2Path = configuration.getProperty(CONFIGURATION_GMOD2_FILE,"./gmod2_eeprom")
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(gmod2Path).getParentFile)
@@ -944,17 +945,17 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     preferences.updateWithoutNotify(PREF_CPMCARTENABLED,enabled)
   }
 
-  protected def manageRS232 : Unit = {
+  protected def manageRS232() : Unit = {
     RS232ConfigPanel.RS232ConfigDialog.setVisible(true)
   }
 
-  def play(file:File) = {
+  def play(file:File): Unit = {
     //ExpansionPort.getExpansionPort.eject
     //ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
     handleDND(file,true,true)
   }
 
-  protected def configureJoystick : Unit = {
+  protected def configureJoystick() : Unit = {
     def getControlPortFor(id:String) = configuration.getProperty(id) match {
       case CONFIGURATION_KEYPAD_VALUE => keypadControlPort
       case CONFIGURATION_JOYSTICK_VALUE => gameControlPort
@@ -967,7 +968,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     keyboardControlPort.updateConfiguration
   }
 
-  protected def joySettings : Unit = {
+  protected def joySettings() : Unit = {
     Clock.systemClock.pause
     try {
       val dialog = new JoystickSettingDialog(displayFrame,configuration,gameControlPort)
@@ -979,7 +980,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def swapJoysticks : Unit = {
+  protected def swapJoysticks() : Unit = {
     val j1 = configuration.getProperty(CONFIGURATION_JOY_PORT_1)
     val j2 = configuration.getProperty(CONFIGURATION_JOY_PORT_2)
     if (j2 != null) configuration.setProperty(CONFIGURATION_JOY_PORT_1,j2) else configuration.remove(CONFIGURATION_JOY_PORT_1)
@@ -987,7 +988,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     configureJoystick
   }
 
-  protected def setVicFullScreen: Unit = {
+  protected def setVicFullScreen(): Unit = {
     ucesoft.cbm.misc.FullScreenMode.goFullScreen(displayFrame,
       display,
       vicChip.SCREEN_WIDTH,
@@ -1006,9 +1007,9 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
   protected def updateVICScreenDimension(dim:Dimension): Unit = {
     display.setPreferredSize(dim)
-    display.invalidate
+    display.invalidate()
     display.repaint()
-    displayFrame.pack
+    displayFrame.pack()
     if (vicChip.VISIBLE_SCREEN_WIDTH == dim.width && vicChip.VISIBLE_SCREEN_HEIGHT == dim.height) vicZoomFactor = 1
     else
     if (vicChip.VISIBLE_SCREEN_WIDTH * 2 == dim.width && vicChip.VISIBLE_SCREEN_HEIGHT * 2 == dim.height) vicZoomFactor = 2
@@ -1030,7 +1031,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     if (!preserveDisplayDim) {
       if (vicZoomFactor > 0) vicZoom(vicZoomFactor)
       display.invalidate()
-      displayFrame.pack
+      displayFrame.pack()
     }
 
     if (resetFlag) reset()
@@ -1038,7 +1039,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   }
 
   // -------------------------------------------------------------------
-  protected def setMenu: Unit = setMenu(true,true)
+  protected def setMenu(): Unit = setMenu(true,true)
 
   override protected def setGlobalCommandLineOptions : Unit = {
     import Preferences._
@@ -1168,7 +1169,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       tapeMenu.add(tapeResetCounterItem)
     }
 
-    fileMenu.addSeparator
+    fileMenu.addSeparator()
 
     val makeDiskItem = new JMenuItem("Make empty disk ...")
     makeDiskItem.addActionListener(_ => makeDisk )
@@ -1212,7 +1213,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       loadFileItems(d).addActionListener(_ => loadFileFromAttachedFile(d,true,isC64Mode) )
       loadFileItem.add(loadFileItems(d))
     }
-    fileMenu.addSeparator
+    fileMenu.addSeparator()
 
     // LOAD PRG AS D64 ====================================================================================
     val prgAsDiskItem = new JCheckBoxMenuItem("Load PRG as D64")
@@ -1270,7 +1271,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
     // ====================================================================================================
 
-    fileMenu.addSeparator
+    fileMenu.addSeparator()
 
     val resetMenu = new JMenu("Reset")
     fileMenu.add(resetMenu)
@@ -1287,7 +1288,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     reset2Item.addActionListener(_ => reset(true,true) )
     resetMenu.add(reset2Item)
 
-    fileMenu.addSeparator
+    fileMenu.addSeparator()
 
     // CART ================================================================================================
     val attachCtrItem = new JMenuItem("Attach cartridge ...")
@@ -1302,7 +1303,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     detachCtrItem.addActionListener(_ => detachCtr )
     fileMenu.add(detachCtrItem)
 
-    fileMenu.addSeparator
+    fileMenu.addSeparator()
 
     // PREF-AUTO-SAVE ======================================================================================
     val autoSaveCheckItem = new JCheckBoxMenuItem("Autosave settings on exit")
@@ -1317,7 +1318,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     saveSettingsCheckItem.addActionListener(_ => saveSettings(true) )
     fileMenu.add(saveSettingsCheckItem)
 
-    fileMenu.addSeparator
+    fileMenu.addSeparator()
 
     val exitItem = new JMenuItem("Exit")
     exitItem.addActionListener(_ => turnOff )
@@ -1394,7 +1395,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
     catch {
       case t:Throwable =>
-        t.printStackTrace
+        t.printStackTrace()
     }
   }
 
@@ -1688,7 +1689,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }) :: resetSettingsActions
   }
 
-  protected def setDrivesSettings : Unit = {
+  protected def setDrivesSettings() : Unit = {
     import Preferences._
     for(drive <- 0 until TOTAL_DRIVES) {
       // DRIVE-X-TYPE ========================================================================================
@@ -2023,7 +2024,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     parent.add(gmodMenu)
   }
 
-  protected def easyFlashWriteChanges : Unit = {
+  protected def easyFlashWriteChanges() : Unit = {
     ExpansionPort.getInternalExpansionPort match {
       case ef:EasyFlash =>
         ef.createCRT
@@ -2031,7 +2032,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def GMOD3WriteChanges : Unit = {
+  protected def GMOD3WriteChanges() : Unit = {
     ExpansionPort.getInternalExpansionPort match {
       case ef:GMOD3 =>
         ef.createCRT

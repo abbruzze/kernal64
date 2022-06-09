@@ -1,32 +1,31 @@
 package ucesoft.cbm.peripheral.rs232
 
-import java.io._
-import java.net.{ServerSocket, Socket}
-
 import ucesoft.cbm.Log
 
+import java.io._
+import java.net.{ServerSocket, Socket}
 import scala.util.matching.Regex
 
 trait ModemCommandListener {
-  def hangUp : Unit
+  def hangUp() : Unit
   def commandMode(on:Boolean) : Unit
   def connectTo(address:String) : Unit
   def ring(ringing:Boolean) : Unit
 }
 
 object HayesResultCode extends Enumeration {
-  val OK          = Value(0)
-  val CONNECT     = Value(1)
-  val RING        = Value(2)
-  val NO_CARRIER  = Value(3)
-  val ERROR       = Value(4)
-  val CONNECT1200 = Value(5)
-  val CONNECT2400 = Value(10)
-  val CONNECT4800 = Value(11)
-  val CONNECT9600 = Value(12)
-  val CONNECT14400= Value(13)
-  val CONNECT19200= Value(14)
-  val CONNECT38400= Value(28)
+  val OK: HayesResultCode.Value = Value(0)
+  val CONNECT: HayesResultCode.Value = Value(1)
+  val RING: HayesResultCode.Value = Value(2)
+  val NO_CARRIER: HayesResultCode.Value = Value(3)
+  val ERROR: HayesResultCode.Value = Value(4)
+  val CONNECT1200: HayesResultCode.Value = Value(5)
+  val CONNECT2400: HayesResultCode.Value = Value(10)
+  val CONNECT4800: HayesResultCode.Value = Value(11)
+  val CONNECT9600: HayesResultCode.Value = Value(12)
+  val CONNECT14400: HayesResultCode.Value = Value(13)
+  val CONNECT19200: HayesResultCode.Value = Value(14)
+  val CONNECT38400: HayesResultCode.Value = Value(28)
 }
 
 class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runnable {
@@ -62,7 +61,7 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
   }
 
   private class FastHayesCommand(re:String,handle:(String,String) => HayesResult) extends HayesCommand {
-    override val RE1 = Some(re.r)
+    override val RE1: Option[Regex] = Some(re.r)
     override def cmd1(cmd:String,p1:String) : HayesResult = handle(cmd,p1)
   }
   // ========================= SUPPORTED HAYES COMMANDS ============================
@@ -182,15 +181,15 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
       commandModeReq
     }
 
-    def reset = lastThree.clear
+    def reset(): Unit = lastThree.clear
   }
 
   private[this] class ModemCommandStream(welcomeMessage:String = "") extends InputStream {
     private[this] var msg = welcomeMessage
 
-    override def available = msg.length
+    override def available: Int = msg.length
 
-    def read = synchronized {
+    def read: Int = synchronized {
       if (msg.length > 0) {
         val b = msg.charAt(0).toInt
         msg = msg.substring(1)
@@ -198,18 +197,18 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
       }
       else -1
     }
-    def append(s:String) = synchronized { msg += s }
+    def append(s:String): Unit = synchronized { msg += s }
   }
 
   private class WrappedInputStream extends InputStream {
-    override def available = {
+    override def available: Int = {
       if (commandMode) modemIn.available
       else
       if (in != null) in.available
       else 0
     }
 
-    def read = {
+    def read: Int = {
       if (commandMode) modemIn.read
       else {
         if (in != null) {
@@ -250,8 +249,8 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
         }
       }
     }
-    override def flush: Unit = {
-      if (out != null) out.flush
+    override def flush(): Unit = {
+      if (out != null) out.flush()
     }
   }
 
@@ -297,7 +296,7 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
 
   reset
 
-  def setBaud(baud:Int) = {
+  def setBaud(baud:Int): Unit = {
     currentBaud = baud
   }
 
@@ -342,7 +341,7 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
   def inputStream : InputStream = win
   def outputStream : OutputStream = wout
 
-  def reset: Unit = {
+  def reset(): Unit = {
     commandMode = true
     commandOutBuffer.clear
     inCommandDetector.reset
@@ -367,18 +366,18 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
       if (listeningThread != null && listeningThread.isAlive) listeningThread.interrupt()
       listeningThread = new Thread(this,"ModemListener")
       listeningPort = port
-      listeningThread.start
+      listeningThread.start()
     }
     else {
       if (listeningThread != null) {
         listeningThread.interrupt()
-        if (in != null) in.close
-        if (out != null) out.close
+        if (in != null) in.close()
+        if (out != null) out.close()
       }
     }
   }
 
-  def run: Unit = {
+  def run(): Unit = {
     try {
       serverSocket = new ServerSocket(listeningPort)
       Log.info(s"Modem listening on port $listeningPort ...")
@@ -408,7 +407,7 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
           mcl.ring(false)
           if (!autoAnswer && !answerCall) {
             newSocket.getOutputStream.write(new String("SERVER NOT ANSWERED+++").getBytes)
-            newSocket.getOutputStream.flush
+            newSocket.getOutputStream.flush()
             newSocket.close()
             socket = null
             ringing = false
@@ -426,7 +425,7 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
         else {
           Log.info("Modem busy, cannot answer new call")
           newSocket.getOutputStream.write(new String("SERVER BUSY+++").getBytes)
-          newSocket.getOutputStream.flush
+          newSocket.getOutputStream.flush()
           newSocket.close()
         }
       }

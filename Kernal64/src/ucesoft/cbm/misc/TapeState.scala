@@ -1,13 +1,11 @@
 package ucesoft.cbm.misc
 
-import javax.swing.{JComponent, JMenuItem, JPopupMenu, JProgressBar}
 import ucesoft.cbm.peripheral.c2n.{Datassette, DatassetteListener, DatassetteState}
-import java.awt.Dimension
-import java.awt.Graphics
-import java.awt.Graphics2D
-import java.awt.Color
+
+import java.awt.{Color, Dimension, Graphics, Graphics2D}
 import java.awt.event.{MouseAdapter, MouseEvent}
 import java.awt.geom.Path2D
+import javax.swing.{JComponent, JMenuItem, JPopupMenu, JProgressBar}
 
 class TapeState(datassette:Datassette) extends JComponent with DatassetteListener {
   private[this] var state = DatassetteState.STOPPED
@@ -33,7 +31,7 @@ class TapeState(datassette:Datassette) extends JComponent with DatassetteListene
         path.moveTo(0, 0)
         path.lineTo(size.width, size.height / 2)
         path.lineTo(0, size.height)
-        path.closePath
+        path.closePath()
         g2.fill(path)
       case STOPPED =>
         g2.setColor(Color.BLACK)
@@ -47,13 +45,13 @@ class TapeState(datassette:Datassette) extends JComponent with DatassetteListene
         path.moveTo(0, 0)
         path.lineTo(size.width / 2, size.height / 2)
         path.lineTo(0, size.height)
-        path.closePath
+        path.closePath()
         g2.fill(path)
         path = new Path2D.Float
         path.moveTo(size.width / 2, 0)
         path.lineTo(size.width, size.height / 2)
         path.lineTo(size.width / 2, size.height)
-        path.closePath
+        path.closePath()
         g2.fill(path)
       case REWIND =>
         g2.setColor(Color.GREEN.darker)
@@ -61,18 +59,18 @@ class TapeState(datassette:Datassette) extends JComponent with DatassetteListene
         path.moveTo(size.width, 0)
         path.lineTo(size.width / 2, size.height / 2)
         path.lineTo(size.width, size.height)
-        path.closePath
+        path.closePath()
         g2.fill(path)
         path = new Path2D.Float
         path.moveTo(size.width / 2, 0)
         path.lineTo(0, size.height / 2)
         path.lineTo(size.width / 2, size.height)
-        path.closePath
+        path.closePath()
         g2.fill(path)
     }
   }
 
-  private def initPopup : Unit = {
+  private def initPopup() : Unit = {
     val tapePlayItem = new JMenuItem("Press play")
     tapePlayItem.addActionListener(_ => datassette.pressPlay)
     pop.add(tapePlayItem)

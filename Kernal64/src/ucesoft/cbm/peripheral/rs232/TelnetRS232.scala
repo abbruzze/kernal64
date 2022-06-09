@@ -1,9 +1,9 @@
 package ucesoft.cbm.peripheral.rs232
 
-import java.io.IOException
-
-import org.apache.commons.net.telnet.{TelnetClient, TelnetInputListener, TelnetNotificationHandler}
+import org.apache.commons.net.telnet.TelnetClient
 import ucesoft.cbm.{Clock, ClockEvent, Log}
+
+import java.io.IOException
 
 object TelnetRS232 extends TelnetRS232
 
@@ -46,7 +46,7 @@ class TelnetRS232 extends StreamRS232 {
     config = conf
   }
   
-  override def connectionInfo = config
+  override def connectionInfo: String = config
   
   override def setEnabled(enabled:Boolean) : Unit = {
     val lastEnabled = isEnabled    
@@ -54,7 +54,7 @@ class TelnetRS232 extends StreamRS232 {
     if (enabled) {
       if (lastEnabled) {
         Log.info(s"Disconnecting from $host...")
-        try { client.disconnect } catch { case _:Throwable => }
+        try { client.disconnect() } catch { case _:Throwable => }
         super.setEnabled(false)
       }
       if (host != "") {
@@ -84,9 +84,9 @@ class TelnetRS232 extends StreamRS232 {
   }
 
   override def disconnect : Unit = {
-    try { client.disconnect } catch { case _:Throwable => }
+    try { client.disconnect() } catch { case _:Throwable => }
     super.disconnect
   }
   
-  override def toString = componentID + (if (isEnabled) "(enabled)" else "")
+  override def toString: String = componentID + (if (isEnabled) "(enabled)" else "")
 }

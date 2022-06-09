@@ -1,25 +1,26 @@
 package ucesoft.cbm.trace
 
-import java.io.PrintWriter
 import ucesoft.cbm.cpu.Memory
+
+import java.io.PrintWriter
 
 sealed trait BreakType {
   def isBreak(address:Int,irq:Boolean,nmi:Boolean) : Boolean
 }
 case class BreakEqual(address:Int) extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = this.address == address
+  def isBreak(address:Int,irq:Boolean,nmi:Boolean): Boolean = this.address == address
   override def toString: String = f"breaks at $address%04X"
 }
 case class BreakSet(addressSet:Set[Int]) extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = addressSet.contains(address)
+  def isBreak(address:Int,irq:Boolean,nmi:Boolean): Boolean = addressSet.contains(address)
   override def toString: String = f"breaks in ${addressSet.map(a => f"$a%04X").mkString("{ ",","," }")}"
 }
 case class BreakIn(fromAddress:Int,toAddress:Int) extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = address >= fromAddress && address <= toAddress
+  def isBreak(address:Int,irq:Boolean,nmi:Boolean): Boolean = address >= fromAddress && address <= toAddress
   override def toString: String = f"breaks between $fromAddress%04X and $toAddress%04X"
 }
 case class BreakOut(fromAddress:Int,toAddress:Int) extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = address < fromAddress || address > toAddress
+  def isBreak(address:Int,irq:Boolean,nmi:Boolean): Boolean = address < fromAddress || address > toAddress
   override def toString: String = f"breaks out of $fromAddress%04X and $toAddress%04X"
 }
 object NoBreak extends BreakType {
@@ -27,11 +28,11 @@ object NoBreak extends BreakType {
   override def toString: String = "no breaks set"
 }
 object IRQBreak extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = irq
+  def isBreak(address:Int,irq:Boolean,nmi:Boolean): Boolean = irq
   override def toString: String = "breaks if IRQ"
 }
 object NMIBreak extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = nmi
+  def isBreak(address:Int,irq:Boolean,nmi:Boolean): Boolean = nmi
   override def toString: String = "breaks if NMI"
 }
 

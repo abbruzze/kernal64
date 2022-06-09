@@ -1,12 +1,10 @@
 package ucesoft.cbm.cpu.asm
 
-import java.io.{File, IOException,PrintWriter}
+import ucesoft.cbm.cpu.CPU65xx.Mode._
+import ucesoft.cbm.cpu.asm.AsmEvaluator._
+import ucesoft.cbm.cpu.asm.AsmParser._
 
-import AsmParser._
-import ucesoft.cbm.cpu.CPU65xx._
-import Mode._
-import AsmEvaluator._
-
+import java.io.{File, IOException, PrintWriter}
 import scala.util.parsing.input.Position
 
 class CompilerException(val msg:String,val statement:Option[AsmParser.Statement]) extends Exception(msg)
@@ -50,7 +48,7 @@ class ByteCodeBlock(_org:Int,var name:Option[String],private var _orgType:ORGTyp
     PC += offset
   }
   
-  def size = PC - org
+  def size: Int = PC - org
   
   def asmStatements : List[ByteCodeStatement] = asmList.toList
   
@@ -122,7 +120,7 @@ class ByteCodeBlock(_org:Int,var name:Option[String],private var _orgType:ORGTyp
       }
   }
   
-  override def toString = {
+  override def toString: String = {
     val sb = new StringBuffer(s"ByteCodeBlock[${org.toHexString},$name,$size] {\n")
     for(s <- asmList) sb.append(s"\t$s\n")
     sb.append("}")
@@ -139,7 +137,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
   private class Context(val name:String,val isLocal:Boolean,val enclosedModule:String = STD_MODULE_NAME) extends EvaluationContext {
     private case class MultilabelInfo(label:String,addresses:List[Int])
 
-    val console = (s : String) => AsmCompiler.this.console.println(s)
+    val console: String => Unit = (s : String) => AsmCompiler.this.console.println(s)
     private val vars = new collection.mutable.HashMap[ModuleRef, Variable]
     private val labels = new collection.mutable.HashMap[String, MultilabelInfo]
     private val structs = new collection.mutable.HashMap[ModuleRef,Struct]
@@ -204,11 +202,11 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
     }
     
     def findVar(varName:String,module:Option[String],forceEnclosingModule:Option[String] = None) : Option[Variable] = findRef(varName,module,vars,forceEnclosingModule)
-    def defineVar(varName:String,module:Option[String],value:RuntimeValue,isConstant:Boolean,isPrivate:Boolean) = {
+    def defineVar(varName:String,module:Option[String],value:RuntimeValue,isConstant:Boolean,isPrivate:Boolean): Boolean = {
       val moduleName = module.getOrElse(enclosedModule)
       vars.put(ModuleRef(varName,moduleName),Variable(value,isConstant,isPrivate,moduleName,this,varName)).isDefined
     }
-    def updateVar(varName:String,module:Option[String],value:RuntimeValue) = {
+    def updateVar(varName:String,module:Option[String],value:RuntimeValue): AsmEvaluator.VariableUpdate.Value = {
       //println(s"Updating variable $varName $module on $vars")
       findVar(varName,module) match {
         case Some(v@Variable(_,false,_,m,_,_)) =>
@@ -228,21 +226,21 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
       }
     }
     
-    def clearVars = {
+    def clearVars(): Unit = {
       vars.clear
       structs.clear
       stackCounter = 0
     }
     
     def findStruct(structName:String,module:Option[String],forceEnclosingModule:Option[String] = None) : Option[Struct] = findRef(structName,module,structs)
-    def defineStruct(structName:String,module:Option[String],fields:List[String],isPrivate:Boolean) = {
+    def defineStruct(structName:String,module:Option[String],fields:List[String],isPrivate:Boolean): Boolean = {
       val moduleName = module.getOrElse(enclosedModule)
       structs.put(ModuleRef(structName,moduleName),Struct(structName,moduleName,this,isPrivate,fields)).isDefined
     }
     
     def evalUserFunction(name:String,module:Option[String],pars:List[RuntimeValue]) : Option[RuntimeValue] = None // not implemented
     
-    def content = {
+    def content: String = {
       val sb = new StringBuffer(s"Context($name,$isLocal) {\n")
       sb.append(s"\tVARS=$vars\n")
       sb.append(s"\tLABS=$labels\n")
@@ -262,7 +260,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
     private val top : EvaluationContext = newStack("top",false,Some(STD_MODULE_NAME),false)
     private var _linking = false
     
-    def linking = _linking
+    def linking: Boolean = _linking
     def linking_=(l:Boolean) : Unit = {
       require(isTop)
       _linking = true
@@ -301,7 +299,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
     private def labelPathOf(path:String,label:String) = label + "." + path
     private def labelPaths(label:String) : List[String] = paths map { labelPathOf(_,label) }
     
-    def console = ctx.console
+    def console: String => Unit = ctx.console
     def findLabel(label:String) : Option[Int] = {
       if (label == "_") Some(pc())
       else
@@ -312,11 +310,11 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
       }
       else labelPaths(label) flatMap top.findLabel headOption
     }
-    def defineLabel(label:String,address:Int) = {
+    def defineLabel(label:String,address:Int): Boolean = {
       top.defineLabel(labelPathOf(currentPathOf(stack),label),address)
     }
     
-    def currentLabel(label:String) = labelPathOf(currentPathOf(stack),label)
+    def currentLabel(label:String): String = labelPathOf(currentPathOf(stack),label)
     
     private def findVarInLocal(ctx:Context,name:String,module:Option[String]) : Option[Variable] = {
       // find in local & global only
@@ -353,8 +351,8 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
         }
       )      
     }
-    def defineVar(varName:String,module:Option[String],value:RuntimeValue,isConstant:Boolean,isPrivate:Boolean) = ctx.defineVar(varName,module,value,isConstant,isPrivate)
-    def updateVar(varName:String,module:Option[String],value:RuntimeValue) = {
+    def defineVar(varName:String,module:Option[String],value:RuntimeValue,isConstant:Boolean,isPrivate:Boolean): Boolean = ctx.defineVar(varName,module,value,isConstant,isPrivate)
+    def updateVar(varName:String,module:Option[String],value:RuntimeValue): AsmEvaluator.VariableUpdate.Value = {
       if (ctx.isLocal) {
         findVarInLocal(ctx,varName,module) match {
           case Some(v) =>
@@ -387,7 +385,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
       )      
     }
     
-    def defineStruct(structName:String,module:Option[String],fields:List[String],isPrivate:Boolean) = {
+    def defineStruct(structName:String,module:Option[String],fields:List[String],isPrivate:Boolean): Boolean = {
       ctx.defineStruct(structName,module,fields,isPrivate)
     }
     
@@ -417,7 +415,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
   // ======================================================================================  
   private var byteCodeBlock : ByteCodeBlock = _ 
   private val byteCodeBlocks = new collection.mutable.ListBuffer[ByteCodeBlock]
-  implicit private val ctx = new StackEvaluationContext(runFunction,() => byteCodeBlock.pc)
+  implicit private val ctx: StackEvaluationContext = new StackEvaluationContext(runFunction, () => byteCodeBlock.pc)
 
   @inline private def checkCondition(cond:Expr,statementType:String,s:Statement) : Boolean = {
     Evaluator.evalExpr(cond) match {          
@@ -732,7 +730,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
     }
   }
   
-  private def init  : Unit = {
+  private def init()  : Unit = {
     byteCodeBlock = new ByteCodeBlock(0,Some("default"))
     byteCodeBlocks.clear
     byteCodeBlocks += byteCodeBlock
@@ -835,7 +833,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
     byteCodeBlocks.toList
   }
   
-  def printStack  : Unit = {
+  def printStack()  : Unit = {
     println(ctx.peek.asInstanceOf[Context].content)
   }
 }

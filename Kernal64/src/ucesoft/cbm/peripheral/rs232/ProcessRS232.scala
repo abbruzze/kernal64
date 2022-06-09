@@ -22,7 +22,7 @@ object ProcessRS232 extends StreamRS232 {
     config = conf
   }
   
-  override def connectionInfo = config
+  override def connectionInfo: String = config
   
   override def setEnabled(enabled:Boolean) : Unit = {
     val lastEnabled = isEnabled
@@ -41,7 +41,7 @@ object ProcessRS232 extends StreamRS232 {
   
   override def disconnect : Unit = {
     try {
-      if (process != null) process.destroy
+      if (process != null) process.destroy()
       super.disconnect
       Log.info(s"Process $processStr terminated")
     }
@@ -50,5 +50,5 @@ object ProcessRS232 extends StreamRS232 {
     }
   }
   
-  override def toString = componentID + (if (isEnabled) "(enabled)" else "")
+  override def toString: String = componentID + (if (isEnabled) "(enabled)" else "")
 }

@@ -1,13 +1,13 @@
 package ucesoft.cbm.misc
 
+import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.formats.Diskette
+
 import java.awt.Dimension
 import java.awt.event.{MouseAdapter, MouseEvent}
 import java.beans.{PropertyChangeEvent, PropertyChangeListener}
 import java.io.File
-
 import javax.swing.{JFileChooser, JScrollPane}
-import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.formats.Diskette
 
 class D64Canvas(fc:JFileChooser,charRom:Memory,c64Mode:Boolean) extends CBMCanvas(charRom) with PropertyChangeListener {
 	var sp : JScrollPane = _

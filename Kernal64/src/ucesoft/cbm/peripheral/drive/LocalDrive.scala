@@ -1,20 +1,16 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.peripheral.bus.IECBus
-import java.io.File
-import ucesoft.cbm.peripheral.bus.BusDataIterator
-import java.io.IOException
-import java.io.FileInputStream
-import java.io.DataInputStream
-import java.io.FileOutputStream
-import language.postfixOps
 import ucesoft.cbm.formats.Diskette
+import ucesoft.cbm.peripheral.bus.{BusDataIterator, IECBus}
+
+import java.io._
+import scala.language.postfixOps
 
 class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device) {
-  val driveType = DriveType.LOCAL
+  val driveType: DriveType.Value = DriveType.LOCAL
   val componentID = "Local Drive"
-  val formatExtList = Nil
-  override val busid = "LocalDrive_" + device
+  val formatExtList: List[String] = Nil
+  override val busid: String = "LocalDrive_" + device
   
   bus.registerListener(this)
   
@@ -24,7 +20,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   final private[this] val STATUS_WELCOME = 73
   final private[this] val STATUS_IO_ERROR = 74
   final private[this] val STATUS_CHANNEL_ERROR = 1
-  protected val ERROR_CODES = Map(
+  protected val ERROR_CODES: Map[Int, String] = Map(
     STATUS_OK -> "OK",
     STATUS_FILE_NOT_FOUND -> "FILE NOT FOUND",
     STATUS_WELCOME -> "KERNAL64 LOCAL DRIVE DOS",
@@ -39,8 +35,8 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   
   def reset : Unit = {}
   
-  def getCurrentDir = currentDir
-  def setCurrentDir(dir:File) = currentDir = dir
+  def getCurrentDir: File = currentDir
+  def setCurrentDir(dir:File): Unit = currentDir = dir
   
   protected def getDirectoryEntries(path:String) : List[DirEntry] = {
     new File(path).listFiles map { f => DirEntry(f.getName,f.length.toInt,f.isDirectory) } toList
@@ -58,7 +54,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
         try {
           val in = new DataInputStream(new FileInputStream(file))
           in.readFully(buffer)
-          in.close
+          in.close()
           setStatus(STATUS_OK)
           import BusDataIterator._
           Some(new ArrayDataIterator(buffer))
@@ -112,11 +108,11 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
       }
       catch {
         case io:IOException =>
-          io.printStackTrace
+          io.printStackTrace()
           setStatus(STATUS_IO_ERROR)
       }
       finally {
-        if (out != null) out.close
+        if (out != null) out.close()
       }
     }
     setStatus(STATUS_OK)

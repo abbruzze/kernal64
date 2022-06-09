@@ -1,15 +1,15 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponent, CBMComponentType}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 import javax.swing.SwingUtilities
 
 abstract class RWHeadController(protected var floppy:Floppy,
                        ledListener:DriveLedListener) extends CBMComponent {
-  val componentType = CBMComponentType.INTERNAL
+  val componentType: Type = CBMComponentType.INTERNAL
   
   protected var isWriting = false
   protected var motorOn = false
@@ -41,7 +41,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
   )
     
   protected var speedZone = 3
-  protected var bitCycleWait = rotationCyclesForBit(speedZone)
+  protected var bitCycleWait: Double = rotationCyclesForBit(speedZone)
   protected var rotationCycleCounter = 0.0  
   protected var bitCounter = 0
   protected var lastRead = 0
@@ -69,11 +69,11 @@ abstract class RWHeadController(protected var floppy:Floppy,
   }
   
   final def isWriteProtected : Boolean = writeProtect | floppy.isReadOnly
-  final def setWriteProtected(wp:Boolean) = writeProtect = wp
+  final def setWriteProtected(wp:Boolean): Unit = writeProtect = wp
   def isOnIndexHole : Boolean = floppy.isOnIndexHole
-  final def getCurrentFileName = currentFilename
-  final def resetByteReadySignal = byteReadySignal = 1
-  final def getByteReadySignal = byteReadySignal
+  final def getCurrentFileName: String = currentFilename
+  final def resetByteReadySignal(): Unit = byteReadySignal = 1
+  final def getByteReadySignal: Int = byteReadySignal
   final def getLastByteReady : Boolean = {
     val lbr = lastByteReady
     lastByteReady = false
@@ -113,7 +113,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
           if (track != lastNotifiedTrack) {
             lastNotifiedTrack = track
             SwingUtilities.invokeLater(new Runnable {
-              def run : Unit = {
+              def run() : Unit = {
                 ledListener.moveTo(track,sector,halfTrack)
               }
             })
@@ -123,7 +123,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
             lastNotifiedTrack = track
             lastNotifiedSector = sec
             SwingUtilities.invokeLater(new Runnable {
-              def run : Unit = {
+              def run() : Unit = {
                 ledListener.moveTo(track,sector,halfTrack)
               }
             })
@@ -131,7 +131,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
       }
     }
   }
-  private def rotateDisk : Unit = {
+  private def rotateDisk() : Unit = {
     rotationCycleCounter += bitCycleWait
     if (rotationCycleCounter >= 1) {
       bitCounter += 1
@@ -191,11 +191,11 @@ abstract class RWHeadController(protected var floppy:Floppy,
  def changeSide(side:Int) : Unit
  def isSync : Boolean
  def moveHead(moveOut: Boolean) : Unit
- protected def readNextBit : Unit
- protected def writeNextBit : Unit
+ protected def readNextBit() : Unit
+ protected def writeNextBit() : Unit
  // ===================================================================================
   
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Motor on",motorOn.toString)
     properties.setProperty("Writing",isWriting.toString)
     properties.setProperty("Track","%2d".format(track))

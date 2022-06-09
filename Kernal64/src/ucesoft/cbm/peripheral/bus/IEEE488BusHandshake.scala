@@ -20,11 +20,11 @@ abstract class IEEE488BusHandshake(val name:String, bus: IEEE488Bus) extends CBM
 
   protected var atnLow = false
   protected var eoiLow = false
-  protected var role = IDLE
+  protected var role: Role.Value = IDLE
   protected var sendScheduled = false
 
   protected val TALK_WAIT_ATN_TIMEOUT = 300 // 200 / 2000000
-  protected val clk = Clock.systemClock
+  protected val clk: Clock = Clock.systemClock
 
   protected class DeviceLineListener extends LineListener {
     override def ATNchanged(id:Long,newValue: IEEE488Bus.LineValue.Value): Unit = {

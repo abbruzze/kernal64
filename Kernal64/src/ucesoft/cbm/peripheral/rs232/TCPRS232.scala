@@ -1,8 +1,8 @@
 package ucesoft.cbm.peripheral.rs232
 
-import java.io.IOException
-
 import ucesoft.cbm.Log
+
+import java.io.IOException
 import java.net.Socket
 
 object TCPRS232 extends TCPRS232
@@ -17,7 +17,7 @@ class TCPRS232 extends StreamRS232 {
   
   def getDescription = "<html><b>Connects to a TCP server</b>.<br>Connection String syntax: <i>host:port,baud,bits,parity,stops</i> to connect or<br><i>baud,bits,parity,stops</i> to use 'at' modem commands</html>"
   
-  override def connectionInfo = hostAndConf
+  override def connectionInfo: String = hostAndConf
   
   /**
    * Syntax: host:port,baud,bits,parity,stops
@@ -73,5 +73,5 @@ class TCPRS232 extends StreamRS232 {
     }
   }
   
-  override def toString = componentID + (if (isEnabled) "(enabled)" else "")
+  override def toString: String = componentID + (if (isEnabled) "(enabled)" else "")
 }

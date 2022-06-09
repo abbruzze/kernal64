@@ -1,13 +1,12 @@
 package ucesoft.cbm.peripheral.vic
 
 import ucesoft.cbm.cpu.RAMComponent
-import ucesoft.cbm.expansion.LastByteReadMemory
-import ucesoft.cbm.expansion.ExpansionPortConfigurationListener
+import ucesoft.cbm.expansion.{ExpansionPortConfigurationListener, LastByteReadMemory}
 
 trait VICMemory extends RAMComponent with LastByteReadMemory with ExpansionPortConfigurationListener {
   def getBank : Int
   
-  final def getBankAddress = getBank << 14
+  final def getBankAddress: Int = getBank << 14
   
   def setVideoBank(bank: Int) : Unit
   

@@ -27,9 +27,9 @@ object Preferences {
   val PREF_VICIINEW           = "viciinew"
   val PREF_WARPONLOAD         = "warponload"
   val PREF_PRGASDISK          = "prg-as-disk"
-  val PREF_DRIVE_X_ENABLED    = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-enabled").toArray
-  val PREF_DRIVE_X_FILE       = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-file").toArray
-  val PREF_DRIVE_X_TYPE       = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-type").toArray
+  val PREF_DRIVE_X_ENABLED: Array[String] = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-enabled").toArray
+  val PREF_DRIVE_X_FILE: Array[String] = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-file").toArray
+  val PREF_DRIVE_X_TYPE: Array[String] = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-type").toArray
   val PREF_DRIVE12LOCALPATH   = "drive12-local-path"
   val PREF_WRITEONDISK        = "write-on-disk"
   val PREF_CART               = "cart"
@@ -77,17 +77,17 @@ object Preferences {
   }
 
   implicit object StringPreferenceConv extends PreferenceConv[String] {
-    def convert(value:String) = value
+    def convert(value:String): String = value
     val default = ""
     val consume = 1
   }
   implicit object IntPreferenceConv extends PreferenceConv[Int] {
-    def convert(value:String) = value.toInt
+    def convert(value:String): Int = value.toInt
     val default = 0
     val consume = 1
   }
   implicit object BooleanPreferenceConv extends PreferenceConv[Boolean] {
-    def convert(value:String) = value.toBoolean
+    def convert(value:String): Boolean = value.toBoolean
     val default = false
     val consume = 0
   }
@@ -106,7 +106,7 @@ object Preferences {
 
     def addChangeListener(l:PreferenceChangeListener) : Unit = if (!listeners.contains(l)) listeners ::= l
 
-    def notifyListeners : Unit = for(l <- listeners) l.preferenceHasChanged(this)
+    def notifyListeners() : Unit = for(l <- listeners) l.preferenceHasChanged(this)
 
     def load(p:Properties) : Unit = {
       p.getProperty(cmdLine) match {

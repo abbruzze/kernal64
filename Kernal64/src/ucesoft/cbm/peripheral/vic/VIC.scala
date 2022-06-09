@@ -1,15 +1,15 @@
 package ucesoft.cbm.peripheral.vic
 
-import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.{CBMComponent, CBMComponentType, Chip, ChipID, Clock}
-import Palette._
-import ucesoft.cbm.c64.C64VICMemory
-import ucesoft.cbm.cpu.RAMComponent
-
-import annotation.switch
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.ChipID.ID
+import ucesoft.cbm._
+import ucesoft.cbm.cpu.{Memory, RAMComponent}
+import ucesoft.cbm.peripheral.vic.Palette._
 import ucesoft.cbm.peripheral.vic.coprocessor.{VICContext, VICCoprocessor}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
+import scala.annotation.switch
 
 
 final class VIC(mem: VICMemory,
@@ -23,7 +23,7 @@ final class VIC(mem: VICMemory,
   val length = 1024
   val isActive = true
   val startAddress = 0xD000
-  val id = ChipID.VIC
+  val id: ID = ChipID.VIC
 
   private[this] var model : VICModel = _
 
@@ -280,8 +280,8 @@ final class VIC(mem: VICMemory,
                              var isMulticolor : Boolean = false,
                              var color: Int = 0,
                              var dataPriority: Boolean = false) extends CBMComponent {
-    val componentID = "Sprite " + index
-    val componentType = CBMComponentType.INTERNAL
+    val componentID: String = "Sprite " + index
+    val componentType: Type = CBMComponentType.INTERNAL
 
     private[this] val DMA_INDEX = 1 << index
     private[this] var _enabled = false
@@ -300,14 +300,14 @@ final class VIC(mem: VICMemory,
     private[this] val pixels = Array.fill[Int](8)(PIXEL_TRANSPARENT)
     private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
 
-    def enabled = _enabled
-    def enabled_=(enabled:Boolean) = {
+    def enabled: Boolean = _enabled
+    def enabled_=(enabled:Boolean): Unit = {
       _enabled = enabled
     }
 
-    override def toString = s"Sprite #${index} mcCounter=${mcCounter} data=${Integer.toBinaryString(gdata & 0xFFFFFF)} en=${_enabled} hasPixels=${hasPixels} x=${x} y=${y} xexp=${xexp} yexp=${_yexp} color=${color} mcm=${isMulticolor} pr=${dataPriority} memP=${memoryPointer} mcbase=${mcbase} mc=${mc} dma=${dma} display=${display} ff=${expansionFF}"
+    override def toString = s"Sprite #$index mcCounter=$mcCounter data=${Integer.toBinaryString(gdata & 0xFFFFFF)} en=${_enabled} hasPixels=$hasPixels x=$x y=$y xexp=$xexp yexp=${_yexp} color=$color mcm=$isMulticolor pr=$dataPriority memP=$memoryPointer mcbase=$mcbase mc=$mc dma=$dma display=$display ff=$expansionFF"
 
-    override def getProperties = {
+    override def getProperties: Properties = {
       properties.setProperty("Enabled",_enabled.toString)
       properties.setProperty("X",x.toString)
       properties.setProperty("Y",y.toString)
@@ -319,8 +319,8 @@ final class VIC(mem: VICMemory,
       properties
     }
 
-    final def yexp = _yexp
-    final def displayable = display
+    final def yexp: Boolean = _yexp
+    final def displayable: Boolean = display
 
     final def yexp_=(v: Boolean) : Unit = {
       if (!v && _yexp) {
@@ -330,7 +330,7 @@ final class VIC(mem: VICMemory,
       _yexp = v
     }
 
-    final def getPixels = pixels
+    final def getPixels: Array[Int] = pixels
 
     final def reset : Unit = {
       _enabled = false
@@ -357,7 +357,7 @@ final class VIC(mem: VICMemory,
 
     def init : Unit = {}
 
-    @inline final def resetSprite : Unit = {
+    @inline final def resetSprite() : Unit = {
       if (hasPixels) {
         hasPixels = false
         Array.copy(ALL_TRANSPARENT,0,pixels,0,8)
@@ -365,7 +365,7 @@ final class VIC(mem: VICMemory,
       if (!display) spritesDisplayedMask &= ~DMA_INDEX
     }
 
-    final def producePixels : Unit = {
+    final def producePixels() : Unit = {
       //var xcoord = xCoord(rasterCycleToDraw) // TODO: PIPE
       var xcoord = xCoord(rasterCycle)
       var i = 0
@@ -461,7 +461,7 @@ final class VIC(mem: VICMemory,
       } // idle access
     }
 
-    final def check16 : Unit = {
+    final def check16() : Unit = {
       if (expansionFF) {
         mcbase = mc
         if (mcbase == 63) {
@@ -483,7 +483,7 @@ final class VIC(mem: VICMemory,
       }
     }
 
-    final def check58 : Unit = {
+    final def check58() : Unit = {
       mc = mcbase
       if (dma) {
         if (_enabled && y == (rasterLine & 0xFF)) {
@@ -549,7 +549,7 @@ final class VIC(mem: VICMemory,
 
   private[this] class BorderShifter extends CBMComponent {
     val componentID = "BorderShifter"
-    val componentType = CBMComponentType.INTERNAL
+    val componentType: Type = CBMComponentType.INTERNAL
     private[this] val ALL_TRANSPARENT = Array.fill(8)(PIXEL_TRANSPARENT)
     private[this] val pixels = Array.fill(8)(PIXEL_TRANSPARENT)
     private[this] var lastBorderColor = -1
@@ -559,7 +559,7 @@ final class VIC(mem: VICMemory,
 
     final def getPixels : Array[Int] = if (isBlank || !drawBorderOpt) ALL_TRANSPARENT else pixels
 
-    final def producePixels  : Unit = {
+    final def producePixels()  : Unit = {
       if (!drawBorderOpt) return
 
       if (!isBlank) {
@@ -587,7 +587,7 @@ final class VIC(mem: VICMemory,
       lastBorderColor = borderColor
     }
 
-    @inline private def checkVertical: Unit = {
+    @inline private def checkVertical(): Unit = {
       //if (rasterCycle == model.RASTER_CYCLES) {
         // 2 If the Y coordinate reaches the bottom comparison value in cycle 63, the
         //   vertical border flip flop is set.
@@ -636,12 +636,12 @@ final class VIC(mem: VICMemory,
    */
   private class GFXShifter extends CBMComponent {
     val componentID = "GFXShifter"
-    val componentType = CBMComponentType.INTERNAL
+    val componentType: Type = CBMComponentType.INTERNAL
     private[this] var gdata,gdataLatch = 0
     private[this] val pixels = Array.fill(8)(PIXEL_TRANSPARENT)
     private[this] var mcFlop = 0
 
-    final def getPixels = pixels
+    final def getPixels: Array[Int] = pixels
 
     final def init : Unit = {}
     final def reset : Unit = {
@@ -804,7 +804,7 @@ final class VIC(mem: VICMemory,
     sprites foreach { add _ }
   }
 
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Video matrix addess",Integer.toHexString(videoMatrixAddress))
     properties.setProperty("Character address",Integer.toHexString(characterAddress))
     properties.setProperty("Bitmap address",Integer.toHexString(bitmapAddress))
@@ -911,16 +911,16 @@ final class VIC(mem: VICMemory,
 
   def getCoprocessor : Option[VICCoprocessor] = Option(coprocessor)
 
-  def setDisplay(display: Display) = {
+  def setDisplay(display: Display): Unit = {
     this.display = display
     displayMem = display.displayMem
 
     display.setClipArea(model.BLANK_LEFT_CYCLE << 3, model.BLANK_TOP_LINE + 1,model.BLANK_RIGHT_CYCLE << 3, model.BLANK_BOTTOM_LINE)
   }
 
-  def enableLightPen(enabled: Boolean) = lightPenEnabled = enabled
+  def enableLightPen(enabled: Boolean): Unit = lightPenEnabled = enabled
 
-  def triggerLightPen : Unit = {
+  def triggerLightPen() : Unit = {
     if (canUpdateLightPenCoords) {
       canUpdateLightPenCoords = false
       lightPenXYCoord(0) = ((xCoord(rasterCycle) >> 1) & 0xFF) + (if (isNewVICModel) 1 else 2)
@@ -1122,7 +1122,7 @@ final class VIC(mem: VICMemory,
     }
   }
 
-  @inline private def checkRasterIRQ : Unit = {
+  @inline private def checkRasterIRQ() : Unit = {
     if (rasterLine == rasterLatch) {
       if (!rasterIRQTriggered) {
         rasterIRQTriggered = true
@@ -1132,7 +1132,7 @@ final class VIC(mem: VICMemory,
     else rasterIRQTriggered = false
   }
 
-  final def clock : Unit = {
+  final def clock() : Unit = {
     if (c128TestBitEnabled) {
       rasterCycle = 0
       updateRasterLine
@@ -1287,7 +1287,7 @@ final class VIC(mem: VICMemory,
     ecmDelay = ecm
   }
 
-  private def refreshAccess : Unit = {
+  private def refreshAccess() : Unit = {
     mem.read(0x3F00 | ref,ChipID.VIC)
     ref = (ref - 1) & 0xFF // DRAM REFRESH
     refreshCycle = true
@@ -1304,7 +1304,7 @@ final class VIC(mem: VICMemory,
   private[this] var showDebug = false
   def setShowDebug(showDebug:Boolean) : Unit = this.showDebug = showDebug
 
-  @inline private[this] def updateRasterLine : Unit = {
+  @inline private[this] def updateRasterLine() : Unit = {
     displayLine += 1
     if (displayLine == model.RASTER_LINES) displayLine = 0
     rasterLine = displayLine + model.RASTER_OFFSET
@@ -1329,7 +1329,7 @@ final class VIC(mem: VICMemory,
     }
   }
 
-  @inline private[this] def drawPixel(index: Int, y: Int, pixel: Int) = {
+  @inline private[this] def drawPixel(index: Int, y: Int, pixel: Int): Unit = {
     val color = VIC_RGB(pixel & 0x0F)
     if (displayMem(index) != color) {
       displayMem(index) = color
@@ -1341,7 +1341,7 @@ final class VIC(mem: VICMemory,
     }
   }
 
-  @inline private def drawCycle : Unit = {
+  @inline private def drawCycle() : Unit = {
     // PIPELINE ===================
     /*
     rasterCycleToDraw = (rasterCycleToDrawPipe >> 8) & 0xFF
@@ -1422,7 +1422,7 @@ final class VIC(mem: VICMemory,
     lastColorReg = 0xFF
   }
 
-  @inline private def checkAndSendIRQ : Unit = {
+  @inline private def checkAndSendIRQ() : Unit = {
     if ((interruptControlRegister & interruptMaskRegister) == 0) {
       if ((interruptControlRegister & 0x80) != 0) {
         interruptControlRegister &= 0x7f
@@ -1435,7 +1435,7 @@ final class VIC(mem: VICMemory,
       irqAction(true)
     }
   }
-  @inline private def rasterLineEqualsLatch : Unit = {
+  @inline private def rasterLineEqualsLatch() : Unit = {
     if ((interruptControlRegister & 1) == 0) {
       interruptControlRegister |= 1
       checkAndSendIRQ
@@ -1463,7 +1463,7 @@ final class VIC(mem: VICMemory,
   /**
    * To be called on bad lines
    */
-  @inline private def cAccess : Unit = {
+  @inline private def cAccess() : Unit = {
     if (_baLow) {
       val busAvailable = clk.currentCycles - baLowFirstCycle > 2
       if (busAvailable) {
@@ -1515,11 +1515,11 @@ final class VIC(mem: VICMemory,
    */
   @inline private def isBadLine = rasterLine >= 0x30 && rasterLine <= 0xF7 && ((rasterLine & 7) == yscroll) && denOn30
 
-  def getMemory = mem
+  def getMemory: VICMemory = mem
 
   def c128TestBitEnabled(enabled:Boolean) : Unit = c128TestBitEnabled = enabled
 
-  def isRefreshCycle = refreshCycle
+  def isRefreshCycle: Boolean = refreshCycle
 
   def set2MhzMode(enabled:Boolean) : Unit = _2MhzMode = enabled
 

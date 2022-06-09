@@ -1,18 +1,18 @@
 package ucesoft.cbm.game
 
-import java.net.URL
 import java.awt.Dimension
-import scala.concurrent.Future
+import java.net.URL
 import java.util.concurrent.atomic.AtomicInteger
-import concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 abstract class PouetSpi(genre:String) extends GameProvider {
   private case object LastConstraint extends SyncConstraint {
     override def toString = s"Last added"
   }  
   
-  val url = Some(new URL("https://www.pouet.net/"))
-  val iconURL = Some(new URL("https://content.pouet.net/logos/ewery_pouet2.png"))
+  val url: Option[URL] = Some(new URL("https://www.pouet.net/"))
+  val iconURL: Option[URL] = Some(new URL("https://content.pouet.net/logos/ewery_pouet2.png"))
   val gameIconPreferredSize = new Dimension(384,272)
   val version = "N/A"
   lazy val repository = new Repository(this)
@@ -26,7 +26,7 @@ abstract class PouetSpi(genre:String) extends GameProvider {
   @volatile private var interrupted = false
   private val constraints : List[SyncConstraint] = List(SyncAll,LastConstraint)
   
-  def setProgressListener(l:GameLoadingProgressListener) = progressListener = Some(l)
+  def setProgressListener(l:GameLoadingProgressListener): Unit = progressListener = Some(l)
   
   private def makeUrl(page:Int) = s"https://www.pouet.net/prodlist.php?type%5B%5D=$genre&order=release&platform%5B%5D=Commodore+64&page=$page"
   

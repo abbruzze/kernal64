@@ -1,19 +1,18 @@
 package ucesoft.cbm.misc
 
-import ucesoft.cbm.peripheral.drive.Drive
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
-import ucesoft.cbm.peripheral.drive.Floppy
+import ucesoft.cbm.{CBMComponent, CBMComponentType}
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.peripheral.drive.{Drive, Floppy}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 class FloppyComponent(device:Int,var drive:Drive,driveLed:DriveLed) extends CBMComponent {
-    val componentID = "Mounted floppy " + device
-    val componentType = CBMComponentType.FLOPPY
+    val componentID: String = "Mounted floppy " + device
+    val componentType: Type = CBMComponentType.FLOPPY
     final private[this] val deviceID = device - 8 
     
-    override def getProperties = {
+    override def getProperties: Properties = {
       val attachedDisk = drive.getFloppy      
       properties.setProperty("Floppy",if (!attachedDisk.isEmpty) attachedDisk.toString else "-")
       properties.setProperty("Track",if (!attachedDisk.isEmpty) attachedDisk.currentTrack.toString else "-")
@@ -25,7 +24,7 @@ class FloppyComponent(device:Int,var drive:Drive,driveLed:DriveLed) extends CBMC
     }
     
     def init  : Unit = {}
-    def reset = drive.getFloppy.reset
+    def reset: Unit = drive.getFloppy.reset
     
     // state
     protected def saveState(out:ObjectOutputStream) : Unit = {

@@ -11,15 +11,15 @@ import ucesoft.cbm.peripheral.printer.{MPS803GFXDriver, MPS803ROM, Printer}
 import ucesoft.cbm.peripheral.vic.Display
 import ucesoft.cbm.trace.{InspectPanelDialog, TraceDialog, TraceListener}
 
-import java.awt.{BorderLayout, Color, FlowLayout}
 import java.awt.event.{MouseAdapter, MouseEvent, WindowAdapter, WindowEvent}
-import java.io.{BufferedReader, File, FileInputStream, FileReader, FileWriter, IOException, InputStreamReader}
+import java.awt.{BorderLayout, Color, FlowLayout}
+import java.io._
 import java.util.Properties
 import javax.swing._
 
 object CBMComputer {
   def turnOn(computer : => CBMHomeComputer, args:Array[String]) : Unit = {
-    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
+    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName)
 
     val cbm = computer
     try {
@@ -39,7 +39,7 @@ object CBMComputer {
 abstract class CBMComputer extends CBMComponent {
   protected val cbmModel : CBMComputerModel
 
-  protected val TOTAL_DRIVES = Preferences.TOTALDRIVES
+  protected val TOTAL_DRIVES: Int = Preferences.TOTALDRIVES
   protected val APPLICATION_NAME : String
   protected val CONFIGURATION_FILENAME : String
   protected val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
@@ -66,7 +66,7 @@ abstract class CBMComputer extends CBMComponent {
   protected var display : Display = _
   protected var gifRecorder : JDialog = _
 
-  protected lazy val displayFrame = {
+  protected lazy val displayFrame: JFrame = {
     val f = new JFrame(s"$APPLICATION_NAME " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
       override def windowClosing(e:WindowEvent) : Unit = turnOff
@@ -79,9 +79,9 @@ abstract class CBMComputer extends CBMComponent {
 
   // memory & main cpu
   protected val mmu : Memory
-  protected lazy val cpu = CPU65xx.make(mmu)
+  protected lazy val cpu: CPU65xx = CPU65xx.make(mmu)
   // main chips
-  protected val clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
+  protected val clock: Clock = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
   // -------------------- TAPE -----------------
   protected val tapeAllowed = true
   protected var datassette : Datassette = _
@@ -90,18 +90,18 @@ abstract class CBMComputer extends CBMComponent {
   protected var device12Drive : Drive = _
   protected var device12DriveEnabled = false
   protected var canWriteOnDisk = true
-  protected val drivesRunning = Array.fill[Boolean](TOTAL_DRIVES)(true)
-  protected val drivesEnabled = Array.fill[Boolean](TOTAL_DRIVES)(true)
+  protected val drivesRunning: Array[Boolean] = Array.fill[Boolean](TOTAL_DRIVES)(true)
+  protected val drivesEnabled: Array[Boolean] = Array.fill[Boolean](TOTAL_DRIVES)(true)
   protected lazy val diskFlusher = new FloppyFlushUI(displayFrame)
-  protected val driveLeds = (for(d <- 0 until TOTAL_DRIVES) yield {
+  protected val driveLeds: Array[DriveLed] = (for(d <- 0 until TOTAL_DRIVES) yield {
     val led = new DriveLed(d + 8)
     led.addMouseListener(new MouseAdapter {
       override def mouseClicked(e: MouseEvent): Unit = attachDisk(d,false,isC64Mode)
     })
     led
   }).toArray
-  protected val floppyComponents = Array.ofDim[FloppyComponent](TOTAL_DRIVES)
-  protected val driveLedListeners = {
+  protected val floppyComponents: Array[FloppyComponent] = Array.ofDim[FloppyComponent](TOTAL_DRIVES)
+  protected val driveLedListeners: Array[AbstractDriveLedListener] = {
     (for(d <- 0 until TOTAL_DRIVES) yield {
       new AbstractDriveLedListener(driveLeds(d)) {
         if (d > 0) driveLeds(d).setVisible(false)
@@ -112,7 +112,7 @@ abstract class CBMComputer extends CBMComponent {
   protected var printerEnabled = false
   protected val printerGraphicsDriver = new MPS803GFXDriver(new MPS803ROM)
   protected val printer : Printer
-  protected lazy val printerDialog = {
+  protected lazy val printerDialog: JDialog = {
     val dialog = new JDialog(displayFrame,"Print preview")
     val sp = new JScrollPane(printerGraphicsDriver)
     sp.getViewport.setBackground(Color.BLACK)
@@ -126,12 +126,12 @@ abstract class CBMComputer extends CBMComponent {
     buttonPanel.add(clearButton)
     clearButton.addActionListener(_ => printerGraphicsDriver.clearPages )
     dialog.getContentPane.add("South",buttonPanel)
-    dialog.pack
+    dialog.pack()
     dialog
   }
   // -------------- MENU ITEMS -----------------
   protected val maxSpeedItem = new JCheckBoxMenuItem("Warp mode")
-  protected val loadFileItems = for(d <- 0 until TOTAL_DRIVES) yield new JMenuItem(s"Load file from attached disk ${d + 8} ...")
+  protected val loadFileItems: IndexedSeq[JMenuItem] = for(d <- 0 until TOTAL_DRIVES) yield new JMenuItem(s"Load file from attached disk ${d + 8} ...")
   protected val tapeMenu = new JMenu("Tape control...")
 
   // -------------------- TRACE ----------------
@@ -145,7 +145,7 @@ abstract class CBMComputer extends CBMComponent {
 
   protected val preferences = new Preferences
 
-  protected lazy val configuration = {
+  protected lazy val configuration: Properties = {
     val kernalConfigHome = System.getProperty("kernal.config",scala.util.Properties.userHome)
     val props = new Properties
     val propsFile = new File(new File(kernalConfigHome),CONFIGURATION_FILENAME)
@@ -168,7 +168,7 @@ abstract class CBMComputer extends CBMComponent {
 
   def turnOn(args:Array[String]) : Unit
 
-  def turnOff : Unit = {
+  def turnOff() : Unit = {
     if (!headless) saveSettings(preferences[Boolean](Preferences.PREF_PREFAUTOSAVE).getOrElse(false))
     for (d <- drives)
       d.getFloppy.close
@@ -218,10 +218,10 @@ abstract class CBMComputer extends CBMComponent {
         Log.info("Fatal error occurred: " + cpu + "-" + t)
         try Log.info(CPU65xx.disassemble(mmu,cpu.getCurrentInstructionPC).toString) catch { case _:Throwable => }
         t.printStackTrace(Log.getOut)
-        t.printStackTrace
+        t.printStackTrace()
         if (headless) {
           println(s"Fatal error occurred on cycle ${clock.currentCycles}: $cpu\n${CPU65xx.disassemble(mmu,cpu.getCurrentInstructionPC)}")
-          t.printStackTrace
+          t.printStackTrace()
           sys.exit(1)
         } // exit if headless
         JOptionPane.showMessageDialog(displayFrame,t.toString + " [PC=" + Integer.toHexString(cpu.getCurrentInstructionPC) + "]", "Fatal error",JOptionPane.ERROR_MESSAGE)
@@ -263,13 +263,13 @@ abstract class CBMComputer extends CBMComponent {
     configuration.setProperty(PREF_WRITEONDISK,"true")
   }
 
-  protected def saveConfigurationFile : Unit = {
+  protected def saveConfigurationFile() : Unit = {
     try {
       val kernalConfigHome = System.getProperty("kernal.config",scala.util.Properties.userHome)
       val propsFile = new File(new File(kernalConfigHome), CONFIGURATION_FILENAME)
       val out = new FileWriter(propsFile)
       configuration.store(out, "Kernal64 configuration file")
-      out.close
+      out.close()
     }
     catch {
       case _: IOException =>
@@ -281,17 +281,17 @@ abstract class CBMComputer extends CBMComponent {
     val kbef = new JFrame(s"Keyboard editor ($source)")
     val kbe = new KeyboardEditor(keyb,keyb.getKeyboardMapper,cbmModel)
     kbef.getContentPane.add("Center",kbe)
-    kbef.pack
+    kbef.pack()
     kbef.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
     kbef.setVisible(true)
   }
 
-  protected def showAbout  : Unit = {
+  protected def showAbout()  : Unit = {
     val about = new AboutCanvas(getCharROM,ucesoft.cbm.Version.VERSION.toUpperCase + " (" + ucesoft.cbm.Version.BUILD_DATE.toUpperCase + ")")
     JOptionPane.showMessageDialog(displayFrame,about,"About",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
   }
 
-  protected def showSettings : Unit = {
+  protected def showSettings() : Unit = {
     val settingsPanel = new SettingsPanel(preferences)
     JOptionPane.showMessageDialog(displayFrame,settingsPanel,"Settings",JOptionPane.INFORMATION_MESSAGE,new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
   }
@@ -312,12 +312,12 @@ abstract class CBMComputer extends CBMComponent {
     printer.setActive(enable)
   }
 
-  protected def showPrinterPreview : Unit = {
+  protected def showPrinterPreview() : Unit = {
     printerGraphicsDriver.checkSize
     printerDialog.setVisible(true)
   }
 
-  protected def printerSaveImage  : Unit = {
+  protected def printerSaveImage()  : Unit = {
     val fc = new JFileChooser
     fc.showSaveDialog(printerDialog) match {
       case JFileChooser.APPROVE_OPTION =>
@@ -361,7 +361,7 @@ abstract class CBMComputer extends CBMComponent {
     for(d <- 0 until TOTAL_DRIVES) drives(d).getFloppy.canWriteOnDisk = canWriteOnDisk
   }
 
-  protected def loadKeyboard  : Unit = {
+  protected def loadKeyboard()  : Unit = {
     JOptionPane.showConfirmDialog(displayFrame,"Would you like to set default keyboard or load a configuration from file ?","Keyboard layout selection", JOptionPane.YES_NO_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE) match {
       case JOptionPane.YES_OPTION =>
         configuration.remove(CONFIGURATION_KEYB_MAP_FILE)
@@ -384,7 +384,7 @@ abstract class CBMComputer extends CBMComponent {
                 showError("Keyboard..","Invalid keyboard layout file")
             }
             finally {
-              in.close
+              in.close()
             }
           case _ =>
         }
@@ -399,7 +399,7 @@ abstract class CBMComputer extends CBMComponent {
     if (!dontPlay) clock.play
   }
 
-  protected def makeDisk : Unit = {
+  protected def makeDisk() : Unit = {
     val fc = new JFileChooser
     fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
     fc.setFileView(new C64FileView)
@@ -417,7 +417,7 @@ abstract class CBMComputer extends CBMComponent {
     }
   }
 
-  protected def openGIFRecorder : Unit = gifRecorder.setVisible(true)
+  protected def openGIFRecorder() : Unit = gifRecorder.setVisible(true)
 
   protected def setMenu(enableCarts:Boolean,enableGames:Boolean) : Unit = {
     val menuBar = new JMenuBar
@@ -474,13 +474,13 @@ abstract class CBMComputer extends CBMComponent {
   protected def setTraceMenu(menu: JMenu): Unit
   protected def setGameMenu(menu: JMenu): Unit = {}
   protected def setHelpMenu(menu: JMenu): Unit
-  protected def showCartInfo : Unit = {}
+  protected def showCartInfo() : Unit = {}
 
-  protected def setGlobalCommandLineOptions : Unit = {}
+  protected def setGlobalCommandLineOptions() : Unit = {}
 
   protected def getCharROM : Memory
 
-  protected def initComputer : Unit
+  protected def initComputer() : Unit
 
   protected def handleDND(file:File,_reset:Boolean,autorun:Boolean) : Unit
 
@@ -490,7 +490,7 @@ abstract class CBMComputer extends CBMComponent {
 
   protected def setSettingsMenu(optionsMenu:JMenu) : Unit
 
-  protected def paste : Unit
+  protected def paste() : Unit
 
   protected def mainLoop(cycles:Long) : Unit
 

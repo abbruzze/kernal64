@@ -1,9 +1,9 @@
 package ucesoft.cbm.misc
 
-import java.io.File
-
-import javax.swing.JFileChooser
 import ucesoft.cbm.cpu.Memory
+
+import java.io.File
+import javax.swing.JFileChooser
 
 class T64Canvas(fc:JFileChooser,charRom:Memory,c64Mode:Boolean) extends D64Canvas(fc,charRom,c64Mode) {
   setToolTipText("")

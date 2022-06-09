@@ -1,7 +1,7 @@
 package ucesoft.cbm.formats
-import java.io.{ObjectInputStream, ObjectOutputStream, RandomAccessFile}
 import ucesoft.cbm.peripheral.drive.Floppy
 
+import java.io.{ObjectInputStream, ObjectOutputStream, RandomAccessFile}
 import scala.collection.mutable.ListBuffer
 
 class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
@@ -45,7 +45,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
                                      ---
                               total 1366
    */
-  protected lazy val TRACK_ALLOCATION = // Key = #track => Value = #sectors per track
+  protected lazy val TRACK_ALLOCATION: Map[Int, Int] = // Key = #track => Value = #sectors per track
     if (file.toUpperCase.endsWith(".D64"))
       (for (t <- 0 to 42) yield {
         if (t <= 17) (t, 21)
@@ -65,16 +65,16 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
       else (t,17)
     }).toMap
     
-  val isReadOnly = !new java.io.File(file).canWrite
+  val isReadOnly: Boolean = !new java.io.File(file).canWrite
   
   protected final val disk = new RandomAccessFile(file, if (isReadOnly) "r" else "rw")
   private[this] val absoluteSectorCache = new collection.mutable.HashMap[Int,Int]
   private[this] val _bam : BamInfo = bamInfo
   private[this] val trackChangeBitMap = Array.ofDim[Long](70)
   
-  @inline private def trackSectorModified(t:Int,s:Int) = trackChangeBitMap(t - 1) |= 1 << s
+  @inline private def trackSectorModified(t:Int,s:Int): Unit = trackChangeBitMap(t - 1) |= 1 << s
   @inline private def isTrackModified(t:Int) = trackChangeBitMap(t - 1) > 0
-  @inline private def clearModification = java.util.Arrays.fill(trackChangeBitMap,0)
+  @inline private def clearModification(): Unit = java.util.Arrays.fill(trackChangeBitMap,0)
   
   TOTAL_TRACKS // just to check for a valid track format
   
@@ -86,7 +86,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     gcr
   }  
   
-  override protected def absoluteSector(t: Int, s: Int) = {
+  override protected def absoluteSector(t: Int, s: Int): Int = {
     val cacheIndex = t << 8 | s
     absoluteSectorCache get cacheIndex match {
       case None =>
@@ -98,7 +98,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     }    
   }
   
-  protected def TOTAL_TRACKS = disk.length match {
+  protected def TOTAL_TRACKS: Int = disk.length match {
     case DISK_SIZE_35_TRACKS|DISK_SIZE_35_TRACKS_WITH_ERRORS => 35
     case DISK_SIZE_40_TRACKS|DISK_SIZE_40_TRACKS_WITH_ERRORS => 40
     case DISK_SIZE_42_TRACKS|DISK_SIZE_42_TRACKS_WITH_ERRORS => 42
@@ -106,7 +106,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     case _ => throw new IllegalArgumentException("Unsupported file format. size is " + disk.length)
   }
   
-  def bam = _bam
+  def bam: BamInfo = _bam
   
   // CONSTRUCTOR
   if (loadImage) loadGCRImage
@@ -132,7 +132,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     }
   }
   
-  private def loadGCRImage  : Unit = {
+  private def loadGCRImage()  : Unit = {
     for(t <- 1 to TOTAL_TRACKS;
     	s <- 0 until TRACK_ALLOCATION(t)) GCRImage(t - 1)(s) = GCR.sector2GCR(s,t,readBlock(t,s),bam.diskID,getSectorError(t,s),s == TRACK_ALLOCATION(t) - 1)
   }
@@ -169,12 +169,12 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     }
   }
   
-  def close = {
+  def close: Unit = {
     flush    
-    disk.close
+    disk.close()
   }
   
-  protected def bamInfo = {
+  protected def bamInfo: BamInfo = {
     //disk.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 3)
     val singleSide = file.toUpperCase.endsWith(".D64")// || disk.read != 0x80
     disk.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)
@@ -204,8 +204,8 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     BamInfo(diskName.toString, diskID, dosType,singleSide,free)
   }
   // --------------------- Floppy -------------------------  
-  val totalTracks = TOTAL_TRACKS
-  override lazy val singleSide = bamInfo.singleSide
+  val totalTracks: Int = TOTAL_TRACKS
+  override lazy val singleSide: Boolean = bamInfo.singleSide
   
   private[this] var track = 1
   private[this] var sector = 0
@@ -217,15 +217,15 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   private[this] var bit = 1
   private[this] var _side = 0
 
-  override def isOnIndexHole = gcrIndex > 0 && gcrIndex < 3
+  override def isOnIndexHole: Boolean = gcrIndex > 0 && gcrIndex < 3
   
-  override def minTrack = _side match {
+  override def minTrack: Int = _side match {
     case 0 =>
       1
     case 1 =>
       (totalTracks >> 1) + 1
   }
-  override def maxTrack = _side match {
+  override def maxTrack: Int = _side match {
     case 0 =>
       if (bam.singleSide) totalTracks else totalTracks >> 1
     case 1 =>
@@ -234,7 +234,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
 
   def isModified : Boolean = sectorModified
   
-  override def side = _side
+  override def side: Int = _side
   override def side_=(newSide:Int) : Unit = {
     newSide match {
       case 0 if _side == 1 =>
@@ -265,7 +265,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     bit = 1
   }
   
-  final def nextBit = {
+  final def nextBit: Int = {
     val b = (gcrSector(gcrIndex) >> (8 - bit)) & 1
     if (bit == 8) rotate else bit += 1
     b
@@ -278,12 +278,12 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     if (bit == 8) rotate else bit += 1
   }
   final def nextByte : Int = gcrSector(gcrIndex)
-  def writeNextByte(b:Int) = {
+  def writeNextByte(b:Int): Unit = {
     gcrSector(gcrIndex) = b & 0xFF
     sectorModified = true
   }
   
-  @inline private def rotate  : Unit = {
+  @inline private def rotate()  : Unit = {
     bit = 1
     gcrIndex += 1
     if (gcrIndex >= gcrSector.length) { // end of current sector
@@ -293,9 +293,9 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     }
   }
   
-  def notifyTrackSectorChangeListener = if (trackChangeListener != null) trackChangeListener(track,false,Some(sector))
-  def currentTrack = track
-  def currentSector = Some(sector)
+  def notifyTrackSectorChangeListener: Unit = if (trackChangeListener != null) trackChangeListener(track,false,Some(sector))
+  def currentTrack: Int = track
+  def currentSector: Option[Int] = Some(sector)
   /**
    * tracksteps & 1 == 0 are valid tracks, the others are half tracks not used
    * in the D64 format.
@@ -316,7 +316,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     }
   }
   
-  def setTrackChangeListener(l:Floppy#TrackListener) = trackChangeListener = l
+  def setTrackChangeListener(l:Floppy#TrackListener): Unit = trackChangeListener = l
   
   override def toString = s"Disk fileName=$file totalTracks=$TOTAL_TRACKS t=$track s=$sector"
   // state
@@ -507,7 +507,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     writeSectorBuffer(DIR_TRACK,BAM_SECTOR,bamBuffer)
   }
 
-  def reloadGCR : Unit = loadGCRImage
+  def reloadGCR() : Unit = loadGCRImage
 
   def rename(name:String) : Unit = {
     disk.seek(absoluteSector(DIR_TRACK,BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)

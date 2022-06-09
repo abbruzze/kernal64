@@ -1,11 +1,11 @@
 package ucesoft.cbm.peripheral.vic.coprocessor
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
-
 import ucesoft.cbm.cpu.CPU65xx.CPUPostponeReadException
 import ucesoft.cbm.cpu.{CPU65xx, Memory}
 import ucesoft.cbm.peripheral.vic.VICType
 import ucesoft.cbm.{CBMComponentType, ChipID, Log}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends VICCoprocessor with Memory {
   override val isRom = false
@@ -72,10 +72,10 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   override val interruptMaskRegisterMask = 0xE0
 
   private implicit class IntToBase(val digits: String) {
-    def base(b: Int) = Integer.parseInt(digits, b)
-    def b = base(2)
-    def o = base(8)
-    def x = base(16)
+    def base(b: Int): Int = Integer.parseInt(digits, b)
+    def b: Int = base(2)
+    def o: Int = base(8)
+    def x: Int = base(16)
   }
 
   private def buildInstructionSet : Array[() => Unit] = {
@@ -165,7 +165,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   // INSTRUCTIONS
 
-  private def BADLINE : Unit = {
+  private def BADLINE() : Unit = {
     if (fetchOp) {
       h_arg = lastOpcode & 7
       if (trace) tracedInstr = s"BADLINE ${h_arg.toHexString}"
@@ -181,7 +181,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     else fetchOp = false
   }
 
-  private def BRA : Unit = {
+  private def BRA() : Unit = {
     val offset = prgMem(pc).toByte
     pc = (pc + 1 + offset) & 0xFFFF
     if (trace) tracedInstr = s"BRA ${offset.toHexString}"
@@ -193,7 +193,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     if (trace) tracedInstr = s"DEC ${'A' + c}"
   }
 
-  private def DELAYH : Unit = {
+  private def DELAYH() : Unit = {
     if (fetchOp) {
       fetchOp = false
       val arg = prgMem(pc)
@@ -214,7 +214,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     }
   }
 
-  private def DELAYV : Unit = {
+  private def DELAYV() : Unit = {
     if (fetchOp) {
       val arg = prgMem(pc)
       pc = (pc + 1) & 0xFFFF
@@ -235,12 +235,12 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     }
   }
 
-  private def IRQ : Unit = {
+  private def IRQ() : Unit = {
     vicCtx.turnOnInterruptControlRegisterBits(16)
     if (trace) tracedInstr = "IRQ"
   }
 
-  private def MASKH : Unit = {
+  private def MASKH() : Unit = {
     val arg = prgMem(pc)
     pc = (pc + 1) & 0xFFFF
     maskh = arg & 63
@@ -248,7 +248,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     if (trace) tracedInstr = s"MASKH ${maskh.toHexString}"
   }
 
-  private def MASKV : Unit = {
+  private def MASKV() : Unit = {
     val arg = prgMem(pc)
     pc = (pc + 1) & 0xFFFF
     maskv = arg & 63
@@ -285,17 +285,17 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     if (trace) tracedInstr = s"SET${'A' + counter}"
   }
 
-  private def SKIP : Unit = {
+  private def SKIP() : Unit = {
     skipNextWait = true
     if (trace) tracedInstr = "SKIP"
   }
 
-  private def VNOP : Unit = {
+  private def VNOP() : Unit = {
     /* DO NOTHING */
     if (trace) tracedInstr = "VNOP"
   }
 
-  private def WAIT : Unit = {
+  private def WAIT() : Unit = {
     if (fetchOp) {
       v_arg = prgMem(pc) | (lastOpcode & 1) << 8
       h_arg = (lastOpcode >> 1) & 63
@@ -330,7 +330,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     }
   }
 
-  private def WAITBAD : Unit = {
+  private def WAITBAD() : Unit = {
     val d011 = vicCtx.read(0xD011,ChipID.VIC_COP)
     val yscroll = d011 & 7
     val den = (d011 & 16) == 16
@@ -339,7 +339,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     if (trace) tracedInstr = "WAITBAD"
   }
 
-  private def WAITREP : Unit = {
+  private def WAITREP() : Unit = {
     if (fetchOp) {
       p_arg = lastOpcode & 1
       if (!portWriteRepsEnabled(p_arg)) return
@@ -351,7 +351,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     if (portWriteReps(p_arg) == 0) fetchOp = true
   }
 
-  private def XFER : Unit = {
+  private def XFER() : Unit = {
     if (fetchOp) {
       r_arg = prgMem(pc) & 63
       p_arg = (prgMem(pc) >> 7) & 1
@@ -372,7 +372,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     }
   }
 
-  private def deactivate : Unit = {
+  private def deactivate() : Unit = {
     portWriteRepsEnabled(0) = false
     portWriteRepsEnabled(1) = false
     seq_active = false
@@ -384,7 +384,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   }
   // ----------------------------------------------------------------------
 
-  final def writeReg(_reg:Int,value:Int) = writeReg(_reg,value,false)
+  final def writeReg(_reg:Int,value:Int): Unit = writeReg(_reg,value,false)
 
   final def writeReg(_reg:Int,value:Int,isVasylWriting:Boolean) : Unit = {
     val reg = _reg & 0xFF
@@ -574,20 +574,20 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     if (debug) println(s"Repeat on write port $port: remaining ${portWriteReps(port)}")
   }
 
-  private def reloadPcFromRegs : Unit = {
+  private def reloadPcFromRegs() : Unit = {
     // load pc with list address
     pc = regs(0x32) | regs(0x33) << 8
     fetchOp = true
   }
 
-  private def activateListExecution : Unit = {
+  private def activateListExecution() : Unit = {
     dlistExecutionActive = true
     //prgMem = banks(currentBank)
     reloadPcFromRegs
     if (debug) println(s"VASYL list execution started at ${pc.toHexString}")
   }
 
-  private def clearMaskh : Unit = {
+  private def clearMaskh() : Unit = {
     if (clearMaskhOnNext) {
       clearMaskhOnNext = false
       maskh = "00111111".b
@@ -595,7 +595,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     }
   }
 
-  private def clearMaskv : Unit = {
+  private def clearMaskv() : Unit = {
     if (clearMaskvOnNext) {
       clearMaskvOnNext = false
       maskv = "111111111".b
@@ -740,7 +740,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
       val opRow = cpuOpCode >> 4
       val opCol = cpuOpCode & 0x0F
 
-      if (debug) println(s"CPU writes to ${address.toHexString} $value [${cpuOpCode.toHexString}] VASYL = $tracedInstr ${lastOpAccessingVIC}")
+      if (debug) println(s"CPU writes to ${address.toHexString} $value [${cpuOpCode.toHexString}] VASYL = $tracedInstr $lastOpAccessingVIC")
 
       if (opCol == 0xE && (opRow < 0x8 || opRow > 0xB)) { // ASL, LSR, DEC, INC, ROL or ROR
         cpuPostponedRMWCounter += 1

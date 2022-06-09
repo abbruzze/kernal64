@@ -30,7 +30,7 @@ private[formats] object GCR {
   /**
    * Convert a gcr track back to a disk format sectors.
    */
-  def GCR2track(gcrTrack:Array[Int],_sectorSize:Int,writeSector : (Int,Int,Array[Int]) => Unit) = {
+  def GCR2track(gcrTrack:Array[Int],_sectorSize:Int,writeSector : (Int,Int,Array[Int]) => Unit): Unit = {
     val ungcr = new UNGCR
     var i = 0
     var readData = 0
@@ -129,7 +129,7 @@ private[formats] object GCR {
   /**
    * Convert a whole sector to a GCR sector.
    */
-  def sector2GCR(sector:Int,track:Int,sectorData:Array[Byte],diskID:String,sectorError:Option[Int],isLastSector:Boolean) = {
+  def sector2GCR(sector:Int,track:Int,sectorData:Array[Byte],diskID:String,sectorError:Option[Int],isLastSector:Boolean): Array[Int] = {
     val sectorErrorCode = sectorError.getOrElse(0)
     val gcr = new GCR
     // SYNC
@@ -179,7 +179,7 @@ private[formats]class UNGCR {
       0, 0x09, 0x0a, 0x0b, 0, 0x0d, 0x0e, 0
   )
   
-  def gcr2Byte(b:Int) = GCR_TO_NIBBLE((b >> 5) & 0x1F) << 4 | GCR_TO_NIBBLE(b & 0x1F)
+  def gcr2Byte(b:Int): Int = GCR_TO_NIBBLE((b >> 5) & 0x1F) << 4 | GCR_TO_NIBBLE(b & 0x1F)
   
   def add(b:Int) : Unit = {
     tmpGCRBuffer(index) = b
@@ -198,7 +198,7 @@ private[formats]class UNGCR {
     }
   }
   
-  def getBytes = buffer.toArray
+  def getBytes: Array[Int] = buffer.toArray
 }
 
 private[formats]class GCR private {
@@ -239,7 +239,7 @@ private[formats]class GCR private {
   /**
    * Add a byte without conversion to GCR
    */
-  def add(bs:Int*) = for(b <- bs) GCRBuffer += b
+  def add(bs:Int*): Unit = for(b <- bs) GCRBuffer += b
   
   def addAndConvertToGCR(bs:Int*) : Unit = {
     for(b <- bs) {
@@ -258,5 +258,5 @@ private[formats]class GCR private {
   /**
    * Get the final GCR buffer.
    */
-  def getGCRBytes = GCRBuffer.toArray// else throw new IllegalStateException("Buffer is not full.Current length is " + GCRBuffer.size)
+  def getGCRBytes: Array[Int] = GCRBuffer.toArray// else throw new IllegalStateException("Buffer is not full.Current length is " + GCRBuffer.size)
 }

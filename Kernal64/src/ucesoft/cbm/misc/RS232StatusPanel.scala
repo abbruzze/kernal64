@@ -1,10 +1,10 @@
 package ucesoft.cbm.misc
 
-import java.awt._
-
-import javax.swing._
 import ucesoft.cbm.peripheral.rs232.RS232._
 import ucesoft.cbm.peripheral.rs232.RS232StatusListener
+
+import java.awt._
+import javax.swing._
 
 class RS232StatusPanel extends JPanel with RS232StatusListener {
   private[this] val FONT = new Font("Monospaced",Font.BOLD,10)
@@ -39,8 +39,8 @@ class RS232StatusPanel extends JPanel with RS232StatusListener {
     add(label)
     add(signal)
     
-    def setValue(value:Int) = signal.setValue(value)
-    def setColor(c:Color) = label.setForeground(c)
+    def setValue(value:Int): Unit = signal.setValue(value)
+    def setColor(c:Color): Unit = label.setForeground(c)
 
     override def getToolTipText: String = {
       if (!showConnectionTime || connectionTS == -1) super.getToolTipText
@@ -85,7 +85,7 @@ class RS232StatusPanel extends JPanel with RS232StatusListener {
   
   def setRS232Enabled(enabled:Boolean) : Unit = {
     SwingUtilities.invokeLater(new Runnable {
-      def run  : Unit = {
+      def run()  : Unit = {
         if (enabled) {
           enabledSignal.setValue(1)
           enabledSignal.setToolTipText("Connected")

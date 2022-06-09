@@ -1,7 +1,7 @@
 package ucesoft.cbm.misc
 
-import ucesoft.cbm.{Clock, ClockEvent}
 import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.{Clock, ClockEvent}
 
 import scala.collection.mutable.ListBuffer
 
@@ -62,7 +62,7 @@ class EN25QH128A(size:Int,mem:Memory) {
   private var blockEraseUnit = 0
   private val clock = Clock.systemClock
 
-  def reset : Unit = {
+  def reset() : Unit = {
     status = 0
     state = STATE_READY
     flashDout = 0
@@ -225,12 +225,12 @@ class EN25QH128A(size:Int,mem:Memory) {
     flashClk = clk
   }
 
-  private def ready : Unit = {
+  private def ready() : Unit = {
     state = STATE_READY
     bitCounter = 0
   }
 
-  private def chipErase : Unit = {
+  private def chipErase() : Unit = {
     status |= STATUS_WIP
     //println(s"Chip erase from 0 to ${(size - 1).toHexString}")
     for(a <- 0 to size - 1) mem.write(a,0xFF)
@@ -238,7 +238,7 @@ class EN25QH128A(size:Int,mem:Memory) {
     ready
   }
 
-  private def blockErase : Unit = {
+  private def blockErase() : Unit = {
     status |= STATUS_WIP
     val sector = address / blockEraseUnit
     val fromAddress = sector * blockEraseUnit
@@ -253,7 +253,7 @@ class EN25QH128A(size:Int,mem:Memory) {
     ready
   }
 
-  private def writeData : Unit = {
+  private def writeData() : Unit = {
     status |= STATUS_WIP
     //println(s"Writing [${writeBuffer.size}] to ${address.toHexString}")
     val msb = address & 0xFFFF00
@@ -267,17 +267,17 @@ class EN25QH128A(size:Int,mem:Memory) {
     ready
   }
 
-  private def rst : Unit = {
+  private def rst() : Unit = {
     //println("RST")
     ready
     status = 0
   }
 
-  private def wrden : Unit = status |= STATUS_WEL
+  private def wrden() : Unit = status |= STATUS_WEL
 
-  private def wrdi : Unit = status &= ~STATUS_WEL
+  private def wrdi() : Unit = status &= ~STATUS_WEL
 
-  private def wrsr : Unit = {
+  private def wrsr() : Unit = {
     status |= STATUS_WIP
     waitForAndDisableWIP(10000) // typical 10ms
     ready

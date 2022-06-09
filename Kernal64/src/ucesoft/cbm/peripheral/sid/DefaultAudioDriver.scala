@@ -1,7 +1,6 @@
 package ucesoft.cbm.peripheral.sid
 
 import javax.sound.sampled._
-import javax.sound.sampled.SourceDataLine
 
 class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false) extends AudioDriverDevice {
   private[this] val dataLine = {
@@ -29,7 +28,7 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
   setMasterVolume(100)
   if (dataLine != null) dataLine.start()
   
-  def getMasterVolume = vol
+  def getMasterVolume: Int = vol
   def setMasterVolume(v:Int) : Unit = {
     if (volume != null) {
       val max = volume.getMaximum
@@ -50,13 +49,13 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
   }
   final def reset : Unit = {
     pos = 0
-    if (dataLine != null) dataLine.flush
+    if (dataLine != null) dataLine.flush()
     setSoundOn(true)
   }
   def discard : Unit = {
     if (dataLine != null) {
-      dataLine.stop
-      dataLine.flush
+      dataLine.stop()
+      dataLine.flush()
     }
   }
   def setSoundOn(on:Boolean) : Unit = {
@@ -64,12 +63,12 @@ class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false)
     updateLine
   }
 
-  private def updateLine : Unit = {
+  private def updateLine() : Unit = {
     if (dataLine != null) {
-      if (soundOn && !muted) dataLine.start
+      if (soundOn && !muted) dataLine.start()
       else {
-        dataLine.stop
-        dataLine.flush
+        dataLine.stop()
+        dataLine.flush()
         pos = 0
       }
     }

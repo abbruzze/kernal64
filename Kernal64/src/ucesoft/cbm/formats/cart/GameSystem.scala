@@ -6,7 +6,7 @@ import ucesoft.cbm.formats.Cartridge
 import ucesoft.cbm.formats.ExpansionPortFactory.CartridgeExpansionPort
 
 class GameSystem(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
-  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     if (address < 0xDF00) {
       romlBankIndex = 0
     }

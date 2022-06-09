@@ -19,12 +19,12 @@ class SuperSnapshot5(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) ex
     val isActive = true
     val isRom = false
     def init  : Unit = {}
-    def reset  : Unit = {}
-    def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+    def reset()  : Unit = {}
+    def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (ramEnabled) internalRam(address & 0x1FFF)
       else romlBanks(romlBankIndex).read(address)
     }
-    override def writeROM(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
+    override def writeROM(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {
       if (ramEnabled && enabled) internalRam(address & 0x1FFF) = value
       else romlBanks(romlBankIndex).write(address,value)
     }
@@ -33,7 +33,7 @@ class SuperSnapshot5(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) ex
   game = false
   exrom = false
 
-  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     romlBanks(romlBankIndex).asInstanceOf[ROM].data((address & 0x1FFF))
   }
 
@@ -50,7 +50,7 @@ class SuperSnapshot5(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) ex
     }
   }
 
-  override def ROML = CRTRAM : Memory
+  override def ROML: Memory = CRTRAM : Memory
 
   override def isFreezeButtonSupported = true
 

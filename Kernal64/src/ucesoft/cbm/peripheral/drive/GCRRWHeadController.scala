@@ -1,10 +1,9 @@
 package ucesoft.cbm.peripheral.drive
 
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 class GCRRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedListener) extends RWHeadController(_floppy,ledListener) {
-  val componentID = name + "GCR rw head controller"
+  val componentID: String = name + "GCR rw head controller"
   
   private[this] var trackSteps = track << 1      
   private[this] var last10Bits = 0

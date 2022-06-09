@@ -1,6 +1,7 @@
 package ucesoft.cbm.peripheral.rs232
 
 import ucesoft.cbm.Log
+
 import java.io._
 
 object FileRS232 extends StreamRS232 {
@@ -30,8 +31,8 @@ object FileRS232 extends StreamRS232 {
       if (lastEnabled) {
         Log.info(s"Closing streams...")
         val (in,out) = getStreams
-        in.close
-        out.close
+        in.close()
+        out.close()
         super.setEnabled(false)
       }
       
@@ -40,13 +41,13 @@ object FileRS232 extends StreamRS232 {
     }
     else {
       val (in,out) = getStreams
-      in.close
-      out.close
+      in.close()
+      out.close()
       Log.info(s"Closing streams...")
     }
     
     super.setEnabled(enabled)
   }
   
-  override def toString = componentID + (if (isEnabled) "(enabled)" else "")
+  override def toString: String = componentID + (if (isEnabled) "(enabled)" else "")
 }

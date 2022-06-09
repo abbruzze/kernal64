@@ -1,16 +1,13 @@
 package ucesoft.cbm.formats
 
+import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.bus.BusDataIterator
 import ucesoft.cbm.peripheral.drive.Floppy
-import ucesoft.cbm.cpu.Memory
-import java.io.RandomAccessFile
-import scala.collection.mutable.ListBuffer
+
+import java.io.{File, FileNotFoundException, IOException, RandomAccessFile}
+import java.nio.file.{Files, StandardCopyOption}
 import java.util.StringTokenizer
-import java.io.FileNotFoundException
-import java.io.IOException
-import java.nio.file.Files
-import java.io.File
-import java.nio.file.StandardCopyOption
+import scala.collection.mutable.ListBuffer
 
 object Diskette {
   object FileType extends Enumeration {
@@ -44,7 +41,7 @@ object Diskette {
   case class DirEntry(fileType: FileType.Value, fileName: String, t: Int, s: Int, sizeInSectors: Int,entryTrack:Int,entrySector:Int,entryPos:Int)
   case class BamInfo(diskName: String, diskID: String, dosType: String,singleSide:Boolean,freeSectors:Int)
   case class FileData(fileName: String, startAddress: Int, data: Array[Int],fileType:FileType.Value) {
-    def iterator = {
+    def iterator: BusDataIterator = {
       val buffer = if (startAddress != -1) Array.ofDim[Int](data.length + 2) else data
       if (startAddress != -1) {
         buffer(0) = startAddress % 256
@@ -53,14 +50,14 @@ object Diskette {
       }
       new BusDataIterator {
         private[this] var index = 0
-        override def hasNext = index < buffer.length
-        override def next = {
+        override def hasNext: Boolean = index < buffer.length
+        override def next: Int = {
           val value = buffer(index)
           index += 1
           value
         }
-        def isLast = index == buffer.length - 1
-        def getPerc = (100 * index.toFloat / buffer.length).toInt
+        def isLast: Boolean = index == buffer.length - 1
+        def getPerc: Int = (100 * index.toFloat / buffer.length).toInt
         def goto(pos:Int) : Unit = {
           index = pos
         }
@@ -204,7 +201,7 @@ abstract class Diskette extends Floppy {
   // optional
   def bam : BamInfo  
   
-  def readBlock(track:Int,sector:Int) = {
+  def readBlock(track:Int,sector:Int): Array[Byte] = {
     disk.seek(absoluteSector(track,sector) * BYTES_PER_SECTOR)
     val buffer = Array.ofDim[Byte](BYTES_PER_SECTOR)
     disk.read(buffer)
@@ -221,7 +218,7 @@ abstract class Diskette extends Floppy {
     }
   }
   
-  protected def loadPRG(entry: DirEntry) = {
+  protected def loadPRG(entry: DirEntry): FileData = {
     val buffer = Array.ofDim[Byte](BYTES_PER_SECTOR)
     val data = new ListBuffer[Int]
     var lastChunk = false
@@ -250,7 +247,7 @@ abstract class Diskette extends Floppy {
     FileData(entry.fileName, startAddress, data.toArray,entry.fileType)
   }
   
-  protected def loadSEQ(entry: DirEntry) = {
+  protected def loadSEQ(entry: DirEntry): FileData = {
     val buffer = Array.ofDim[Byte](BYTES_PER_SECTOR)
     val data = new ListBuffer[Int]
     var lastChunk = false
@@ -273,7 +270,7 @@ abstract class Diskette extends Floppy {
     FileData(entry.fileName, -1, data.toArray,entry.fileType)
   }
   
-  def load(fileName: String,fileType:FileType.Value = FileType.PRG) = {
+  def load(fileName: String,fileType:FileType.Value = FileType.PRG): FileData = {
     if (fileName.startsWith("$")) formatDirectoriesAsPRG(DirectoryFileName(Some(fileName),None))
     else {
       val dpos = fileName.indexOf(":")
@@ -316,7 +313,7 @@ abstract class Diskette extends Floppy {
 
   protected def getDirectoryStartAddress: Int = 0x801
   
-  protected def formatDirectoriesAsPRG(dir:DirectoryFileName,showDEL:Boolean = false) = {
+  protected def formatDirectoriesAsPRG(dir:DirectoryFileName,showDEL:Boolean = false): FileData = {
     /*val colonPos = fileName.indexOf(":")
     val dirs = if (colonPos == -1) directories else {
       val filter = fileName.substring(colonPos + 1)

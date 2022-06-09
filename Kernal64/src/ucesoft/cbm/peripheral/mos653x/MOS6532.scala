@@ -19,12 +19,12 @@ object MOS653X {
 class MOS6532(val portA:MOS653X.Port,val portB:MOS653X.Port,val irqLow: Boolean => Unit) {
   import MOS653X._
 
-  protected val ram = Array.ofDim[Int](128)
-  protected val regs  = Array.ofDim[Int](4)
+  protected val ram: Array[Int] = Array.ofDim[Int](128)
+  protected val regs: Array[Int] = Array.ofDim[Int](4)
   protected var timer = 0
-  protected var lastPb7Value = true
-  protected var pb7NegativeEdgeMode = true
-  protected var pb7IRQ,pb7IRQEnabled = false
+  protected var lastPA7Value = true
+  protected var pa7NegativeEdgeMode = true
+  protected var pa7IRQ,pa7IRQEnabled = false
   protected var timerIRQ,timerIRQEnabled = false
   protected var timerMultiplier = 1
   protected var timerMultiplierCounter = 1
@@ -33,10 +33,10 @@ class MOS6532(val portA:MOS653X.Port,val portB:MOS653X.Port,val irqLow: Boolean 
     java.util.Arrays.fill(ram,0)
     java.util.Arrays.fill(regs,0)
     timer = 0
-    lastPb7Value = true
-    pb7NegativeEdgeMode = true
-    pb7IRQ = false
-    pb7IRQEnabled = false
+    lastPA7Value = true
+    pa7NegativeEdgeMode = true
+    pa7IRQ = false
+    pa7IRQEnabled = false
     timerIRQ = false
     timerIRQEnabled = false
     timerMultiplier = 1
@@ -83,19 +83,19 @@ class MOS6532(val portA:MOS653X.Port,val portB:MOS653X.Port,val irqLow: Boolean 
   }
 
   protected def writeEdgeDetectControl(address:Int): Unit = {
-    pb7IRQEnabled = (address & 2) > 0
-    pb7NegativeEdgeMode = (address & 1) == 0
+    pa7IRQEnabled = (address & 2) > 0
+    pa7NegativeEdgeMode = (address & 1) == 0
   }
 
-  def pb7(value:Boolean): Unit = {
-    if (pb7NegativeEdgeMode) {
-      pb7IRQ = lastPb7Value && !value
+  def pa7(value:Boolean): Unit = {
+    if (pa7NegativeEdgeMode) {
+      pa7IRQ = lastPA7Value && !value
     }
     else {
-      pb7IRQ = !lastPb7Value && value
+      pa7IRQ = !lastPA7Value && value
     }
     checkIRQ()
-    lastPb7Value = value
+    lastPA7Value = value
   }
 
   def clock(): Unit = {
@@ -137,12 +137,12 @@ class MOS6532(val portA:MOS653X.Port,val portB:MOS653X.Port,val irqLow: Boolean 
   }
 
   protected def checkIRQ(): Unit = {
-    irqLow((pb7IRQEnabled & pb7IRQ) | (timerIRQEnabled & timerIRQ))
+    irqLow((pa7IRQEnabled & pa7IRQ) | (timerIRQEnabled & timerIRQ))
   }
 
   protected def readInterruptFlag(): Int = {
-    val st = (if (timerIRQ) 0x80 else 0) | (if (pb7IRQ) 0x40 else 0)
-    pb7IRQ = false // clear PB7 IRQ
+    val st = (if (timerIRQ) 0x80 else 0) | (if (pa7IRQ) 0x40 else 0)
+    pa7IRQ = false // clear PA7 IRQ
     checkIRQ()
     st
   }

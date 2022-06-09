@@ -1,10 +1,10 @@
 package ucesoft.cbm.misc
 
+import ucesoft.cbm.peripheral.drive.{C1541Mems, Drive, DriveType, ParallelCable}
+
 import java.awt.{BorderLayout, Component, GridLayout}
 import java.io.File
-
 import javax.swing._
-import ucesoft.cbm.peripheral.drive.{C1541Mems, Drive, DriveType, ParallelCable}
 
 object DrivesConfigPanel {
   private var drives : Array[Drive] = _
@@ -154,7 +154,7 @@ object DrivesConfigPanel {
       for(c <- toBeDisabled) c.setEnabled(initialDrivesEnabled(id))
     }
     dialog.setResizable(false)
-    dialog.pack
+    dialog.pack()
     dialog.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE)
 
     dialog

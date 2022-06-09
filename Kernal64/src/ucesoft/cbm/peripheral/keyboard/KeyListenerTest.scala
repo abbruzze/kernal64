@@ -1,11 +1,9 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import javax.swing.JFrame
-
-import java.awt.event.KeyEvent
-import javax.swing.JPanel
 import ucesoft.cbm.Log
-import java.awt.event.KeyListener
+
+import java.awt.event.{KeyEvent, KeyListener}
+import javax.swing.{JFrame, JPanel}
 
 object QKeyListenerTest extends App with KeyListener {
     Log.setDebug

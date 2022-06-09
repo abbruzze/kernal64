@@ -1,16 +1,16 @@
 package ucesoft.cbm.c64
 
-import ucesoft.cbm.peripheral.vic.VICMemory
-import ucesoft.cbm.{CBMComponentType, ChipID, Clock, ClockEvent, Log}
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm._
 import ucesoft.cbm.cpu.{CPU65xx, Memory}
+import ucesoft.cbm.peripheral.vic.VICMemory
 
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
+import java.io.{ObjectInputStream, ObjectOutputStream}
 import java.util.Properties
 
 class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
   val componentID = "VIC Banked Memory"
-  val componentType = CBMComponentType.MEMORY
+  val componentType: Type = CBMComponentType.MEMORY
   val name = "VIC-Memory"
   val isRom = false
   val startAddress = 0
@@ -22,7 +22,7 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
   private[this] var ultimax = false
   private[this] var isGlueLogicCustom = false
   
-  def getBank = bank
+  def getBank: Int = bank
   
   def init  : Unit = {
     Log.info("Initialaizing banked memory ...")
@@ -61,7 +61,7 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
     //Log.debug(s"Set VIC bank to ${bank}. Internal bank is ${this.bank}")
   }
   
-  final def lastByteRead = memLastByteRead
+  final def lastByteRead: Int = memLastByteRead
   
   def expansionPortConfigurationChanged(game:Boolean,exrom:Boolean) : Unit = {
     ultimax = !game && exrom
@@ -85,9 +85,9 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
     else mem.read(realAddress,ChipID.VIC)
   }
   
-  final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = { /* ignored for VIC */}
+  final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = { /* ignored for VIC */}
 
-  override def readPCOpcode = mem.read(cpu.getPC)
+  override def readPCOpcode: Int = mem.read(cpu.getPC)
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeInt(bank)

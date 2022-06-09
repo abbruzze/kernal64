@@ -1,9 +1,9 @@
 package ucesoft.cbm.misc
 
 import ucesoft.cbm.cpu.Memory
+
 import java.awt.Desktop
-import java.io.PrintWriter
-import java.io.FileWriter
+import java.io.{FileWriter, PrintWriter}
 
 object BasicListExplorer {
   private[this] val TOKEN_MAP = Map(
@@ -349,10 +349,10 @@ object BasicListExplorer {
     val sb = createSource(ram, startAddress)
     if (Desktop.isDesktopSupported) {
       val file = java.io.File.createTempFile("kernal64",".txt")
-      file.deleteOnExit
+      file.deleteOnExit()
       val pw = new PrintWriter(new FileWriter(file))
       pw.println(sb.toString)
-      pw.close
+      pw.close()
       Desktop.getDesktop.edit(file)
     }
     else println(sb)

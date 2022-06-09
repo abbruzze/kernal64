@@ -14,6 +14,6 @@ trait VICCoprocessor extends CBMComponent {
   def reset : Unit
   def g_access(rasterCycle:Int) : Int
 
-  def disinstall : Unit
-  def install : Unit
+  def disinstall() : Unit
+  def install() : Unit
 }

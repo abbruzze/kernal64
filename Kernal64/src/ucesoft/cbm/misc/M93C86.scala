@@ -1,9 +1,9 @@
 package ucesoft.cbm.misc
 
-import java.util.Arrays
-import java.io.{DataInputStream, DataOutputStream, File, FileInputStream, FileOutputStream, IOException, InputStream, OutputStream}
-
 import ucesoft.cbm.Log
+
+import java.io._
+import java.util.Arrays
 
 /**
  * Programmable EEPROM, x16 or x8 organization
@@ -38,8 +38,8 @@ class M93C86(x16:Boolean) {
   private[this] var address = 0
   private[this] var firstRead = true
   
-  def input(b:Int) = in = b
-  def output = out
+  def input(b:Int): Unit = in = b
+  def output: Int = out
   def chipSelect(select:Boolean) : Unit = {
     cs = select
     if (!cs) {
@@ -56,7 +56,7 @@ class M93C86(x16:Boolean) {
       for(i <- 0 until eeprom.length) {
         eeprom(i) = f.readInt
       }
-      f.close
+      f.close()
     }
     catch {
       case io:IOException =>
@@ -80,7 +80,7 @@ class M93C86(x16:Boolean) {
       eeprom foreach { v =>
         f.writeInt(v)
       }
-      f.close
+      f.close()
     }
     catch {
       case io:IOException =>
@@ -88,7 +88,7 @@ class M93C86(x16:Boolean) {
     }
   }
   
-  private def serialIn  : Unit = {
+  private def serialIn()  : Unit = {
     serialBus <<= 1
     serialBus |= in
     bitCounter += 1

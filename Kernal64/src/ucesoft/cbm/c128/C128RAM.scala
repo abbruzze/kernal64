@@ -1,13 +1,11 @@
 package ucesoft.cbm.c128
 
-import ucesoft.cbm.cpu.RAMComponent
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.Log
-import ucesoft.cbm.ChipID
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
-import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponentType, ChipID, Log}
+import ucesoft.cbm.cpu.{Memory, RAMComponent}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 private[c128] class C128RAM extends RAMComponent {
   val name = "C128 RAM Blocks"
@@ -15,7 +13,7 @@ private[c128] class C128RAM extends RAMComponent {
   val isRom = false
   val startAddress = 0
   val length = 0x10000
-  val componentType = CBMComponentType.MEMORY
+  val componentType: Type = CBMComponentType.MEMORY
   val isActive = true  
   
   // RAM BANKS 0,1,2,3 ------------------------------------
@@ -48,14 +46,14 @@ private[c128] class C128RAM extends RAMComponent {
     def init  : Unit = {}
     def isActive = true  
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(0)(address)
-    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(0)(address) = value
+    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = mem(0)(address) = value
   }
   
   def getBank0 : Memory = Bank0
 
   final def setDMA(dma:Boolean) : Unit = this.dma = dma
   
-  override def getProperties = {
+  override def getProperties: Properties = {
     super.getProperties
     properties.setProperty("Processor memory bank",processorBank.toString)
     properties.setProperty("VIC memory bank",VICbank.toString)
@@ -208,7 +206,7 @@ private[c128] class C128RAM extends RAMComponent {
   }
   
   final def read(address:Int,bank:Int) : Int = mem(bank)(address)
-  final def write(address:Int,bank:Int,value:Int) = mem(bank)(address) = value
+  final def write(address:Int,bank:Int,value:Int): Unit = mem(bank)(address) = value
   
   final def read(_address: Int, chipID: ChipID.ID = ChipID.CPU) : Int = {
     if (chipID == ChipID.VIC) return mem(VICbank)(_address)

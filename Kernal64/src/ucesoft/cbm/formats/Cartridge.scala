@@ -12,7 +12,7 @@ object Cartridge {
     val buffer = Array.ofDim[Byte](len)
     in.readFully(buffer)
     tmpOut.write(buffer)
-    tmpOut.close
+    tmpOut.close()
     tmpFile
   }
 }
@@ -38,14 +38,14 @@ class Cartridge(val file:String) {
       for(i <- 0 until romSize) romData(i) = buffer(i).toInt & 0xFF
     }
     
-    override def toString = s"CHIP bank=${bankNumber} loadAddress=${Integer.toHexString(startingLoadAddress)} romSize=${romSize}"
+    override def toString = s"CHIP bank=$bankNumber loadAddress=${Integer.toHexString(startingLoadAddress)} romSize=$romSize"
   }
   private val CRT_SIGN = "C64 CARTRIDGE   "
   var name = ""
   var ctrType = 0 
   var EXROM,GAME = false
   var chips : Array[Chip] = null
-  lazy val kbSize = (chips map { _.romSize } sum) / 1024
+  lazy val kbSize: Int = (chips map { _.romSize } sum) / 1024
   
   load
 
@@ -55,7 +55,7 @@ class Cartridge(val file:String) {
     java.nio.file.Files.copy(f.toPath,out)
   }
   
-  def load  : Unit = {
+  def load()  : Unit = {
     println("Opening file " + file)
     val in = new RandomAccessFile(file,"r")
     try {
@@ -84,11 +84,11 @@ class Cartridge(val file:String) {
       chips = tmp.reverse.toArray
     }
     finally {
-      in.close
+      in.close()
     }
   }
   
-  override def toString = s"Cartridge ${name} type=${ctrType} EXROM=${EXROM} GAME=${GAME} CHIPS=${chips.map{_.toString} mkString("[",",","]")}"
+  override def toString = s"Cartridge $name type=$ctrType EXROM=$EXROM GAME=$GAME CHIPS=${chips.map{_.toString} mkString("[",",","]")}"
 }
 
 class CartridgeBuilder(crt:String,name:String,crtType:Int,exrom:Boolean,game:Boolean) {
@@ -135,5 +135,5 @@ class CartridgeBuilder(crt:String,name:String,crtType:Int,exrom:Boolean,game:Boo
     out.write(bdata)
   }
 
-  def finish : Unit = out.close
+  def finish() : Unit = out.close()
 }

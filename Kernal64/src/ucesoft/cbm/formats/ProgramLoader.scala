@@ -1,9 +1,8 @@
 package ucesoft.cbm.formats
 
-import java.io.{File, FileInputStream, FileOutputStream}
-
-import ucesoft.cbm.Clock
 import ucesoft.cbm.cpu.{CPU65xx, Memory}
+
+import java.io.{File, FileInputStream, FileOutputStream}
 ;
 
 object ProgramLoader {
@@ -41,64 +40,54 @@ object ProgramLoader {
     }
   }
 
-  def reset: Unit = {
+  def reset(): Unit = {
     loadingWithWarp = false
   }
 
   def updateBASICPointers(mem:Memory,startAddress:Int,endAddress:Int,c64Mode:Boolean,drive:Int,fileName:String) : Unit = {
-    c64Mode match {
-      case true =>
-        val endOfBasic = mem.read(55) | mem.read(56) << 8
-        mem.write(11, 76)
-        mem.write(15, 2)
-        mem.write(35, 8)
-        for(adr <- 45 until 50 by 2) {
-          mem.write(adr, endAddress & 0xFF)
-          mem.write(adr + 1, endAddress >> 8)
-        }
-        mem.write(54, 160)
-        mem.write(73, drive)
-        mem.write(144, 64)
-        mem.write(148, 64)
-        mem.write(163, 64)
-        mem.write(0xAE,endAddress & 0xFF)
-        mem.write(0xAF,endAddress >> 8)
-        mem.write(184, 1)
-        mem.write(185, 96)
-        mem.write(186, drive)
-        mem.write(187,endOfBasic & 0xFF)
-        mem.write(188,endOfBasic >> 8)
-        mem.write(195, 1)
-        mem.write(196, 8)
-        mem.write(183, 0)
-
-        // filename
-        /* Ignored for now: breaks testbench decimalmode c128 in c64 mode
-        var i = 0
-        while (i < fileName.length && i < 16) {
-          mem.write(0x9FF0,fileName.charAt(i).toUpper)
-          i += 1
-        }
-
-        mem.write(183,if (fileName.length > 16) 16 else fileName.length)
-         */
-      case false =>
-        mem.write(0x2B,startAddress & 0xFF)
-        mem.write(0xAC,startAddress & 0xFF)
-        mem.write(0x2C,startAddress >> 8)
-        mem.write(0xAD,startAddress >> 8)
-        mem.write(0x1210,endAddress & 0xFF)
-        mem.write(0x1211,endAddress >> 8)
+    if (c64Mode) {
+      val endOfBasic = mem.read(55) | mem.read(56) << 8
+      mem.write(11, 76)
+      mem.write(15, 2)
+      mem.write(35, 8)
+      for (adr <- 45 until 50 by 2) {
+        mem.write(adr, endAddress & 0xFF)
+        mem.write(adr + 1, endAddress >> 8)
+      }
+      mem.write(54, 160)
+      mem.write(73, drive)
+      mem.write(144, 64)
+      mem.write(148, 64)
+      mem.write(163, 64)
+      mem.write(0xAE, endAddress & 0xFF)
+      mem.write(0xAF, endAddress >> 8)
+      mem.write(184, 1)
+      mem.write(185, 96)
+      mem.write(186, drive)
+      mem.write(187, endOfBasic & 0xFF)
+      mem.write(188, endOfBasic >> 8)
+      mem.write(195, 1)
+      mem.write(196, 8)
+      mem.write(183, 0)
+    } else {
+      mem.write(0x2B, startAddress & 0xFF)
+      mem.write(0xAC, startAddress & 0xFF)
+      mem.write(0x2C, startAddress >> 8)
+      mem.write(0xAD, startAddress >> 8)
+      mem.write(0x1210, endAddress & 0xFF)
+      mem.write(0x1211, endAddress >> 8)
     }
   }
-  private def startAddress(mem:Memory,c64Mode:Boolean) : Int = c64Mode match {
-    case true => mem.read(43) | mem.read(44) << 8
-    case false => mem.read(0xAC) | mem.read(0xAD) << 8
+  private def startAddress(mem:Memory,c64Mode:Boolean) : Int = if (c64Mode) {
+    mem.read(43) | mem.read(44) << 8
+  } else {
+    mem.read(0xAC) | mem.read(0xAD) << 8
   }
 
-  private def endAddress(mem:Memory,c64Mode:Boolean) : Int = c64Mode match {
-    case true => mem.read(45) | mem.read(46) << 8
-    case false => mem.read(0x1210) | mem.read(0x1211) << 8
+  private def endAddress(mem:Memory,c64Mode:Boolean) : Int = if (c64Mode) {
+    mem.read(45) | mem.read(46) << 8
+  } else {
+    mem.read(0x1210) | mem.read(0x1211) << 8
   }
 
   def loadPRG(mem:Memory,file:File,c64Mode:Boolean,drive:Int): (Int,Int) = {
@@ -113,7 +102,7 @@ object ProgramLoader {
       size += 1
       b = in.read
     }
-    in.close
+    in.close()
     val end = start + size
     val dotprg = file.getName.lastIndexOf(".")
     val fileName = if (dotprg != -1) file.getName.substring(0,dotprg) else file.getName
@@ -146,7 +135,7 @@ object ProgramLoader {
     out.write(start & 0x0F)
     out.write(start >> 8)
     for (m <- start to end) out.write(mem.read(m))
-    out.close
+    out.close()
     (start,end)
   }
 }

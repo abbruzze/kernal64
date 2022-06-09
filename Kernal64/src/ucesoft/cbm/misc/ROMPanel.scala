@@ -1,12 +1,12 @@
 package ucesoft.cbm.misc
 
+import ucesoft.cbm.c128.FunctionROMType
+
 import java.awt.{Container, GridBagConstraints, GridBagLayout, Insets}
 import java.io.File
 import java.util.Properties
-
 import javax.swing._
 import javax.swing.event.{DocumentEvent, DocumentListener}
-import ucesoft.cbm.c128.FunctionROMType
 
 class ROMPanel(prop:Properties,c64Only:Boolean,scpu:Boolean = false) extends JPanel {
   import ucesoft.cbm.cpu.ROM._
@@ -47,7 +47,7 @@ class ROMPanel(prop:Properties,c64Only:Boolean,scpu:Boolean = false) extends JPa
   } map { r => r.propName -> r } toMap
   private var lastDir = "./"
 
-  def applyUpdates : Unit = {
+  def applyUpdates() : Unit = {
     for(rom <- romList) {
       rom.apply(prop)
     }
@@ -156,7 +156,7 @@ class ROMPanel(prop:Properties,c64Only:Boolean,scpu:Boolean = false) extends JPa
 }
 
 object ROMPanel {
-  def showROMPanel(parent:JFrame,prop:Properties,c64Only:Boolean,scpu:Boolean = false,applyCallBack : () => Unit) = {
+  def showROMPanel(parent:JFrame,prop:Properties,c64Only:Boolean,scpu:Boolean = false,applyCallBack : () => Unit): Unit = {
     val f = new JDialog(parent,"System ROMs",true)
     f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
     f.setLocationRelativeTo(parent)
@@ -168,10 +168,10 @@ object ROMPanel {
     val okB = new JButton("Apply")
     okB.setToolTipText("Apply changes")
     val cancelB = new JButton("Cancel")
-    cancelB.addActionListener(_ => f.dispose )
+    cancelB.addActionListener(_ => f.dispose() )
     okB.addActionListener(_ => {
       romPanel.applyUpdates
-      f.dispose
+      f.dispose()
       applyCallBack()
     })
     buttonPanel.add(okB)

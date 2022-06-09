@@ -1,10 +1,8 @@
 package ucesoft.cbm.misc
 
-import java.awt.event._
 import java.awt._
-
+import java.awt.event._
 import javax.swing.JComponent
-
 import scala.util.Try
 
 object MouseCage extends MouseAdapter {
@@ -43,7 +41,7 @@ object MouseCage extends MouseAdapter {
     robotMove(p)
   }
 
-  def disableMouseCage  : Unit = {
+  def disableMouseCage()  : Unit = {
     if (component != null) {
       component.removeMouseListener(this)
       component.removeMouseMotionListener(this)
@@ -51,7 +49,7 @@ object MouseCage extends MouseAdapter {
     }
   }
 
-  override def mouseExited(e:MouseEvent) = robotMove(center)
+  override def mouseExited(e:MouseEvent): Unit = robotMove(center)
 
   override def mouseMoved(e:MouseEvent) : Unit = {
     val moveTs = System.currentTimeMillis()
@@ -64,5 +62,5 @@ object MouseCage extends MouseAdapter {
     robotMove(compCenter)
   }
 
-  override def mouseDragged(e:MouseEvent) = mouseMoved(e)
+  override def mouseDragged(e:MouseEvent): Unit = mouseMoved(e)
 }

@@ -1,6 +1,7 @@
 package ucesoft.cbm.cpu.asm
 
-import util.parsing.combinator._
+import scala.util.matching.Regex
+import scala.util.parsing.combinator._
 import scala.util.parsing.input.{Position, Positional}
 
 object AsmParser {
@@ -79,11 +80,10 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   import AsmParser._
   import ucesoft.cbm.cpu.CPU65xx._
   import Mode._
-  import Instruction._
   
   private val other_opcodes: Parser[String] = OPCODES.drop(1).foldLeft(OPCODES.head: Parser[String]) { (p, b) => p | b }
 
-  override val whiteSpace = "[ \t]+".r
+  override val whiteSpace: Regex = "[ \t]+".r
   // =================================================================
 
   private def nl : Parser[String] = "[\n\r]*".r
@@ -273,11 +273,10 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
           if (!hasMode(o,ZPY)) ABY else mm
         case m => m
       }
-      BRANCHES.contains(o.toUpperCase) match {
-        case true =>
-          ASM(o, REL, Some(mode._2))
-        case false =>
-          ASM(o, mm, Some(mode._2))
+      if (BRANCHES.contains(o.toUpperCase)) {
+        ASM(o, REL, Some(mode._2))
+      } else {
+        ASM(o, mm, Some(mode._2))
       }
   }
   // ===================== STATEMENT =================================       

@@ -4,6 +4,7 @@ import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.{CPU6510_CE, RAMComponent}
+import ucesoft.cbm.misc.TestCart
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.crtc.CRTC6845
 import ucesoft.cbm.peripheral.mos6525.MOS6525
@@ -212,6 +213,8 @@ class CBM2MMU extends RAMComponent {
     else if (address < 0xDE00) acia.write(address,value) // 6551 RS-232
     else if (address < 0xDF00) tpi_ieee488.write(address,value) // 6525 IEEE 488
     else if (address < 0xE000) tpi_kb.write(address,value) // 6525 KEYBOARD
+
+    TestCart.write(0xF0000 | address,value)
   }
 
   override protected def saveState(out: ObjectOutputStream): Unit = ???

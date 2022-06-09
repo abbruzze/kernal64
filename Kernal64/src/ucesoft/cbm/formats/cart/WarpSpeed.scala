@@ -6,7 +6,7 @@ import ucesoft.cbm.formats.Cartridge
 import ucesoft.cbm.formats.ExpansionPortFactory.CartridgeExpansionPort
 
 class WarpSpeed(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
-  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     val offs = address - startAddress
     romlBanks(0).read(0x9E00 + offs)
   }
@@ -22,7 +22,7 @@ class WarpSpeed(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ra
     notifyMemoryConfigurationChange
   }
 
-  override def reset = {
+  override def reset: Unit = {
     game = false
     exrom = false
     notifyMemoryConfigurationChange

@@ -3,8 +3,8 @@ package ucesoft.cbm.misc
 import ucesoft.cbm.Version
 import ucesoft.cbm.expansion.WiC64
 
-import java.awt.event.{WindowAdapter, WindowEvent}
 import java.awt._
+import java.awt.event.{WindowAdapter, WindowEvent}
 import java.net.NetworkInterface
 import javax.swing._
 import javax.swing.text.{Style, StyleConstants, StyleContext}
@@ -63,7 +63,7 @@ class WiC64Panel(frame:JFrame,pref:Preferences) extends JPanel with WiC64.WiC64L
     d
   }
 
-  val dialog = {
+  val dialog: JDialog = {
     init()
     val d = new JDialog(frame,"WiC64 panel")
     d.getContentPane.add("Center",this)
@@ -112,8 +112,8 @@ class WiC64Panel(frame:JFrame,pref:Preferences) extends JPanel with WiC64.WiC64L
     textPane.setForeground(Color.WHITE)
     textPane.setEditable(false)
 
-    val doc = textPane.getStyledDocument()
-    val df = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE)
+    val doc = textPane.getStyledDocument
+    val df = StyleContext.getDefaultStyleContext.getStyle(StyleContext.DEFAULT_STYLE)
     regular = doc.addStyle("regular", df)
     StyleConstants.setFontFamily(regular,"Monospaced")
     StyleConstants.setBold(regular, true)
@@ -174,7 +174,7 @@ class WiC64Panel(frame:JFrame,pref:Preferences) extends JPanel with WiC64.WiC64L
   }
 
   private def update(): Unit = {
-    val doc = textPane.getStyledDocument()
+    val doc = textPane.getStyledDocument
     doc.remove(0,doc.getLength)
     doc.insertString(doc.getLength,WiC64.getIPAddress(),large)
     doc.insertString(doc.getLength,"\n\n",regular)

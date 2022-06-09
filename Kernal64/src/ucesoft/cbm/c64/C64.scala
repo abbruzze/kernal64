@@ -1,6 +1,8 @@
 package ucesoft.cbm.c64
 
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm._
+import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.formats._
 import ucesoft.cbm.misc._
@@ -21,10 +23,10 @@ object C64 extends App {
 }
 
 class C64 extends CBMHomeComputer {
-  override protected val cbmModel = C64Model
+  override protected val cbmModel: CBMComputerModel = C64Model
 
   val componentID = "Commodore 64"
-  val componentType = CBMComponentType.INTERNAL
+  val componentType: Type = CBMComponentType.INTERNAL
 
   protected val APPLICATION_NAME = "Kernal64"
   protected val CONFIGURATION_FILENAME = "C64.config"
@@ -184,7 +186,7 @@ class C64 extends CBMHomeComputer {
     expansionPort.setBaLow(low)
   }
 
-  override def isHeadless = headless
+  override def isHeadless: Boolean = headless
 
   // ======================================== Settings ==============================================
   override protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
@@ -192,11 +194,11 @@ class C64 extends CBMHomeComputer {
     if (updateFrame) adjustRatio
   }
   
-  private def adjustRatio  : Unit = {
+  private def adjustRatio()  : Unit = {
     val dim = display.asInstanceOf[java.awt.Component].getSize
     dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).round.toInt
     display.setPreferredSize(dim) 
-    displayFrame.pack
+    displayFrame.pack()
   } 
 
   protected def loadPRGFile(file:File,autorun:Boolean) : Unit = {
@@ -208,7 +210,7 @@ class C64 extends CBMHomeComputer {
     }
   }
 
-  private def takeSnapshot  : Unit = {
+  private def takeSnapshot()  : Unit = {
     val fc = new JFileChooser
     fc.showSaveDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
@@ -221,7 +223,7 @@ class C64 extends CBMHomeComputer {
   protected def setSettingsMenu(optionMenu:JMenu) : Unit = {
     setDriveMenu(optionMenu)
 
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     val keybMenu = new JMenu("Keyboard")
     optionMenu.add(keybMenu)
@@ -233,15 +235,15 @@ class C64 extends CBMHomeComputer {
     loadKeybItem.addActionListener(_ => loadKeyboard )
     keybMenu.add(loadKeybItem)
     
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setVolumeSettings(optionMenu)
     
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setWarpModeSettings(optionMenu)
     
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
     
     val adjustRatioItem = new JMenuItem("Adjust display ratio")
     adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A,java.awt.event.InputEvent.ALT_DOWN_MASK))
@@ -279,7 +281,7 @@ class C64 extends CBMHomeComputer {
     setOneFrameMode(vicItem,display,java.awt.event.KeyEvent.VK_N)
     // -----------------------------------
     
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setJoysticsSettings(optionMenu)
 
@@ -287,7 +289,7 @@ class C64 extends CBMHomeComputer {
 
     setMouseSettings(optionMenu)
     
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     val snapshotItem = new JMenuItem("Take a snapshot...")
     snapshotItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S,java.awt.event.InputEvent.ALT_DOWN_MASK))
@@ -299,21 +301,21 @@ class C64 extends CBMHomeComputer {
     gifRecorderItem.addActionListener(_ => openGIFRecorder )
     optionMenu.add(gifRecorderItem)
     
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setPauseSettings(optionMenu)
     
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setPrinterSettings(optionMenu)
     // -----------------------------------
 
     
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setSIDSettings(optionMenu)
     // -----------------------------------
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setDrivesSettings
 
@@ -327,22 +329,22 @@ class C64 extends CBMHomeComputer {
       busSnooperActive = false
     }) :: resetSettingsActions
     
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setRemotingSettings(optionMenu)
     
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
     
     val IOItem = new JMenu("I/O")
     optionMenu.add(IOItem)
     
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     val rs232Item = new JMenuItem("RS-232 ...")
     rs232Item.addActionListener(_ => manageRS232 )
     IOItem.add(rs232Item)
     
-    IOItem.addSeparator
+    IOItem.addSeparator()
 
     setFlyerSettings(IOItem)
 
@@ -356,17 +358,17 @@ class C64 extends CBMHomeComputer {
 
     // -----------------------------------
     
-    IOItem.addSeparator
+    IOItem.addSeparator()
 
     setDigiMAXSettings(IOItem)
     
-    IOItem.addSeparator
+    IOItem.addSeparator()
 
     setGMOD3FlashSettings(IOItem)
 
     setEasyFlashSettings(IOItem)
     
-    IOItem.addSeparator
+    IOItem.addSeparator()
 
     setCPMSettings(IOItem)
 
@@ -404,8 +406,8 @@ class C64 extends CBMHomeComputer {
     }
   }
 
-  protected def getRAM = mmu.getRAM
-  protected def getCharROM = mmu.CHAR_ROM
+  protected def getRAM: Memory = mmu.getRAM
+  protected def getCharROM: Memory = mmu.CHAR_ROM
   
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
@@ -431,15 +433,14 @@ class C64 extends CBMHomeComputer {
     setVICModel(vicModel,false,false,false)
 
     // VIC Coprocessor
-    in.readBoolean match {
-      case false =>
-      case true =>
-        in.readObject.toString match { // copy factory
-          case "VASYL" =>
-            preferences(Preferences.PREF_BEAMRACERENABLED) = true
-          case cn =>
-            throw new IllegalArgumentException(s"Coprocessor $cn unknown")
-        }
+    if (in.readBoolean) {
+      in.readObject.toString match { // copy factory
+        case "VASYL" =>
+          preferences(Preferences.PREF_BEAMRACERENABLED) = true
+        case cn =>
+          throw new IllegalArgumentException(s"Coprocessor $cn unknown")
+      }
+    } else {
 
     }
   }
@@ -458,7 +459,7 @@ class C64 extends CBMHomeComputer {
     if (args.exists(_ == "--headless")) headless = true
     swing { initComponent }
     // VIC
-    swing { displayFrame.pack }
+    swing { displayFrame.pack() }
     // --ignore-config-file handling
     if (args.exists(_ == "--ignore-config-file")) configuration.clear()
     // screen's dimension and size restoration

@@ -1,19 +1,15 @@
 package ucesoft.cbm.peripheral.controlport
 
-import java.awt.event.KeyListener
-import java.awt.event.KeyEvent
-import java.awt.event.MouseListener
-import java.awt.event.MouseEvent
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponent, CBMComponentType}
+
+import java.awt.event.{KeyEvent, KeyListener, MouseEvent, MouseListener}
+import java.io.{ObjectInputStream, ObjectOutputStream}
 import java.util.Properties
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
 import javax.swing.SwingUtilities
 
 abstract class ControlPort extends CBMComponent {
-  val componentType = CBMComponentType.INPUT_DEVICE
+  val componentType: Type = CBMComponentType.INPUT_DEVICE
   val componentID = "ControlPort"
   val isConnected = true
     
@@ -26,30 +22,30 @@ abstract class ControlPort extends CBMComponent {
     emulatedBit = 0
   }
   
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("~Value",Integer.toHexString(~readPort & 0xFF))
     properties
   }
   
-  def readPort = read & (~emulatedBit & 0xFF)
+  def readPort: Int = read & (~emulatedBit & 0xFF)
 
   def consumeKey(e:KeyEvent): Boolean = false
   
   protected def read : Int	// 4 bits
 
-  def updateConfiguration : Unit = {}
+  def updateConfiguration() : Unit = {}
   
-  def emulateFire = emulatedBit = 16
-  def emulateUp = emulatedBit = 1
-  def emulateDown = emulatedBit = 2
-  def emulateLeft = emulatedBit = 4
-  def emulateRight = emulatedBit = 8
-  def releaseEmulated = emulatedBit = 0
+  def emulateFire(): Unit = emulatedBit = 16
+  def emulateUp(): Unit = emulatedBit = 1
+  def emulateDown(): Unit = emulatedBit = 2
+  def emulateLeft(): Unit = emulatedBit = 4
+  def emulateRight(): Unit = emulatedBit = 8
+  def releaseEmulated(): Unit = emulatedBit = 0
   
-  def setLightPenEmulation(enabled:Boolean) = lightPenEmulationEnabled = enabled
-  def isLightPenEmulationEnabled = lightPenEmulationEnabled
-  def setMouse1351Emulation(enabled:Boolean) = mouse1351EmulationEnabled = enabled
-  def isMouse1351EmulationEnabled = mouse1351EmulationEnabled
+  def setLightPenEmulation(enabled:Boolean): Unit = lightPenEmulationEnabled = enabled
+  def isLightPenEmulationEnabled: Boolean = lightPenEmulationEnabled
+  def setMouse1351Emulation(enabled:Boolean): Unit = mouse1351EmulationEnabled = enabled
+  def isMouse1351EmulationEnabled: Boolean = mouse1351EmulationEnabled
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {}
   protected def loadState(in:ObjectInputStream) : Unit = {}
@@ -91,12 +87,12 @@ object ControlPort {
       if (!isLightPenEmulationEnabled) mask &= ~16
     }
     
-    def keyPressed(e: KeyEvent) = mask |= getKeyMask(e)
+    def keyPressed(e: KeyEvent): Unit = mask |= getKeyMask(e)
     
-    def keyReleased(e: KeyEvent) = mask &= ~getKeyMask(e)
+    def keyReleased(e: KeyEvent): Unit = mask &= ~getKeyMask(e)
     def keyTyped(e: KeyEvent) : Unit = {}
    
-    protected def read = ~mask & 0xFF
+    protected def read: Int = ~mask & 0xFF
   }
   
   val emptyControlPort : ControlPort with MouseListener = new AbstractControlPort {
@@ -123,7 +119,7 @@ object ControlPort {
       }
       else false
     }
-    protected def getKeyMask(e:KeyEvent) = {
+    protected def getKeyMask(e:KeyEvent): Int = {
       import KeyEvent._
       if (e.getKeyLocation == KEY_LOCATION_NUMPAD) {
         e.getKeyCode match {
@@ -167,7 +163,7 @@ object ControlPort {
       else false
     }
 
-    protected def getKeyMask(e:KeyEvent) = {
+    protected def getKeyMask(e:KeyEvent): Int = {
       import KeyEvent._
       if (e.getKeyLocation != KEY_LOCATION_NUMPAD) {
         val keyCode = e.getKeyCode

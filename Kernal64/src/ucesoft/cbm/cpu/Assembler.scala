@@ -1,38 +1,22 @@
 package ucesoft.cbm.cpu
 
-import util.parsing.combinator._
-import java.io.Reader
-
-import javax.swing.JFrame
-import javax.swing.JTextArea
-import java.awt.Font
-
-import javax.swing.JButton
-import javax.swing.JPanel
-import javax.swing.JDialog
-import java.awt.event.ActionListener
-import java.awt.event.ActionEvent
-
-import javax.swing.JFileChooser
-import java.io.PrintWriter
-import java.io.FileWriter
-import java.io.StringReader
-
-import javax.swing.JOptionPane
-import java.awt.Color
-
-import javax.swing.JScrollPane
 import org.fife.ui.rsyntaxtextarea.{RSyntaxTextArea, SyntaxConstants}
 import org.fife.ui.rtextarea.RTextScrollPane
 
+import java.awt.{Color, Font}
+import java.awt.event.{ActionEvent, ActionListener}
+import java.io.{FileWriter, PrintWriter, Reader, StringReader}
+import javax.swing._
 import scala.language.postfixOps
+import scala.util.matching.Regex
+import scala.util.parsing.combinator._
 
 class AssemblerException(msg: String) extends Exception(msg)
 
 class Assembler {
   import CPU65xx._
-  import Mode._
   import Instruction._
+  import Mode._
 
   private val OPS = (Instruction.values.map { _.toString.toLowerCase }) ++ (Instruction.values map { _.toString.toUpperCase })
   private trait Step {
@@ -42,15 +26,15 @@ class Assembler {
 
     def notify(labelAddress: Int) : Unit = {}
     def addListener(l: Step) : Unit = { listeners = l :: listeners }
-    def notifyListeners = listeners foreach { _.notify(PC.get) }
+    def notifyListeners(): Unit = listeners foreach { _.notify(PC.get) }
   }
   private trait Operand
   private case class Label(label: String,fn:String="") extends Operand
   private case class Value(value: Int) extends Operand
 
-  private case object REM extends Step { val label = None }
+  private case object REM extends Step { val label: Option[String] = None }
   private case class EQU(label: Option[String], value: Int) extends Step
-  private case class ORG(value: Int) extends Step { val label = None }
+  private case class ORG(value: Int) extends Step { val label: Option[String] = None }
   private case class BYTE(label: Option[String], bytes: List[Int]) extends Step
   private case class WORD(label: Option[String], bytes: List[Int]) extends Step
   private case class OP(label: Option[String], op: String, var mode: Mode.MODE, var operand: Option[Operand]) extends Step {
@@ -62,11 +46,11 @@ class Assembler {
     }
   }
 
-  def isZeroPage(a: Int) = a <= 0xff
-  val BRANCHES = Set(BPL,BMI,BVC,BVS,BCC,BCS,BNE,BEQ) map { _.toString }
+  def isZeroPage(a: Int): Boolean = a <= 0xff
+  val BRANCHES: Set[String] = Set(BPL,BMI,BVC,BVS,BCC,BCS,BNE,BEQ) map { _.toString }
 
   private object Parser extends JavaTokenParsers {
-    override val whiteSpace = "[ \t\f]+".r
+    override val whiteSpace: Regex = "[ \t\f]+".r
     def label: Parser[String] = ident
     def number: Parser[Int] = wholeNumber ^^ { i => i.toInt }
     def hexWord: Parser[Int] = "\\$[0-9A-Fa-f]{1,4}".r ^^ { i => Integer.parseInt(i.substring(1), 16) }
@@ -136,7 +120,7 @@ class Assembler {
       case ">" => (v >> 8) & 0xFF
       case "" => v
     }
-  private def resolve(steps: List[Step]) = {
+  private def resolve(steps: List[Step]): Unit = {
     val sym = makeSymbolTable(steps)
     var PC = 0
     val filteredSteps = steps.view.filter {
@@ -237,7 +221,7 @@ class Assembler {
     }
   }
 
-  def assemble(in: Reader,mem:Memory) = {
+  def assemble(in: Reader,mem:Memory): Option[String] = {
     Parser.parseAll(Parser.steps, in) match {
       case Parser.Success(parsed, _) =>
         resolve(parsed)
@@ -264,7 +248,7 @@ object Assembler {
   val asm = new Assembler
   asm.assemble(new InputStreamReader(System.in),mem)
   */
-  def getAssemblerDialog(parent:JFrame,mem:Memory) = {
+  def getAssemblerDialog(parent:JFrame,mem:Memory): JDialog = {
     val assembler = new Assembler
     val textArea = new RSyntaxTextArea(20,50)
     textArea.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_ASSEMBLER_6502)
@@ -287,7 +271,7 @@ object Assembler {
               case JFileChooser.APPROVE_OPTION =>
                 val pw = new PrintWriter(new FileWriter(fc.getSelectedFile))
                 pw.println(textArea.getText)
-                pw.close
+                pw.close()
               case _ =>
             }
           case "COMPILE" =>
@@ -321,7 +305,7 @@ object Assembler {
     val dialog = new JDialog(parent,"Assembler")
     dialog.getContentPane.add("North",buttonPanel)
     dialog.getContentPane.add("Center",new RTextScrollPane(textArea))
-    dialog.pack
+    dialog.pack()
     dialog
   }
 }

@@ -1,12 +1,10 @@
 package ucesoft.cbm.cpu
 
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.Log
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponentType, ChipID, Log}
+
 import java.io._
 import java.util.Properties
-
-import ucesoft.cbm.ChipID
-import javax.swing.JFrame
 
 class ROM(ram: Memory,
           val name: String,
@@ -15,8 +13,8 @@ class ROM(ram: Memory,
           val resourceName: String,
           initialOffset:Int = 0,
           validLengths:List[Int] = Nil) extends RAMComponent {
-  val componentID = "ROM " + name
-  val componentType = CBMComponentType.MEMORY
+  val componentID: String = "ROM " + name
+  val componentType: Type = CBMComponentType.MEMORY
 
   val isRom = true
   private[this] var mem : Array[Int] = _
@@ -24,22 +22,22 @@ class ROM(ram: Memory,
 
   def getDynamicLength : Int = mem.length
 
-  final def isActive = active
-  def setActive(active:Boolean) = this.active = active
+  final def isActive: Boolean = active
+  def setActive(active:Boolean): Unit = this.active = active
 
   def init  : Unit = {
     mem = Array.fill(length)(0)
-    Log.info(s"Initialaizing ${name} memory ...")
+    Log.info(s"Initialaizing $name memory ...")
     reload
   }
 
-  def reload : Unit = {
+  def reload() : Unit = {
     val in = new DataInputStream(ROM.getROMInputStream(this,resourceName))
     if (length > 0) {
       in.skip(initialOffset)
       val buffer = Array.ofDim[Byte](length)
       in.readFully(buffer)
-      in.close
+      in.close()
       if (mem != null) for (i <- 0 until length) mem(i) = buffer(i) & 0xff
     }
     else {
@@ -51,20 +49,20 @@ class ROM(ram: Memory,
         buffer.write(read)
         read = bin.read
       }
-      bin.close
+      bin.close()
       if (!validLengths.contains(buffer.size)) throw new IllegalArgumentException(s"Bad ROM size: ${buffer.size}. Valid sizes: ${validLengths.mkString(",")}")
       val bufferArray = buffer.toByteArray
       mem = Array.fill(buffer.size)(0)
       for (i <- 0 until buffer.size) mem(i) = bufferArray(i) & 0xff
-      Log.info(s"Loaded ${name} as a variable ROM: size is ${bufferArray.length}")
+      Log.info(s"Loaded $name as a variable ROM: size is ${bufferArray.length}")
     }
   }
 
   def reset  : Unit = {}
 
   final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address - startAddress)
-  def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = ram.write(address,value,chipID)
-  final def patch(address:Int,value:Int) = mem(address - startAddress) = value
+  def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = ram.write(address,value,chipID)
+  final def patch(address:Int,value:Int): Unit = mem(address - startAddress) = value
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeBoolean(active)

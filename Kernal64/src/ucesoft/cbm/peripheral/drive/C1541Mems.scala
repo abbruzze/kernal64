@@ -1,14 +1,10 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.cpu.ROM
-import ucesoft.cbm.ChipID
-import ucesoft.cbm.Log
-import ucesoft.cbm.cpu.BridgeMemory
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.cpu.RAMComponent
-import java.io.{FileNotFoundException, ObjectInputStream, ObjectOutputStream}
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.cpu.{BridgeMemory, RAMComponent, ROM}
+import ucesoft.cbm.{CBMComponentType, ChipID, Log}
 
-import javax.swing.JFrame
+import java.io.{FileNotFoundException, ObjectInputStream, ObjectOutputStream}
 
 object C1541Mems {
   import ROM._
@@ -19,22 +15,22 @@ object C1541Mems {
       try {
         val in = ROM.getROMInputStream(this,resourceName)
         val al = (0x10000 - in.available,in.available)
-        in.close
+        in.close()
         al
       }
       catch {
         case _: FileNotFoundException => (0,0)
       }
     }
-    override val startAddress = startAndLen._1
-    override val length = startAndLen._2
+    override val startAddress: Int = startAndLen._1
+    override val length: Int = startAndLen._2
      
     final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
   }
   
   private class RAM extends RAMComponent {
     val componentID = "DISK RAM"
-    val componentType = CBMComponentType.MEMORY
+    val componentType: Type = CBMComponentType.MEMORY
     
     val isRom = false
     val name = "C1541_RAM"
@@ -45,8 +41,8 @@ object C1541Mems {
     final val isActive = true
     private[this] var channelActive = 0
     
-    def isChannelActive = channelActive != 0
-    def getChannelsState = channelActive
+    def isChannelActive: Boolean = channelActive != 0
+    def getChannelsState: Int = channelActive
     
     def init : Unit = {
       Log.info("Initialaizing C1541 RAM memory ...")
@@ -74,12 +70,12 @@ object C1541Mems {
   }
   
   class EXP_RAM(baseAddress:Int) extends RAMComponent {
-    val componentID = "Extended RAM " + Integer.toHexString(baseAddress)
-    val componentType = CBMComponentType.MEMORY
+    val componentID: String = "Extended RAM " + Integer.toHexString(baseAddress)
+    val componentType: Type = CBMComponentType.MEMORY
     
     val isRom = false
     val name = "C1541_RAM"
-    val startAddress = baseAddress
+    val startAddress: Int = baseAddress
     val length = 0x2000
 
     private[this] val mem = Array.fill(length)(0)
@@ -118,7 +114,7 @@ object C1541Mems {
   
   class C1541_RAM extends BridgeMemory {
     val componentID = "MAIN DISK RAM"
-    val componentType = CBMComponentType.MEMORY
+    val componentType: Type = CBMComponentType.MEMORY
     
     val isRom = false
     val name = "C1541_MAIN_RAM"
@@ -140,10 +136,10 @@ object C1541Mems {
     
     def reset : Unit = {}
     
-    def isChannelActive = RAM.isChannelActive
-    def getChannelsState = RAM.getChannelsState
+    def isChannelActive: Boolean = RAM.isChannelActive
+    def getChannelsState: Int = RAM.getChannelsState
     
-    override def defaultValue(address:Int) = Some(address >> 8)
+    override def defaultValue(address:Int): Option[Int] = Some(address >> 8)
     // state
     protected def saveState(out:ObjectOutputStream) : Unit = {}
     protected def loadState(in:ObjectInputStream) : Unit = {}
