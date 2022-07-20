@@ -93,13 +93,15 @@ class ROMPanel(prop:Properties,c64Only:Boolean,scpu:Boolean = false) extends JPa
         val p1 = new JPanel
         p1.setLayout(new BoxLayout(p1,BoxLayout.Y_AXIS))
         p1.add(cb)
-        val combo = new JComboBox(Array(FunctionROMType.NORMAL.toString,FunctionROMType.MEGABIT.toString))
+        val combo = new JComboBox(Array(FunctionROMType.NORMAL.toString,FunctionROMType.MEGABIT.toString,FunctionROMType.MAGICDESK128.toString))
         combo.addActionListener(_ => rom.item = Some(FunctionROMType.withName(combo.getSelectedItem.toString).toString) )
         rom.item match {
           case Some(rt) if rt == FunctionROMType.NORMAL.toString =>
             combo.setSelectedIndex(0)
           case Some(rt) if rt == FunctionROMType.MEGABIT.toString =>
             combo.setSelectedIndex(1)
+          case Some(rt) if rt == FunctionROMType.MAGICDESK128.toString =>
+            combo.setSelectedIndex(2)
           case None =>
             combo.setEnabled(false)
         }

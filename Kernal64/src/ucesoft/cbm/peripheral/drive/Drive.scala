@@ -8,6 +8,7 @@ object DriveType extends Enumeration {
   val _1541: DriveType.Value = Value("1541")
   val _1571: DriveType.Value = Value("1571")
   val _1581: DriveType.Value = Value("1581")
+  val _8050: DriveType.Value = Value("8050")
   val OTHER: DriveType.Value = Value("OTHER")
   val LOCAL: DriveType.Value = Value("LOCAL")
 }

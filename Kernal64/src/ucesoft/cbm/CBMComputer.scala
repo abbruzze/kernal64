@@ -4,7 +4,7 @@ import ucesoft.cbm.cpu.{CPU65xx, Memory}
 import ucesoft.cbm.formats.Diskette
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral.c2n.Datassette
-import ucesoft.cbm.peripheral.drive.{D1581, Drive, DriveType, EmptyFloppy}
+import ucesoft.cbm.peripheral.drive.{D1581, Drive, DriveIDMismatch, DriveType, EmptyFloppy}
 import ucesoft.cbm.peripheral.keyboard
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.printer.{MPS803GFXDriver, MPS803ROM, Printer}
@@ -15,7 +15,9 @@ import java.awt.event.{MouseAdapter, MouseEvent, WindowAdapter, WindowEvent}
 import java.awt.{BorderLayout, Color, FlowLayout}
 import java.io._
 import java.util.Properties
+import java.util.zip.{GZIPInputStream, GZIPOutputStream}
 import javax.swing._
+import javax.swing.filechooser.FileFilter
 
 object CBMComputer {
   def turnOn(computer : => CBMHomeComputer, args:Array[String]) : Unit = {
@@ -176,7 +178,7 @@ abstract class CBMComputer extends CBMComponent {
     sys.exit(0)
   }
 
-  protected def reset(play:Boolean=true,loadAndRunLastPrg:Boolean = false) : Unit = {
+  protected def reset(play:Boolean,loadAndRunLastPrg:Boolean = false) : Unit = {
     if (traceDialog != null) traceDialog.forceTracing(false)
     if (diskTraceDialog != null) diskTraceDialog.forceTracing(false)
     if (Thread.currentThread != Clock.systemClock) clock.pause
@@ -497,4 +499,129 @@ abstract class CBMComputer extends CBMComponent {
   protected def initDrive(id:Int,driveType:DriveType.Value) : Unit
 
   protected def attachDisk(driveID:Int,autorun:Boolean,c64Mode:Boolean) : Unit
+
+  protected def resetSettings() : Unit = {}
+
+  protected def loadState(fileName:Option[String]) : Unit = {
+    clock.pause
+    var in : ObjectInputStream = null
+
+    try {
+      val canLoad = allowsState
+      if (!canLoad) {
+
+        showError("State saving error","Can't load state")
+        return
+      }
+      val fn = fileName match {
+        case None =>
+          val fc = new JFileChooser
+          fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+          fc.setFileFilter(new FileFilter {
+            def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
+            def getDescription = "Kernal64 state files"
+          })
+          fc.setDialogTitle("Choose a state file to load")
+          fc.showOpenDialog(getActiveFrame.get) match {
+            case JFileChooser.APPROVE_OPTION =>
+              Some(fc.getSelectedFile)
+            case _ =>
+              None
+          }
+        case Some(fn) =>
+          Some(new File(fn))
+      }
+
+      var loaded = false
+      var asked = false
+      var aborted = !fn.isDefined
+
+      while (!loaded && !aborted) try {
+        in = new ObjectInputStream(new GZIPInputStream(new FileInputStream(fn.get)))
+        for(i <- 0 until APPLICATION_NAME.length) if (in.readChar != APPLICATION_NAME(i)) throw new IOException(s"Bad header: expected $APPLICATION_NAME")
+        val ver = in.readObject.asInstanceOf[String]
+        val ts = in.readLong
+        if (!loadStateFromOptions && !asked) {
+          val msg = s"<html><b>Version:</b> $ver<br><b>Date:</b> ${new java.util.Date(ts)}</html>"
+          JOptionPane.showConfirmDialog(displayFrame, msg, "State loading confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) match {
+            case JOptionPane.YES_OPTION =>
+              asked = true
+              resetSettings
+              reset(false)
+              load(in)
+              loaded = true
+            case _ =>
+              aborted = true
+          }
+        }
+        else {
+          reset(false)
+          load(in)
+          loaded = true
+        }
+      }
+      catch {
+        case dm: DriveIDMismatch =>
+          in.close()
+          reset(false)
+          val newDriveType = if (dm.expectedDriveComponentID.startsWith("C1541")) DriveType._1541
+          else if (dm.expectedDriveComponentID.startsWith("D1571")) DriveType._1571
+          else if (dm.expectedDriveComponentID.startsWith("D1581")) DriveType._1581
+          else throw new IllegalArgumentException(s"Bad drive component type: ${dm.expectedDriveComponentID}")
+          initDrive(dm.driveID,newDriveType)
+      }
+    }
+    catch {
+      case t:Throwable =>
+        showError(s"State loading error",s"Can't load state: ${t.getMessage}")
+        t.printStackTrace()
+        reset(false)
+    }
+    finally {
+      if (in != null) in.close()
+      clock.play
+    }
+  }
+
+  protected def saveState() : Unit = {
+    clock.pause
+    var out : ObjectOutputStream = null
+    try {
+      val canSave = allowsState
+      if (!canSave) {
+
+        showError("State saving error","Can't save state")
+        return
+      }
+      val fc = new JFileChooser
+      fc.setDialogTitle("Choose where to save current state")
+      fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
+      fc.setFileFilter(new FileFilter {
+        def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
+        def getDescription = "Kernal64 state files"
+      })
+      val fn = fc.showSaveDialog(getActiveFrame.get) match {
+        case JFileChooser.APPROVE_OPTION =>
+          if (fc.getSelectedFile.getName.toUpperCase.endsWith(".K64")) fc.getSelectedFile.toString else fc.getSelectedFile.toString + ".k64"
+        case _ =>
+          return
+      }
+      out = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(fn)))
+      out.writeChars(APPLICATION_NAME)
+      out.writeObject(ucesoft.cbm.Version.VERSION)
+      out.writeLong(System.currentTimeMillis)
+      save(out)
+      out.close()
+    }
+    catch {
+      case t:Throwable =>
+
+        showError("State saving error","Can't save state. Unexpected error occurred: " + t)
+        t.printStackTrace()
+    }
+    finally {
+      if (out != null) out.close()
+      clock.play
+    }
+  }
 }

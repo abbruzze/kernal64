@@ -65,17 +65,23 @@ object Diskette {
     }
   }
 
-  sealed trait FileName
-  case class StandardFileName(name:String,fileType:FileType.Value,mode:FileMode.Value,overwrite:Boolean) extends FileName
-  case class DirectoryFileName(pattern:Option[String],filterOnType:Option[FileType.Value]) extends FileName
+  sealed trait FileName {
+    val isDirectory : Boolean
+  }
+  case class StandardFileName(name:String,fileType:FileType.Value,mode:FileMode.Value,overwrite:Boolean) extends FileName {
+    override val isDirectory: Boolean = false
+  }
+  case class DirectoryFileName(drive:Int,pattern:Option[String],filterOnType:Option[FileType.Value]) extends FileName {
+    override val isDirectory: Boolean = true
+  }
 
   private val FILENAME_RE = """(@?\d:)?([^,]+)(,(s|seq|S|SEQ|p|prg|P|PRG|u|usr|U|USR|r|rel|R|REL))?(,(r|w|a|R|W|A))?""".r
-  private val DIRECTORY_RE = """\$(\d:([^=]+)(=([s|S|r|R|p|P|u|U]))?)?""".r
+  private val DIRECTORY_RE = """\$(\d)?(:([^=]+)(=([s|S|r|R|p|P|u|U]))?)?""".r
 
   def parseFileName(fn:String): Option[FileName] = {
     fn match {
-      case DIRECTORY_RE(_,pattern,_,ftype) =>
-        Some(DirectoryFileName(Option(pattern),Option(ftype).map(FileType.fromString)))
+      case DIRECTORY_RE(drive,_,pattern,_,ftype) =>
+        Some(DirectoryFileName(Option(drive).getOrElse("0").toInt,Option(pattern),Option(ftype).map(FileType.fromString)))
       case FILENAME_RE(ovr,pattern,_,ftype,_,mode) =>
         Some(StandardFileName(pattern,FileType.fromString(ftype),FileMode.fromString(mode),ovr != null && ovr.startsWith("@")))
       case _ =>
@@ -137,6 +143,7 @@ abstract class Diskette extends Floppy {
   import Diskette._
   
   protected val BYTES_PER_SECTOR = 256
+  protected def BAM_TRACK = 18
   protected def DIR_TRACK = 18
   protected def DIR_SECTOR = 1
   protected def BAM_SECTOR = 0
@@ -198,14 +205,19 @@ abstract class Diskette extends Floppy {
     dirs.toList
   }
   
-  // optional
-  def bam : BamInfo  
+  def bam : BamInfo
+  def reloadBam : BamInfo = bam
   
   def readBlock(track:Int,sector:Int): Array[Byte] = {
     disk.seek(absoluteSector(track,sector) * BYTES_PER_SECTOR)
     val buffer = Array.ofDim[Byte](BYTES_PER_SECTOR)
     disk.read(buffer)
     buffer
+  }
+
+  def writeBlock(t:Int,s:Int,sector:Array[Byte]) : Unit = {
+    disk.seek(absoluteSector(t, s) * BYTES_PER_SECTOR)
+    disk.write(sector)
   }
   
   // =======================================================================
@@ -271,7 +283,7 @@ abstract class Diskette extends Floppy {
   }
   
   def load(fileName: String,fileType:FileType.Value = FileType.PRG): FileData = {
-    if (fileName.startsWith("$")) formatDirectoriesAsPRG(DirectoryFileName(Some(fileName),None))
+    if (fileName.startsWith("$")) formatDirectoriesAsPRG(DirectoryFileName(0,Some(fileName),None))
     else {
       val dpos = fileName.indexOf(":")
       val st = new StringTokenizer(if (dpos != -1) fileName.substring(dpos + 1) else fileName,",")
@@ -295,7 +307,7 @@ abstract class Diskette extends Floppy {
     }
   }
 
-  def load(fileName:FileName): Option[FileData] = {
+  def load(fileName:FileName,secondaryAddress:Int): Option[FileData] = {
     fileName match {
       case StandardFileName(name, fileType, mode, overwrite) =>
         val fn = if (name.length < 17) name else name.substring(0,16)
@@ -306,24 +318,16 @@ abstract class Diskette extends Floppy {
             case _ => throw new IOException("Bad file type: " + e.fileType)
           }
         }
-      case d@DirectoryFileName(_,_) =>
-        Some(formatDirectoriesAsPRG(d))
+      case d@DirectoryFileName(_,_,_) =>
+        if (secondaryAddress == 0) Some(formatDirectoriesAsPRG(d))
+        else formatDirectory()
     }
   }
 
-  protected def getDirectoryStartAddress: Int = 0x801
-  
+  protected def formatDirectory(): Option[FileData] = None
+
   protected def formatDirectoriesAsPRG(dir:DirectoryFileName,showDEL:Boolean = false): FileData = {
-    /*val colonPos = fileName.indexOf(":")
-    val dirs = if (colonPos == -1) directories else {
-      val filter = fileName.substring(colonPos + 1)
-      val asteriskPos = filter.indexOf('*')
-      directories filter { fn =>
-        if (asteriskPos == -1) fn.fileName == filter else fn.fileName.startsWith(filter.substring(0,asteriskPos))
-      }      
-    }
-     */
-    val dirs = directories filter { d =>
+    val dirs = directories.filter(_ => dir.drive == 0).filter { d => // DRIVE 1 NOT SUPPORTED
       dir.pattern match {
         case Some(p) =>
           fileNameMatch(p,d.fileName)
@@ -343,10 +347,9 @@ abstract class Diskette extends Floppy {
     }
 
     val out = new ListBuffer[Int]
-    val _bam = bam
+    val _bam = reloadBam
     
-    // set start address to $0801
-    var ptr = getDirectoryStartAddress
+    var ptr = 0x401
     // write next line address
     ptr += 30
     out.append(ptr & 0xFF) 	// L
@@ -360,10 +363,10 @@ abstract class Diskette extends Floppy {
       if (i < _bam.diskName.length) out.append(_bam.diskName.charAt(i)) else out.append(0x20)
     }
     out.append(0x22) // "
-    out.append(0x20)
+    out.append(0xA0)
     out.append(_bam.diskID(0))
     out.append(_bam.diskID(1))
-    out.append(0x20)
+    out.append(0xA0)
     out.append(_bam.dosType(0))
     out.append(_bam.dosType(1))
     out.append(0x00)	// EOL
@@ -382,15 +385,15 @@ abstract class Diskette extends Floppy {
       out.append(dir.sizeInSectors & 0xFF)
       out.append(dir.sizeInSectors >> 8)
       // blanks after blocks      
-      for(i <- 1 to blanks) out.append(0x20)
+      for(i <- 1 to blanks) out.append(0xA0)
       out.append(0x22) // "
       for(i <- 0 until dir.fileName.length) out.append(dir.fileName.charAt(i))
       out.append(0x22) // "
-      for(i <- 1 to 16 - dir.fileName.length) out.append(0x20)
-      out.append(0x20) // "
+      for(i <- 1 to 16 - dir.fileName.length) out.append(0xA0)
+      out.append(0xA0)
       val fileType = dir.fileType.toString
       for(i <- 0 until fileType.length) out.append(fileType.charAt(i))
-      for(i <- 1 to endBlanks) out.append(0x20)
+      for(i <- 1 to endBlanks) out.append(0xA0)
       out.append(0x00) // EOL
     }
     
@@ -399,7 +402,7 @@ abstract class Diskette extends Floppy {
     ptr += 2 + 2 + blocksFreeText.length + 1
     out.append(ptr & 0xFF) 	// L
     out.append(ptr >> 8)	// H
-    val blocksFree = bam.freeSectors
+    val blocksFree = _bam.freeSectors
     // write block free
     out.append(blocksFree & 0xFF) 	// L
     out.append(blocksFree >> 8)		// H    
@@ -408,6 +411,6 @@ abstract class Diskette extends Floppy {
     
     out.append(0x00)
     out.append(0x00)
-    FileData("$",getDirectoryStartAddress,out.toArray,FileType.PRG)
+    FileData("$",0x401,out.toArray,FileType.PRG)
   }
 }

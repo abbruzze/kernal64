@@ -39,42 +39,108 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
     }
   }
 
+  protected class DirectAccessBuffer(val index:Int,val memoryAddress:Int) {
+    val addresses = memoryAddress until (memoryAddress + 0xFF)
+    private var used = false
+    private val buffer = Array.ofDim[Int](256)
+    private var bp = 0
+
+    def isUsed: Boolean = used
+    def setUsed(used:Boolean): Unit = {
+      this.used = used
+    }
+
+    def getBuffer(): Array[Int] = buffer
+
+    def setBP(bp:Int): Unit = this.bp = bp % 256
+    def get(pos:Int): Int = {
+      if (pos < buffer.length) buffer(pos) else 0
+    }
+    def get(): Int = {
+      val v = buffer(bp)
+      bp = (bp + 1) % buffer.length
+      v
+    }
+
+    def set(value:Int): Unit = {
+      if (used) {
+        buffer(bp) = value
+        bp = (bp + 1) % buffer.length
+      }
+    }
+    def set(value:Array[Int]): Unit = {
+      System.arraycopy(value,0,buffer,0,value.length)
+      bp = 0
+    }
+    def set(value:Array[Int],pos:Int): Unit = {
+      if (used) {
+        for (i <- 0 until value.length) {
+          buffer((pos + i) % buffer.length) = value(i)
+        }
+      }
+    }
+  }
+
   protected class Channel {
     private var opened = false
     private val _name = new StringBuilder()
-    private val buffer = new ListBuffer[Int]
-    private var bufferIndex = 0
+    private val inBuffer = new ListBuffer[Int]
+    private var outBuffer : Array[Int] = Array()
+    private var outBufferIndex = 0
     private var notFound = false
+    private var writeMode = false
+    private var bufferPtr : DirectAccessBuffer = _
+    private var commandOutputReady = false
+
+    def setCommandOutputReady(): Unit = commandOutputReady = true
+    def isCommandOutputReady(): Boolean = commandOutputReady
 
     def isOpened(): Boolean = opened
     def isNotFound(): Boolean = notFound
     def setNotFound(): Unit = notFound = true
 
+    def setBuffer(buffer:DirectAccessBuffer): Unit = bufferPtr = buffer
+    def hasBuffer(): Boolean = bufferPtr != null
+    def getBuffer(): DirectAccessBuffer = bufferPtr
+
     def open(): Unit = {
       opened = true
       _name.clear()
-      bufferIndex = 0
+      outBufferIndex = 0
       notFound = false
     }
     def close(): Unit = {
       opened = false
-      bufferIndex = 0
+      outBuffer = Array()
+      outBufferIndex = 0
+      if (bufferPtr != null) bufferPtr.setUsed(false)
+      bufferPtr = null
+      inBuffer.clear()
+      commandOutputReady = false
     }
     def name(): String = _name.toString
     def addNameChar(c:Int): Unit = _name.append(c.toChar)
-    def setData(data:Array[Int]): Unit = {
-      buffer.clear()
-      buffer.addAll(data)
-      bufferIndex = 0
+    def setOutData(data:Array[Int]): Unit = {
+      /*
+      inBuffer.clear()
+      inBuffer.addAll(data)*/
+      outBuffer = data
+      outBufferIndex = 0
     }
-    def addData(data:Int): Unit = {
-      buffer += data
+    def addInData(data:Int): Unit = {
+      if (bufferPtr != null)
+        bufferPtr.set(data)
+      else inBuffer += data
     }
-    def hasMoreData(): Boolean = bufferIndex < buffer.length
-    def nextData(): Int = {
-      if (bufferIndex < buffer.length) {
-        val data = buffer(bufferIndex)
-        bufferIndex += 1
+    def getInData(): Array[Int] = inBuffer.toArray
+    def getOutData(): Array[Int] = outBuffer
+    def hasMoreOutData(): Boolean = bufferPtr != null || outBufferIndex < outBuffer.length
+    def nextOutData(): Int = {
+      if (bufferPtr != null) bufferPtr.get()
+      else
+      if (outBufferIndex < outBuffer.length) {
+        val data = outBuffer(outBufferIndex)
+        outBufferIndex += 1
         data
       }
       else 0
@@ -82,17 +148,45 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
     def reset(): Unit = {
       opened = false
       _name.clear()
-      buffer.clear()
-      bufferIndex = 0
+      inBuffer.clear()
+      outBuffer = Array()
+      outBufferIndex = 0
+      writeMode = false
+      bufferPtr = null
+      commandOutputReady = false
     }
-    def getBuffer: Array[Int] = buffer.toArray
-    def index(): Int = bufferIndex
-    def rewind(): Unit = bufferIndex = 0
+    def resetInput(): Unit = {
+      inBuffer.clear()
+      _name.clear()
+    }
+    def setWriteMode(wm:Boolean): Unit = writeMode = wm
+    def isWriteMode(): Boolean = writeMode
+    def rewind(): Unit = outBufferIndex = 0
   }
 
   protected var lastCommand : Command = UNKNOWN
   protected var secondaryAddress = 0
   protected val channels: Array[Channel] = Array.fill(16)(new Channel)
+  protected val buffersAddress : Array[Int] = Array()
+  protected lazy val buffers: Array[DirectAccessBuffer] = {
+    for(a <- buffersAddress.zipWithIndex) yield {
+      new DirectAccessBuffer(a._2,a._1)
+    }
+  }
+
+
+  protected def findFreeBuffer(): Option[DirectAccessBuffer] = {
+    val buf = buffers.find(!_.isUsed)
+    buf.foreach(_.setUsed(true))
+    buf
+  }
+
+  protected def maskAddressForBuffer(address:Int): Int = address
+
+  protected def findBufferForAddress(address:Int): Option[DirectAccessBuffer] = {
+    val maskedAdr = maskAddressForBuffer(address)
+    buffers.find(_.addresses.contains(maskedAdr))
+  }
 
 
   protected def closeChannel(channel:Int): Unit = {}
@@ -108,16 +202,11 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
 
   override protected def sendData(): Boolean = {
     val ch = channels(secondaryAddress)
-    /*
-    if (ch.index() == 0) {
-      if (!loadChannel()) return false
-    }
-     */
     if (ch.isNotFound()) return false
 
-    bus.setDIO(ch.nextData())
+    bus.setDIO(ch.nextOutData())
     //println(s"Sending '${bus.getDIO().toChar}''")
-    if (!ch.hasMoreData()) {
+    if (!ch.hasMoreOutData()) {
       bus.pullLine(listener,EOI)
       eoiLow = true
       ch.rewind()
@@ -144,8 +233,9 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
         }
       case _ =>
         if (checkData(data)) {
-          channels(secondaryAddress).addData(data)
-          //println(s"New data[$secondaryAddress]: ${channels(secondaryAddress).getBuffer().mkString("[",",","]")}")
+          channels(secondaryAddress).addInData(data)
+          if (secondaryAddress == 15 && data == 13) executeCommand()
+          //println(s"New data[$secondaryAddress]: ${channels(secondaryAddress).getBuffer.mkString("[",",","]")}")
         }
     }
   }
@@ -163,7 +253,7 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
         case LISTEN(device) =>
           if (isThisDevice(device)) role = LISTENER
         case UNLISTEN =>
-          if (secondaryAddress == 15 && channels(15).isOpened() && channels(15).name().length > 0) executeCommand()
+          if (secondaryAddress == 15 /*&& channels(15).isOpened()*/ && (channels(15).name().length > 0 || channels(15).getInData().length > 0)) executeCommand()
           role = IDLE
         case SECONDARY_ADDRESS(sa) =>
           if (role != IDLE) {
@@ -183,8 +273,8 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
           }
         case CLOSE(address) =>
           if (role != IDLE) {
-            channels(address).close()
             closeChannel(address)
+            channels(address).close()
           }
         case TALK(device) =>
           if (isThisDevice(device)) {

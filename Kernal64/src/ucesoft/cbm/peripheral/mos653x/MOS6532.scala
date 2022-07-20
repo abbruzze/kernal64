@@ -16,7 +16,7 @@ object MOS653X {
   }
 }
 
-class MOS6532(val portA:MOS653X.Port,val portB:MOS653X.Port,val irqLow: Boolean => Unit) {
+class MOS6532(val name:String,val portA:MOS653X.Port,val portB:MOS653X.Port,val irqLow: Boolean => Unit) {
   import MOS653X._
 
   protected val ram: Array[Int] = Array.ofDim[Int](128)
@@ -44,15 +44,17 @@ class MOS6532(val portA:MOS653X.Port,val portB:MOS653X.Port,val irqLow: Boolean 
   }
 
   def writeRAM(address:Int,value:Int): Unit = ram(address & (ram.length - 1)) = value
-  def readRAM(address:Int): Unit = ram(address & (ram.length - 1))
+  def readRAM(address:Int): Int = ram(address & (ram.length - 1))
 
   def write(address:Int,value:Int): Unit = {
     address & 7 match {
       case adr@(PRA|DDRA) =>
+        println(s"[6532 $name] write ${if (adr == PRA) "PRA" else "DDRA"} = ${value.toHexString}")
         regs(adr) = value
         val byte = (regs(PRA) | ~regs(DDRA)) & 0xFF
         portA.write(byte)
       case adr@(PRB|DDRB) =>
+        println(s"[6532 $name] write ${if (adr == PRB) "PRB" else "DDRB"} = ${value.toHexString}")
         regs(adr) = value
         val byte = (regs(PRB) | ~regs(DDRB)) & 0xFF
         portB.write(byte)
@@ -79,12 +81,14 @@ class MOS6532(val portA:MOS653X.Port,val portB:MOS653X.Port,val irqLow: Boolean 
     timer = value
     timerMultiplierCounter = timerMultiplier
     timerIRQ = false
+    println(s"[6532 $name] setting timer = ${value.toHexString} multiplier = $timerMultiplier")
     checkIRQ()
   }
 
   protected def writeEdgeDetectControl(address:Int): Unit = {
     pa7IRQEnabled = (address & 2) > 0
     pa7NegativeEdgeMode = (address & 1) == 0
+    println(s"[6532 $name] write PA7 mode: pa7IRQEnabled=$pa7IRQEnabled pa7NegativeEdgeMode=$pa7NegativeEdgeMode")
   }
 
   def pa7(value:Boolean): Unit = {

@@ -5,6 +5,7 @@ import ucesoft.cbm._
 import ucesoft.cbm.cpu._
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.formats._
+import ucesoft.cbm.formats.cart.MagicDesk128
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
 import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
@@ -422,6 +423,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
       val file = new File(fn)
       romType match {
         case FunctionROMType.NORMAL if file.length > 32768 => throw new IllegalArgumentException("ROM's size must be less than 32K")
+        case FunctionROMType.MAGICDESK128 if (file.length() % 16384) != 0 => throw new IllegalArgumentException("ROM's size must be a multiple of 16K")
         case _ =>
       }      
       val rom = Array.ofDim[Byte](file.length.toInt)
@@ -429,6 +431,10 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
       f.readFully(rom)
       f.close()
       mmu.configureFunctionROM(internal,rom,romType)
+      romType match {
+        case FunctionROMType.MAGICDESK128 =>
+          ExpansionPort.setExpansionPort(new MagicDesk128(mmu))
+      }
       if (!fileName.isDefined) JOptionPane.showMessageDialog(displayFrame,"ROM loaded. Reset to turn it on", "ROM loaded successfully",JOptionPane.INFORMATION_MESSAGE)
       if (internal) {
         internalFunctionROMFileName = fn
@@ -738,7 +744,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
       ROMPanel.showROMPanel(displayFrame,configuration,false,false,() => {
         saveSettings(false)
         checkFunctionROMS
-        reset()
+        reset(false)
       })
       clock.play
     } )

@@ -10,7 +10,7 @@ class DualSID(sid:SID,sidAddress:Int) extends ExpansionPort {
   val TYPE : ExpansionPortType.Value = ExpansionPortType.DUALSID
   override val name = "DualSID"
   override val componentID = "DualSID"
-  private[this] final val endAddress = sidAddress + 0x20
+  override lazy val endAddress = sidAddress + 0x20
       
   val EXROM = true
   val GAME = true

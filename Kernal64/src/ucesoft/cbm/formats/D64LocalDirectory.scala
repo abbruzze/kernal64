@@ -96,7 +96,7 @@ class D64LocalDirectory(override val file:String,val dir:File) extends D64_D71(f
     val out = new FileOutputStream(f)
     try {
       do {
-        val sector = readSectorBuffer(t, s)
+        val sector = readBlock(t, s)
         t = sector(0)
         s = sector(1).toInt & 0xFF
         if (t == 0) out.write(sector, 2, s)

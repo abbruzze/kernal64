@@ -378,7 +378,7 @@ class C64 extends CBMHomeComputer {
       clock.pause
       ROMPanel.showROMPanel(displayFrame,configuration,true,false,() => {
         saveSettings(false)
-        reset()
+        reset(false)
       })
       clock.play
     })

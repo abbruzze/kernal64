@@ -39,7 +39,7 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
   private[this] val lock = new Object
   private[this] val tree = new JTree(treeRoot)
   private[this] val spin = new JSpinner
-  private[this] var visible = false
+  private[this] var panelVisible = false
   private[this] var sleepPeriod = 1000
 
   spin.setValue(sleepPeriod)
@@ -121,7 +121,7 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
   }
 
   def enableUpdating(enabled: Boolean) : Unit = {
-    visible = enabled
+    panelVisible = enabled
     if (enabled) lock.synchronized {
       lock.notify()
     }
@@ -133,8 +133,8 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
 
   def run() : Unit = {
     while (true) {
-      if (!visible) lock.synchronized {
-        while (!visible) lock.wait()
+      if (!panelVisible) lock.synchronized {
+        while (!panelVisible) lock.wait()
       }
       Thread.sleep(sleepPeriod)
       SwingUtilities.invokeLater(new Runnable {

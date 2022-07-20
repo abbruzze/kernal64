@@ -108,6 +108,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // Internal & External function ROM =========================================================
   private[this] var internalFunctionROM,internalFunctionROM_mid,internalFunctionROM_high,externalFunctionROM_mid,externalFunctionROM_high : Array[Int] = _
   private[this] var internalROMType : FunctionROMType.Value = FunctionROMType.NORMAL
+  // Banked MagicDesk128 stuff ================================================================
+  private var internalBankedROM : Array[Array[Int]] = _
   // ==========================================================================================
   private[this] var cpu : CPU65xx = _
 
@@ -164,6 +166,15 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     add(sid)
     add(vdc)    
   }
+
+  def setInternalFunctionROMBank(bank:Int): Unit = {
+    if (internalROMType == FunctionROMType.MAGICDESK128) {
+      internalFunctionROM_mid = internalBankedROM(bank % internalBankedROM.length)
+      internalFunctionROM_high = internalBankedROM(bank % internalBankedROM.length)
+      externalFunctionROM_mid = internalFunctionROM_mid
+      externalFunctionROM_high = internalFunctionROM_high
+    }
+  }
   
   def configureFunctionROM(internal:Boolean,_rom:Array[Byte],romType:FunctionROMType.Value) : Unit = {
     if (_rom == null) {
@@ -180,6 +191,29 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     }
     internalROMType = romType
     val rom = _rom map { _.toInt & 0xFF }
+    // MagicDesk128 handling
+    if (romType == FunctionROMType.MAGICDESK128) {
+      internalBankedROM = rom.sliding(16384,16384).toArray
+      internalFunctionROM_mid = internalBankedROM(0)
+      internalFunctionROM_high = internalBankedROM(0)
+      externalFunctionROM_mid = internalBankedROM(0)
+      externalFunctionROM_high = internalBankedROM(0)
+      return
+      /*
+      internalBankedROM = Array.ofDim[Array[Int]](rom.length / 16384)
+      var offset = 0
+      var b = 0
+      while (offset < rom.length) {
+        internalBankedROM(b) = Array.ofDim[Int](16384)
+        System.arraycopy(rom,offset,internalBankedROM(b),0,16384)
+        offset += 16384
+        b += 1
+      }
+      internalFunctionROM_mid = internalBankedROM(0)
+      internalFunctionROM_high = internalBankedROM(0)
+      return
+       */
+    }
     if (_rom.length <= 16384) { // only mid affected      
       if (internal) {
         internalFunctionROM_mid = rom

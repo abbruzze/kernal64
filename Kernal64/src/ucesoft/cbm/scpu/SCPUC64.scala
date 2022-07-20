@@ -395,7 +395,7 @@ class SCPUC64 extends CBMHomeComputer {
       clock.pause
       ROMPanel.showROMPanel(displayFrame, configuration, true,true, () => {
         saveSettings(false)
-        reset()
+        reset(false)
       })
       clock.play
     })

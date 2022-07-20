@@ -1,4 +1,5 @@
 package ucesoft.cbm.formats
+import ucesoft.cbm.formats.TestD64Editor.d64
 import ucesoft.cbm.peripheral.drive.Floppy
 
 import java.io.{ObjectInputStream, ObjectOutputStream, RandomAccessFile}
@@ -105,6 +106,14 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     case D71_DISK_SIZE_70_TRACKS | D71_DISK_SIZE_70_TRACKS_WITH_ERRORS => if (_bam != null && _bam.singleSide) 35 else 70
     case _ => throw new IllegalArgumentException("Unsupported file format. size is " + disk.length)
   }
+
+  def isValidTrackAndSector(t:Int,s:Int): Boolean =
+    TRACK_ALLOCATION.get(t) match {
+      case Some(sectors) =>
+        s <= sectors
+      case None =>
+        false
+    }
   
   def bam: BamInfo = _bam
   
@@ -177,7 +186,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   protected def bamInfo: BamInfo = {
     //disk.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 3)
     val singleSide = file.toUpperCase.endsWith(".D64")// || disk.read != 0x80
-    disk.seek(absoluteSector(DIR_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)
+    disk.seek(absoluteSector(BAM_TRACK, BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)
     val diskName = new StringBuilder
     var i = 0
     while (i < 16) {
@@ -340,41 +349,70 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   }
 
   // ================================== EDITOR ====================================================
+  protected def BAM_HEADER_SIZE = 4
+  protected def BAM_SECTORS : Int = 1
+  protected def BAM_INTERLEAVE : Int = 0
+  protected def BAM_ENTRY_SIZE : Int = 4
+  protected def BAM_TRACKS : Array[Int] = Array(TOTAL_TRACKS)
+
+  protected def readBams(): Array[Array[Byte]] = {
+    var bamSector = BAM_SECTOR
+    val buffers = Array.ofDim[Array[Byte]](BAM_SECTORS)
+    for(b <- 0 until BAM_SECTORS) {
+      buffers(b) = readBlock(BAM_TRACK,bamSector)
+      bamSector += BAM_INTERLEAVE
+    }
+    buffers
+  }
+
+  override def formatDirectory(): Option[FileData] = {
+    val buffer = new ListBuffer[Int]
+    val dir = readBlock(DIR_TRACK,BAM_SECTOR)
+    buffer.addAll(dir.drop(2).map(_.toInt & 0xFF)) // BAM sector without 1st and 2nd bytes
+    Some(FileData("$",0,buffer.toArray,FileType.SEQ))
+  }
+
   def addPRG(file:Array[Byte],fileName:String,startAddress:Int) : Boolean = addFile(file,fileName,startAddress,true)
   def addSEQ(file:Array[Byte],fileName:String) : Boolean = addFile(file,fileName,-1,false)
 
-  private def addFile(file:Array[Byte],fileName:String,startAddress:Int,isPRG:Boolean = true) : Boolean = {
+  protected def addFile(file:Array[Byte],fileName:String,startAddress:Int,isPRG:Boolean = true) : Boolean = {
     def asByte(a:Array[Byte],p:Int) : Int = a(p).toInt & 0xFF
+    for(b <- file) println(s"Writing ${b.toInt & 0xFF} ${b.toChar}")
     val fileBlocks = math.ceil(file.length / 256.0).toInt
     if (fileBlocks > bam.freeSectors) return false
     // load bam in buffer
-    val bamBuffer = readSectorBuffer(DIR_TRACK,BAM_SECTOR)
-    var dirSector = readSectorBuffer(DIR_TRACK,DIR_SECTOR)
+    val bamsBuffer = readBams()
+    var dirSector = readBlock(DIR_TRACK,DIR_SECTOR)
     val dirSectorsToUpdate = new ListBuffer[(Int,Int,Array[Byte])]
 
-    // search last dir entry
-    var t = asByte(dirSector,0)
-    var s = asByte(dirSector,1)
+    var t = DIR_TRACK
+    var s = DIR_SECTOR
     var lt = DIR_TRACK
     var ls = DIR_SECTOR
-    while (t != 0 && s != 0xFF) {
-      lt = t
-      ls = s
-      dirSector = readSectorBuffer(t,s)
-      t = asByte(dirSector,0)
-      s = asByte(dirSector,1)
-    }
-    dirSectorsToUpdate.addOne((lt,ls,dirSector))
 
-    // check if there is an empty entry
-    var dirEntry = 2
+    // search en empty entry in the directory chain
     var dirEntryFound = false
-    while (dirEntry < 256 && !dirEntryFound) {
-      if (asByte(dirSector,dirEntry) == 0) dirEntryFound = true
-      else dirEntry += 32
+    var dirEntry = 2
+    while (t != 0 && !dirEntryFound) {
+      // check if there is an empty entry in current sector
+      dirEntry = 2
+      while (dirEntry < 256 && !dirEntryFound) {
+        if (asByte(dirSector,dirEntry) == 0) dirEntryFound = true
+        else dirEntry += 32
+      }
+      if (!dirEntryFound) {
+        lt = t
+        ls = s
+        t = asByte(dirSector, 0)
+        s = asByte(dirSector, 1)
+        if (t != 0) dirSector = readBlock(t, s)
+      }
     }
+    if (dirEntryFound) dirSectorsToUpdate.addOne((t,s,dirSector)) // modify current one
+    else dirSectorsToUpdate.addOne((lt,ls,dirSector)) // modify last one to point eventually to the new one
+
     if (!dirEntryFound) { // no entry found on current sector
-      findFreeSector(bamBuffer,true) match {
+      findOrAllocateFreeSector(bamsBuffer(0),true) match {
         case None =>
           return false
         case Some((nt,ns)) =>
@@ -386,7 +424,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
           dirEntry = 2
       }
     }
-    dirSector(1) = 0xFF.toByte // last sector
+    //dirSector(1) = 0xFF.toByte // last sector
     dirSector(dirEntry) = if (isPRG) 0x82.toByte else 0x81.toByte // PRG or SEQ
     for(i <- 0 until 16) dirSector(dirEntry + 3 + i) = if (i < fileName.length) fileName.charAt(i).toByte else 0xA0.toByte
 
@@ -395,7 +433,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     var fileOffset = 0
     var sectors = new ListBuffer[(Int,Int)]
     while (fileOffset < file.length) {
-      findFreeSector(bamBuffer,false) match {
+      findFreeSector(bamsBuffer) match {
         case None =>
           return false
         case Some(ts@(nt,ns)) =>
@@ -444,70 +482,143 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     }
     // write directory sectors
     for((t,s,buffer) <- dirSectorsToUpdate) {
-      writeSectorBuffer(t,s,buffer)
+      writeBlock(t,s,buffer)
     }
     // write bam
-    writeSectorBuffer(DIR_TRACK,BAM_SECTOR,bamBuffer)
+    var bamSector = BAM_SECTOR
+    for(b <- 0 until BAM_SECTORS) {
+      writeBlock(BAM_TRACK, bamSector, bamsBuffer(b))
+      bamSector += BAM_INTERLEAVE
+    }
     true
   }
 
-  private def findFreeSector(bam:Array[Byte],on18:Boolean) : Option[(Int,Int)] = {
+  protected def findFreeSector(bams:Array[Array[Byte]],allocate:Boolean = true): Option[(Int,Int)] = {
+    var trackAllocationOffset = 0
+    for(b <- 0 until bams.length) {
+      findOrAllocateFreeSector(bams(b),false,trackAllocationOffset,BAM_TRACKS(b),allocate) match {
+        case s@Some(_) =>
+          return s
+        case None =>
+          trackAllocationOffset += BAM_TRACKS(b)
+      }
+    }
+    None
+  }
+
+  def findOrAllocateFreeSector(bam:Array[Byte], onDirTrack:Boolean,trackAllocationOffset : Int = 0,bamTrackLimit : Int = TOTAL_TRACKS,allocate:Boolean = true) : Option[(Int,Int)] = {
     def asByte(p:Int) : Int = bam(p).toInt & 0xFF
-    var track = if (on18) 18 else 17
-    val trackLimit = if (on18) 19 else TOTAL_TRACKS + 1
-    val jump = if (on18) 3 else 10
+    var track = if (onDirTrack) DIR_TRACK else 1
+    val trackLimit = if (onDirTrack) DIR_TRACK + 1 else bamTrackLimit + 1
+    val jump = 1
     var trackCount = 0
+    val bamEntrySize = BAM_ENTRY_SIZE
     while (trackCount < trackLimit) {
-      if (track != 18 || on18) {
-        val sectorPerTrack = TRACK_ALLOCATION(track)
-        val pos = 4 + (track - 1) * 4
+      if (track != DIR_TRACK || onDirTrack) {
+        val sectorPerTrack = TRACK_ALLOCATION(track + trackAllocationOffset)
+        val pos = BAM_HEADER_SIZE + bamEntrySize * (track - 1)
         if (asByte(pos) > 0) {
-          val sectorsMap = asByte(pos + 1) | asByte(pos + 2) << 8 | asByte(pos + 3) << 16
-          var mask = 1
+          val sectorsMap = {
+            var map = 0L
+            var i = 1
+            while (i < bamEntrySize) {
+              map |= (bam(pos + i).toLong & 0xFF) << ((i - 1) << 3)
+              i += 1
+            }
+            map
+          }
+          var mask = 1L
           var s = 0
           var i = 0
           while (i < sectorPerTrack) {
             if ((sectorsMap & mask) == mask) { // found
-              val modSectorsMap = (sectorsMap & ~mask) & 0xFFFFFF
-              bam(pos + 1) = (modSectorsMap & 0xFF).toByte
-              bam(pos + 2) = ((modSectorsMap >> 8) & 0xFF).toByte
-              bam(pos + 3) = ((modSectorsMap >> 16) & 0xFF).toByte
-              bam(pos) = (bam(pos) - 1).toByte
+              if (allocate) {
+                var modSectorsMap = sectorsMap & ~mask
+                bam(pos) = (bam(pos) - 1).toByte
+                var j = 0
+                while (j < BAM_ENTRY_SIZE - 1) {
+                  bam(pos + 1 + j) = (modSectorsMap & 0xFF).toByte
+                  modSectorsMap >>= 8
+                  j += 1
+                }
+              }
 
-              return Some((track,s))
+              return Some((track + trackAllocationOffset,s))
             }
             s = (s + jump) % sectorPerTrack
-            mask = 1 << s
+            mask = 1L << s
             i += 1
           }
         }
       }
       trackCount += 1
-      track = if (track == 1) TOTAL_TRACKS else track - 1
+      track = if (track == 1)
+        bamTrackLimit
+      else track - 1
     }
     None
   }
 
   def deleteFile(entry:DirEntry) : Unit = {
-    val bamBuffer = readSectorBuffer(DIR_TRACK,BAM_SECTOR)
+    val bamsBuffer = readBams()
     // DEL on directory
-    val dir = readSectorBuffer(entry.entryTrack,entry.entrySector)
+    val dir = readBlock(entry.entryTrack,entry.entrySector)
     dir(2 + entry.entryPos * 32) = 0 // DEL
     // delete file
     var t = entry.t
     var s = entry.s
     while (t != 0) {
-      makeFreeSector(bamBuffer,t,s)
+      val (bamSector,track) = getBAMForTrack(bamsBuffer,t)
+      makeFreeSector(bamSector,track,s)
       disk.seek(absoluteSector(t,s) * BYTES_PER_SECTOR)
       // read next t,s
       t = disk.read
       s = disk.read
     }
-    writeSectorBuffer(entry.entryTrack,entry.entrySector,dir)
-    writeSectorBuffer(DIR_TRACK,BAM_SECTOR,bamBuffer)
+    writeBlock(entry.entryTrack,entry.entrySector,dir)
+    // write bam
+    var bamSector = BAM_SECTOR
+    for(b <- 0 until BAM_SECTORS) {
+      writeBlock(BAM_TRACK, bamSector, bamsBuffer(b))
+      bamSector += BAM_INTERLEAVE
+    }
+  }
+
+  protected def getBAMForTrack(bams:Array[Array[Byte]],t:Int): (Array[Byte],Int) = {
+    var tracks = 0
+    for(b <- 0 until bams.length) {
+      if (t - tracks <= BAM_TRACKS(b)) return (bams(b),t - tracks)
+      tracks += BAM_TRACKS(b)
+    }
+    throw new IllegalArgumentException(s"Error while getting BAM for track $t")
   }
 
   def reloadGCR() : Unit = loadGCRImage
+
+  /*
+    0 = OK
+    1 = newName already exists
+    2 = oldName doesn't exist
+   */
+  def renameFile(oldName:String,newName:String): Int = {
+    val dirs = directories
+    if (dirs.exists(_.fileName == newName)) 1
+    else {
+      dirs.find(_.fileName == oldName) match {
+        case Some(e) =>
+          disk.seek(absoluteSector(e.entryTrack, e.entrySector) * BYTES_PER_SECTOR + e.entryPos * 0x20 + 5) // file name
+          var i = 0
+          while (i < 16) {
+            if (i < newName.length) disk.write(newName.charAt(i))
+            else disk.write(0xA0)
+            i += 1
+          }
+          0
+        case None =>
+          2
+      }
+    }
+  }
 
   def rename(name:String) : Unit = {
     disk.seek(absoluteSector(DIR_TRACK,BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)
@@ -517,43 +628,48 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     }
   }
 
-  private def makeFreeSector(bam:Array[Byte],t:Int,s:Int) : Unit = {
-    def asByte(p:Int) : Int = bam(p).toInt & 0xFF
-    val pos = 4 + (t - 1) * 4
+  def makeFreeSector(bam:Array[Byte],t:Int,s:Int) : Unit = {
+    val bamEntrySize = BAM_ENTRY_SIZE
+    val pos = BAM_HEADER_SIZE + bamEntrySize * (t - 1)
     bam(pos) = (bam(pos) + 1).toByte
-    val sectorsMap = asByte(pos + 1) | asByte(pos + 2) << 8 | asByte(pos + 3) << 16
-    val modSectorsMap = sectorsMap | 1 << s
-    bam(pos + 1) = (modSectorsMap & 0xFF).toByte
-    bam(pos + 2) = ((modSectorsMap >> 8) & 0xFF).toByte
-    bam(pos + 3) = ((modSectorsMap >> 16) & 0xFF).toByte
-  }
-
-  protected def readSectorBuffer(t:Int,s:Int) : Array[Byte] = {
-    val buffer = Array.ofDim[Byte](256)
-    disk.seek(absoluteSector(t, s) * BYTES_PER_SECTOR)
-    disk.read(buffer)
-    buffer
-  }
-
-  protected def writeSectorBuffer(t:Int,s:Int,sector:Array[Byte]) : Unit = {
-    disk.seek(absoluteSector(t, s) * BYTES_PER_SECTOR)
-    disk.write(sector)
+    val sectorsMap = {
+      var map = 0L
+      var i = 1
+      while (i < bamEntrySize) {
+        map |= (bam(pos + i).toLong & 0xFF) << ((i - 1) << 3)
+        i += 1
+      }
+      map
+    }
+    var modSectorsMap = sectorsMap | 1L << s
+    var j = 0
+    while (j < BAM_ENTRY_SIZE - 1) {
+      bam(pos + 1 + j) = (modSectorsMap & 0xFF).toByte
+      modSectorsMap >>= 8
+      j += 1
+    }
   }
 }
 
 object TestD64Editor extends App {
-  val d64 = new D64_D71("/Users/ealeame/Desktop/empty.d64",false)
+  val d64 = new D80("/Users/ealeame/Desktop/empty.d80",false)
 
-  val in = new java.io.FileInputStream("/Users/ealeame/Desktop/basictest.prg")
+  d64.rename("PIPPO") ; d64.close ; sys.exit(0)
+  d64.directories foreach { d64.deleteFile } ; d64.close ; sys.exit(0)
+
+  val in = new java.io.FileInputStream("/Users/ealeame/Desktop/bruce.prg")
   val file = in.readAllBytes()
   val startAddress = file(0) | file(1) << 8
   val content = file.drop(2)
-  for(i <- 1 to 1)
-  if (!d64.addPRG(content,s"BASICTEST",startAddress)) println("NO SPACE")
+
+  val N = scala.io.StdIn.readLine("How many?:").toInt
+  val from = scala.io.StdIn.readLine("From:").toInt
+  for(i <- 1 to N)
+    if (!d64.addPRG(content,s"BRUCE${from + i - 1}",startAddress)) println("NO SPACE") else println("OK, added")
 
 
   //d64.directories find { e =>e.fileName == "BRUCE LEE2" } foreach { d64.deleteFile }
-  d64.rename("AUTOSTART")
+  //d64.rename("AUTOSTART")
   d64.reloadGCR
   d64.close
 }
