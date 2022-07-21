@@ -1,7 +1,7 @@
 package ucesoft.cbm.cbm2
 
 import ucesoft.cbm.{ChipID, Clock, ClockEvent, Log}
-import ucesoft.cbm.cpu.CPU6510_CE
+import ucesoft.cbm.cpu.{CPU6510_CE, ROM}
 import ucesoft.cbm.misc.{Switcher, TestCart}
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.cia.CIA
@@ -10,9 +10,9 @@ import ucesoft.cbm.peripheral.vic.Display
 import ucesoft.cbm.trace.TraceDialog
 import IEEE488Connectors._
 import ucesoft.cbm.peripheral.EmptyConnector
-import ucesoft.cbm.peripheral.bus.IEEE488Bus
+import ucesoft.cbm.peripheral.bus.{IECBus, IEEE488Bus}
 import ucesoft.cbm.peripheral.crtc.CRTC6845
-import ucesoft.cbm.peripheral.drive.IEEE488Drive
+import ucesoft.cbm.peripheral.drive.{C1541, DriveLedListener, IEEE488Drive}
 import ucesoft.cbm.peripheral.keyboard.BKeyboard
 import ucesoft.cbm.peripheral.mos6525.MOS6525
 import ucesoft.cbm.peripheral.mos6551.ACIA6551
@@ -20,6 +20,7 @@ import ucesoft.cbm.peripheral.printer.{IEEE488MPS803, MPS803GFXDriver, MPS803ROM
 
 import java.awt.{Dimension, FlowLayout}
 import java.io.{File, PrintWriter, StringWriter}
+import java.util.Properties
 import javax.swing.{JButton, JFrame, JPanel, JToggleButton}
 
 object CBM2Test {
@@ -32,6 +33,8 @@ object CBM2Test {
   private var datassette : Datassette = _
   private val bus = new IEEE488Bus
   private var acia : ACIA6551 = _
+
+  private var c1541 : C1541 = _
 
   private val _50_60_CYCLES = 2000000 / 50 // 50Hz
 
@@ -112,10 +115,12 @@ object CBM2Test {
 
     datassette = new Datassette(ciaieee.setFlagLow _)
 
-    val ieeeA: Unit =
+    val iec = new IECBus
+
     tpiIeee = new MOS6525(
       "tpiIeee",
       new IEEE488InterfaceA(bus,ciaConnectorA),
+      //new IECInterfaceB(iec,ciaieee.setFlagLow _),
       new IEEE488InterfaceB(bus,datassette),
       new MOS6525.PortC {
         override def read(): Int = {
@@ -163,6 +168,22 @@ object CBM2Test {
       },
       _ => {}
     )
+
+    // 1541
+    /*
+    c1541 = new C1541(1,iec,new DriveLedListener {
+      override def writeMode(enabled: Boolean): Unit = {}
+      override def setPowerLedMode(on: Boolean): Unit = {}
+      override def turnPower(on: Boolean): Unit = {}
+      override def turnOn(): Unit = println("DRIVE LED ON")
+      override def turnOff(): Unit = println("DRIVE LED OFF")
+      override def isOn: Boolean = false
+      override def moveTo(track: Int, sector: Option[Int], halfTrack: Boolean): Unit = println(s"DRIVE track=$track sector=${sector.getOrElse(0)}")
+    })
+    ROM.props = new Properties()
+    c1541.initComponent()
+    c1541.runningListener = x => {}
+    */
 
     // TEST Device
     val device = new IEEE488Drive("8050",8,bus)
@@ -224,5 +245,6 @@ object CBM2Test {
     cpu.fetchAndExecute(1)
     ciaieee.clock(false)
     ciaip.clock(false)
+    //if ((cycles & 1) == 0) c1541.clock(cycles >> 1)
   }
 }

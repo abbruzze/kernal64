@@ -2,7 +2,7 @@ package ucesoft.cbm.formats
 import ucesoft.cbm.formats.TestD64Editor.d64
 import ucesoft.cbm.peripheral.drive.Floppy
 
-import java.io.{ObjectInputStream, ObjectOutputStream, RandomAccessFile}
+import java.io.{BufferedInputStream, ObjectInputStream, ObjectOutputStream, RandomAccessFile}
 import scala.collection.mutable.ListBuffer
 
 class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
@@ -354,6 +354,9 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   protected def BAM_INTERLEAVE : Int = 0
   protected def BAM_ENTRY_SIZE : Int = 4
   protected def BAM_TRACKS : Array[Int] = Array(TOTAL_TRACKS)
+  protected def EMPTY_DISK() : String = {
+    if (file.toUpperCase().endsWith(".D64")) "/resources/emptyDisk.d64" else "/resources/emptyDisk.d71"
+  }
 
   protected def readBams(): Array[Array[Byte]] = {
     var bamSector = BAM_SECTOR
@@ -377,7 +380,6 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
 
   protected def addFile(file:Array[Byte],fileName:String,startAddress:Int,isPRG:Boolean = true) : Boolean = {
     def asByte(a:Array[Byte],p:Int) : Int = a(p).toInt & 0xFF
-    for(b <- file) println(s"Writing ${b.toInt & 0xFF} ${b.toChar}")
     val fileBlocks = math.ceil(file.length / 256.0).toInt
     if (fileBlocks > bam.freeSectors) return false
     // load bam in buffer
@@ -620,11 +622,28 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     }
   }
 
-  def rename(name:String) : Unit = {
+  def rename(name:String,id:String) : Unit = {
     disk.seek(absoluteSector(DIR_TRACK,BAM_SECTOR) * BYTES_PER_SECTOR + 0x90)
-    for(i <- 0 to 15) {
+    for(i <- 0 to 17) {
       val c = if (i < name.length) name.charAt(i).toInt else 0xA0
       disk.write(c)
+    }
+    disk.write(id.charAt(0))
+    disk.write(id.charAt(1))
+  }
+
+  def formatDisk(name:String,id:String): Unit = {
+    var in = getClass().getResourceAsStream(EMPTY_DISK())
+    if (in != null) {
+      val buffer = Array.ofDim[Byte](10240)
+      in = new BufferedInputStream(in)
+      disk.seek(0)
+      var read = in.read(buffer)
+      while (read > 0) {
+        disk.write(buffer,0,read)
+        read = in.read(buffer)
+      }
+      rename(name,id)
     }
   }
 
@@ -654,7 +673,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
 object TestD64Editor extends App {
   val d64 = new D80("/Users/ealeame/Desktop/empty.d80",false)
 
-  d64.rename("PIPPO") ; d64.close ; sys.exit(0)
+  d64.rename("PIPPO","XY") ; d64.close ; sys.exit(0)
   d64.directories foreach { d64.deleteFile } ; d64.close ; sys.exit(0)
 
   val in = new java.io.FileInputStream("/Users/ealeame/Desktop/bruce.prg")

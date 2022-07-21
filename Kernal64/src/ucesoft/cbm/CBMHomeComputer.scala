@@ -312,7 +312,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     disk.deleteOnExit()
     Diskette.makeEmptyDisk(disk.toString)
     val d64 = new D64_D71(disk.toString,false)
-    d64.rename("AUTOSTART")
+    d64.rename("AUTOSTART","  ")
     val in = new java.io.FileInputStream(file)
     val prg = in.readAllBytes()
     in.close()

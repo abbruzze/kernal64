@@ -35,7 +35,7 @@ object D64LocalDirectory {
       }
     }
     d64.setFileMap(fileMap.toMap)
-    d64.rename(s"/${dir.getName.toUpperCase}")
+    d64.rename(s"/${dir.getName.toUpperCase}","  ")
     d64.reloadGCR
     d64
   }

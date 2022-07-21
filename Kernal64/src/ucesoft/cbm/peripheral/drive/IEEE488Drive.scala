@@ -48,6 +48,7 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
 
   protected val RENAME_CMD_RE = """R(ENAME)?\d?:([^=]+=.+)""".r
   protected val SCRATCH_CMD_RE = """S(CRATCH)?(.+)""".r
+  protected val NEW_CMD_RE = """N(EW)?\d?:([^,]+)(,..)?""".r
 
   // INIT
   setStatus(STATUS_POWERUP)
@@ -249,6 +250,7 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
       println(s"Executing command '$cmd' ${cmd.toCharArray.map(_.toInt).mkString(",")}")
       if (RENAME_CMD_RE.matches(cmd)) renameFile(cmd)
       else if (SCRATCH_CMD_RE.matches(cmd)) scratchFile(cmd)
+      else if (NEW_CMD_RE.matches(cmd)) formatDisk(cmd)
       else if (cmd.startsWith("I")) executeInitialize()
       else if (cmd.startsWith("B-P")) executeBP(cmd.substring(3))
       else if (cmd.startsWith("U1")) executeBlockRead(cmd.substring(2),true)
@@ -285,6 +287,17 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
     }
     if (lastWasPar) pars += sb.toString()
     pars.toArray
+  }
+
+  protected def formatDisk(cmd:String): Unit = {
+    cmd match {
+      case NEW_CMD_RE(_,name,id) =>
+        println(s"Formatting name=$name id=$id")
+        d80.formatDisk(name,Option(id).map(_.substring(1)).getOrElse(0xA0.toChar.toString + 0xA0.toChar))
+        setStatus(STATUS_OK)
+      case _ =>
+        setStatus(STATUS_SYNTAX_ERROR)
+    }
   }
 
   protected def scratchFile(cmd:String): Unit = {

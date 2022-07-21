@@ -1,7 +1,7 @@
 package ucesoft.cbm.cbm2
 
 import ucesoft.cbm.peripheral.Connector
-import ucesoft.cbm.peripheral.bus.IEEE488Bus
+import ucesoft.cbm.peripheral.bus.{IECBus, IECBusListener, IEEE488Bus}
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.mos6525.MOS6525
 
@@ -106,6 +106,33 @@ object IEEE488Connectors {
       val datassetteWrite = (value & 0x20) == 0
       datassette.setMotor(datassetteMotor)
       datassette.setWriteLine(datassetteWrite)
+    }
+  }
+
+  /**
+    1 GND -----------+     1 SRQ
+    2 +5V            |---  2 GND
+    3 MTR -----------|---  3 ATN       =====> PB6
+    4 RD ------|           4 CLK ----+ =====> PB7
+    5 WR ------+---------  5 DATA    | =====> PB5
+    6 SNS                  6 RESET   |
+       +------------------------------
+   */
+  class IECInterfaceB(iec:IECBus,flagLow: () => Unit) extends IECBusListener with MOS6525.PortAB {
+    import IECBus._
+    override val isController = true
+    override val busid: String = "IECBUS-Adapter"
+
+    iec.registerListener(this)
+
+    override def read(): Int = /*~*/(iec.clk << 7 | iec.data << 5 | iec.atn << 6) & 0xFF
+    override def write(value: Int): Unit = {
+      val atn = if ((value & 0x40) > 0) GROUND else VOLTAGE
+      val data = if ((value & 0x20) == 0) GROUND else VOLTAGE
+      val clock = if ((value & 0x80) == 0) GROUND else VOLTAGE
+      println(s"WRITE IEC atn=$atn data=$data clock=$clock")
+      iec.setLine(this,atn,data,clock)
+      flagLow()
     }
   }
 }

@@ -27,6 +27,8 @@ class D80(override val file: String,loadImage:Boolean = true) extends D64_D71(fi
   override protected def BAM_ENTRY_SIZE : Int = 5
   override protected def BAM_TRACKS : Array[Int] = Array(50,27)
 
+  override protected def EMPTY_DISK() : String = "/resources/emptyDisk.d80"
+
   private[this] final val DISK_SIZE_77_TRACKS = 533248
 
   override protected def TOTAL_TRACKS : Int = 77
@@ -104,12 +106,14 @@ class D80(override val file: String,loadImage:Boolean = true) extends D64_D71(fi
     BamInfo(diskName.toString, diskID, dosType,true,free)
   }
 
-  override def rename(name:String) : Unit = {
+  override def rename(name:String,id:String) : Unit = {
     disk.seek(absoluteSector(DIR_TRACK,BAM_SECTOR) * BYTES_PER_SECTOR + 0x06)
-    for(i <- 0 to 15) {
+    for(i <- 0 to 17) {
       val c = if (i < name.length) name.charAt(i).toInt else 0xA0
       disk.write(c)
     }
+    disk.write(id.charAt(0))
+    disk.write(id.charAt(1))
   }
 
 }
