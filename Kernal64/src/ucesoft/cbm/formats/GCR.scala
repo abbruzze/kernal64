@@ -8,7 +8,7 @@ private[formats] object GCR {
   final private[this] val SYNC_SIZE = 5
   final private[this] val GAP = 0x55
   final private[this] val HEADER_DATA_GAP_SIZE = 9  
-  final private[this] val LAST_SECTOR_GAP = 20
+  final private[this] val LAST_SECTOR_GAP = 40//20
   final private[this] val INTER_SECTOR_GAPS_PER_ZONE = Array(9, 12, 17, 8)
   
   final private[this] val DOS_20_HEADER_DESC_BYTE_NOT_FOUND = 2
