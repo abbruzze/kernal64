@@ -10,7 +10,7 @@ class C64FileView extends FileView {
   override def getTypeDescription(f:File): String = {
     if (f.getName.toUpperCase.endsWith(".D64") || f.getName.toUpperCase.endsWith(".D71")) "Commodore 64 disk image"
     else
-    if (f.getName.toUpperCase.endsWith(".G64")) "Commodore 64 GCR disk image"
+    if (f.getName.toUpperCase.endsWith(".G64") || f.getName.toUpperCase.endsWith(".G71")) "Commodore 64 GCR disk image"
     else
     if (f.getName.toUpperCase.endsWith(".T64")) "Commodore 64 tape image"
     else
@@ -28,6 +28,7 @@ class C64FileView extends FileView {
     if (name.endsWith(".D64") || 
         name.endsWith(".D71") ||
         name.endsWith(".G64") ||
+        name.endsWith(".G71") ||
         name.endsWith(".T64") || 
         name.endsWith(".PRG") || 
         name.endsWith(".CRT") ||

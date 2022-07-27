@@ -20,7 +20,7 @@ class D1571(val driveID: Int,
             Drive {
   val driveType: DriveType.Value = DriveType._1571
   val componentID: String = "D1571 Disk Drive " + (driveID + 8)
-  val formatExtList: List[String] = List("D64","D71","G64")
+  val formatExtList: List[String] = List("D64","D71","G64","G71")
   override val MIN_SPEED_HZ = 985248
   override val MAX_SPEED_HZ = 1000000
   val isRom = false
