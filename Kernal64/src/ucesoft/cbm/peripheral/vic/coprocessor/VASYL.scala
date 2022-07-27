@@ -27,6 +27,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
   private[this] val regs = Array.ofDim[Int](0x4D)
 
   private[this] var dlistOnPendingOnNextFrame,dlistOnPendingOnNextCycle,dlistExecutionActive = false
+  private[this] var updatePCWithDLIST2LH = false
   private[this] var beamRacerActiveState = 0
   private[this] val addressPort = Array.ofDim[Int](2)
   private[this] val portWriteReps = Array.ofDim[Int](2)
@@ -147,6 +148,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     cpuPostponedWrite = false
     cpuPostponedRead = false
     cpuPostponedRMWCounter = 0
+    updatePCWithDLIST2LH = false
   }
 
   override def hardReset: Unit = {
@@ -477,7 +479,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
           if (debug) println(s"DLIST2H = ${value.toHexString}, execution address = ${(value << 8| regs(0x41)).toHexString}")
         case 0x43 if isVasylWriting =>
           dlistOnPendingOnNextCycle = true
-          pc = regs(0x41) | regs(0x42) << 8
+          updatePCWithDLIST2LH = true
           if ((value & 0x8) > 0) {
             displayListFetchBank = value & 7
             prgMem = banks(displayListFetchBank)
@@ -515,14 +517,14 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   private def writePort(port:Int,value:Int) : Unit = {
     portMem(addressPort(port)) = value
-    if (debug) println(s"Writing $value to ${addressPort(port).toHexString}")
+    if (debug) println(s"Writing $value to $portBank/${addressPort(port).toHexString}")
     incPortAddress(port)
     lastPortWriteValue(port) = value
   }
 
   private def readPort(port:Int) : Int = {
     val value = portMem(addressPort(port))
-    if (debug) println(s"Reading from ${addressPort(port).toHexString} = $value")
+    if (debug) println(s"Reading from $portBank/${addressPort(port).toHexString} = $value")
     incPortAddress(port)
     value
   }
@@ -576,13 +578,16 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   private def reloadPcFromRegs() : Unit = {
     // load pc with list address
-    pc = regs(0x32) | regs(0x33) << 8
+    if (updatePCWithDLIST2LH) {
+      pc = regs(0x41) | regs(0x42) << 8
+      updatePCWithDLIST2LH = false
+    }
+    else pc = regs(0x32) | regs(0x33) << 8
     fetchOp = true
   }
 
   private def activateListExecution() : Unit = {
     dlistExecutionActive = true
-    //prgMem = banks(currentBank)
     reloadPcFromRegs
     if (debug) println(s"VASYL list execution started at ${pc.toHexString}")
   }
@@ -685,8 +690,9 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
         else lastInstr() // execute opcode
         if (trace && Log.isDebug) {
           val bytes = s"%02x".format(lastOpcode) + (if (pc - oldPC > 1) s" %02x".format(prgMem((oldPC + 1) & 0xFFFF)) else "")
-          val disa = s"[VASYL] %04x $bytes $tracedInstr".format(oldPC)
+          val disa = s"[VASYL/$rasterLine] %04x $displayListFetchBank/$bytes $tracedInstr".format(oldPC)
           Log.debug(disa)
+          //println(disa)
         }
       }
     } while (executeNextNow && !lastExecuteNow)
@@ -808,6 +814,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     out.writeInt(cpuPostponedValue)
     out.writeInt(cpuPostponedRMWCounter)
     out.writeBoolean(cpuPostponedRead)
+    out.writeBoolean(updatePCWithDLIST2LH)
   }
 
   override protected def loadState(in: ObjectInputStream): Unit = {
@@ -860,6 +867,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     cpuPostponedValue = in.readInt()
     cpuPostponedRMWCounter = in.readInt()
     cpuPostponedRead = in.readBoolean()
+    updatePCWithDLIST2LH = in.readBoolean()
   }
 
   override protected def allowsStateRestoring: Boolean = true
