@@ -1,5 +1,6 @@
 package ucesoft.cbm.misc
 
+import ucesoft.cbm.cbm2.CBM2MMU
 import ucesoft.cbm.cpu.Memory
 
 import java.awt.Desktop
@@ -344,9 +345,58 @@ object BasicListExplorer {
     }
     sb
   }
-  
+
+  def createSourceCBM2(ram:CBM2MMU, startAddress:Int): StringBuilder = {
+    val sb = new StringBuilder
+    var adr = startAddress
+
+    var keepListing = true
+    while (keepListing && adr < 0x10000) {
+      val nextAdr = ram.readBank(adr,1) | ram.readBank(adr + 1,1) << 8
+      adr += 2
+      keepListing = nextAdr != 0
+      if (keepListing) {
+        val line = ram.readBank(adr,1) | ram.readBank(adr + 1,1) << 8
+        var stringMode = false
+        adr += 2
+        sb.append(s"$line ")
+        var token = ram.readBank(adr,1)
+        while (token != 0 && adr < 0x10000) {
+          if (token == 0x22) stringMode = !stringMode
+          val nextByte = ram.readBank(adr + 1,1)
+          if (!stringMode && (token & 0x80) > 0) {
+            val (text,length) = findToken(token,nextByte)
+            adr += length
+            sb.append(text)
+          }
+          else {
+            sb.append(mapChar(token))
+            adr += 1
+          }
+          token = ram.readBank(adr,1)
+        }
+        adr = nextAdr
+        sb.append("\n")
+      }
+    }
+    sb
+  }
+
   def list(ram:Memory,startAddress:Int) : Unit = {
     val sb = createSource(ram, startAddress)
+    if (Desktop.isDesktopSupported) {
+      val file = java.io.File.createTempFile("kernal64",".txt")
+      file.deleteOnExit()
+      val pw = new PrintWriter(new FileWriter(file))
+      pw.println(sb.toString)
+      pw.close()
+      Desktop.getDesktop.edit(file)
+    }
+    else println(sb)
+  }
+
+  def listCBM2(ram:CBM2MMU,startAddress:Int) : Unit = {
+    val sb = createSourceCBM2(ram, startAddress)
     if (Desktop.isDesktopSupported) {
       val file = java.io.File.createTempFile("kernal64",".txt")
       file.deleteOnExit()
