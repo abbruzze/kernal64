@@ -106,6 +106,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // Internal & External function ROM =========================================================
   private[this] var internalFunctionROM,internalFunctionROM_mid,internalFunctionROM_high,externalFunctionROM_mid,externalFunctionROM_high : Array[Int] = _
   private[this] var internalROMType : FunctionROMType.Value = FunctionROMType.NORMAL
+  // Banked MagicDesk128 stuff ================================================================
+  private var internalBankedROM : Array[Array[Int]] = _
   // ==========================================================================================
   private[this] var cpu : CPU65xx = _
 
@@ -162,7 +164,16 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     add(sid)
     add(vdc)    
   }
-  
+
+  def setInternalFunctionROMBank(bank:Int): Unit = {
+    if (internalROMType == FunctionROMType.MAGICDESK128) {
+      internalFunctionROM_mid = internalBankedROM(bank % internalBankedROM.length)
+      internalFunctionROM_high = internalBankedROM(bank % internalBankedROM.length)
+      externalFunctionROM_mid = internalFunctionROM_mid
+      externalFunctionROM_high = internalFunctionROM_high
+    }
+  }
+
   def configureFunctionROM(internal:Boolean,_rom:Array[Byte],romType:FunctionROMType.Value) : Unit = {
     if (_rom == null) {
       if (internal) {
@@ -174,11 +185,20 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
         externalFunctionROM_mid = null
         externalFunctionROM_high = null
       }
-      return  
+      return
     }
     internalROMType = romType
     val rom = _rom map { _.toInt & 0xFF }
-    if (_rom.length <= 16384) { // only mid affected      
+    // MagicDesk128 handling
+    if (romType == FunctionROMType.MAGICDESK128) {
+      internalBankedROM = rom.sliding(16384,16384).toArray
+      internalFunctionROM_mid = internalBankedROM(0)
+      internalFunctionROM_high = internalBankedROM(0)
+      externalFunctionROM_mid = internalBankedROM(0)
+      externalFunctionROM_high = internalBankedROM(0)
+      return
+    }
+    if (_rom.length <= 16384) { // only mid affected
       if (internal) {
         internalFunctionROM_mid = rom
         internalFunctionROM_high = rom

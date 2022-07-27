@@ -8,6 +8,7 @@ import ucesoft.cbm._
 import ucesoft.cbm.cpu._
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.formats._
+import ucesoft.cbm.formats.cart.MagicDesk128
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
 import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
@@ -399,7 +400,7 @@ class C128 extends CBMComputer with MMUChangeListener {
     else mmu.configureFunctionROM(true,null,FunctionROMType.NORMAL)
   }
   // ================================================================================================
-  
+
   private def loadFunctionROM(internal:Boolean,fileName:Option[String] = None,romType:FunctionROMType.Value = FunctionROMType.NORMAL) : Unit = {
     val fn = fileName match {
       case None =>
@@ -409,33 +410,39 @@ class C128 extends CBMComputer with MMUChangeListener {
         fc.showOpenDialog(displayFrame) match {
           case JFileChooser.APPROVE_OPTION =>
             fc.getSelectedFile.toString
-          case _ => 
+          case _ =>
             return
         }
       case Some(filename) => filename
     }
-    
+
     try {
       val file = new File(fn)
       romType match {
         case FunctionROMType.NORMAL if file.length > 32768 => throw new IllegalArgumentException("ROM's size must be less than 32K")
+        case FunctionROMType.MAGICDESK128 if (file.length() % 16384) != 0 => throw new IllegalArgumentException("ROM's size must be a multiple of 16K")
         case _ =>
-      }      
+      }
       val rom = Array.ofDim[Byte](file.length.toInt)
       val f = new DataInputStream(new FileInputStream(fn))
       f.readFully(rom)
-      f.close
+      f.close()
       mmu.configureFunctionROM(internal,rom,romType)
+      romType match {
+        case FunctionROMType.MAGICDESK128 =>
+          ExpansionPort.setExpansionPort(new MagicDesk128(mmu))
+      }
       if (!fileName.isDefined) JOptionPane.showMessageDialog(displayFrame,"ROM loaded. Reset to turn it on", "ROM loaded successfully",JOptionPane.INFORMATION_MESSAGE)
-      internal match {
-        case true => internalFunctionROMFileName = fn
-        case false => externalFunctionROMFileName = fn
+      if (internal) {
+        internalFunctionROMFileName = fn
+      } else {
+        externalFunctionROMFileName = fn
       }
     }
     catch {
       case t:Throwable =>
         showError("ROM loading error","Can't load ROM. Unexpected error occurred: " + t)
-        t.printStackTrace
+        t.printStackTrace()
     }
   }
 
