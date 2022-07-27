@@ -845,5 +845,5 @@ object WiC64 extends CBMComponent with Runnable {
 
   override protected def loadState(in: ObjectInputStream): Unit = {}
 
-  override protected def allowsStateRestoring: Boolean = false
+  override protected def allowsStateRestoring: Boolean = true
 }
