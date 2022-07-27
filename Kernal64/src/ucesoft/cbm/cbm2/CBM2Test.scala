@@ -1,26 +1,24 @@
 package ucesoft.cbm.cbm2
 
-import ucesoft.cbm.{ChipID, Clock, ClockEvent, Log}
-import ucesoft.cbm.cpu.{CPU6510_CE, ROM}
-import ucesoft.cbm.misc.{Switcher, TestCart}
-import ucesoft.cbm.peripheral.c2n.Datassette
-import ucesoft.cbm.peripheral.cia.CIA
-import ucesoft.cbm.peripheral.sid.SID
-import ucesoft.cbm.peripheral.vic.Display
-import ucesoft.cbm.trace.TraceDialog
-import IEEE488Connectors._
+import ucesoft.cbm.cbm2.IEEE488Connectors._
+import ucesoft.cbm.cpu.CPU6510_CE
+import ucesoft.cbm.misc.{BasicListExplorer, Switcher, TestCart}
 import ucesoft.cbm.peripheral.EmptyConnector
 import ucesoft.cbm.peripheral.bus.{IECBus, IEEE488Bus}
+import ucesoft.cbm.peripheral.c2n.Datassette
+import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.crtc.CRTC6845
-import ucesoft.cbm.peripheral.drive.{C1541, DriveLedListener, IEEE488Drive}
+import ucesoft.cbm.peripheral.drive.{C1541, IEEE488Drive}
 import ucesoft.cbm.peripheral.keyboard.BKeyboard
 import ucesoft.cbm.peripheral.mos6525.MOS6525
 import ucesoft.cbm.peripheral.mos6551.ACIA6551
-import ucesoft.cbm.peripheral.printer.{IEEE488MPS803, MPS803GFXDriver, MPS803ROM}
+import ucesoft.cbm.peripheral.sid.SID
+import ucesoft.cbm.peripheral.vic.Display
+import ucesoft.cbm.{ChipID, Clock, ClockEvent, Log}
 
-import java.awt.{Dimension, FlowLayout}
+import java.awt.datatransfer.DataFlavor
+import java.awt.{Dimension, FlowLayout, Toolkit}
 import java.io.{File, PrintWriter, StringWriter}
-import java.util.Properties
 import javax.swing.{JButton, JFrame, JPanel, JToggleButton}
 
 object CBM2Test {
@@ -216,10 +214,30 @@ object CBM2Test {
      */
 
     val warp = new JToggleButton("Warp")
+    val paste = new JButton("Paste")
+    val list = new JButton("List")
     warp.setFocusable(false)
+    paste.setFocusable(false)
+    list.setFocusable(false)
     val dummy = new JPanel(new FlowLayout(FlowLayout.LEFT))
     dummy.add(warp)
+    dummy.add(paste)
+    dummy.add(list)
     warp.addActionListener(_ => clk.maximumSpeed = warp.isSelected )
+    paste.addActionListener(_ => {
+      val clipboard = Toolkit.getDefaultToolkit.getSystemClipboard
+      val contents = clipboard.getContents(null)
+      if (contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+        val str = contents.getTransferData(DataFlavor.stringFlavor).toString
+        BKeyboard.insertTextIntoKeyboardBuffer(str,mmu)
+      }
+    })
+    list.addActionListener(_ => {
+      clk.pause()
+      BasicListExplorer.listCBM2(mmu,3)
+      clk.play()
+    })
+
     frame.getContentPane.add("Center",display)
     frame.getContentPane.add("South",dummy)
     frame.pack()

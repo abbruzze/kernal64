@@ -99,13 +99,6 @@ class CBM2MMU extends RAMComponent {
     else
       System.arraycopy(prg,2,banks(bank),startAddress,prg.length - 2)
   }
-  def writeBank(bank:Int,address:Int,value:Int): Unit = {
-    if (bank == 15) writeBank15(address,value)
-    else {
-      val ram = banks(bank)
-      if (ram != null) ram(address) = value
-    }
-  }
 
   def setIO(_6845:CRTC6845,ciaieee:CIA,ciaip:CIA,tpi_kb:MOS6525,tpi_ieee488:MOS6525,sid:SID,acia:ACIA6551): Unit = {
     this._6845 = _6845
@@ -122,8 +115,12 @@ class CBM2MMU extends RAMComponent {
     init
   }
 
-  override final def read(address: Int, chipID: ID): Int = {
-    val bank = if (cpu.isExecuting(YIND_LDA)) dataBank else codeBank
+  override final def read(address: Int, chipID: ID): Int = readBank(address)
+
+  final def readBank(address: Int, forcedBank: Int = -1): Int = {
+    val bank =
+      if (forcedBank != -1) forcedBank
+      else if (cpu.isExecuting(YIND_LDA)) dataBank else codeBank
     if (bank == 15) {
       if (address == 0) codeBank
       else if (address == 1) dataBank
@@ -143,8 +140,12 @@ class CBM2MMU extends RAMComponent {
     }
   }
 
-  override final def write(address: Int, value: Int, chipID: ID): Unit = {
-    val bank = if (cpu.isExecuting(YIND_STA)) dataBank else codeBank
+  override final def write(address: Int, value: Int, chipID: ID): Unit = writeBank(address,value)
+
+  final def writeBank(address: Int, value: Int, forcedBank:Int = -1): Unit = {
+    val bank =
+      if (forcedBank != -1) forcedBank
+      else if (cpu.isExecuting(YIND_STA)) dataBank else codeBank
     if (bank == 15) {
       if (address == 0) codeBank = value & 0xF
       else if (address == 1) dataBank = value & 0xF
@@ -161,6 +162,7 @@ class CBM2MMU extends RAMComponent {
       }
     }
   }
+
 
   private def readBank15(address: Int): Int = {
     if (address < 0x800) ram(address) // 2K RAM
