@@ -67,7 +67,7 @@ object Diskette {
     else
     if (upper.endsWith(".D81") ) new D81(fileName)
     else
-    if (upper.endsWith(".G64") ) new G64(fileName)
+    if (upper.endsWith(".G64") || upper.endsWith(".G71")) new G64(fileName)
     else throw new IllegalArgumentException("Unsupported file format")
   }
   

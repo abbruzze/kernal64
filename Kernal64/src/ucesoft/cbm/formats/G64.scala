@@ -1,10 +1,9 @@
 package ucesoft.cbm.formats
 
-import ucesoft.cbm.peripheral.drive.Floppy
-import java.io.RandomAccessFile
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
 import ucesoft.cbm.formats.Diskette._
+import ucesoft.cbm.peripheral.drive.Floppy
+
+import java.io.{ObjectInputStream, ObjectOutputStream, RandomAccessFile}
 import scala.collection.mutable.ListBuffer
 
 object G64 {
@@ -19,7 +18,7 @@ object G64 {
 private[formats] class G64(val file:String) extends Diskette {
   import G64._
 
-  val isReadOnly = !new java.io.File(file).canWrite
+  val isReadOnly: Boolean = !new java.io.File(file).canWrite
   private[this] var tracks : Array[Array[Int]] = _
   private[this] var trackOffsets : Array[Int] = _
   private[this] var speedZones : Array[Int] = _
@@ -32,16 +31,27 @@ private[formats] class G64(val file:String) extends Diskette {
   private[this] val ungcr = new UNGCR
   protected val disk = new RandomAccessFile(file, if (isReadOnly) "r" else "rw")
   private[this] var trackIndexModified = false
-  
+  private[this] var _side = 0
+  private[this] var trackSideOffset = 0
+  private[this] var _singleSide = true
+
   loadTracks
-  val canBeEmulated = false  
-  lazy val totalTracks = tracks.length
-  
+  val canBeEmulated = false
+  lazy val totalTracks: Int = tracks.length
+
   private[this] var trackChangeListener : Floppy#TrackListener = null
+
+  override lazy val singleSide = _singleSide
+
+  override def side_=(newSide: Int): Unit = {
+    _side = newSide
+    trackSideOffset = if (newSide == 1) 84 else 0
+  }
+  override def side: Int = _side
 
   def bam : BamInfo = {
     var bamSector : Array[Int] = null
-    GCR.GCR2track(tracks((DIR_TRACK - 1) * 2),-1,(tr,se,data) => if (se == BAM_SECTOR) bamSector = data)
+    GCR.GCR2track(tracks((DIR_TRACK - 1) * 2),-1,(_,se,data) => if (se == BAM_SECTOR) bamSector = data)
 
     var offset = 0x90
     val diskName = new StringBuilder
@@ -59,10 +69,17 @@ private[formats] class G64(val file:String) extends Diskette {
 
     offset = 4
     var free = 0
-    for(t <- 1 to 35) {
+    for (t <- 1 to 35) {
       val f = bamSector(offset) & 0xFF
       free += (if (t == 18) 0 else f)
       offset += 4
+    }
+    if (!_singleSide) {
+      offset = 0
+      for (t <- 0 until 35) {
+        val f = bamSector(0xDD + t) & 0xFF
+        free += f
+      }
     }
     BamInfo(diskName.toString, diskID, dosType,true,free)
   }
@@ -70,7 +87,7 @@ private[formats] class G64(val file:String) extends Diskette {
   override def directories : List[DirEntry] = {
     var t = DIR_TRACK
     var s = DIR_SECTOR
-    var dirs = new ListBuffer[DirEntry]
+    val dirs = new ListBuffer[DirEntry]
     var readNextSector = true
     val buffer = Array.ofDim[Int](0x20)
     val sectors = new collection.mutable.HashMap[(Int,Int),Array[Int]]
@@ -116,27 +133,30 @@ private[formats] class G64(val file:String) extends Diskette {
     }
     dirs.toList
   }
-  
-  private def loadTracks  : Unit = {
+
+  private def loadTracks()  : Unit = {
     val header = Array.ofDim[Byte](0x0C)
     disk.readFully(header)
-    val magic = "GCR-1541".toArray
-    for(i <- 0 to 7) if (header(i) != magic(i)) throw new IllegalArgumentException("Bad signature")
-    tracks = Array.ofDim[Array[Int]](header(0x09))
+    val magic = new String(header,0,8)
+    if (magic != "GCR-1541" && magic != "GCR-1571") throw new IllegalArgumentException("Bad signature")
+
+    val totalTracks = header(0x09).toInt & 0xFF
+    _singleSide = totalTracks != 0xA8
+    tracks = Array.ofDim[Array[Int]](totalTracks)
     speedZones = Array.ofDim[Int](tracks.length)
-    
+
     trackOffsets = Array.ofDim[Int](tracks.length)
     // read track offset
-    for(i <- 0 until trackOffsets.length) {      
-      val offset = disk.read | 
-                   disk.read << 8 | 
-                   disk.read << 16 |
-                   disk.read << 24
+    for(i <- 0 until trackOffsets.length) {
+      val offset = disk.read |
+        disk.read << 8 |
+        disk.read << 16 |
+        disk.read << 24
       //println(s"Track $i offset = ${Integer.toHexString(offset)}")
       trackOffsets(i) = offset
     }
     // read speed zones
-    for(i <- 0 until tracks.length) {        
+    for(i <- 0 until tracks.length) {
       speedZones(i) = disk.read
       if (speedZones(i) > 3) {
         speedZones(i) = defaultZoneFor(i + 1)
@@ -160,15 +180,17 @@ private[formats] class G64(val file:String) extends Diskette {
           b += 1
         }
       }
-    }   
+    }
   }
-  
+
   def reset  : Unit = {
     bit = 1
     trackIndex = 0
     track = 0
+    _side = 0
+    trackSideOffset = 0
   }
-  
+
   @inline private def checkSector(b:Int) : Unit = {
     sectorData <<= 1
     sectorData |= b
@@ -181,31 +203,31 @@ private[formats] class G64(val file:String) extends Diskette {
       }
     }
     else
-    if ((sectorData & 0xFFFFF) == 1047881) { // found header
-      headerFound = true
-      sectorBit = 0
-    }
+      if ((sectorData & 0xFFFFF) == 1047881) { // found header
+        headerFound = true
+        sectorBit = 0
+      }
   }
-  
-  final def nextBit = {
-    val b = (tracks(track)(trackIndex) >> (8 - bit)) & 1
+
+  final def nextBit: Int = {
+    val b = (tracks(track + trackSideOffset)(trackIndex) >> (8 - bit)) & 1
     if (bit == 8) rotate else bit += 1
     checkSector(b)
     b
   }
-  private def writeNewTrack : Unit = {
+  private def writeNewTrack() : Unit = {
     val trackLen = DEFAULT_TRACK_LENGTH(track >> 1)
-    tracks(track) = Array.fill[Int](trackLen)(0x55)
+    tracks(track + trackSideOffset) = Array.fill[Int](trackLen)(0x55)
     if (canWriteOnDisk) {
-      trackOffsets(track) = disk.length.toInt
+      trackOffsets(track + trackSideOffset) = disk.length.toInt
       // updating track data position
-      disk.seek(0x0C + 4 * track)
-      disk.write(trackOffsets(track) & 0xFF)
-      disk.write((trackOffsets(track) >> 8) & 0xFF)
-      disk.write((trackOffsets(track) >> 16) & 0xFF)
-      disk.write((trackOffsets(track) >> 24) & 0xFF)
+      disk.seek(0x0C + 4 * (track + trackSideOffset))
+      disk.write(trackOffsets(track + trackSideOffset) & 0xFF)
+      disk.write((trackOffsets(track + trackSideOffset) >> 8) & 0xFF)
+      disk.write((trackOffsets(track + trackSideOffset) >> 16) & 0xFF)
+      disk.write((trackOffsets(track + trackSideOffset) >> 24) & 0xFF)
       // writing track length
-      disk.seek(trackOffsets(track))
+      disk.seek(trackOffsets(track + trackSideOffset))
       disk.write(trackLen & 0xFF)
       disk.write(trackLen >> 8)
       // writing track data
@@ -214,42 +236,42 @@ private[formats] class G64(val file:String) extends Diskette {
   }
 
   final def writeNextBit(value:Boolean) : Unit = {
-    if (trackOffsets(track) == 0) writeNewTrack // writing on an empty track
+    if (trackOffsets(track + trackSideOffset) == 0) writeNewTrack // writing on an empty track
 
     checkSector(if (value) 1 else 0)
     trackIndexModified = true
     val mask = 1 << (8 - bit)
-    if (value) tracks(track)(trackIndex) |= mask else tracks(track)(trackIndex) &= ~mask
+    if (value) tracks(track + trackSideOffset)(trackIndex) |= mask else tracks(track + trackSideOffset)(trackIndex) &= ~mask
     if (bit == 8) rotate else bit += 1
   }
-  final def nextByte : Int = tracks(track)(trackIndex)
-  def writeNextByte(b:Int) = tracks(track)(trackIndex) = b & 0xFF
-  
-  @inline private def rotate  : Unit = {
+  final def nextByte : Int = tracks(track + trackSideOffset)(trackIndex)
+  def writeNextByte(b:Int): Unit = tracks(track + trackSideOffset)(trackIndex) = b & 0xFF
+
+  @inline private def rotate()  : Unit = {
     bit = 1
     if (trackIndexModified && canWriteOnDisk) {
       trackIndexModified = false
-      disk.seek(trackOffsets(track) + trackIndex + 2)
-      disk.write(tracks(track)(trackIndex))
+      disk.seek(trackOffsets(track + trackSideOffset) + trackIndex + 2)
+      disk.write(tracks(track + trackSideOffset)(trackIndex))
     }
-    trackIndex = (trackIndex + 1) % tracks(track).length
+    trackIndex = (trackIndex + 1) % tracks(track + trackSideOffset).length
   }
-  
+
   def notifyTrackSectorChangeListener  : Unit = {
-    if (trackChangeListener != null) trackChangeListener((track >> 1) + 1,(track & 1) == 1,sector)
+    if (trackChangeListener != null) trackChangeListener(((track + trackSideOffset) >> 1) + 1,(track & 1) == 1,sector)
   }
-  def currentTrack = track + 1
-  def currentSector = sector
+  def currentTrack: Int = track + 1
+  def currentSector: Option[Int] = sector
   def changeTrack(trackSteps:Int) : Unit = {
     track = trackSteps - 2
-    trackIndex = trackIndex % tracks(track).length
+    trackIndex = trackIndex % tracks(track + trackSideOffset).length
     bit = 1
     notifyTrackSectorChangeListener
   }
-  def setTrackChangeListener(l:TrackListener) = trackChangeListener = l
-    
-  def close = disk.close
-  
+  def setTrackChangeListener(l:TrackListener): Unit = trackChangeListener = l
+
+  def close: Unit = disk.close()
+
   override def toString = s"G64 $file total tracks=$totalTracks"
   // state
   def save(out:ObjectOutputStream) : Unit = {
