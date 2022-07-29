@@ -3,7 +3,7 @@
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
 
-Kernal64 ver 1.7.3b16
+Kernal64 ver 1.7.4b1
 ========
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
@@ -21,6 +21,16 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+### What's new 1.7.4b1 (Jul 29th 2022)
+- General
+  - Added support for G71 disk format
+  - Fixed state saving support: broken on last Wic64 release
+  - Adjusted LAST_SECTOR_GAP in gcr handling to a larger value: demo E2IRA now runs fine (except for a part into disk B that is not visible; border must be turned off !!)
+- C128
+  - Added support for MagicDesk128 cart (https://github.com/RetroNynjah/Magic-Desk-128). It can be possible to run VolleyForTwo game with cartridge (https://kollektivet.nu/v42/)
+- BeamRacer
+  - Fixed 0x43 registry handling. Now silverdr's demo jema_n_silver works fine. Thanks Silverdr for your help in testing.
 
 ### What's new 1.7.3b16 (Apr 10th 2022)
 - C64, C128, SCPU
