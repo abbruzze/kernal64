@@ -34,6 +34,7 @@ private[formats] class G64(val file:String) extends Diskette {
   private[this] var _side = 0
   private[this] var trackSideOffset = 0
   private[this] var _singleSide = true
+  private[this] var lastTrackSteps = -1
   
   loadTracks
   val canBeEmulated = false  
@@ -189,6 +190,7 @@ private[formats] class G64(val file:String) extends Diskette {
     track = 0
     _side = 0
     trackSideOffset = 0
+    lastTrackSteps = -1
   }
   
   @inline private def checkSector(b:Int) : Unit = {
@@ -263,7 +265,12 @@ private[formats] class G64(val file:String) extends Diskette {
   def currentTrack: Int = track + 1
   def currentSector: Option[Int] = sector
   def changeTrack(trackSteps:Int) : Unit = {
-    track = trackSteps - 2
+    if (lastTrackSteps == -1) track = trackSteps - 2
+    else {
+      if (trackSteps > lastTrackSteps) track += 1
+      else if (trackSteps < lastTrackSteps) track -= 1
+    }
+    lastTrackSteps = trackSteps
     trackIndex = trackIndex % tracks(track + trackSideOffset).length
     bit = 1
     notifyTrackSectorChangeListener
@@ -279,11 +286,13 @@ private[formats] class G64(val file:String) extends Diskette {
     out.writeInt(track)
     out.writeInt(bit)
     out.writeBoolean(trackIndexModified)
+    out.writeInt(lastTrackSteps)
   }
   def load(in:ObjectInputStream) : Unit = {
     trackIndex = in.readInt
     track = in.readInt
     bit = in.readInt
     trackIndexModified = in.readBoolean
+    lastTrackSteps = in.readInt()
   }
 }
