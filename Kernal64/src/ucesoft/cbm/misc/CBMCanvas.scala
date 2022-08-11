@@ -105,15 +105,7 @@ class CBMCanvas(charRom: Memory,romCharBytes:Int,romCharHeight:Int) extends JCom
     }
   }
 
-  private def convertCode(c: Int) =
-//    if (c >= 64 && c <= 95) c - 64
-//    else if (c >= 96 && c <= 127) c - 32
-//    else if (c >= 128 && c <= 191) c - 64
-//    else if (c >= 192 && c <= 223) c - 192 + 96 - 32
-//    else if (c >= 224 && c <= 254) c - 224 + 160 - 32
-//    /*
-//    else if (c >= 192 && c <= 254) c - 128
-//    */
+  private def convertCode(c: Int): Int =
     if (c >= 64 && c <= 95) c - 64
     else if (c >= 96 && c <= 127) c - 32
     else if (c >= 128 && c <= 159) c + 64
@@ -124,7 +116,7 @@ class CBMCanvas(charRom: Memory,romCharBytes:Int,romCharHeight:Int) extends JCom
     else if (c > 255) c & 0xFF
     else c
 
-  private def withModifiers(code: Int) = {
+  private def withModifiers(code: Int): Int = {
     var c = code
     if (reverseOn) c += 0x80
     if (lowerCase) c += 0x100
@@ -134,7 +126,7 @@ class CBMCanvas(charRom: Memory,romCharBytes:Int,romCharHeight:Int) extends JCom
   def checkSize()  : Unit = {
     val maxWidth = lines map { _.length } max
 
-    setPreferredSize(new Dimension(maxWidth * (if (doubleWidth) 16 else 8),lines.length * (if (doubleHeight) 16 else 8)))
+    setPreferredSize(new Dimension(maxWidth * (if (doubleWidth) 16 else 8),lines.length * (if (doubleHeight) romCharHeight * 2 else romCharHeight)))
   }
 
   override def paint(g: Graphics) : Unit = {

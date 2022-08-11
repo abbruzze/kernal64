@@ -59,6 +59,8 @@ class ROM(ram: Memory,
     mem = transform(mem)
   }
 
+  final def getROMBytes(): Array[Int] = mem
+
   protected def transform(buffer:Array[Int]): Array[Int] = buffer
 
   def reset  : Unit = {}

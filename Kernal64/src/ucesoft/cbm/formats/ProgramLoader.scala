@@ -94,7 +94,7 @@ object ProgramLoader {
   def loadCBMIIPRG(mem:CBM2MMU,file:File): (Int,Int) = {
     val in = new BufferedInputStream(new FileInputStream(file))
     val size = (file.length() - 2).toInt
-    in.skipNBytes(2)
+    in.skip(2)
     var m = 3
     var b = in.read
     while (b != -1) {
