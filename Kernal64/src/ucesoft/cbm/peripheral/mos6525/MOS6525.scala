@@ -1,5 +1,8 @@
 package ucesoft.cbm.peripheral.mos6525
 
+import ucesoft.cbm.{CBMComponent, CBMComponentType}
+import java.io.{ObjectInputStream, ObjectOutputStream}
+
 object MOS6525 {
   trait PortAB {
     def setMOS6525(MOS6525: MOS6525): Unit = {}
@@ -30,7 +33,10 @@ object MOS6525 {
   case object INT_I4 extends InterruptPin { override val pin = 4 }
 }
 
-class MOS6525(name:String,pa:MOS6525.PortAB,pb:MOS6525.PortAB,pc:MOS6525.PortC,irqLow: Boolean => Unit) {
+class MOS6525(name:String,pa:MOS6525.PortAB,pb:MOS6525.PortAB,pc:MOS6525.PortC,irqLow: Boolean => Unit) extends CBMComponent {
+  override val componentID: String = name
+  override val componentType = CBMComponentType.CHIP
+
   import MOS6525._
 
   val regs: Array[Int] = Array.ofDim[Int](8)
@@ -246,4 +252,32 @@ class MOS6525(name:String,pa:MOS6525.PortAB,pb:MOS6525.PortAB,pc:MOS6525.PortC,i
     }
     if (value == 0) irqPrevious &= ~bit else irqPrevious |= bit
   }
+
+  override def reset(): Unit = {
+    java.util.Arrays.fill(regs,0)
+    ca = 0
+    cb = 0
+    irqStack = 0
+    irqPrevious = 0xFF
+  }
+
+  override def init(): Unit = {}
+
+  override protected def saveState(out: ObjectOutputStream): Unit = {
+    out.writeInt(ca)
+    out.writeInt(cb)
+    out.writeInt(irqStack)
+    out.writeInt(irqPrevious)
+    out.writeObject(regs)
+  }
+
+  override protected def loadState(in: ObjectInputStream): Unit = {
+    ca = in.readInt()
+    cb = in.readInt()
+    irqStack = in.readInt()
+    irqPrevious = in.readInt()
+    loadMemory(regs,in)
+  }
+
+  override protected def allowsStateRestoring: Boolean = true
 }

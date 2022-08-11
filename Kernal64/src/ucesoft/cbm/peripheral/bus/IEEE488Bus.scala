@@ -1,6 +1,9 @@
 package ucesoft.cbm.peripheral.bus
 
-import ucesoft.cbm.Log
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponent, CBMComponentType, CBMComputer, Log}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 object IEEE488Bus {
   object LineType extends Enumeration {
@@ -67,10 +70,15 @@ object IEEE488Bus {
         //println(s"IEEE $id has changed line $lineType from ${LineValue.fromValue(oldValue)} to new ${LineValue.fromValue(value)}")
         lineListener(id,lineType,LineValue.fromValue(value))
       }
+
+    def loadState(in:ObjectInputStream): Unit = line = in.readLong()
+    def saveState(out:ObjectOutputStream): Unit = out.writeLong(line)
   }
 }
 
-class IEEE488Bus {
+class IEEE488Bus extends CBMComponent {
+  val componentID = "IEEE488 Bus"
+  val componentType: Type = CBMComponentType.CHIP
   import IEEE488Bus._
   import LineType._
 
@@ -118,4 +126,20 @@ class IEEE488Bus {
     listeners = listeners filterNot { _.id == l.id }
     listenersBitMap &= ~l.id
   }
+
+  override def reset(): Unit = ???
+
+  override def init(): Unit = {}
+
+  override protected def saveState(out: ObjectOutputStream): Unit = {
+    out.writeInt(DIO)
+    lines.foreach(_.saveState(out))
+  }
+
+  override protected def loadState(in: ObjectInputStream): Unit = {
+    DIO = in.readInt()
+    lines.foreach(_.loadState(in))
+  }
+
+  override protected def allowsStateRestoring: Boolean = true
 }

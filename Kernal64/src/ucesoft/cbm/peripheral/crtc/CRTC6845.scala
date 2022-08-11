@@ -40,7 +40,7 @@ object CRTC6845 {
   16/$10 Light pen vertical position
   17/$11 Light pen horizontal position
  */
-class CRTC6845(ram:Array[Int],charRom:Array[Int],bytes_per_char:Int,retraceListener:Boolean => Unit = null) extends RAMComponent {
+class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceListener:Boolean => Unit = null) extends RAMComponent {
   import CRTC6845._
 
   val name = "CRTC6845"

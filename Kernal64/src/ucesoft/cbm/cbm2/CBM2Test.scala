@@ -1,7 +1,7 @@
 package ucesoft.cbm.cbm2
 
 import ucesoft.cbm.cbm2.IEEE488Connectors._
-import ucesoft.cbm.cpu.CPU6510_CE
+import ucesoft.cbm.cpu.{CPU6510_CE, ROM}
 import ucesoft.cbm.misc.{AbstractDriveLedListener, BasicListExplorer, DriveLed, Switcher, TestCart}
 import ucesoft.cbm.peripheral.EmptyConnector
 import ucesoft.cbm.peripheral.bus.{IECBus, IEEE488Bus}
@@ -48,8 +48,16 @@ object CBM2Test {
 
     val model : CBM2Model = _610PAL
 
-    val _charROM = java.nio.file.Files.readAllBytes(new File(s"/Users/ealeame/OneDrive - Ericsson AB/CBM-II/roms/${model.charROMName}").toPath).map(_.toInt & 0xFF)
-    val basicROM = java.nio.file.Files.readAllBytes(new File(s"/Users/ealeame/OneDrive - Ericsson AB/CBM-II/roms/${model.basicROMName}").toPath).map(_.toInt & 0xFF)
+    CBM2MMU.BASIC_ROM.resourceName = model.basicROMPropName
+    CBM2MMU.CHAR_ROM.resourceName = model.charROMPropName
+
+    CBM2MMU.BASIC_ROM.init
+    CBM2MMU.KERNAL_ROM.init
+    CBM2MMU.CHAR_ROM.init
+
+    /*
+    val _charROM = java.nio.file.Files.readAllBytes(new File(s"/Users/ealeame/OneDrive - Ericsson AB/CBM-II/roms/${model.charROMPropName}").toPath).map(_.toInt & 0xFF)
+    val basicROM = java.nio.file.Files.readAllBytes(new File(s"/Users/ealeame/OneDrive - Ericsson AB/CBM-II/roms/${model.basicROMPropName}").toPath).map(_.toInt & 0xFF)
     val kernal = java.nio.file.Files.readAllBytes(new File("/Users/ealeame/OneDrive - Ericsson AB/CBM-II/roms/kernal").toPath).map(_.toInt & 0xFF)
     val charROM = Array.ofDim[Int](8192)
     System.arraycopy(_charROM,0,charROM,0,4096)
@@ -68,10 +76,12 @@ object CBM2Test {
       |--------|--------|--------|--------|
           B1      Inv B1    B2      Inv B2
      */
+
+     */
     val frame = new JFrame()
     val display = new Display(CRTC6845.SCREEN_WIDTH,CRTC6845.SCREEN_HEIGHT,"CBM-II",frame)
-    display.setRenderingHints(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-    display.setPreferredSize(new Dimension(704,534))
+    display.setRenderingHints(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
+    display.setPreferredSize(new Dimension(720,542))
     frame.setFocusTraversalKeysEnabled(false)
 
     val keyb = new BKeyboard(BKeyboard.DEF_CBM2_KEYMAPPER)
@@ -82,8 +92,8 @@ object CBM2Test {
 
     cpu = new CPU6510_CE(mmu,ChipID.CPU)
     mmu.setCPU(cpu)
-    mmu.setBasicROM(basicROM)
-    mmu.setKernalROM(kernal)
+    mmu.setBasicROM(CBM2MMU.BASIC_ROM.getROMBytes())
+    mmu.setKernalROM(CBM2MMU.KERNAL_ROM.getROMBytes())
     mmu.setModel(model)
     cpu.initComponent
     val irq = new Switcher("IRQ",low => cpu.irqRequest(low))
@@ -205,7 +215,7 @@ object CBM2Test {
     // 50/60 Hz source
     clk.schedule(new ClockEvent("50_60Hz",clk.nextCycles,_50_60_Hz _))
 
-    crt = new CRTC6845(mmu.getCRTCRam,charROM,16/*,blank => tpiIeee.setInterruptPin(MOS6525.INT_I0,if (blank) 1 else 0)*/)
+    crt = new CRTC6845(mmu.getCRTCRam,CBM2MMU.CHAR_ROM.getROMBytes(),16/*,blank => tpiIeee.setInterruptPin(MOS6525.INT_I0,if (blank) 1 else 0)*/)
     crt.setDisplay(display)
     crt.initComponent
     crt.setClipping(model.crtClip._1,model.crtClip._2,model.crtClip._3,model.crtClip._4)

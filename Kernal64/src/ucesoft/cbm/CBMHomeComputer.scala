@@ -1809,10 +1809,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  override protected def configurationLoaded(properties: Properties): Unit = {
-    ROM.props = properties
-  }
-
   override protected def setDefaultProperties(configuration:Properties) : Unit = {
     import Preferences._
     configuration.setProperty(PREF_RENDERINGTYPE,"default")

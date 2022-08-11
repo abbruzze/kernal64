@@ -260,7 +260,9 @@ abstract class CBMComputer extends CBMComponent {
     clock.maximumSpeed = warpOn
   }
 
-  protected def configurationLoaded(properties: Properties): Unit = {}
+  protected def configurationLoaded(properties: Properties): Unit = {
+    ROM.props = properties
+  }
 
   protected def setDefaultProperties(configuration:Properties) : Unit = {
     import Preferences._

@@ -3,7 +3,7 @@ package ucesoft.cbm.cbm2
 import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.ChipID.ID
-import ucesoft.cbm.cpu.{CPU6510_CE, RAMComponent}
+import ucesoft.cbm.cpu.{CPU6510_CE, RAMComponent, ROM}
 import ucesoft.cbm.misc.TestCart
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.crtc.CRTC6845
@@ -12,6 +12,33 @@ import ucesoft.cbm.peripheral.mos6551.ACIA6551
 import ucesoft.cbm.peripheral.sid.SID
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
+
+object CBM2MMU {
+  val KERNAL_ROM = new ROM(null,"Kernal",0,8192,ROM.CBM2_KERNAL_ROM_PROP)
+  val BASIC_ROM = new ROM(null,"Basic",0,16384,ROM.CBM2_BASIC128_ROM_PROP)
+  val CHAR_ROM = new ROM(null,"Char",0,4096,ROM.CBM2_CHAR600_ROM_PROP) {
+    override def transform(_charROM: Array[Int]): Array[Int] = {
+      /*
+        Initial char layout:
+        0       2048     4096
+        |--------|--------|
+            B1       B2
+        Final char layout:
+        0       2048     4096     6144     8192
+        |--------|--------|--------|--------|
+            B1      Inv B1    B2      Inv B2
+      */
+      val charROM = Array.ofDim[Int](8192)
+      System.arraycopy(_charROM, 0, charROM, 0, 4096)
+      System.arraycopy(charROM, 2048, charROM, 4096, 2048)
+      for (i <- 0 until 2048) {
+        charROM(i + 2048) = charROM(i) ^ 0xFF
+        charROM(i + 6144) = charROM(i + 4096) ^ 0xFF
+      }
+      charROM
+    }
+  }
+}
 
 class CBM2MMU extends RAMComponent {
   override val componentID: String = "CBM2_MMU"
