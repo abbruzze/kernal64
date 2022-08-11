@@ -8,7 +8,7 @@ import java.util.zip.{ZipEntry, ZipFile, ZipOutputStream}
 import scala.util.Try
 
 object ZIP {
-  private val allowedArchiveExtentions = Set("PRG","D64","G64","CRT","TAP","T64")
+  private val allowedArchiveExtentions = Set("PRG","D64","G64","CRT","TAP","T64","D71","G71","D80")
   case class ArchiveEntry(name:String,zipFile:File,private[ZIP] entry:String) {
     val isPRG: Boolean = name.toUpperCase.endsWith(".PRG")
     val isDisk: Boolean = name.toUpperCase.endsWith(".D64") || name.toUpperCase.endsWith(".G64")

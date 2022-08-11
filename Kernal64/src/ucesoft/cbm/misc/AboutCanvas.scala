@@ -5,7 +5,7 @@ import ucesoft.cbm.cpu.Memory
 import java.io.IOException
 import java.util.Properties
 
-class AboutCanvas(charRom:Memory,version:String) extends CBMCanvas(charRom) {
+class AboutCanvas(charRom:Memory,version:String) extends CBMCanvas(charRom,8,8) {
   private val WIDTH = 50
   private val scalaVersion = {
     val p = new Properties

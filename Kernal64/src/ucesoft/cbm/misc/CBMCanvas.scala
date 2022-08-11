@@ -8,7 +8,7 @@ import javax.swing._
 import scala.collection.mutable.ListBuffer
 import scala.language.postfixOps
 
-class CBMCanvas(charRom: Memory) extends JComponent {
+class CBMCanvas(charRom: Memory,romCharBytes:Int,romCharHeight:Int) extends JComponent {
   private[this] case class Char(fgColor: Int, charCode: Int,double:Boolean)
 
   private[this] val lines = new ListBuffer[ListBuffer[Char]]
@@ -149,7 +149,7 @@ class CBMCanvas(charRom: Memory) extends JComponent {
       for (rc <- 0 to 7) {
         var x = 0
         for (char <- line) {
-          val byte = charRom.read(charRom.startAddress | (char.charCode << 3) | rc)
+          val byte = charRom.read(charRom.startAddress | (char.charCode * romCharBytes) | rc)
           g.setColor(Palette.VIC_COLORS(char.fgColor))
           var bit = 0x80
           var dx = 0
@@ -159,8 +159,8 @@ class CBMCanvas(charRom: Memory) extends JComponent {
               var pixel = (byte & bit) > 0
               if (rowSelected == row) pixel = !pixel
               if (pixel) {
-                g.drawRect(x << 3 | dx, y << 3 | rcy, 0, 0)
-                if (doubleHeight) g.drawRect(x << 3 | dx, y << 3 | (rcy + 1), 0, 0)
+                g.drawRect(x << 3 | dx, y * romCharHeight | rcy, 0, 0)
+                if (doubleHeight) g.drawRect(x << 3 | dx, y * romCharHeight | (rcy + 1), 0, 0)
               }
               dx += 1
               width -= 1

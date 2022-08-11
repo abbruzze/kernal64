@@ -10,7 +10,7 @@ class ROM(ram: Memory,
           val name: String,
           val startAddress: Int,
           val length: Int,
-          val resourceName: String,
+          var resourceName: String,
           initialOffset:Int = 0,
           validLengths:List[Int] = Nil) extends RAMComponent {
   val componentID: String = "ROM " + name
@@ -56,12 +56,15 @@ class ROM(ram: Memory,
       for (i <- 0 until buffer.size) mem(i) = bufferArray(i) & 0xff
       Log.info(s"Loaded $name as a variable ROM: size is ${bufferArray.length}")
     }
+    mem = transform(mem)
   }
+
+  protected def transform(buffer:Array[Int]): Array[Int] = buffer
 
   def reset  : Unit = {}
 
   final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address - startAddress)
-  def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = ram.write(address,value,chipID)
+  def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = if (ram != null) ram.write(address,value,chipID)
   final def patch(address:Int,value:Int): Unit = mem(address - startAddress) = value
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {

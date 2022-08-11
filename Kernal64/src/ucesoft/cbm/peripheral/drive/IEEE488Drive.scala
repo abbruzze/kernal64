@@ -1,15 +1,19 @@
 package ucesoft.cbm.peripheral.drive
 
 import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.formats.Diskette
+import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.formats.{D80, Diskette}
 import ucesoft.cbm.formats.Diskette.{FileMode, FileType, StandardFileName}
 import ucesoft.cbm.peripheral.bus.{IEEE488Bus, IEEE488BusCommand}
+import ucesoft.cbm.trace.{BreakType, CpuStepInfo, TraceListener}
 
-import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
+import java.io.{IOException, ObjectInputStream, ObjectOutputStream, PrintWriter}
 import scala.collection.mutable.ListBuffer
 
-class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE488Bus) extends IEEE488BusCommand(name,deviceID, bus) {
+class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE488Bus,driveLedListener: DriveLedListener) extends IEEE488BusCommand(name,deviceID, bus) with Drive with TraceListener {
   override val componentType: CBMComponentType.Type = CBMComponentType.DISK
+  override val driveType: DriveType.Value = DriveType._8050
+  override val formatExtList: List[String] = List("D80")
 
   protected case class Status(var st:Int = 0,var t:Int = 0,var s:Int = 0,var filesScratched:Int = 0)
 
@@ -25,6 +29,7 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
   protected final val STATUS_ILLEGAL_TRACK_AND_SECTOR = 66
   protected final val STATUS_FILE_EXISTS = 63
   protected final val STATUS_FILES_SCRATCHED = 1
+  protected final val STATUS_DRIVE_NOT_READY = 74
 
   override protected val buffersAddress : Array[Int] = Array(
     0x1100,0x1200,0x1300,         // #0,#1,#2
@@ -43,7 +48,8 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
     STATUS_NO_CHANNEL -> "NO CHANNEL",
     STATUS_ILLEGAL_TRACK_AND_SECTOR -> "ILLEGAL TRACK AND SECTOR",
     STATUS_FILE_EXISTS -> "FILE EXISTS",
-    STATUS_FILES_SCRATCHED -> "FILES SCRATCHED"
+    STATUS_FILES_SCRATCHED -> "FILES SCRATCHED",
+    STATUS_DRIVE_NOT_READY -> "DRIVE NOT READY"
   )
 
   protected val RENAME_CMD_RE = """R(ENAME)?\d?:([^=]+=.+)""".r
@@ -53,7 +59,38 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
   // INIT
   setStatus(STATUS_POWERUP)
 
-  private val d80 = new ucesoft.cbm.formats.D80("""C:\Users\ealeame\OneDrive - Ericsson AB\CBM-II\software\cbug02.d80""")
+  // Drive stuff
+  override def setDriveReader(driveReader: Floppy, emulateInserting: Boolean): Unit = {
+    if (driveReader != EmptyFloppy) {
+      d80 = driveReader.asInstanceOf[D80]
+      d80.setTrackSectorListener((t, s) => driveLedListener.moveTo(t, Some(s), false))
+      emptyFloppy = false
+    }
+    else emptyFloppy = true
+  }
+
+  override def clock(cycles: Long): Unit = {}
+
+  override def getFloppy: Floppy = d80
+
+  private var d80 = new ucesoft.cbm.formats.D80("""C:\Users\ealeame\OneDrive - Ericsson AB\CBM-II\software\bi3_Superbase700v1.d80""")
+  private var emptyFloppy = false
+  //TODO: REMOVE
+  private var lastTrack = 0
+  d80.setTrackSectorListener((t,s) => {
+    driveLedListener.moveTo(t,Some(s),false)
+    if (lastTrack != t) {
+      lastTrack = t
+      Thread.sleep(100)
+    }
+  })
+
+  override def commandReceived(cmd:Command): Unit = {
+    val channelOpened = channels.exists(_.isOpened())
+    if (channelOpened) driveLedListener.turnOn() else driveLedListener.turnOff()
+
+    super.commandReceived(cmd)
+  }
 
   protected def formatST(): String = {
     val text = STATUS_CODES.getOrElse(status.st,"CODE NOT FOUND")
@@ -91,6 +128,12 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
   override protected def openNamedChannel(): Boolean = {
     if (secondaryAddress == 15) {
       return true
+    }
+
+    if (emptyFloppy) {
+      setStatus(STATUS_DRIVE_NOT_READY)
+      clk.cancel("IEEE488Talk")
+      return false
     }
 
     val name = channels(secondaryAddress).name()
@@ -182,17 +225,15 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
       Diskette.parseFileName(channels(secondaryAddress).name()) match {
         case Some(StandardFileName(name, ftype, _, overwrite)) =>
           println(s"Saving $channel name = $name type = $ftype overwrite = $overwrite data size = ${channels(secondaryAddress).getInData().length}")
-          ftype match {
+          ftype.getOrElse(FileType.PRG) match {
             case FileType.PRG =>
               val data = channels(secondaryAddress).getInData()
               val startAddress = data(0) << 8 | data(1)
-              if (!d80.addPRG(data.drop(2).map(_.toByte),name,startAddress)) {
-                setStatus(STATUS_DISK_FULL)
-              }
+              if (!d80.addPRG(data.drop(2).map(_.toByte),name,startAddress)) setStatus(STATUS_DISK_FULL)
+              else setStatus(STATUS_OK)
             case FileType.SEQ =>
-              if (!d80.addSEQ(channels(secondaryAddress).getInData().map(_.toByte),name)) {
-                setStatus(STATUS_DISK_FULL)
-              }
+              if (!d80.addSEQ(channels(secondaryAddress).getInData().map(_.toByte),name)) setStatus(STATUS_DISK_FULL)
+              else setStatus(STATUS_OK)
             case ft =>
               println(s"File type $ft not supported")
           }
@@ -207,6 +248,12 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
   }
 
   protected def loadChannel(fn:Diskette.FileName): Boolean = {
+    if (emptyFloppy) {
+      setStatus(STATUS_DRIVE_NOT_READY)
+      clk.cancel("IEEE488Talk")
+      return false
+    }
+
     d80.load(fn,secondaryAddress) match {
       case Some(data) if data.fileType != FileType.DEL =>
         if ((secondaryAddress == 0 || secondaryAddress == 1) && data.fileType != FileType.PRG) {
@@ -293,6 +340,10 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
     cmd match {
       case NEW_CMD_RE(_,name,id) =>
         println(s"Formatting name=$name id=$id")
+        if (emptyFloppy) {
+          setStatus(STATUS_DRIVE_NOT_READY)
+          return
+        }
         d80.formatDisk(name,Option(id).map(_.substring(1)).getOrElse(0xA0.toChar.toString + 0xA0.toChar))
         setStatus(STATUS_OK)
       case _ =>
@@ -303,6 +354,10 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
   protected def scratchFile(cmd:String): Unit = {
     cmd match {
       case SCRATCH_CMD_RE(_,files) =>
+        if (emptyFloppy) {
+          setStatus(STATUS_DRIVE_NOT_READY)
+          return
+        }
         val dirs = d80.directories
         for(f <- files.split(",")) {
           val fileName = f.substring(f.indexOf(":") + 1)
@@ -329,6 +384,10 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
   protected def renameFile(cmd:String): Unit = {
     cmd match {
       case RENAME_CMD_RE(_,files) =>
+        if (emptyFloppy) {
+          setStatus(STATUS_DRIVE_NOT_READY)
+          return
+        }
         val Array(newFile,oldFile) = files.split("=")
         println(s"Renaming file $oldFile to $newFile")
         try {
@@ -382,6 +441,10 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
   protected def executeBlockRead(cmd: String,u1:Boolean): Unit = {
     parseCommand(cmd) match {
       case Array(ch,_,t,s) =>
+        if (emptyFloppy) {
+          setStatus(STATUS_DRIVE_NOT_READY)
+          return
+        }
         try {
           val channel = ch.trim.toInt
           val track = t.trim.toInt
@@ -421,6 +484,10 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
     parseCommand(cmd) match {
       case Array(ch,_,t,s) =>
         try {
+          if (emptyFloppy) {
+            setStatus(STATUS_DRIVE_NOT_READY)
+            return
+          }
           val channel = ch.trim.toInt
           val track = t.trim.toInt
           val sector = s.trim.toInt
@@ -520,5 +587,14 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
 
   override protected def saveState(out: ObjectOutputStream): Unit = ???
   override protected def loadState(in: ObjectInputStream): Unit = ???
-  override protected def allowsStateRestoring: Boolean = ???
+  override protected def allowsStateRestoring: Boolean = true
+
+  // Trace listener
+  override def setTraceOnFile(out: PrintWriter, enabled: Boolean): Unit = {}
+  override def setTrace(traceOn: Boolean): Unit = {}
+  override def step(updateRegisters: CpuStepInfo => Unit): Unit = {}
+  override def setBreakAt(breakType: BreakType, callback: CpuStepInfo => Unit): Unit = {}
+  override def jmpTo(pc: Int): Unit = {}
+  override def disassemble(mem: Memory, address: Int): (String, Int) = ("",0)
+  override def setCycleMode(cycleMode: Boolean): Unit = {}
 }

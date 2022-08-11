@@ -35,6 +35,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
   protected val CONFIGURATION_FILENAME = "C128.config"
   private[this] val CONFIGURATION_VDC_FRAME_XY = "vdc.frame.xy"
   private[this] val CONFIGURATION_VDC_FRAME_DIM = "vdc.frame.dim"
+  override def PRG_LOAD_ADDRESS() = if (isC64Mode) 0x801 else 0x1C01
   override protected def PRG_RUN_DELAY_CYCLES: Int = if (isC64Mode) super.PRG_RUN_DELAY_CYCLES else 5400000
 
 

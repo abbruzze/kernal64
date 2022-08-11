@@ -9,7 +9,12 @@ import java.beans.{PropertyChangeEvent, PropertyChangeListener}
 import java.io.File
 import javax.swing.{JFileChooser, JScrollPane}
 
-class D64Canvas(fc:JFileChooser,charRom:Memory,c64Mode:Boolean) extends CBMCanvas(charRom) with PropertyChangeListener {
+class D64Canvas(fc:JFileChooser,
+								charRom:Memory,
+								c64Mode:Boolean,
+								doubleHeight:Boolean = true,
+								romCharBytes:Int = 8,
+								romCharHeight:Int = 8) extends CBMCanvas(charRom,romCharBytes,romCharHeight) with PropertyChangeListener {
 	var sp : JScrollPane = _
 	protected var validSelectableIndexes : Map[Int,AnyRef] = Map.empty
 
@@ -23,6 +28,8 @@ class D64Canvas(fc:JFileChooser,charRom:Memory,c64Mode:Boolean) extends CBMCanva
     bgColor(11)
     lightGreen
   }
+
+	if (doubleHeight) enhanceHeight
 
 	setToolTipText("Select a PRG file to run")
 
@@ -67,7 +74,7 @@ class D64Canvas(fc:JFileChooser,charRom:Memory,c64Mode:Boolean) extends CBMCanva
 
 			validSelectableIndexes = dirs.zipWithIndex filter { case (d,_) => d.fileType == Diskette.FileType.PRG } map { d => (d._2 + 1,d._1.fileName) } toMap
 
-			enhanceHeight
+			//enhanceHeight
 			//enhanceWidth
 	    add("0 ")
 	    rvsOn

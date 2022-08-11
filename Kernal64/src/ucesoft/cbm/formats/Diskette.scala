@@ -13,16 +13,15 @@ object Diskette {
   object FileType extends Enumeration {
     val DEL, SEQ, PRG, USR, REL, CBM = Value
 
-    def fromString(s:String): FileType.Value = {
-      if (s == null) PRG
-      else
-      s.toUpperCase() match {
-        case null|"P"|"PRG" => PRG
+    def fromString(s:String): Option[FileType.Value] = {
+      if (s == null) None
+      else Option(s.toUpperCase() match {
+        case "P"|"PRG" => PRG
         case "D"|"DEL" => DEL
         case "S"|"SEQ" => SEQ
         case "R"|"REL" => REL
         case "U"|"USR" => USR
-      }
+      })
     }
   }
   object FileMode extends Enumeration {
@@ -68,7 +67,7 @@ object Diskette {
   sealed trait FileName {
     val isDirectory : Boolean
   }
-  case class StandardFileName(name:String,fileType:FileType.Value,mode:FileMode.Value,overwrite:Boolean) extends FileName {
+  case class StandardFileName(name:String,fileType:Option[FileType.Value],mode:FileMode.Value,overwrite:Boolean) extends FileName {
     override val isDirectory: Boolean = false
   }
   case class DirectoryFileName(drive:Int,pattern:Option[String],filterOnType:Option[FileType.Value]) extends FileName {
@@ -81,7 +80,7 @@ object Diskette {
   def parseFileName(fn:String): Option[FileName] = {
     fn match {
       case DIRECTORY_RE(drive,_,pattern,_,ftype) =>
-        Some(DirectoryFileName(Option(drive).getOrElse("0").toInt,Option(pattern),Option(ftype).map(FileType.fromString)))
+        Some(DirectoryFileName(Option(drive).getOrElse("0").toInt,Option(pattern),FileType.fromString(ftype)))
       case FILENAME_RE(ovr,pattern,_,ftype,_,mode) =>
         Some(StandardFileName(pattern,FileType.fromString(ftype),FileMode.fromString(mode),ovr != null && ovr.startsWith("@")))
       case _ =>
@@ -114,6 +113,8 @@ object Diskette {
     if (upper.endsWith(".D81") ) new D81(fileName)
     else
     if (upper.endsWith(".G64") || upper.endsWith(".G71")) new G64(fileName)
+    else
+    if (upper.endsWith(".D80") ) new D80(fileName)
     else throw new IllegalArgumentException("Unsupported file format")
   }
   
@@ -312,7 +313,7 @@ abstract class Diskette extends Floppy {
       case StandardFileName(name, fileType, mode, overwrite) =>
         val fn = if (name.length < 17) name else name.substring(0,16)
         directories.find(e => fileNameMatch(fn,e.fileName)).map { e =>
-          fileType match {
+          fileType.getOrElse(e.fileType) match {
             case FileType.PRG => loadPRG(e)
             case FileType.SEQ => loadSEQ(e)
             case _ => throw new IOException("Bad file type: " + e.fileType)

@@ -1,8 +1,9 @@
 package ucesoft.cbm.formats
 
+import ucesoft.cbm.cbm2.CBM2MMU
 import ucesoft.cbm.cpu.{CPU65xx, Memory}
 
-import java.io.{File, FileInputStream, FileOutputStream}
+import java.io.{BufferedInputStream, File, FileInputStream, FileOutputStream}
 ;
 
 object ProgramLoader {
@@ -88,6 +89,31 @@ object ProgramLoader {
     mem.read(45) | mem.read(46) << 8
   } else {
     mem.read(0x1210) | mem.read(0x1211) << 8
+  }
+
+  def loadCBMIIPRG(mem:CBM2MMU,file:File): (Int,Int) = {
+    val in = new BufferedInputStream(new FileInputStream(file))
+    val size = (file.length() - 2).toInt
+    in.skipNBytes(2)
+    var m = 3
+    var b = in.read
+    while (b != -1) {
+      mem.writeBank(m,b,2)
+      m += 1
+      b = in.read
+    }
+    in.close()
+    // update end of BASIC pointers
+    mem.writeBank(47,(3 + size) & 0xFF,15)
+    mem.writeBank(48,(3 + size) >> 8,15)
+    // update filename related entries
+    val dotprg = file.getName.lastIndexOf(".")
+    val fileName = if (dotprg != -1) file.getName.substring(0, dotprg) else file.getName
+    mem.writeBank(157,fileName.length,15)
+    m = mem.readBank(144,15) | mem.readBank(145,15) << 8
+    val fnBank = mem.readBank(146,15)
+    for(i <- 0 until fileName.length) mem.writeBank(m + i,fileName.charAt(i),fnBank)
+    (3,3 + size)
   }
 
   def loadPRG(mem:Memory,file:File,c64Mode:Boolean,drive:Int): (Int,Int) = {

@@ -28,6 +28,8 @@ class DNDHandler(handleDND:(File) => Unit,extOnly:Option[() => DriveType.Value] 
                 name.endsWith(".D81") ||
                 name.endsWith(".D64") ||
                 name.endsWith(".G64") ||
+                name.endsWith(".G71") ||
+                name.endsWith(".D80") ||
                 name.endsWith(".TAP") ||
                 name.endsWith(".PRG") ||
                 name.endsWith(".CRT") ||
@@ -51,10 +53,13 @@ class DNDHandler(handleDND:(File) => Unit,extOnly:Option[() => DriveType.Value] 
                 case DriveType._1541 if List(".D64",".G64").exists( name.endsWith ) =>
                   handleDND(f)
                   true
-                case DriveType._1571 if List(".D64",".G64","D71").exists( name.endsWith ) =>
+                case DriveType._1571 if List(".D64",".G64","D71","G71").exists( name.endsWith ) =>
                   handleDND(f)
                   true
-                case DriveType._1581 if List(".D81").exists( name.endsWith ) =>
+                case DriveType._1581 if List(".D81").exists(name.endsWith ) =>
+                  handleDND(f)
+                  true
+                case DriveType._8050 if List(".D80").exists(name.endsWith) =>
                   handleDND(f)
                   true
                 case _ =>

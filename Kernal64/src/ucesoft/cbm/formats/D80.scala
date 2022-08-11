@@ -4,16 +4,6 @@ import ucesoft.cbm.formats.Diskette.{BamInfo, FileData, FileType}
 
 import scala.collection.mutable.ListBuffer
 
-object D80 {
-  def main(args:Array[String]): Unit = {
-    val d80 = new D80(args(0))
-    println(d80.bam)
-    println(d80.directories)
-    val data = d80.loadPRG(d80.directories.head)
-    println(data)
-  }
-}
-
 class D80(override val file: String,loadImage:Boolean = true) extends D64_D71(file,loadImage) {
   override protected def BAM_HEADER_SIZE = 6
   override protected def BAM_TRACK = 38

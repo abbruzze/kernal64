@@ -26,12 +26,16 @@ abstract class IEEE488BusHandshake(val name:String, bus: IEEE488Bus) extends CBM
   protected val TALK_WAIT_ATN_TIMEOUT = 300 // 200 / 2000000
   protected val clk: Clock = Clock.systemClock
 
+  protected def setRole(newRole: Role.Value): Unit = {
+    role = newRole
+  }
+
   protected class DeviceLineListener extends LineListener {
     override def ATNchanged(id:Long,newValue: IEEE488Bus.LineValue.Value): Unit = {
       if (newValue == PULLED) {
         bus.pullLine(listener,NDAC)
         atnLow = true
-        role = IDLE
+        setRole(IDLE)
         clk.cancel("IEEE488Talk")
       }
       else atnLow = false
@@ -47,7 +51,7 @@ abstract class IEEE488BusHandshake(val name:String, bus: IEEE488Bus) extends CBM
         if (eoiLow) {
           //println("Last byte sent, received")
           bus.releaseLine(listener,EOI)
-          role = IDLE
+          setRole(IDLE)
           eoiLow = false
         }
       }
@@ -85,7 +89,7 @@ abstract class IEEE488BusHandshake(val name:String, bus: IEEE488Bus) extends CBM
     bus.releaseLine(listener,DAV)
     atnLow = false
     eoiLow = false
-    role = IDLE
+    setRole(IDLE)
   }
 
   override def init: Unit = {

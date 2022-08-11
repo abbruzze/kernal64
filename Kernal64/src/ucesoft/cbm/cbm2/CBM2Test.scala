@@ -2,13 +2,13 @@ package ucesoft.cbm.cbm2
 
 import ucesoft.cbm.cbm2.IEEE488Connectors._
 import ucesoft.cbm.cpu.CPU6510_CE
-import ucesoft.cbm.misc.{BasicListExplorer, Switcher, TestCart}
+import ucesoft.cbm.misc.{AbstractDriveLedListener, BasicListExplorer, DriveLed, Switcher, TestCart}
 import ucesoft.cbm.peripheral.EmptyConnector
 import ucesoft.cbm.peripheral.bus.{IECBus, IEEE488Bus}
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.crtc.CRTC6845
-import ucesoft.cbm.peripheral.drive.{C1541, IEEE488Drive}
+import ucesoft.cbm.peripheral.drive.{C1541, DriveLedListener, IEEE488Drive}
 import ucesoft.cbm.peripheral.keyboard.BKeyboard
 import ucesoft.cbm.peripheral.mos6525.MOS6525
 import ucesoft.cbm.peripheral.mos6551.ACIA6551
@@ -17,7 +17,7 @@ import ucesoft.cbm.peripheral.vic.Display
 import ucesoft.cbm.{ChipID, Clock, ClockEvent, Log}
 
 import java.awt.datatransfer.DataFlavor
-import java.awt.{Dimension, FlowLayout, Toolkit}
+import java.awt.{BorderLayout, Dimension, FlowLayout, Toolkit}
 import java.io.{File, PrintWriter, StringWriter}
 import javax.swing.{JButton, JFrame, JPanel, JToggleButton}
 
@@ -183,8 +183,20 @@ object CBM2Test {
     c1541.runningListener = x => {}
     */
 
+    val driveLed = new DriveLed(8)
+    val driveLedListener = new AbstractDriveLedListener(driveLed) {}
+
     // TEST Device
-    val device = new IEEE488Drive("8050",8,bus)
+    val device = new IEEE488Drive("8050",8,bus,driveLedListener)
+    /*,new DriveLedListener {
+      override def writeMode(enabled: Boolean): Unit = {}
+      override def setPowerLedMode(on: Boolean): Unit = {}
+      override def turnPower(on: Boolean): Unit = {}
+      override def turnOn(): Unit = println("Drive ON")
+      override def turnOff(): Unit = println("Drive OFF")
+      override def isOn: Boolean = false
+      override def moveTo(track: Int, sector: Option[Int], halfTrack: Boolean): Unit = println(s"Drive ($track,${sector.getOrElse(0)})")
+    })*/
     device.initComponent
 
     //val printer = new IEEE488MPS803("MPS803",4,bus,new MPS803GFXDriver(new MPS803ROM))
@@ -237,9 +249,12 @@ object CBM2Test {
       BasicListExplorer.listCBM2(mmu,3)
       clk.play()
     })
+    val southPanel = new JPanel(new BorderLayout())
+    southPanel.add("West",dummy)
+    southPanel.add("East",driveLed)
 
     frame.getContentPane.add("Center",display)
-    frame.getContentPane.add("South",dummy)
+    frame.getContentPane.add("South",southPanel)
     frame.pack()
     frame.setVisible(true)
 

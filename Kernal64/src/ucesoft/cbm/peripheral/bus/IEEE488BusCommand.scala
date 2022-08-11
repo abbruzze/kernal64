@@ -190,9 +190,6 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
 
 
   protected def closeChannel(channel:Int): Unit = {}
-  protected def letsTalk(): Unit = {
-    role = TALKER_READY
-  }
   protected def checkData(data:Int): Boolean = true
 
   override def reset: Unit = {
@@ -251,10 +248,10 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
       println(s"Command received: $lastCommand [$role]")
       lastCommand match {
         case LISTEN(device) =>
-          if (isThisDevice(device)) role = LISTENER
+          if (isThisDevice(device)) setRole(LISTENER)
         case UNLISTEN =>
           if (secondaryAddress == 15 /*&& channels(15).isOpened()*/ && (channels(15).name().length > 0 || channels(15).getInData().length > 0)) executeCommand()
-          role = IDLE
+          setRole(IDLE)
         case SECONDARY_ADDRESS(sa) =>
           if (role != IDLE) {
             secondaryAddress = sa
@@ -262,10 +259,10 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
             openChannel()
           }
           if (role == TALKER_READY) {
-            role = TALKER
+            setRole(TALKER)
           }
         case UNTALK =>
-          role = IDLE
+          setRole(IDLE)
         case OPEN(address) =>
           if (role != IDLE) {
             secondaryAddress = address
@@ -278,9 +275,10 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
           }
         case TALK(device) =>
           if (isThisDevice(device)) {
-            letsTalk()
+            setRole(TALKER_READY)
           }
       }
+      commandReceived(lastCommand)
     } else {
       if (role != IDLE) {
         receiveData(data)
@@ -288,4 +286,6 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
     }
     //println("----------------------------------------")
   }
+
+  protected def commandReceived(cmd:Command): Unit = {}
 }

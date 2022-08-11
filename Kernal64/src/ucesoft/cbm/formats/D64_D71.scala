@@ -1,5 +1,4 @@
 package ucesoft.cbm.formats
-import ucesoft.cbm.formats.TestD64Editor.d64
 import ucesoft.cbm.peripheral.drive.Floppy
 
 import java.io.{BufferedInputStream, ObjectInputStream, ObjectOutputStream, RandomAccessFile}
@@ -72,6 +71,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   private[this] val absoluteSectorCache = new collection.mutable.HashMap[Int,Int]
   private[this] val _bam : BamInfo = bamInfo
   private[this] val trackChangeBitMap = Array.ofDim[Long](70)
+  private[this] var trackSectorListener : (Int,Int) => Unit = _
   
   @inline private def trackSectorModified(t:Int,s:Int): Unit = trackChangeBitMap(t - 1) |= 1 << s
   @inline private def isTrackModified(t:Int) = trackChangeBitMap(t - 1) > 0
@@ -88,6 +88,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   }  
   
   override protected def absoluteSector(t: Int, s: Int): Int = {
+    if (trackSectorListener != null) trackSectorListener(t,s)
     val cacheIndex = t << 8 | s
     absoluteSectorCache get cacheIndex match {
       case None =>
@@ -106,6 +107,8 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     case D71_DISK_SIZE_70_TRACKS | D71_DISK_SIZE_70_TRACKS_WITH_ERRORS => if (_bam != null && _bam.singleSide) 35 else 70
     case _ => throw new IllegalArgumentException("Unsupported file format. size is " + disk.length)
   }
+
+  def setTrackSectorListener(tsl:(Int,Int) => Unit): Unit = trackSectorListener = tsl
 
   def isValidTrackAndSector(t:Int,s:Int): Boolean =
     TRACK_ALLOCATION.get(t) match {

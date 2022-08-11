@@ -76,7 +76,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     ProcessRS232)
   override protected val printer : Printer = new MPS803(bus,printerGraphicsDriver)
   // -------------- AUDIO ----------------------
-  protected lazy val volumeDialog : JDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
+  override protected lazy val volumeDialog : JDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
   // ------------ Control Port -----------------------
   protected lazy val gameControlPort = new controlport.GamePadControlPort(configuration)
   protected val keypadControlPort: ControlPort with MouseListener with KeyListener = controlport.ControlPort.keypadControlPort
@@ -180,36 +180,12 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def loadSettings(args:Array[String]) : Unit = {
-    def loadFile(fn:String) : Unit = {
-      val cmd = if (isC64Mode) s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar else s"""RUN"$fn"""" + 13.toChar
-      clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => HomeKeyboard.insertTextIntoKeyboardBuffer(cmd,mmu,isC64Mode) ))
-    }
-    // AUTOPLAY
-    preferences.parseAndLoad(args,configuration) match {
-      case None =>
-        // run the given file name
-        preferences[String](Preferences.PREF_RUNFILE) match {
-          case Some(fn) if fn != null && fn != "" =>
-            loadFile(fn)
-          case _ =>
-        }
-      case Some(f) =>
-        preferences[String](Preferences.PREF_DRIVE_X_FILE(0)) match {
-          case None =>
-            handleDND(new File(f),false,true)
-          case Some(_) =>
-            // here we have both drive8 and PRG set: we load the given PRG file from disk 8
-            val fn = new File(f).getName
-            val dot = fn.indexOf('.')
-            val cbmFile = if (dot > 0) fn.substring(0,dot) else f
-            loadFile(cbmFile)
-        }
-    }
-    DrivesConfigPanel.registerDrives(displayFrame,drives,setDriveType(_,_,false),enableDrive(_,_,true),attachDisk(_,_,isC64Mode),attachDiskFile(_,_,_,None),drivesEnabled)
+  override protected def delayedAutorun(fn:String): Unit = {
+    val cmd = if (isC64Mode) s"""LOAD"$fn",8,1""" + 13.toChar + "RUN" + 13.toChar else s"""RUN"$fn"""" + 13.toChar
+    clock.schedule(new ClockEvent("Loading", clock.currentCycles + PRG_RUN_DELAY_CYCLES, _ => HomeKeyboard.insertTextIntoKeyboardBuffer(cmd, mmu, isC64Mode)))
   }
 
-  protected def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String],emulateInserting:Boolean = true) : Unit = {
+  override protected def attachDiskFile(driveID:Int,file:File,autorun:Boolean,fileToLoad:Option[String],emulateInserting:Boolean = true) : Unit = {
     try {
       if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
       if (!file.isDirectory) {
@@ -246,13 +222,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
         showError("Disk attaching error",t.toString)
     }
-  }
-
-  protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
-    drivesEnabled(id) = enabled
-    drives(id).setActive(enabled)
-    driveLeds(id).setVisible(enabled)
-    preferences(Preferences.PREF_DRIVE_X_ENABLED(id)) = enabled
   }
 
   override protected def resetSettings() : Unit = {
@@ -325,7 +294,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     attachDiskFile(0,disk,autorun,Some(prgName),false)
   }
 
-  protected def attachDevice(file:File,autorun:Boolean,fileToLoad:Option[String] = None,emulateInserting:Boolean = true) : Unit = {
+  override protected def attachDevice(file:File,autorun:Boolean,fileToLoad:Option[String] = None,emulateInserting:Boolean = true) : Unit = {
     val name = file.getName.toUpperCase
 
     if (name.endsWith(".PRG") && loadPRGasDisk) attachPRGAsDisk(file)
@@ -335,7 +304,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       lastLoadedPrg = Some(file)
     }
     else
-    if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81")) attachDiskFile(0,file,autorun,fileToLoad,emulateInserting)
+    if (name.endsWith(".D64") || name.endsWith(".G64") || name.endsWith(".D71") || name.endsWith(".D81") || name.endsWith(".G71")) attachDiskFile(0,file,autorun,fileToLoad,emulateInserting)
     else
     if (tapeAllowed && name.endsWith(".TAP")) attachTapeFile(file,None,autorun)
     else
@@ -403,26 +372,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     fc.showOpenDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
         attachDiskFile(driveID,fc.getSelectedFile,false,canvas.selectedFile)
-      case _ =>
-    }
-  }
-
-  override protected def attachDisk(driveID:Int,autorun:Boolean,c64Mode:Boolean) : Unit = {
-    val fc = new JFileChooser
-    val canvas = new D64Canvas(fc,getCharROM,c64Mode)
-    val sp = new javax.swing.JScrollPane(canvas)
-    canvas.sp = sp
-    fc.setDialogTitle(s"Attach disk to drive ${driveID + 8}")
-    fc.setAccessory(sp)
-    fc.setFileView(new C64FileView)
-    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-    fc.setFileFilter(new javax.swing.filechooser.FileFilter {
-      def accept(f:File): Boolean = f.isDirectory || drives(driveID).formatExtList.exists { ext => try { f.toString.toUpperCase.endsWith(ext) } catch { case _:Throwable=> false } }
-      def getDescription = s"${drives(driveID).formatExtList.mkString(",")} files"
-    })
-    fc.showOpenDialog(displayFrame) match {
-      case JFileChooser.APPROVE_OPTION =>
-        attachDiskFile(driveID,fc.getSelectedFile,autorun,canvas.selectedFile)
       case _ =>
     }
   }
@@ -916,7 +865,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   }
 
   // -------------------------------------------------------------------
-  protected def setMenu(): Unit = setMenu(true,true)
 
   override protected def setGlobalCommandLineOptions : Unit = {
     import Preferences._
@@ -1202,45 +1150,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     fileMenu.add(exitItem)
   }
 
-  protected def setEditMenu(editMenu: JMenu) : Unit = {
-    val pasteItem = new JMenuItem("Paste text")
-    pasteItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V,java.awt.Event.CTRL_MASK))
-    pasteItem.addActionListener(_ => paste )
-    editMenu.add(pasteItem)
-    val listItem = new JMenuItem("List BASIC to editor")
-    listItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_I,java.awt.Event.ALT_MASK))
-    listItem.addActionListener(_ => ucesoft.cbm.misc.BasicListExplorer.list(mmu,0x801) )
-    editMenu.add(listItem)
-  }
-
-  protected def setStateMenu(stateMenu: JMenu) : Unit = {
-    val saveStateItem = new JMenuItem("Save state ...")
-    saveStateItem.addActionListener(_ => saveState() )
-    stateMenu.add(saveStateItem)
-    val loadStateItem = new JMenuItem("Load state ...")
-    loadStateItem.addActionListener(_ => loadState(None) )
-    stateMenu.add(loadStateItem)
-  }
-
-  protected def setTraceMenu(traceMenu: JMenu) : Unit = {
-    traceItem = new JCheckBoxMenuItem("Trace CPU")
-    traceItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_T,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    traceItem.setSelected(false)
-    traceItem.addActionListener(e => trace(true,e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
-    traceMenu.add(traceItem)
-
-    traceDiskItem = new JCheckBoxMenuItem("Trace Disk CPU")
-    traceDiskItem.setSelected(false)
-    traceDiskItem.addActionListener(e => trace(false,e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
-    traceMenu.add(traceDiskItem)
-
-    val inspectItem = new JCheckBoxMenuItem("Inspect components ...")
-    inspectItem.setSelected(false)
-    inspectItem.addActionListener(e => inspectDialog.setVisible(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
-    traceMenu.add(inspectItem)
-
-  }
-
   override protected def setGameMenu(gamesMenu: JMenu) : Unit = {
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])
     var providers = loader.iterator
@@ -1274,36 +1183,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       case t:Throwable =>
         t.printStackTrace()
     }
-  }
-
-  protected def setHelpMenu(helpMenu: JMenu) : Unit = {
-    val aboutItem = new JMenuItem("About")
-    aboutItem.addActionListener(_ => showAbout )
-    helpMenu.add(aboutItem)
-    val settingsItem = new JMenuItem("Settings")
-    settingsItem.addActionListener(_ => showSettings )
-    helpMenu.add(settingsItem)
-  }
-
-  protected def setDriveMenu(parent:JMenu) : Unit = {
-    val driveMenu = new JMenuItem("Drives ...")
-    driveMenu.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    parent.add(driveMenu)
-    driveMenu.addActionListener(_ => DrivesConfigPanel.getDriveConfigDialog.setVisible(true) )
-  }
-
-  protected def setVolumeSettings(parent:JMenu) : Unit = {
-    val volumeItem = new JMenuItem("Volume settings ...")
-    volumeItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    volumeItem.addActionListener(_ => volumeDialog.setVisible(true) )
-    parent.add(volumeItem)
-  }
-
-  protected def setWarpModeSettings(parent:JMenu) : Unit = {
-    maxSpeedItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_W,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    maxSpeedItem.setSelected(clock.maximumSpeed)
-    maxSpeedItem.addActionListener(e => warpMode(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
-    parent.add(maxSpeedItem)
   }
 
   protected def setRenderingSettings(parent:JMenu) : Unit = {
@@ -1454,17 +1333,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       mouseEnabledItem.setSelected(false)
       enableMouse(false,display)
     }) :: resetSettingsActions
-  }
-
-  protected def setPauseSettings(parent:JMenu) : Unit = {
-    val pauseItem = new JCheckBoxMenuItem("Pause")
-    pauseItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_P,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    pauseItem.addActionListener(e =>
-      if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) {
-        clock.pause
-        display.setPaused
-      } else clock.play )
-    parent.add(pauseItem)
   }
 
   protected def setPrinterSettings(parent:JMenu) : Unit = {
@@ -1917,18 +1785,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-
-  protected def reloadROM(resource:String,location:String) : Unit = {
-    val oldLocation = configuration.getProperty(resource)
-    try {
-      configuration.setProperty(resource, location)
-      ROM.reload(resource)
-    }
-    finally {
-      configuration.setProperty(resource,if (oldLocation == null) "" else oldLocation)
-    }
-  }
-
   override protected def showCartInfo : Unit = {
     ExpansionPort.getExpansionPort.getCRT match {
       case Some(crt) =>
@@ -1962,5 +1818,9 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     configuration.setProperty(PREF_RENDERINGTYPE,"default")
     configuration.setProperty(PREF_WRITEONDISK,"true")
     configuration.setProperty(PREF_VICPALETTE,"bright")
+  }
+
+  override protected def listBASIC(): Unit = {
+    BasicListExplorer.list(mmu, PRG_LOAD_ADDRESS())
   }
 }
