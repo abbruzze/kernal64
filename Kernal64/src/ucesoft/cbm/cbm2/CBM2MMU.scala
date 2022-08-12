@@ -68,13 +68,12 @@ class CBM2MMU extends RAMComponent {
   private var sid : SID = _
   private var acia : ACIA6551 = _
 
-  override def reset: Unit = {
-    // TODO
+  override def reset(): Unit = {
     codeBank = 15
     dataBank = 15
   }
 
-  override def init: Unit = {
+  override def init(): Unit = {
     for(i <- 0 until banks.length) banks(i) = null
 
     val bs = model.memoryK / 64
@@ -246,9 +245,13 @@ class CBM2MMU extends RAMComponent {
     TestCart.write(0xF0000 | address,value)
   }
 
-  override protected def saveState(out: ObjectOutputStream): Unit = ???
+  override protected def saveState(out: ObjectOutputStream): Unit = {
+    // TODO
+  }
 
-  override protected def loadState(in: ObjectInputStream): Unit = ???
+  override protected def loadState(in: ObjectInputStream): Unit = {
+    // TODO
+  }
 
   override protected def allowsStateRestoring: Boolean = true
 }

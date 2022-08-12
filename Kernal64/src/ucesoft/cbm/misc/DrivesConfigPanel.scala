@@ -7,12 +7,31 @@ import java.io.File
 import javax.swing._
 
 object DrivesConfigPanel {
+  val ALL_DRIVES_ALLOWED = Map(
+    DriveType._1541 -> true,
+    DriveType._1571 -> true,
+    DriveType._1581 -> true,
+    DriveType._8050 -> true
+  )
+  val ALL_IEC_DRIVES_ALLOWED = Map(
+    DriveType._1541 -> true,
+    DriveType._1571 -> true,
+    DriveType._1581 -> true,
+    DriveType._8050 -> false
+  )
+  val ALL_IEEE488_DRIVES_ALLOWED = Map(
+    DriveType._1541 -> false,
+    DriveType._1571 -> false,
+    DriveType._1581 -> false,
+    DriveType._8050 -> true
+  )
   private var drives : Array[Drive] = _
   private var configPanel : JDialog = _
   private var changeDrive : (Int,DriveType.Value) => Unit = _
   private var enableDrive : (Int,Boolean) => Unit = _
   private var selectDisk : (Int,Boolean) => Unit = _
   private var attachDisk : (Int,File,Boolean) => Unit = _
+  private var allowedDriveTypes : Map[DriveType.Value,Boolean] = _
 
   def registerDrives(parent:JFrame,
                      drives:Array[_ <: Drive],
@@ -20,8 +39,10 @@ object DrivesConfigPanel {
                      enableDrive: (Int,Boolean) => Unit,
                      selectDisk: (Int,Boolean) => Unit,
                      attachDisk: (Int,File,Boolean) => Unit,
-                     initialDrivesEnabled : Array[Boolean]) : Unit = {
+                     initialDrivesEnabled : Array[Boolean],
+                     allowedDriveTypes:Map[DriveType.Value,Boolean] = ALL_DRIVES_ALLOWED) : Unit = {
     this.drives = drives.toArray
+    this.allowedDriveTypes = allowedDriveTypes
     configPanel = initConfigPanel(parent,initialDrivesEnabled)
     this.changeDrive = changeDrive
     this.enableDrive = enableDrive
@@ -61,41 +82,60 @@ object DrivesConfigPanel {
       driveTypePanel.setLayout(new BoxLayout(driveTypePanel,BoxLayout.Y_AXIS))
       driveTypePanel.setBorder(BorderFactory.createTitledBorder("Type"))
       val group = new ButtonGroup
-      val _1541CB = new JRadioButton("1541")
-      toBeDisabled = _1541CB :: toBeDisabled
-      _1541CB.setAlignmentX(Component.LEFT_ALIGNMENT)
-      group.add(_1541CB)
-      _1541CB.setSelected(drive.driveType == DriveType._1541)
-      _1541ParallelCableCB.setEnabled(_1541CB.isSelected)
-      _1541RamExpCombo.setEnabled(_1541CB.isSelected)
-      _1541CB.addActionListener(_ => {
-        changeDrive(id,DriveType._1541)
-        _1541ParallelCableCB.setEnabled(true)
-        _1541RamExpCombo.setEnabled(true)
-      } )
-      driveTypePanel.add(_1541CB)
-      val _1571CB = new JRadioButton("1571")
-      toBeDisabled = _1571CB :: toBeDisabled
-      _1571CB.setAlignmentX(Component.LEFT_ALIGNMENT)
-      group.add(_1571CB)
-      _1571CB.setSelected(drive.driveType == DriveType._1571)
-      _1571CB.addActionListener(_ => {
-        changeDrive(id,DriveType._1571)
-        _1541ParallelCableCB.setEnabled(false)
-        _1541RamExpCombo.setEnabled(false)
-      } )
-      driveTypePanel.add(_1571CB)
-      val _1581CB = new JRadioButton("1581")
-      toBeDisabled = _1581CB :: toBeDisabled
-      _1581CB.setAlignmentX(Component.LEFT_ALIGNMENT)
-      group.add(_1581CB)
-      _1581CB.setSelected(drive.driveType == DriveType._1581)
-      _1581CB.addActionListener(_ => {
-        changeDrive(id,DriveType._1581)
-        _1541ParallelCableCB.setEnabled(false)
-        _1541RamExpCombo.setEnabled(false)
-      } )
-      driveTypePanel.add(_1581CB)
+      if (allowedDriveTypes(DriveType._1541)) {
+        val _1541CB = new JRadioButton("1541")
+        toBeDisabled = _1541CB :: toBeDisabled
+        _1541CB.setAlignmentX(Component.LEFT_ALIGNMENT)
+        group.add(_1541CB)
+        _1541CB.setSelected(drive.driveType == DriveType._1541)
+        _1541ParallelCableCB.setEnabled(_1541CB.isSelected)
+        _1541RamExpCombo.setEnabled(_1541CB.isSelected)
+        _1541CB.addActionListener(_ => {
+          changeDrive(id, DriveType._1541)
+          _1541ParallelCableCB.setEnabled(true)
+          _1541RamExpCombo.setEnabled(true)
+        })
+        driveTypePanel.add(_1541CB)
+      }
+      if (allowedDriveTypes(DriveType._1571)) {
+        val _1571CB = new JRadioButton("1571")
+        toBeDisabled = _1571CB :: toBeDisabled
+        _1571CB.setAlignmentX(Component.LEFT_ALIGNMENT)
+        group.add(_1571CB)
+        _1571CB.setSelected(drive.driveType == DriveType._1571)
+        _1571CB.addActionListener(_ => {
+          changeDrive(id, DriveType._1571)
+          _1541ParallelCableCB.setEnabled(false)
+          _1541RamExpCombo.setEnabled(false)
+        })
+        driveTypePanel.add(_1571CB)
+      }
+      if (allowedDriveTypes(DriveType._1581)) {
+        val _1581CB = new JRadioButton("1581")
+        toBeDisabled = _1581CB :: toBeDisabled
+        _1581CB.setAlignmentX(Component.LEFT_ALIGNMENT)
+        group.add(_1581CB)
+        _1581CB.setSelected(drive.driveType == DriveType._1581)
+        _1581CB.addActionListener(_ => {
+          changeDrive(id, DriveType._1581)
+          _1541ParallelCableCB.setEnabled(false)
+          _1541RamExpCombo.setEnabled(false)
+        })
+        driveTypePanel.add(_1581CB)
+      }
+      if (allowedDriveTypes(DriveType._8050)) {
+        val _8050CB = new JRadioButton("8050")
+        toBeDisabled = _8050CB :: toBeDisabled
+        _8050CB.setAlignmentX(Component.LEFT_ALIGNMENT)
+        group.add(_8050CB)
+        _8050CB.setSelected(drive.driveType == DriveType._8050)
+        _8050CB.addActionListener(_ => {
+          changeDrive(id, DriveType._8050)
+          _1541ParallelCableCB.setEnabled(false)
+          _1541RamExpCombo.setEnabled(false)
+        })
+        driveTypePanel.add(_8050CB)
+      }
       panel.add(driveTypePanel)
       // general
       val generalPanel = new JPanel
@@ -130,7 +170,7 @@ object DrivesConfigPanel {
       maxSpeedCB.addActionListener(_ => if (maxSpeedCB.isSelected) drive.setSpeedHz(drive.MAX_SPEED_HZ) else drive.setSpeedHz(drive.MIN_SPEED_HZ) )
       generalPanel.add(maxSpeedCB)
 
-      if (id == 0) {
+      if (id == 0 && allowedDriveTypes(DriveType._1541)) {
         generalPanel.add(_1541ParallelCableCB)
         val _1541RamExpLabel = new JLabel("1541 RAM Expansion")
         _1541RamExpLabel.setAlignmentX(Component.LEFT_ALIGNMENT)

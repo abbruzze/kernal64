@@ -52,6 +52,10 @@ object IEEE488Bus {
   private class Line(val lineType:LineType.Value,lineListener:(Long,LineType.Value,LineValue.Value) => Unit) {
     private var line = 0L
 
+    def reset(): Unit = {
+      line = 0L
+    }
+
     final def pull(pullID:Long): Unit = {
       val oldLine = line
       line |= pullID
@@ -127,7 +131,10 @@ class IEEE488Bus extends CBMComponent {
     listenersBitMap &= ~l.id
   }
 
-  override def reset(): Unit = ???
+  override def reset(): Unit = {
+    DIO = 0
+    lines.foreach(_.reset())
+  }
 
   override def init(): Unit = {}
 

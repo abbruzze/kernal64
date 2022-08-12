@@ -33,6 +33,7 @@ import javax.swing.filechooser.FileFilter
 import scala.util.{Failure, Success}
 
 abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListener { cbmComputer =>
+  override protected val ALLOWED_DRIVE_TYPES = DrivesConfigPanel.ALL_IEC_DRIVES_ALLOWED
   protected val CONFIGURATION_GMOD2_FILE = "gmod2.file"
 
   protected val detachCtrItem = new JMenuItem("Detach cartridge")

@@ -185,6 +185,7 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     currentScreenHeight = SCREEN_HEIGHT
     oneLineDrawn = true
     setScanLines(SCREEN_HEIGHT)
+    play()
   }
 
   override def hardReset: Unit = {

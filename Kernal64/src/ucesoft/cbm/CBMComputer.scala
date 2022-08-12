@@ -42,6 +42,7 @@ abstract class CBMComputer extends CBMComponent {
   protected val cbmModel : CBMComputerModel
 
   protected val TOTAL_DRIVES: Int = Preferences.TOTALDRIVES
+  protected val ALLOWED_DRIVE_TYPES = DrivesConfigPanel.ALL_DRIVES_ALLOWED
   protected val APPLICATION_NAME : String
   protected val CONFIGURATION_FILENAME : String
   protected val CONFIGURATION_LASTDISKDIR = "lastDiskDirectory"
@@ -647,7 +648,7 @@ abstract class CBMComputer extends CBMComponent {
             delayedAutorun(cbmFile)
         }
     }
-    DrivesConfigPanel.registerDrives(displayFrame, drives, setDriveType(_, _, false), enableDrive(_, _, true), attachDisk(_, _, isC64Mode), attachDiskFile(_, _, _, None), drivesEnabled)
+    DrivesConfigPanel.registerDrives(displayFrame, drives, setDriveType(_, _, false), enableDrive(_, _, true), attachDisk(_, _, isC64Mode), attachDiskFile(_, _, _, None), drivesEnabled,ALLOWED_DRIVE_TYPES)
   }
 
   protected def resetSettings() : Unit = {}

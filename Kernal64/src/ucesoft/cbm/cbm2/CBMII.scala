@@ -4,7 +4,7 @@ import ucesoft.cbm.cbm2.IEEE488Connectors.{CIAIEEE488ConnectorA, CIAIEEE488Conne
 import ucesoft.cbm.{CBMComponentType, CBMComputer, CBMComputerModel, CBMIIModel, ClockEvent, Log}
 import ucesoft.cbm.cpu.{CPU6510_CE, Memory}
 import ucesoft.cbm.formats.{Diskette, ProgramLoader}
-import ucesoft.cbm.misc.{AboutCanvas, BasicListExplorer, GIFPanel, Preferences, Switcher, TestCart, VolumeSettingsPanel}
+import ucesoft.cbm.misc.{AboutCanvas, BasicListExplorer, DrivesConfigPanel, GIFPanel, Preferences, Switcher, TestCart, VolumeSettingsPanel}
 import ucesoft.cbm.peripheral.EmptyConnector
 import ucesoft.cbm.peripheral.bus.IEEE488Bus
 import ucesoft.cbm.peripheral.c2n.Datassette
@@ -29,6 +29,7 @@ object CBMII extends App {
 }
 
 class CBMII extends CBMComputer {
+  override protected val ALLOWED_DRIVE_TYPES = DrivesConfigPanel.ALL_IEEE488_DRIVES_ALLOWED
   override val componentID: String = "CBMII"
   override val componentType = CBMComponentType.INTERNAL
   override protected val cbmModel: CBMComputerModel = CBMIIModel
@@ -277,6 +278,8 @@ class CBMII extends CBMComputer {
   }
 
   override def reset(): Unit = {
+    println("CBMII RESET!")
+    clock.schedule(new ClockEvent("50_60Hz", clock.nextCycles, _50_60_Hz _))
     // TODO
   }
 
@@ -373,6 +376,7 @@ class CBMII extends CBMComputer {
     add(CBM2MMU.KERNAL_ROM)
     add(CBM2MMU.BASIC_ROM)
     add(CBM2MMU.CHAR_ROM)
+    add(irq)
     add(clock)
     add(mmu)
     add(cpu)
