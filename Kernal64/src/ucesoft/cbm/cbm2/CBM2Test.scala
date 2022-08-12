@@ -2,7 +2,7 @@ package ucesoft.cbm.cbm2
 
 import ucesoft.cbm.cbm2.IEEE488Connectors._
 import ucesoft.cbm.cpu.{CPU6510_CE, ROM}
-import ucesoft.cbm.misc.{AbstractDriveLedListener, BasicListExplorer, DriveLed, Switcher, TestCart}
+import ucesoft.cbm.misc.{AboutCanvas, AbstractDriveLedListener, BasicListExplorer, DriveLed, Switcher, TestCart}
 import ucesoft.cbm.peripheral.EmptyConnector
 import ucesoft.cbm.peripheral.bus.{IECBus, IEEE488Bus}
 import ucesoft.cbm.peripheral.c2n.Datassette
@@ -19,7 +19,7 @@ import ucesoft.cbm.{ChipID, Clock, ClockEvent, Log}
 import java.awt.datatransfer.DataFlavor
 import java.awt.{BorderLayout, Dimension, FlowLayout, Toolkit}
 import java.io.{File, PrintWriter, StringWriter}
-import javax.swing.{JButton, JFrame, JPanel, JToggleButton}
+import javax.swing.{ImageIcon, JButton, JFrame, JOptionPane, JPanel, JToggleButton}
 
 object CBM2Test {
   private var cpu : CPU6510_CE = _
@@ -46,7 +46,7 @@ object CBM2Test {
     Log.setInfo
     val clk = Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
 
-    val model : CBM2Model = _610PAL
+    val model : CBM2Model = _710PAL
 
     CBM2MMU.BASIC_ROM.resourceName = model.basicROMPropName
     CBM2MMU.CHAR_ROM.resourceName = model.charROMPropName
@@ -81,7 +81,7 @@ object CBM2Test {
     val frame = new JFrame()
     val display = new Display(CRTC6845.SCREEN_WIDTH,CRTC6845.SCREEN_HEIGHT,"CBM-II",frame)
     display.setRenderingHints(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
-    display.setPreferredSize(new Dimension(720,542))
+    display.setPreferredSize(model.preferredFrameSize)
     frame.setFocusTraversalKeysEnabled(false)
 
     val keyb = new BKeyboard(BKeyboard.DEF_CBM2_KEYMAPPER)
@@ -255,6 +255,8 @@ object CBM2Test {
       }
     })
     list.addActionListener(_ => {
+      val about = new AboutCanvas(CBM2MMU.CHAR_ROM, "test",16,16)
+      JOptionPane.showMessageDialog(frame, about, "About", JOptionPane.INFORMATION_MESSAGE, new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
       clk.pause()
       BasicListExplorer.listCBM2(mmu,3)
       clk.play()

@@ -4,7 +4,7 @@ import ucesoft.cbm.cbm2.IEEE488Connectors.{CIAIEEE488ConnectorA, CIAIEEE488Conne
 import ucesoft.cbm.{CBMComponentType, CBMComputer, CBMComputerModel, CBMIIModel, ClockEvent, Log}
 import ucesoft.cbm.cpu.{CPU6510_CE, Memory}
 import ucesoft.cbm.formats.{Diskette, ProgramLoader}
-import ucesoft.cbm.misc.{BasicListExplorer, Preferences, Switcher, TestCart, VolumeSettingsPanel}
+import ucesoft.cbm.misc.{AboutCanvas, BasicListExplorer, GIFPanel, Preferences, Switcher, TestCart, VolumeSettingsPanel}
 import ucesoft.cbm.peripheral.EmptyConnector
 import ucesoft.cbm.peripheral.bus.IEEE488Bus
 import ucesoft.cbm.peripheral.c2n.Datassette
@@ -16,11 +16,13 @@ import ucesoft.cbm.peripheral.mos6525.MOS6525
 import ucesoft.cbm.peripheral.mos6551.ACIA6551
 import ucesoft.cbm.peripheral.printer.{IEEE488MPS803, MPS803GFXDriver, MPS803ROM, Printer}
 import ucesoft.cbm.peripheral.sid.SID
+import ucesoft.cbm.peripheral.vic.Display
+import ucesoft.cbm.trace.TraceDialog
 
 import java.awt.datatransfer.DataFlavor
 import java.awt.{Dimension, Toolkit}
 import java.io.{File, FileNotFoundException, ObjectInputStream, ObjectOutputStream, PrintWriter, StringWriter}
-import javax.swing.{JDialog, JMenu}
+import javax.swing.{ImageIcon, JDialog, JMenu, JOptionPane}
 
 object CBMII extends App {
   CBMComputer.turnOn(new CBMII,args)
@@ -97,6 +99,7 @@ class CBMII extends CBMComputer {
     }
     // PLAY
     clock.play
+    crt.play()
   }
 
   protected def updateScreenDimension(dim:Dimension): Unit = {
@@ -172,11 +175,13 @@ class CBMII extends CBMComputer {
     }
   }
 
-  override protected def setFileMenu(menu: JMenu): Unit = ???
+  override protected def setFileMenu(menu: JMenu): Unit = {
 
-  override protected def getCharROM: Memory = ???
+  }
 
-  override protected def initComputer(): Unit = ???
+  override protected def getCharROM: Memory = CBM2MMU.CHAR_ROM
+
+  override protected def initComputer(): Unit = {}
 
   override protected def handleDND(file: File, _reset: Boolean, autorun: Boolean): Unit = {
     if (_reset) reset(false)
@@ -213,7 +218,9 @@ class CBMII extends CBMComputer {
     }
   }
 
-  override protected def setSettingsMenu(optionsMenu: JMenu): Unit = ???
+  override protected def setSettingsMenu(optionsMenu: JMenu): Unit = {
+
+  }
 
   override protected def paste(): Unit = {
     val clipboard = Toolkit.getDefaultToolkit.getSystemClipboard
@@ -224,7 +231,11 @@ class CBMII extends CBMComputer {
     }
   }
 
-  override protected def mainLoop(cycles: Long): Unit = ???
+  override protected def mainLoop(cycles: Long): Unit = {
+    cpu.fetchAndExecute(1)
+    ciaieee.clock(false)
+    ciaip.clock(false)
+  }
 
   override protected def initDrive(id: Int, driveType: DriveType.Value): Unit = {
     val old = Option(drives(id))
@@ -260,7 +271,14 @@ class CBMII extends CBMComputer {
     }
   }
 
-  override def reset(): Unit = ???
+  override protected def showAbout(): Unit = {
+    val about = new AboutCanvas(getCharROM, ucesoft.cbm.Version.VERSION.toUpperCase + " (" + ucesoft.cbm.Version.BUILD_DATE.toUpperCase + ")",16,16)
+    JOptionPane.showMessageDialog(displayFrame, about, "About", JOptionPane.INFORMATION_MESSAGE, new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
+  }
+
+  override def reset(): Unit = {
+    // TODO
+  }
 
   override def init(): Unit = {
     val sw = new StringWriter
@@ -336,15 +354,25 @@ class CBMII extends CBMComputer {
     // ============== ACIA ==================================================
     acia = new ACIA6551(irq => tpiIeee.setInterruptPin(MOS6525.INT_I4,if (irq) 0 else 1))
 
-    mmu.setIO(crt,ciaieee,ciaip,tpiKb,tpiIeee,sid,acia)
-
     // 50/60 Hz source
     clock.schedule(new ClockEvent("50_60Hz", clock.nextCycles, _50_60_Hz _))
 
     TestCart.setCartLocation(0xFDAFF)
     //TestCart.enabled = true
 
+    // ============== DISPLAY ===============================================
+    display = new Display(CRTC6845.SCREEN_WIDTH, CRTC6845.SCREEN_HEIGHT, displayFrame.getTitle, displayFrame)
+    display.setRenderingHints(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
+    display.setPreferredSize(model.preferredFrameSize)
+    //displayFrame.setFocusTraversalKeysEnabled(false)
+
+    // Keyboard
+    displayFrame.addKeyListener(keyb)
+
     // components
+    add(CBM2MMU.KERNAL_ROM)
+    add(CBM2MMU.BASIC_ROM)
+    add(CBM2MMU.CHAR_ROM)
     add(clock)
     add(mmu)
     add(cpu)
@@ -354,6 +382,25 @@ class CBMII extends CBMComputer {
     add(ciaieee)
     add(ciaip)
     add(tpiIeee)
+    add(display)
+    add(datassette)
+    add(printer)
+
+    // GUI
+    displayFrame.getContentPane.add("Center",display)
+    displayFrame.getContentPane.add("South",makeInfoPanel(true))
+    // tracing
+    if (!headless) {
+      traceDialog = TraceDialog.getTraceDialog("CPU Debugger", displayFrame, mmu, cpu)
+      Log.setOutput(traceDialog.logPanel.writer)
+    }
+    else Log.setOutput(null)
+
+    displayFrame.setTransferHandler(DNDHandler)
+    Log.info(sw.toString)
+
+    // GIF Recorder
+    gifRecorder = GIFPanel.createGIFPanel(displayFrame, Array(display), Array("CRT"))
   }
 
   private def _50_60_Hz(cycles: Long): Unit = {
@@ -369,6 +416,9 @@ class CBMII extends CBMComputer {
     crt = new CRTC6845(mmu.getCRTCRam,CBM2MMU.CHAR_ROM.getROMBytes(),16)
     crt.setDisplay(display)
     crt.setClipping(model.crtClip._1,model.crtClip._2,model.crtClip._3,model.crtClip._4)
+    add(crt)
+    crt.initComponent()
+    mmu.setIO(crt,ciaieee,ciaip,tpiKb,tpiIeee,sid,acia)
   }
 
   override protected def saveState(out: ObjectOutputStream): Unit = ???

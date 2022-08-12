@@ -112,7 +112,7 @@ class IEEE488Bus extends CBMComponent {
         listenersBitMap |= p
         l.setID(p)
         listeners = l :: listeners
-        Log.info(s"IECBus has registerd ${l.id}(${l.getClass.getName}) as a listener")
+        Log.info(s"IEEE488 has registerd ${l.id}(${l.getClass.getName}) as a listener")
         if (l.isController) {
           Log.info(s"Found IECBus controller: ${l.id}")
         }

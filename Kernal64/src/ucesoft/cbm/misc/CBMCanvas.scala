@@ -138,7 +138,7 @@ class CBMCanvas(charRom: Memory,romCharBytes:Int,romCharHeight:Int) extends JCom
     var y = 0
     for ((line,row) <- lines.zipWithIndex) {
       var rcy = 0
-      for (rc <- 0 to 7) {
+      for (rc <- 0 to (romCharHeight - 1)) {
         var x = 0
         for (char <- line) {
           val byte = charRom.read(charRom.startAddress | (char.charCode * romCharBytes) | rc)

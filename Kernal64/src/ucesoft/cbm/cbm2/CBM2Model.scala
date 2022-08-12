@@ -2,6 +2,8 @@ package ucesoft.cbm.cbm2
 
 import ucesoft.cbm.cpu.ROM
 
+import java.awt.Dimension
+
 /*object CBM2Model extends Enumeration {
   val _600 = Value
   val _620 = Value
@@ -17,6 +19,7 @@ sealed trait CBM2Model {
   val basicROMPropName : String
   val charROMPropName : String
   val crtClip : (Int,Int,Int,Int)
+  val preferredFrameSize = new Dimension(720,554)
 }
 
 case object _610PAL extends CBM2Model {
@@ -67,6 +70,7 @@ case object _710NTSC extends CBM2Model {
   override val charROMPropName = ROM.CBM2_CHAR700_ROM_PROP
   override val basicROMPropName = ROM.CBM2_BASIC128_ROM_PROP
   override val crtClip: (Int, Int, Int, Int) = (18,0,0,0)
+  override val preferredFrameSize = new Dimension(720,732)
 }
 
 case object _710PAL extends CBM2Model {
@@ -77,6 +81,7 @@ case object _710PAL extends CBM2Model {
   override val charROMPropName = ROM.CBM2_CHAR700_ROM_PROP
   override val basicROMPropName = ROM.CBM2_BASIC128_ROM_PROP
   override val crtClip: (Int, Int, Int, Int) = (18,0,0,0)
+  override val preferredFrameSize = new Dimension(720,732)
 }
 
 case object _720NTSC extends CBM2Model {
@@ -87,4 +92,5 @@ case object _720NTSC extends CBM2Model {
   override val charROMPropName = ROM.CBM2_CHAR700_ROM_PROP
   override val basicROMPropName = ROM.CBM2_BASIC256_ROM_PROP
   override val crtClip: (Int, Int, Int, Int) = (18,0,0,0)
+  override val preferredFrameSize = new Dimension(720,732)
 }
