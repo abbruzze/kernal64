@@ -53,7 +53,7 @@ class CBM2MMU extends RAMComponent {
   private final val YIND_LDA = 0xB1
 
   private var model : CBM2Model  = _610PAL
-  private val ram,screenRam = Array.ofDim[Int](2048)
+  private val ram,screenRam = Array.fill[Int](2048)(0xFF)
   private val romSlot = Array.ofDim[Array[Int]](4)
   private val romSlotRAMAccess = Array.ofDim[Boolean](4)
   private final val banks = Array.ofDim[Array[Int]](16)
@@ -73,19 +73,20 @@ class CBM2MMU extends RAMComponent {
     dataBank = 15
   }
 
+  override def hardReset(): Unit = {
+    reset()
+    for(b <- banks) {
+      if (b != null) java.util.Arrays.fill(b,0)
+    }
+    java.util.Arrays.fill(ram,0xFF)
+    java.util.Arrays.fill(screenRam,0xFF)
+  }
+
   override def init(): Unit = {
     for(i <- 0 until banks.length) banks(i) = null
 
     val bs = model.memoryK / 64
-    for(b <- 1 to bs) banks(b) = Array.ofDim[Int](0x10000)
-    /*
-    model match {
-      case CBM2Model._600|CBM2Model._700 =>
-        for(b <- 1 to 2) banks(b) = Array.ofDim[Int](0x10000)
-      case CBM2Model._620|CBM2Model._720 =>
-        for(b <- 1 to 4) banks(b) = Array.ofDim[Int](0x10000)
-    }
-     */
+    for(b <- 1 to bs) banks(b) = Array.fill[Int](0x10000)(0xFF)
   }
 
   def setROM1000(rom:Array[Int]): Unit = romSlot(0) = rom

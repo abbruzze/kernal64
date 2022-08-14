@@ -63,7 +63,14 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
   override def setDriveReader(driveReader: Floppy, emulateInserting: Boolean): Unit = {
     if (driveReader != EmptyFloppy) {
       d80 = driveReader.asInstanceOf[D80]
-      d80.setTrackSectorListener((t, s) => driveLedListener.moveTo(t, Some(s), false))
+      d80.setTrackSectorListener((t, s) => {
+        var lastTrack = 0
+        driveLedListener.moveTo(t, Some(s), false)
+        if (lastTrack != t) {
+          lastTrack = t
+          Thread.sleep(100)
+        }
+      })
       emptyFloppy = false
     }
     else emptyFloppy = true
@@ -71,19 +78,10 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
 
   override def clock(cycles: Long): Unit = {}
 
-  override def getFloppy: Floppy = d80
+  override def getFloppy: Floppy = if (emptyFloppy) EmptyFloppy else d80
 
-  private var d80 = new ucesoft.cbm.formats.D80("""C:\Users\ealeame\OneDrive - Ericsson AB\CBM-II\software\bi3_Superbase700v1.d80""")
-  private var emptyFloppy = false
-  //TODO: REMOVE
-  private var lastTrack = 0
-  d80.setTrackSectorListener((t,s) => {
-    driveLedListener.moveTo(t,Some(s),false)
-    if (lastTrack != t) {
-      lastTrack = t
-      Thread.sleep(100)
-    }
-  })
+  private var d80 : D80 = null
+  private var emptyFloppy = true
 
   override def commandReceived(cmd:Command): Unit = {
     val channelOpened = channels.exists(_.isOpened())

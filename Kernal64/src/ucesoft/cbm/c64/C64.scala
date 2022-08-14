@@ -31,7 +31,7 @@ class C64 extends CBMHomeComputer {
   protected val APPLICATION_NAME = "Kernal64"
   protected val CONFIGURATION_FILENAME = "C64.config"
 
-  protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c64")
+  protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c64",C64Model)
 
   protected val mmu = new C64MMU.MAIN_MEMORY
   protected val busSnooper = new BusSnoop(bus)

@@ -165,7 +165,7 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
 
   final def init : Unit = {
     reset
-    java.util.Arrays.fill(ram,32)
+    //java.util.Arrays.fill(ram,32)
   }
 
   final def reset : Unit = {

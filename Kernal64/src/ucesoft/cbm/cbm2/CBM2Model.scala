@@ -4,13 +4,6 @@ import ucesoft.cbm.cpu.ROM
 
 import java.awt.Dimension
 
-/*object CBM2Model extends Enumeration {
-  val _600 = Value
-  val _620 = Value
-  val _700 = Value
-  val _720 = Value
-}*/
-
 sealed trait CBM2Model {
   val name : String
   val memoryK : Int
@@ -19,7 +12,7 @@ sealed trait CBM2Model {
   val basicROMPropName : String
   val charROMPropName : String
   val crtClip : (Int,Int,Int,Int)
-  val preferredFrameSize = new Dimension(720,554)
+  val preferredFrameSize = new Dimension(720,562)
 }
 
 case object _610PAL extends CBM2Model {

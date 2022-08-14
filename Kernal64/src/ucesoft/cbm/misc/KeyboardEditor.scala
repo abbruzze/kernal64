@@ -64,7 +64,8 @@ class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerM
   }
   private val tiles = for(k <- keys.zip(buttons)) yield new JPanel {
     setLayout(new FlowLayout(FlowLayout.LEFT))
-    val lab: String = k._1.toString + (" " * (maxKeyLen - k._1.toString.length))
+    val keyName = if (model == CBMIIModel) k._1.toString.substring(5) else k._1.toString
+    val lab: String = keyName + (" " * (maxKeyLen - k._1.toString.length))
     val jlabel = new JLabel(lab)
     add(jlabel)
     val f: Font = jlabel.getFont

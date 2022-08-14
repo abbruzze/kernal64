@@ -51,7 +51,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected val nmiSwitcher = new Switcher("NMI",cpu.nmiRequest _)//new NMISwitcher(cpu.nmiRequest _)
   protected val irqSwitcher = new Switcher("IRQ",cpu.irqRequest _)//new IRQSwitcher(cpu.irqRequest _)
   protected val dmaSwitcher = new Switcher("DMA",setDMA _)
-  protected val keybMapper : keyboard.KeyboardMapper
   override protected lazy val keyb : Keyboard = new keyboard.HomeKeyboard(keybMapper,nmiSwitcher.setLine(Switcher.KB,_),!isC64Mode)	// key listener
 
   protected val bus = new IECBus
@@ -360,23 +359,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def attachLocalDir(driveID:Int) : Unit = {
-    val fc = new JFileChooser
-    val canvas = new D64Canvas(fc,getCharROM,isC64Mode)
-    val sp = new javax.swing.JScrollPane(canvas)
-    canvas.sp = sp
-    fc.setDialogTitle(s"Attach local directory to drive ${driveID + 8}")
-    fc.setAccessory(sp)
-    fc.setFileView(new C64FileView)
-    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-    fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
-    fc.showOpenDialog(displayFrame) match {
-      case JFileChooser.APPROVE_OPTION =>
-        attachDiskFile(driveID,fc.getSelectedFile,false,canvas.selectedFile)
-      case _ =>
-    }
-  }
-
   protected def loadFileFromAttachedFile(driveID:Int,relocate:Boolean,c64Mode:Boolean) : Unit = {
     val floppy = drives(driveID).getFloppy
     if (floppy.isEmpty) showError("Loading error","No disk attached!")
@@ -456,27 +438,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def attachTape()  : Unit = {
-    val fc = new JFileChooser
-    val canvas = new TAPCanvas(fc,getCharROM,isC64Mode)
-    val sp = new javax.swing.JScrollPane(canvas)
-    canvas.sp = sp
-    fc.setAccessory(sp)
-    fc.setFileView(new C64FileView)
-    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-    fc.setFileFilter(new FileFilter {
-      def accept(f:File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".TAP")
-      def getDescription = "TAP files"
-    })
-    fc.showOpenDialog(displayFrame) match {
-      case JFileChooser.APPROVE_OPTION =>
-        val tapFile = canvas.selectedObject.asInstanceOf[Option[TAP.TAPHeader]]
-        attachTapeFile(fc.getSelectedFile,tapFile,tapFile.isDefined)
-      case _ =>
-    }
-  }
-
-  protected def attachTapeFile(file:File,tapFile:Option[TAP.TAPHeader],autorun:Boolean) : Unit = {
+  override protected def attachTapeFile(file:File,tapFile:Option[TAP.TAPHeader],autorun:Boolean) : Unit = {
     val tap = new TAP(file.toString)
     datassette.setTAP(Some(tap),tapFile.map(_.tapOffset.toInt))
     tapeMenu.setEnabled(true)

@@ -364,10 +364,10 @@ abstract class Diskette extends Floppy {
       if (i < _bam.diskName.length) out.append(_bam.diskName.charAt(i)) else out.append(0x20)
     }
     out.append(0x22) // "
-    out.append(0xA0)
+    out.append(0x20)
     out.append(_bam.diskID(0))
     out.append(_bam.diskID(1))
-    out.append(0xA0)
+    out.append(0x20)
     out.append(_bam.dosType(0))
     out.append(_bam.dosType(1))
     out.append(0x00)	// EOL
@@ -386,15 +386,15 @@ abstract class Diskette extends Floppy {
       out.append(dir.sizeInSectors & 0xFF)
       out.append(dir.sizeInSectors >> 8)
       // blanks after blocks      
-      for(i <- 1 to blanks) out.append(0xA0)
+      for(i <- 1 to blanks) out.append(0x20)
       out.append(0x22) // "
       for(i <- 0 until dir.fileName.length) out.append(dir.fileName.charAt(i))
       out.append(0x22) // "
-      for(i <- 1 to 16 - dir.fileName.length) out.append(0xA0)
-      out.append(0xA0)
+      for(i <- 1 to 16 - dir.fileName.length) out.append(0x20)
+      out.append(0x20)
       val fileType = dir.fileType.toString
       for(i <- 0 until fileType.length) out.append(fileType.charAt(i))
-      for(i <- 1 to endBlanks) out.append(0xA0)
+      for(i <- 1 to endBlanks) out.append(0x20)
       out.append(0x00) // EOL
     }
     

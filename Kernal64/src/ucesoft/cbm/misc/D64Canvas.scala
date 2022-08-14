@@ -35,7 +35,7 @@ class D64Canvas(fc:JFileChooser,
 
 	addMouseListener(new MouseAdapter {
 		override def mouseClicked(e: MouseEvent): Unit = {
-			val rowHeight = if (isDoubleHeight) 16 else 8
+			val rowHeight = if (isDoubleHeight) romCharHeight * 2 else romCharHeight
 			val rowSel = e.getY / rowHeight
 			if (validSelectableIndexes.contains(rowSel)) {
         if (e.isControlDown && rowSel == selectedRow) selectRow(-1) else selectRow(rowSel)
@@ -52,7 +52,8 @@ class D64Canvas(fc:JFileChooser,
 																												 fileName.toUpperCase.endsWith(".D71") ||
 																												 fileName.toUpperCase.endsWith(".D81") ||
 																												 fileName.toUpperCase.endsWith(".G64") ||
-																												 fileName.toUpperCase.endsWith(".G71")
+																												 fileName.toUpperCase.endsWith(".G71") ||
+																												 fileName.toUpperCase.endsWith(".D80")
 
   def propertyChange(e:PropertyChangeEvent) : Unit = {
     val prop = e.getPropertyName

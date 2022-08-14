@@ -41,7 +41,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
 
   protected var vdcFullScreenAtBoot = false // used with --vdc-full-screen
 
-  protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c128")
+  protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c128",C128Model)
   private[this] var vdcEnabled = true // used with --vdc-disabled
   override protected val mmu = new C128MMU(this)
   private[this] val z80 = new Z80(mmu,mmu)

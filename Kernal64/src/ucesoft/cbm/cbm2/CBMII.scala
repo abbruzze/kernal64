@@ -1,28 +1,29 @@
 package ucesoft.cbm.cbm2
 
 import ucesoft.cbm.cbm2.IEEE488Connectors.{CIAIEEE488ConnectorA, CIAIEEE488ConnectorB, IEEE488InterfaceA, IEEE488InterfaceB}
-import ucesoft.cbm.{CBMComponentType, CBMComputer, CBMComputerModel, CBMIIModel, ClockEvent, Log}
 import ucesoft.cbm.cpu.{CPU6510_CE, Memory}
-import ucesoft.cbm.formats.{Diskette, ProgramLoader}
-import ucesoft.cbm.misc.{AboutCanvas, BasicListExplorer, DrivesConfigPanel, GIFPanel, Preferences, Switcher, TestCart, VolumeSettingsPanel}
+import ucesoft.cbm.formats.{Diskette, ProgramLoader, TAP}
+import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral.EmptyConnector
 import ucesoft.cbm.peripheral.bus.IEEE488Bus
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.crtc.CRTC6845
 import ucesoft.cbm.peripheral.drive.{DriveType, IEEE488Drive}
-import ucesoft.cbm.peripheral.keyboard.{BKeyboard, Keyboard}
+import ucesoft.cbm.peripheral.keyboard.{BKeyboard, KeyboardMapper, KeyboardMapperStore}
 import ucesoft.cbm.peripheral.mos6525.MOS6525
 import ucesoft.cbm.peripheral.mos6551.ACIA6551
 import ucesoft.cbm.peripheral.printer.{IEEE488MPS803, MPS803GFXDriver, MPS803ROM, Printer}
 import ucesoft.cbm.peripheral.sid.SID
 import ucesoft.cbm.peripheral.vic.Display
 import ucesoft.cbm.trace.TraceDialog
+import ucesoft.cbm._
 
 import java.awt.datatransfer.DataFlavor
 import java.awt.{Dimension, Toolkit}
-import java.io.{File, FileNotFoundException, ObjectInputStream, ObjectOutputStream, PrintWriter, StringWriter}
-import javax.swing.{ImageIcon, JDialog, JMenu, JOptionPane}
+import java.io._
+import javax.swing.filechooser.FileFilter
+import javax.swing._
 
 object CBMII extends App {
   CBMComputer.turnOn(new CBMII,args)
@@ -35,7 +36,8 @@ class CBMII extends CBMComputer {
   override protected val cbmModel: CBMComputerModel = CBMIIModel
   override protected val APPLICATION_NAME: String = "CBMII"
   override protected val CONFIGURATION_FILENAME: String = "CBMII.config"
-  override protected val keyb = new BKeyboard(BKeyboard.DEF_CBM2_KEYMAPPER)
+  protected val keybMapper : KeyboardMapper = KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_cbm2",CBMIIModel)
+  override protected val keyb = new BKeyboard(keybMapper)
 
   override protected val mmu = new CBM2MMU
   protected val sid : SID = new SID()
@@ -137,6 +139,35 @@ class CBMII extends CBMComputer {
     //TODO: else if (tapeAllowed && name.endsWith(".TAP")) attachTapeFile(file, None, autorun)
   }
 
+  override protected def attachDisk(driveID: Int, autorun: Boolean, c64Mode: Boolean): Unit = {
+    val fc = new JFileChooser
+    val canvas = new D64Canvas(fc, getCharROM, false,false,16,16)
+    canvas.bgColor(0)
+    canvas.fgColor(5)
+    val sp = new javax.swing.JScrollPane(canvas)
+    canvas.sp = sp
+    fc.setDialogTitle(s"Attach disk to drive ${driveID + 8}")
+    fc.setAccessory(sp)
+    fc.setFileView(new C64FileView)
+    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR, "./")))
+    fc.setFileFilter(new javax.swing.filechooser.FileFilter {
+      def accept(f: File): Boolean = f.isDirectory || drives(driveID).formatExtList.exists { ext =>
+        try {
+          f.toString.toUpperCase.endsWith(ext)
+        } catch {
+          case _: Throwable => false
+        }
+      }
+
+      def getDescription = s"${drives(driveID).formatExtList.mkString(",")} files"
+    })
+    fc.showOpenDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        attachDiskFile(driveID, fc.getSelectedFile, autorun, canvas.selectedFile)
+      case _ =>
+    }
+  }
+
   override protected def attachDiskFile(driveID: Int, file: File, autorun: Boolean, fileToLoad: Option[String], emulateInserting: Boolean = true): Unit = {
     try {
       if (!file.exists) throw new FileNotFoundException(s"Cannot attach file $file on drive ${driveID + 8}: file not found")
@@ -176,8 +207,189 @@ class CBMII extends CBMComputer {
     }
   }
 
-  override protected def setFileMenu(menu: JMenu): Unit = {
+  override protected def attachTapeFile(file: File, tapFile: Option[TAP.TAPHeader], autorun: Boolean): Unit = {
+    val tap = new TAP(file.toString)
+    datassette.setTAP(Some(tap), tapFile.map(_.tapOffset.toInt))
+    tapeMenu.setEnabled(true)
+    configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
+    if (autorun) {
+      datassette.pressPlay
+      BKeyboard.insertTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar, mmu)
+    }
+  }
 
+  protected def loadPrg(): Unit = {
+    val fc = new JFileChooser
+    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR, "./")))
+    fc.setFileView(new C64FileView)
+    fc.setFileFilter(new FileFilter {
+      def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".PRG")
+
+      def getDescription = "PRG files"
+    })
+    fc.showOpenDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        loadPRGFile(fc.getSelectedFile, false)
+        lastLoadedPrg = Some(fc.getSelectedFile)
+
+      case _ =>
+    }
+  }
+
+  override protected def attachTape(): Unit = {
+    val fc = new JFileChooser
+    val canvas = new TAPCanvas(fc, getCharROM, false,false,16,16)
+    val sp = new javax.swing.JScrollPane(canvas)
+    canvas.sp = sp
+    fc.setAccessory(sp)
+    fc.setFileView(new C64FileView)
+    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR, "./")))
+    fc.setFileFilter(new FileFilter {
+      def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".TAP")
+
+      def getDescription = "TAP files"
+    })
+    fc.showOpenDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        val tapFile = canvas.selectedObject.asInstanceOf[Option[TAP.TAPHeader]]
+        attachTapeFile(fc.getSelectedFile, tapFile, tapFile.isDefined)
+      case _ =>
+    }
+  }
+
+  override protected def setFileMenu(fileMenu: JMenu): Unit = {
+    import Preferences._
+
+    if (tapeAllowed) {
+      val attachTapeItem = new JMenuItem("Attach tape ...")
+      attachTapeItem.addActionListener(_ => attachTape)
+      fileMenu.add(attachTapeItem)
+
+      tapeMenu.setEnabled(false)
+      fileMenu.add(tapeMenu)
+
+      val tapePlayItem = new JMenuItem("Press play")
+      tapePlayItem.addActionListener(_ => datassette.pressPlay)
+      tapeMenu.add(tapePlayItem)
+
+      val tapeStopItem = new JMenuItem("Press stop")
+      tapeStopItem.addActionListener(_ => datassette.pressStop)
+      tapeMenu.add(tapeStopItem)
+
+      val tapeRecordItem = new JMenuItem("Press record & play")
+      tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay)
+      tapeMenu.add(tapeRecordItem)
+
+      val tapeRewindItem = new JMenuItem("Press rewind")
+      tapeRewindItem.addActionListener(_ => datassette.pressRewind)
+      tapeMenu.add(tapeRewindItem)
+
+      val tapeForwardItem = new JMenuItem("Press forward")
+      tapeForwardItem.addActionListener(_ => datassette.pressForward)
+      tapeMenu.add(tapeForwardItem)
+
+      val tapeResetItem = new JMenuItem("Reset")
+      tapeResetItem.addActionListener(_ => datassette.resetToStart)
+      tapeMenu.add(tapeResetItem)
+
+      val tapeResetCounterItem = new JMenuItem("Reset counter")
+      tapeResetCounterItem.addActionListener(_ => datassette.resetCounter)
+      tapeMenu.add(tapeResetCounterItem)
+    }
+
+    fileMenu.addSeparator()
+
+    val makeDiskItem = new JMenuItem("Make empty disk ...")
+    makeDiskItem.addActionListener(_ => makeDisk)
+    fileMenu.add(makeDiskItem)
+
+    val autorunDiskItem = new JMenuItem("Autorun disk ...")
+    autorunDiskItem.addActionListener(_ => attachDisk(0, true, true))
+    fileMenu.add(autorunDiskItem)
+
+    val attackDiskItem = new JMenu("Attach disk ...")
+    fileMenu.add(attackDiskItem)
+    for (d <- 0 until TOTAL_DRIVES) {
+      val attachDisk0Item = new JMenuItem(s"Attach disk ${d + 8}...")
+      val key = if (d > 1) java.awt.event.KeyEvent.VK_0 + (d - 2) else java.awt.event.KeyEvent.VK_8 + d
+      attachDisk0Item.setAccelerator(KeyStroke.getKeyStroke(key, java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK))
+      attachDisk0Item.addActionListener(_ => attachDisk(d, false, isC64Mode))
+      attackDiskItem.add(attachDisk0Item)
+    }
+
+    // For settings see below, after drive type
+
+    val ejectMenu = new JMenu("Eject disk")
+    fileMenu.add(ejectMenu)
+    for (d <- 0 until TOTAL_DRIVES) {
+      val ejectDisk0Item = new JMenuItem(s"Eject disk ${d + 8} ...")
+      ejectDisk0Item.addActionListener(_ => ejectDisk(d))
+      ejectMenu.add(ejectDisk0Item)
+    }
+
+    fileMenu.addSeparator()
+
+    // ====================================================================================================
+    val loadPrgItem = new JMenuItem("Load PRG file from local disk ...")
+    loadPrgItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G, java.awt.event.InputEvent.ALT_DOWN_MASK))
+    loadPrgItem.addActionListener(_ => loadPrg)
+    fileMenu.add(loadPrgItem)
+
+    // DRIVEX-ENABLED =====================================================================================
+    for (d <- 1 until TOTAL_DRIVES) {
+      preferences.add(PREF_DRIVE_X_ENABLED(d), s"Enabled/disable driver ${8 + d}", false) {
+        enableDrive(d, _, false)
+      }
+    }
+    // ====================================================================================================
+
+    // WRITE-ON-DISK ======================================================================================
+    val writeOnDiskCheckItem = new JCheckBoxMenuItem("Write changes on disk")
+    writeOnDiskCheckItem.setSelected(true)
+    writeOnDiskCheckItem.addActionListener(_ => preferences(PREF_WRITEONDISK) = writeOnDiskCheckItem.isSelected)
+    fileMenu.add(writeOnDiskCheckItem)
+    preferences.add(PREF_WRITEONDISK, "Tells if the modifications made on disks must be written on file", true) { wod =>
+      writeOnDiskCheckItem.setSelected(wod)
+      writeOnDiskSetting(wod)
+    }
+    // ====================================================================================================
+
+    fileMenu.addSeparator()
+
+    val resetMenu = new JMenu("Reset")
+    fileMenu.add(resetMenu)
+    val softResetItem = new JMenuItem("Soft Reset")
+    softResetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R, java.awt.event.InputEvent.ALT_DOWN_MASK))
+    softResetItem.addActionListener(_ => reset(true))
+    resetMenu.add(softResetItem)
+    val hardResetItem = new JMenuItem("Hard Reset")
+    hardResetItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R, java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK))
+    hardResetItem.addActionListener(_ => hardReset(true))
+    resetMenu.add(hardResetItem)
+    val reset2Item = new JMenuItem("Reset and run last PRG")
+    reset2Item.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R, java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.CTRL_DOWN_MASK))
+    reset2Item.addActionListener(_ => reset(true, true))
+    resetMenu.add(reset2Item)
+
+    fileMenu.addSeparator()
+    // PREF-AUTO-SAVE ======================================================================================
+    val autoSaveCheckItem = new JCheckBoxMenuItem("Autosave settings on exit")
+    autoSaveCheckItem.addActionListener(e => preferences(PREF_PREFAUTOSAVE) = autoSaveCheckItem.isSelected)
+    fileMenu.add(autoSaveCheckItem)
+    preferences.add(PREF_PREFAUTOSAVE, "Auto save settings on exit", false) { auto =>
+      autoSaveCheckItem.setSelected(auto)
+    }
+    // ====================================================================================================
+
+    val saveSettingsCheckItem = new JMenuItem("Save settings")
+    saveSettingsCheckItem.addActionListener(_ => saveSettings(true))
+    fileMenu.add(saveSettingsCheckItem)
+
+    fileMenu.addSeparator()
+
+    val exitItem = new JMenuItem("Exit")
+    exitItem.addActionListener(_ => turnOff)
+    fileMenu.add(exitItem)
   }
 
   override protected def getCharROM: Memory = CBM2MMU.CHAR_ROM
@@ -219,7 +431,30 @@ class CBMII extends CBMComputer {
     }
   }
 
-  override protected def setSettingsMenu(optionsMenu: JMenu): Unit = {
+  override protected def setSettingsMenu(optionMenu: JMenu): Unit = {
+    setDriveMenu(optionMenu)
+
+    optionMenu.addSeparator()
+
+    val keybMenu = new JMenu("Keyboard")
+    optionMenu.add(keybMenu)
+
+    val keybEditorItem = new JMenuItem("Keyboard editor ...")
+    keybEditorItem.addActionListener(_ => showKeyboardEditor(true))
+    keybMenu.add(keybEditorItem)
+    val loadKeybItem = new JMenuItem("Set keyboard layout ...")
+    loadKeybItem.addActionListener(_ => loadKeyboard)
+    keybMenu.add(loadKeybItem)
+
+    optionMenu.addSeparator()
+
+    setVolumeSettings(optionMenu)
+
+    optionMenu.addSeparator()
+
+    setWarpModeSettings(optionMenu)
+
+    optionMenu.addSeparator()
 
   }
 
@@ -367,7 +602,7 @@ class CBMII extends CBMComputer {
     display = new Display(CRTC6845.SCREEN_WIDTH, CRTC6845.SCREEN_HEIGHT, displayFrame.getTitle, displayFrame)
     display.setRenderingHints(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
     display.setPreferredSize(model.preferredFrameSize)
-    //displayFrame.setFocusTraversalKeysEnabled(false)
+    displayFrame.setFocusTraversalKeysEnabled(false)
 
     // Keyboard
     displayFrame.addKeyListener(keyb)

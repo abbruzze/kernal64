@@ -6,7 +6,12 @@ import ucesoft.cbm.formats.TAP
 import java.io.File
 import javax.swing.JFileChooser
 
-class TAPCanvas(fc:JFileChooser, charRom:Memory, c64Mode:Boolean) extends D64Canvas(fc,charRom,c64Mode) {
+class TAPCanvas(fc:JFileChooser,
+                charRom:Memory,
+                c64Mode:Boolean,
+                doubleHeight:Boolean = true,
+                romCharBytes:Int = 8,
+                romCharHeight:Int = 8) extends D64Canvas(fc,charRom,c64Mode,doubleHeight,romCharBytes,romCharHeight) {
   private final val TAPE_NAME = "C64-TAPE-RAW"
 
   override protected def isFileExtOK(fileName:String) : Boolean = fileName.toUpperCase.endsWith(".TAP")

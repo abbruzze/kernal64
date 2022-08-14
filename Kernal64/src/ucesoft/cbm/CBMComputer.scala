@@ -1,7 +1,7 @@
 package ucesoft.cbm
 
 import ucesoft.cbm.cpu.{CPU65xx, Memory, ROM}
-import ucesoft.cbm.formats.Diskette
+import ucesoft.cbm.formats.{Diskette, TAP}
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.drive.{D1581, Drive, DriveIDMismatch, DriveType, EmptyFloppy}
@@ -65,6 +65,7 @@ abstract class CBMComputer extends CBMComponent {
   protected val cartMenu = new JMenu("Cartridge")
   protected var cartButtonRequested = false
 
+  protected val keybMapper : keyboard.KeyboardMapper
   protected val keyb : Keyboard
 
   protected var display : Display = _
@@ -417,7 +418,7 @@ abstract class CBMComputer extends CBMComponent {
           case JFileChooser.APPROVE_OPTION =>
             val in = new BufferedReader(new InputStreamReader(new FileInputStream(fc.getSelectedFile)))
             try {
-              keyboard.KeyboardMapperStore.load(in)
+              keyboard.KeyboardMapperStore.load(in,cbmModel)
               configuration.setProperty(CONFIGURATION_KEYB_MAP_FILE,fc.getSelectedFile.toString)
               JOptionPane.showMessageDialog(displayFrame,"Reboot the emulator to activate the new keyboard", "Keyboard..",JOptionPane.INFORMATION_MESSAGE)
             }
@@ -445,7 +446,10 @@ abstract class CBMComputer extends CBMComponent {
   protected def enableDrive(id: Int, enabled: Boolean, updateFrame: Boolean): Unit = {
     drivesEnabled(id) = enabled
     drives(id).setActive(enabled)
+    val dim = display.getPreferredSize
     driveLeds(id).setVisible(enabled)
+    display.setPreferredSize(dim)
+    displayFrame.pack()
     preferences(Preferences.PREF_DRIVE_X_ENABLED(id)) = enabled
   }
 
@@ -466,6 +470,46 @@ abstract class CBMComputer extends CBMComponent {
       case _ =>
     }
   }
+
+  protected def attachTape(): Unit = {
+    val fc = new JFileChooser
+    val canvas = new TAPCanvas(fc, getCharROM, isC64Mode)
+    val sp = new javax.swing.JScrollPane(canvas)
+    canvas.sp = sp
+    fc.setAccessory(sp)
+    fc.setFileView(new C64FileView)
+    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR, "./")))
+    fc.setFileFilter(new FileFilter {
+      def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".TAP")
+
+      def getDescription = "TAP files"
+    })
+    fc.showOpenDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        val tapFile = canvas.selectedObject.asInstanceOf[Option[TAP.TAPHeader]]
+        attachTapeFile(fc.getSelectedFile, tapFile, tapFile.isDefined)
+      case _ =>
+    }
+  }
+
+  protected def attachLocalDir(driveID: Int): Unit = {
+    val fc = new JFileChooser
+    val canvas = new D64Canvas(fc, getCharROM, isC64Mode)
+    val sp = new javax.swing.JScrollPane(canvas)
+    canvas.sp = sp
+    fc.setDialogTitle(s"Attach local directory to drive ${driveID + 8}")
+    fc.setAccessory(sp)
+    fc.setFileView(new C64FileView)
+    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR, "./")))
+    fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
+    fc.showOpenDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        attachDiskFile(driveID, fc.getSelectedFile, false, canvas.selectedFile)
+      case _ =>
+    }
+  }
+
+  protected def attachTapeFile(file: File, tapFile: Option[TAP.TAPHeader], autorun: Boolean): Unit
 
   protected def openGIFRecorder() : Unit = gifRecorder.setVisible(true)
 
