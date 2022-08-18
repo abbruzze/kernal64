@@ -456,6 +456,17 @@ class CBMII extends CBMComputer {
 
     optionMenu.addSeparator()
 
+    val modelMenu = new JMenu("Model")
+    optionMenu.add(modelMenu)
+    for(m <- Array(_610PAL,_610NTSC,_620PAL,_620NTSC,_710NTSC,_720NTSC)) {
+      val item = new JMenuItem(m.name)
+      modelMenu.add(item)
+      item.addActionListener(_ => {
+        clock.pause()
+        setModel(m)
+        hardReset(true)
+      })
+    }
   }
 
   override protected def paste(): Unit = {
@@ -608,11 +619,11 @@ class CBMII extends CBMComputer {
     displayFrame.addKeyListener(keyb)
 
     // components
+    add(clock)
     add(CBM2MMU.KERNAL_ROM)
     add(CBM2MMU.BASIC_ROM)
     add(CBM2MMU.CHAR_ROM)
     add(irq)
-    add(clock)
     add(mmu)
     add(cpu)
     add(keyb)
@@ -655,9 +666,28 @@ class CBMII extends CBMComputer {
     crt = new CRTC6845(mmu.getCRTCRam,CBM2MMU.CHAR_ROM.getROMBytes(),16)
     crt.setDisplay(display)
     crt.setClipping(model.crtClip._1,model.crtClip._2,model.crtClip._3,model.crtClip._4)
+    //crt.setOwnThread(2000000)
+    //crt.play()
     add(crt)
     crt.initComponent()
     mmu.setIO(crt,ciaieee,ciaip,tpiKb,tpiIeee,sid,acia)
+  }
+
+  protected def setModel(newModel:CBM2Model): Unit = {
+    if (model != newModel) {
+      model = newModel
+      crt.setClipping(model.crtClip._1, model.crtClip._2, model.crtClip._3, model.crtClip._4)
+      display.setPreferredSize(model.preferredFrameSize)
+      displayFrame.invalidate()
+      displayFrame.pack()
+      CBM2MMU.CHAR_ROM.resourceName = model.charROMPropName
+      CBM2MMU.BASIC_ROM.resourceName = model.basicROMPropName
+      CBM2MMU.CHAR_ROM.reload()
+      crt.charRom = CBM2MMU.CHAR_ROM.getROMBytes()
+      CBM2MMU.BASIC_ROM.reload()
+      mmu.setBasicROM(CBM2MMU.BASIC_ROM.getROMBytes())
+      mmu.setModel(model)
+    }
   }
 
   override protected def saveState(out: ObjectOutputStream): Unit = ???

@@ -121,9 +121,10 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     cycles_per_line_accu -= next_clk << 16
     clk.schedule(new ClockEvent("CRTC_TICK",clk.currentCycles + next_clk,drawLine _))
   }
-  def setOwnThread() : Unit = {
+  def setOwnThread(freq:Int) : Unit = {
     pause
     clk = Clock.makeClock("CRTCClock",Some(errorHandler _))((cycles) => {})
+    clk.setClockHz(freq)
     clk.play
     play
   }
@@ -164,11 +165,6 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
   }
 
   final def init : Unit = {
-    reset
-    //java.util.Arrays.fill(ram,32)
-  }
-
-  final def reset : Unit = {
     regs(0) = 126
     regs(1) = 102
     xchars_total = regs(0) + 1
@@ -185,12 +181,16 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     currentScreenHeight = SCREEN_HEIGHT
     oneLineDrawn = true
     setScanLines(SCREEN_HEIGHT)
+  }
+
+  final def reset : Unit = {
+    init
     play()
   }
 
-  override def hardReset: Unit = {
+  override def hardReset(): Unit = {
     java.util.Arrays.fill(regs,0)
-    init
+    reset
   }
 
   final def read(address: Int, chipID: ChipID.ID = ChipID.CPU) : Int = {
