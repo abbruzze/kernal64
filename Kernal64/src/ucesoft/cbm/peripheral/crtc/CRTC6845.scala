@@ -121,12 +121,12 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     cycles_per_line_accu -= next_clk << 16
     clk.schedule(new ClockEvent("CRTC_TICK",clk.currentCycles + next_clk,drawLine _))
   }
-  def setOwnThread(freq:Int) : Unit = {
+  def setOwnThread(freq:Int,_play:Boolean = true) : Unit = {
     pause
     clk = Clock.makeClock("CRTCClock",Some(errorHandler _))((cycles) => {})
     clk.setClockHz(freq)
     clk.play
-    play
+    if (_play) play
   }
   def stopOwnThread() : Unit = {
     if (clk != Clock.systemClock) {
@@ -180,6 +180,8 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     bitmap = display.displayMem
     currentScreenHeight = SCREEN_HEIGHT
     oneLineDrawn = true
+    rowCounter = 0
+    vblank = false
     setScanLines(SCREEN_HEIGHT)
   }
 

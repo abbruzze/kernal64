@@ -245,7 +245,7 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
     val data = bus.getDIO() ^ 0xFF
     if (atnLow) {
       lastCommand = Command.fromByte(data)
-      println(s"Command received: $lastCommand [$role]")
+      //println(s"Command received: $lastCommand [$role]")
       lastCommand match {
         case LISTEN(device) =>
           if (isThisDevice(device)) setRole(LISTENER)

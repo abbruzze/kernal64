@@ -1,16 +1,19 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.formats.{D80, Diskette}
 import ucesoft.cbm.formats.Diskette.{FileMode, FileType, StandardFileName}
+import ucesoft.cbm.formats.{D80, Diskette}
 import ucesoft.cbm.peripheral.bus.{IEEE488Bus, IEEE488BusCommand}
 import ucesoft.cbm.trace.{BreakType, CpuStepInfo, TraceListener}
+import ucesoft.cbm.{CBMComponentType, ClockEvent}
 
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream, PrintWriter}
 import scala.collection.mutable.ListBuffer
 
-class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE488Bus,driveLedListener: DriveLedListener) extends IEEE488BusCommand(name,deviceID, bus) with Drive with TraceListener {
+class IEEE488Drive(override val name:String,
+                   override val deviceID:Int,
+                   bus: IEEE488Bus,
+                   driveLedListener: DriveLedListener) extends IEEE488BusCommand(name,deviceID, bus) with Drive with TraceListener {
   override val componentType: CBMComponentType.Type = CBMComponentType.DISK
   override val driveType: DriveType.Value = DriveType._8050
   override val formatExtList: List[String] = List("D80")
@@ -52,12 +55,22 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
     STATUS_DRIVE_NOT_READY -> "DRIVE NOT READY"
   )
 
+  protected val letLedBlinkOnError = false
+  protected var ledBlinking = false
+  protected var ledBlinkingOn = false
+
   protected val RENAME_CMD_RE = """R(ENAME)?\d?:([^=]+=.+)""".r
   protected val SCRATCH_CMD_RE = """S(CRATCH)?(.+)""".r
   protected val NEW_CMD_RE = """N(EW)?\d?:([^,]+)(,..)?""".r
 
   // INIT
   setStatus(STATUS_POWERUP)
+
+  override def reset: Unit = {
+    super.reset
+    driveLedListener.turnOff()
+    ledBlinking = false
+  }
 
   // Drive stuff
   override def setDriveReader(driveReader: Floppy, emulateInserting: Boolean): Unit = {
@@ -68,7 +81,7 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
         driveLedListener.moveTo(t, Some(s), false)
         if (lastTrack != t) {
           lastTrack = t
-          Thread.sleep(100)
+          //Clock.systemClock.waitFor(10)
         }
       })
       emptyFloppy = false
@@ -270,7 +283,7 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
 
           channels(secondaryAddress).setWriteMode(false)
           channels(secondaryAddress).setOutData(startData)
-          status.st = STATUS_OK
+          setStatus(STATUS_OK)
           true
         }
       case _ =>
@@ -286,6 +299,24 @@ class IEEE488Drive(override val name:String,override val deviceID:Int,bus: IEEE4
     status.s = s
     status.filesScratched = sf
     channels(15).rewind()
+
+    if (letLedBlinkOnError) {
+      if (st != STATUS_OK && st != STATUS_POWERUP) {
+        clk.cancel(s"IEEE488LedBlink$deviceID")
+        ledBlinking = true
+        clk.schedule(new ClockEvent(s"IEEE488LedBlink$deviceID", clk.nextCycles, ledBlink _))
+      }
+      else {
+        clk.cancel(s"IEEE488LedBlink$deviceID")
+        ledBlinking = false
+      }
+    }
+  }
+
+  protected def ledBlink(cycles:Long): Unit = {
+    if (ledBlinkingOn) driveLedListener.turnOn() else driveLedListener.turnOff()
+    ledBlinkingOn ^= true
+    if (ledBlinking) clk.schedule(new ClockEvent(s"IEEE488LedBlink$deviceID",cycles + clk.getClockHz.toLong / 10,ledBlink _))
   }
 
   override def executeCommand(): Unit = {

@@ -1148,41 +1148,9 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def setRenderingSettings(parent:JMenu) : Unit = {
+  override protected def setRenderingSettings(parent:JMenu) : Unit = {
     import Preferences._
-    // RENDERING-TYPE ======================================================================================
-    val renderingItem = new JMenu("Rendering")
-    parent.add(renderingItem)
-    val groupR = new ButtonGroup
-    val renderingDefault1Item = new JRadioButtonMenuItem("Default")
-    renderingDefault1Item.setSelected(true)
-    renderingDefault1Item.addActionListener(_ => preferences(PREF_RENDERINGTYPE) = "default" )
-    renderingItem.add(renderingDefault1Item)
-    groupR.add(renderingDefault1Item)
-    val renderingBilinear1Item = new JRadioButtonMenuItem("Bilinear")
-    renderingBilinear1Item.addActionListener(_ => preferences(PREF_RENDERINGTYPE) = "bilinear" )
-    renderingItem.add(renderingBilinear1Item)
-    groupR.add(renderingBilinear1Item)
-    val renderingBicubic1Item = new JRadioButtonMenuItem("Bicubic")
-    renderingBicubic1Item.addActionListener(_ => preferences(PREF_RENDERINGTYPE) = "bicubic" )
-    renderingItem.add(renderingBicubic1Item)
-    groupR.add(renderingBicubic1Item)
-
-    preferences.add(PREF_RENDERINGTYPE,"Set the rendering type (default,bilinear,bicubic)","",Set("default","bilinear","bicubic")) { rt =>
-      rt match {
-        case "bilinear" =>
-          setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-          renderingBilinear1Item.setSelected(true)
-        case "bicubic" =>
-          setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-          renderingBicubic1Item.setSelected(true)
-        case "default" | "" =>
-          setDisplayRendering(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
-          renderingDefault1Item.setSelected(true)
-      }
-    }
-    // =====================================================================================================
-
+    super.setRenderingSettings(parent)
     // VIC-PALETTE =========================================================================================
     val paletteItem = new JMenu("Palette")
     parent.add(paletteItem)

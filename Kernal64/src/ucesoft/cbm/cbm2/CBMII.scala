@@ -1,8 +1,10 @@
 package ucesoft.cbm.cbm2
 
+import ucesoft.cbm._
 import ucesoft.cbm.cbm2.IEEE488Connectors.{CIAIEEE488ConnectorA, CIAIEEE488ConnectorB, IEEE488InterfaceA, IEEE488InterfaceB}
 import ucesoft.cbm.cpu.{CPU6510_CE, Memory}
 import ucesoft.cbm.formats.{Diskette, ProgramLoader, TAP}
+import ucesoft.cbm.misc.Preferences._
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral.EmptyConnector
 import ucesoft.cbm.peripheral.bus.IEEE488Bus
@@ -13,17 +15,17 @@ import ucesoft.cbm.peripheral.drive.{DriveType, IEEE488Drive}
 import ucesoft.cbm.peripheral.keyboard.{BKeyboard, KeyboardMapper, KeyboardMapperStore}
 import ucesoft.cbm.peripheral.mos6525.MOS6525
 import ucesoft.cbm.peripheral.mos6551.ACIA6551
-import ucesoft.cbm.peripheral.printer.{IEEE488MPS803, MPS803GFXDriver, MPS803ROM, Printer}
+import ucesoft.cbm.peripheral.printer.{IEEE488MPS803, Printer}
 import ucesoft.cbm.peripheral.sid.SID
 import ucesoft.cbm.peripheral.vic.Display
-import ucesoft.cbm.trace.TraceDialog
-import ucesoft.cbm._
+import ucesoft.cbm.trace.{InspectPanel, TraceDialog}
 
 import java.awt.datatransfer.DataFlavor
+import java.awt.event.MouseAdapter
 import java.awt.{Dimension, Toolkit}
 import java.io._
-import javax.swing.filechooser.FileFilter
 import javax.swing._
+import javax.swing.filechooser.FileFilter
 
 object CBMII extends App {
   CBMComputer.turnOn(new CBMII,args)
@@ -43,7 +45,9 @@ class CBMII extends CBMComputer {
   protected val sid : SID = new SID()
   override protected lazy val volumeDialog: JDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
   protected val bus = new IEEE488Bus
-  override protected val printer: Printer = new IEEE488MPS803("MPS803",4,bus,new MPS803GFXDriver(new MPS803ROM))
+  override protected val printer: Printer = new IEEE488MPS803("MPS803",4,bus,printerGraphicsDriver)
+
+  protected val crtOwnThreadMenu = new JCheckBoxMenuItem("CRT runs on separate thread")
 
   protected val _50_60_CYCLES = 2000000 / 50 // 50Hz
   protected var ciaieee, ciaip: CIA = _
@@ -85,7 +89,7 @@ class CBMII extends CBMComputer {
         updateScreenDimension(new Dimension(dim(0), dim(1)))
       }
     }
-    else crtZoom(2)
+
     if (configuration.getProperty(CONFIGURATION_FRAME_XY) != null) {
       val xy = configuration.getProperty(CONFIGURATION_FRAME_XY) split "," map {_.toInt }
       swing {
@@ -106,15 +110,8 @@ class CBMII extends CBMComputer {
   }
 
   protected def updateScreenDimension(dim:Dimension): Unit = {
-    // TODO
-  }
-
-  protected def crtZoom(f:Int): Unit = {
-    // TODO
-  }
-
-  protected def setCRTFullScreen(): Unit = {
-    // TODO
+    display.setPreferredSize(dim)
+    displayFrame.pack()
   }
 
   override protected def listBASIC(): Unit = {
@@ -432,6 +429,23 @@ class CBMII extends CBMComputer {
   }
 
   override protected def setSettingsMenu(optionMenu: JMenu): Unit = {
+    val modelMenu = new JMenu("Model")
+    optionMenu.add(modelMenu)
+    val groupR = new ButtonGroup
+    for (m <- Array(_610PAL, _610NTSC, _620PAL, _620NTSC, _710NTSC, _720NTSC)) {
+      val item = new JRadioButtonMenuItem(m.name)
+      groupR.add(item)
+      if (m == _610PAL) item.setSelected(true)
+      modelMenu.add(item)
+      item.addActionListener(_ => {
+        clock.pause()
+        setModel(m)
+        hardReset(true)
+      })
+    }
+
+    optionMenu.addSeparator()
+
     setDriveMenu(optionMenu)
 
     optionMenu.addSeparator()
@@ -448,25 +462,51 @@ class CBMII extends CBMComputer {
 
     optionMenu.addSeparator()
 
-    setVolumeSettings(optionMenu)
+    val crtMenu = new JMenu("CRT")
+    optionMenu.add(crtMenu)
+    crtMenu.add(crtOwnThreadMenu)
+    crtOwnThreadMenu.setSelected(false)
+    crtOwnThreadMenu.addActionListener(_ => setCRTOwnThread(crtOwnThreadMenu.isSelected))
+    setRenderingSettings(crtMenu)
+    val restoreCRTDim = new JMenuItem("Restore screen size")
+    restoreCRTDim.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_0, java.awt.event.InputEvent.ALT_DOWN_MASK))
+    crtMenu.add(restoreCRTDim)
+    restoreCRTDim.addActionListener(_ => updateScreenDimension(model.preferredFrameSize))
+
+    val displayEffectsItem = new JMenuItem("CRT's display effects ...")
+    crtMenu.add(displayEffectsItem)
+    displayEffectsItem.addActionListener(_ => DisplayEffectPanel.createDisplayEffectPanel(displayFrame, display, "CRT").setVisible(true))
 
     optionMenu.addSeparator()
+
+    val fullScreenItem = new JMenuItem("Full screen")
+    fullScreenItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, java.awt.event.InputEvent.ALT_DOWN_MASK))
+    fullScreenItem.addActionListener(_ => setCRTFullScreen())
+    optionMenu.add(fullScreenItem)
+
+    setVolumeSettings(optionMenu)
 
     setWarpModeSettings(optionMenu)
 
+    val snapshotItem = new JMenuItem("Take a snapshot...")
+    snapshotItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.ALT_DOWN_MASK))
+    snapshotItem.addActionListener(_ => takeSnapshot)
+    optionMenu.add(snapshotItem)
+
+    val gifRecorderItem = new JMenuItem("GIF recorder...")
+    gifRecorderItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F, java.awt.event.InputEvent.ALT_DOWN_MASK))
+    gifRecorderItem.addActionListener(_ => openGIFRecorder)
+    optionMenu.add(gifRecorderItem)
+
+    setPauseSettings(optionMenu)
+
     optionMenu.addSeparator()
 
-    val modelMenu = new JMenu("Model")
-    optionMenu.add(modelMenu)
-    for(m <- Array(_610PAL,_610NTSC,_620PAL,_620NTSC,_710NTSC,_720NTSC)) {
-      val item = new JMenuItem(m.name)
-      modelMenu.add(item)
-      item.addActionListener(_ => {
-        clock.pause()
-        setModel(m)
-        hardReset(true)
-      })
-    }
+    setPrinterSettings(optionMenu)
+  }
+
+  protected def setCRTOwnThread(enabled:Boolean): Unit = {
+    if (enabled) crt.setOwnThread(2000000) else crt.stopOwnThread()
   }
 
   override protected def paste(): Unit = {
@@ -545,8 +585,6 @@ class CBMII extends CBMComputer {
     sid.setCPUFrequency(2000000)
     clock.setClockHz(2000000)
 
-    // drive
-    initializedDrives(DriveType._8050)
     // chips
     // ============== CIA-IEEE ==============================================
     val ciaConnectorA = new CIAIEEE488ConnectorA(bus)
@@ -615,6 +653,9 @@ class CBMII extends CBMComputer {
     display.setPreferredSize(model.preferredFrameSize)
     displayFrame.setFocusTraversalKeysEnabled(false)
 
+    // drive
+    initializedDrives(DriveType._8050)
+
     // Keyboard
     displayFrame.addKeyListener(keyb)
 
@@ -666,20 +707,18 @@ class CBMII extends CBMComputer {
     crt = new CRTC6845(mmu.getCRTCRam,CBM2MMU.CHAR_ROM.getROMBytes(),16)
     crt.setDisplay(display)
     crt.setClipping(model.crtClip._1,model.crtClip._2,model.crtClip._3,model.crtClip._4)
-    //crt.setOwnThread(2000000)
-    //crt.play()
     add(crt)
     crt.initComponent()
+    //crt.play()
     mmu.setIO(crt,ciaieee,ciaip,tpiKb,tpiIeee,sid,acia)
+    inspectDialog = InspectPanel.getInspectDialog(displayFrame, this)
   }
 
   protected def setModel(newModel:CBM2Model): Unit = {
     if (model != newModel) {
       model = newModel
       crt.setClipping(model.crtClip._1, model.crtClip._2, model.crtClip._3, model.crtClip._4)
-      display.setPreferredSize(model.preferredFrameSize)
-      displayFrame.invalidate()
-      displayFrame.pack()
+      updateScreenDimension(model.preferredFrameSize)
       CBM2MMU.CHAR_ROM.resourceName = model.charROMPropName
       CBM2MMU.BASIC_ROM.resourceName = model.basicROMPropName
       CBM2MMU.CHAR_ROM.reload()
@@ -688,6 +727,41 @@ class CBMII extends CBMComputer {
       mmu.setBasicROM(CBM2MMU.BASIC_ROM.getROMBytes())
       mmu.setModel(model)
     }
+  }
+
+  protected def takeSnapshot(): Unit = {
+    val fc = new JFileChooser
+    fc.showSaveDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        val file = if (fc.getSelectedFile.getName.toUpperCase.endsWith(".PNG")) fc.getSelectedFile else new File(fc.getSelectedFile.toString + ".png")
+        display.saveSnapshot(file)
+      case _ =>
+    }
+  }
+
+  protected def setPrinterSettings(parent: JMenu): Unit = {
+    // PRINTER-ENABLED =====================================================================================
+    val printerPreviewItem = new JMenuItem("Printer preview ...")
+    printerPreviewItem.addActionListener(_ => showPrinterPreview)
+    parent.add(printerPreviewItem)
+
+    val printerEnabledItem = new JCheckBoxMenuItem("Printer enabled")
+    printerEnabledItem.setSelected(false)
+    printerEnabledItem.addActionListener(_ => preferences(PREF_PRINTERENABLED) = printerEnabledItem.isSelected)
+    parent.add(printerEnabledItem)
+    preferences.add(PREF_PRINTERENABLED, "Enable printer", false) { pe =>
+      enablePrinter(pe)
+      printerEnabledItem.setSelected(pe)
+    }
+  }
+
+  protected def setCRTFullScreen(): Unit = {
+    ucesoft.cbm.misc.FullScreenMode.goFullScreen(displayFrame,
+      display,
+      CRTC6845.SCREEN_WIDTH,
+      CRTC6845.SCREEN_HEIGHT * 2,
+      new MouseAdapter {},
+      keyb)
   }
 
   override protected def saveState(out: ObjectOutputStream): Unit = ???

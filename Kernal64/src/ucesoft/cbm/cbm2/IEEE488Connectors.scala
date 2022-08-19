@@ -28,9 +28,7 @@ object IEEE488Connectors {
     override val componentID: String = "CIA1-PortB"
 
     override def read: Int = 0
-    override protected def performWrite(data: Int): Unit = {
-      println(s"CIA write on port B = $data")
-    }
+    override protected def performWrite(data: Int): Unit = {}
   }
 
   /**
