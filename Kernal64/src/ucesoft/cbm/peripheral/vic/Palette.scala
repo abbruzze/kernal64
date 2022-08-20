@@ -93,15 +93,15 @@ object Palette {
   private[this] val PALETTE_RGB : Map[PaletteType.Value,Array[java.awt.Color]] = Map(PaletteType.VICE -> (WINVICE_RGB map toRGB),PaletteType.BRIGHT -> (BRIGHT_RGB map toRGB),PaletteType.PEPTO -> (PEPTO_RGB map toRGB),PaletteType.COLORDORE -> (COLORDORE_RGB map toRGB))
 	private[this] val PALETTE_COLORS : Map[PaletteType.Value,Array[Int]] = Map(PaletteType.VICE -> WINVICE_RGB,PaletteType.BRIGHT -> BRIGHT_RGB,PaletteType.PEPTO -> PEPTO_RGB,PaletteType.COLORDORE -> COLORDORE_RGB)
 
-	final val VIC_COLORS = Array.ofDim[java.awt.Color](16)
-  final val VIC_RGB = Array.ofDim[Int](16)
+	final val VIC_II_COLORS = Array.ofDim[java.awt.Color](16)
+  final val VIC_II_RGB = Array.ofDim[Int](16)
 
   setPalette(PaletteType.BRIGHT)
 
   def setPalette(pal:PaletteType.Value): Unit = {
     val colors = PALETTE_RGB(pal)
     val rgb = PALETTE_COLORS(pal)
-    System.arraycopy(colors,0,VIC_COLORS,0,colors.length)
-    System.arraycopy(rgb,0,VIC_RGB,0,rgb.length)
+    System.arraycopy(colors,0,VIC_II_COLORS,0,colors.length)
+    System.arraycopy(rgb,0,VIC_II_RGB,0,rgb.length)
   }
 }

@@ -175,9 +175,9 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
 
   override def paintComponent(g: Graphics) : Unit = {
     val size = getPreferredSize
-    g.setColor(Palette.VIC_COLORS(1)) // white background
+    g.setColor(Palette.VIC_II_COLORS(1)) // white background
     g.fillRect(0, 0, size.width - 1, size.height - 1)
-    g.setColor(Palette.VIC_COLORS(0)) // black foreground
+    g.setColor(Palette.VIC_II_COLORS(0)) // black foreground
 
     val INTER_LINE_PIXEL = 2
     val INTER_LINE_PIXEL_BITMAP = 0

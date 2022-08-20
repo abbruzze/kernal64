@@ -5,14 +5,14 @@ import ucesoft.cbm.peripheral.Connector
 import ucesoft.cbm.peripheral.bus._
 import ucesoft.cbm.peripheral.drive.ParallelCable
 import ucesoft.cbm.peripheral.rs232.RS232
-import ucesoft.cbm.peripheral.vic.VICMemory
+import ucesoft.cbm.peripheral.vic.VIC_II_Memory
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
 object CIA2Connectors {
   val CIA2_PORTA_BUSID = "CIA2_PortA"
   
-  class PortAConnector(mem:VICMemory,bus:IECBus,rs232:RS232) extends Connector with IECBusListener {
+  class PortAConnector(mem:VIC_II_Memory, bus:IECBus, rs232:RS232) extends Connector with IECBusListener {
     val componentID = "CIA2 Port A Connector"
     override val isController = true
     val busid: String = CIA2_PORTA_BUSID

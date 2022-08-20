@@ -111,6 +111,7 @@ class CBMII extends CBMComputer {
 
   protected def updateScreenDimension(dim:Dimension): Unit = {
     display.setPreferredSize(dim)
+    display.repaint()
     displayFrame.pack()
   }
 

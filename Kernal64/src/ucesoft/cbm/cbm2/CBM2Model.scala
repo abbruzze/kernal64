@@ -23,7 +23,8 @@ case object _610PAL extends CBM2Model {
   override val charROMPropName = ROM.CBM2_CHAR600_ROM_PROP
   override val basicROMPropName = ROM.CBM2_BASIC128_ROM_PROP
   override val crtClip: (Int, Int, Int, Int) = (25,13,28,0)
-  override val preferredFrameSize = new Dimension(720,624)
+  //override val preferredFrameSize = new Dimension(720,624)
+  override val preferredFrameSize = new Dimension(720,1 + (312 - crtClip._3 - crtClip._4) * 2)
 }
 
 case object _610NTSC extends CBM2Model {
@@ -34,7 +35,8 @@ case object _610NTSC extends CBM2Model {
   override val charROMPropName = ROM.CBM2_CHAR600_ROM_PROP
   override val basicROMPropName = ROM.CBM2_BASIC128_ROM_PROP
   override val crtClip: (Int, Int, Int, Int) = (21,13,14,0)
-  override val preferredFrameSize = new Dimension(742,525)
+  //override val preferredFrameSize = new Dimension(742,525)
+  override val preferredFrameSize = new Dimension(744,1 + (262 - crtClip._3 - crtClip._4) * 2)
 }
 
 case object _620PAL extends CBM2Model {
@@ -45,7 +47,7 @@ case object _620PAL extends CBM2Model {
   override val charROMPropName = ROM.CBM2_CHAR600_ROM_PROP
   override val basicROMPropName = ROM.CBM2_BASIC256_ROM_PROP
   override val crtClip: (Int, Int, Int, Int) = (25,13,28,0)
-  override val preferredFrameSize = new Dimension(720,624)
+  override val preferredFrameSize = new Dimension(720,1 + (312 - crtClip._3 - crtClip._4) * 2)
 }
 
 case object _620NTSC extends CBM2Model {
@@ -56,7 +58,7 @@ case object _620NTSC extends CBM2Model {
   override val charROMPropName = ROM.CBM2_CHAR600_ROM_PROP
   override val basicROMPropName = ROM.CBM2_BASIC256_ROM_PROP
   override val crtClip: (Int, Int, Int, Int) = (21,13,14,0)
-  override val preferredFrameSize = new Dimension(742,525)
+  override val preferredFrameSize = new Dimension(744,1 + (262 - crtClip._3 - crtClip._4) * 2)
 }
 
 case object _710NTSC extends CBM2Model {

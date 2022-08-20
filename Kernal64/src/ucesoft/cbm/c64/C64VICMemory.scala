@@ -3,12 +3,12 @@ package ucesoft.cbm.c64
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm._
 import ucesoft.cbm.cpu.{CPU65xx, Memory}
-import ucesoft.cbm.peripheral.vic.VICMemory
+import ucesoft.cbm.peripheral.vic.VIC_II_Memory
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 import java.util.Properties
 
-class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VICMemory {
+class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VIC_II_Memory {
   val componentID = "VIC Banked Memory"
   val componentType: Type = CBMComponentType.MEMORY
   val name = "VIC-Memory"

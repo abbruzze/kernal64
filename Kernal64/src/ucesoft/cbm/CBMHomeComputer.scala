@@ -43,7 +43,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected var loadPRGasDisk = false // used with --prg-as-disk
   protected var disk8LoadedAsPRG = false
 
-  protected var vicChip : vic.VIC = _
+  protected var vicChip : vic.VIC_II = _
   protected var vicZoomFactor : Int = 1
   protected var cia1,cia2 : CIA = _
   protected val cia12Running: Array[Boolean] = Array(true,true)
@@ -810,8 +810,8 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected def setVICModel(model:VICType.Value,preserveDisplayDim:Boolean = false,resetFlag:Boolean,play:Boolean = true) : Unit = {
     if (play) clock.pause
     val vicType = model match {
-      case VICType.PAL => VIC_PAL
-      case VICType.NTSC => VIC_NTSC
+      case VICType.PAL => VIC_II_PAL
+      case VICType.NTSC => VIC_II_NTSC
     }
     vicChip.setVICModel(vicType)
     clock.setClockHz(vicType.CPU_FREQ)

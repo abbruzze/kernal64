@@ -155,7 +155,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     rs232.setCIA12(cia1,cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
-    vicChip = new vic.VIC(vicMemory,mmu.colorRAM,irqSwitcher.setLine(Switcher.VIC,_),baLow _,true)
+    vicChip = new vic.VIC_II(vicMemory,mmu.colorRAM,irqSwitcher.setLine(Switcher.VIC,_),baLow _,true)
     // I/O set
     mmu.setIO(cia1,cia2,vicChip,sid,vdc)
     // VIC display

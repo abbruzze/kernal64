@@ -118,7 +118,7 @@ class SCPUC64 extends CBMHomeComputer {
     rs232.setCIA12(cia1, cia2)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
-    vicChip = new vic.VIC(vicMemory, mmu.COLOR_RAM, irqSwitcher.setLine(Switcher.VIC,_), baLow _)
+    vicChip = new vic.VIC_II(vicMemory, mmu.COLOR_RAM, irqSwitcher.setLine(Switcher.VIC,_), baLow _)
     mmu.setLastByteReadMemory(vicMemory)
     // mapping I/O chips in memory
     mmu.setIO(cia1, cia2, sid, vicChip)

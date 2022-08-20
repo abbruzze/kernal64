@@ -7,7 +7,7 @@ import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortConfigurationListener,
 import ucesoft.cbm.misc.TestCart
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.sid.SID
-import ucesoft.cbm.peripheral.vic.VIC
+import ucesoft.cbm.peripheral.vic.VIC_II
 import ucesoft.cbm.{CBMComponentType, ChipID, Log}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
@@ -155,7 +155,7 @@ object SCPUC64MMU {
 
     private[this] var cia1,cia2 : CIA = _
     private[this] var sid : SID = _
-    private[this] var vic : VIC = _
+    private[this] var vic : VIC_II = _
 
     private[this] var clockStretchingRequest : () => Unit = _
     private[this] var cacheWriteWaitListener : Boolean => Unit = _
@@ -235,7 +235,7 @@ object SCPUC64MMU {
       if (!baLow) cacheWriteWaitListener(false)
     }
 
-    def setIO(cia1:CIA,cia2:CIA,sid:SID,vic:VIC): Unit = {
+    def setIO(cia1:CIA,cia2:CIA,sid:SID,vic:VIC_II): Unit = {
       this.cia1 = cia1
       this.cia2 = cia2
       this.sid = sid

@@ -10,7 +10,7 @@ import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.sid.SID
 import ucesoft.cbm.peripheral.vdc.VDC
-import ucesoft.cbm.peripheral.vic.{VIC, VICMemory}
+import ucesoft.cbm.peripheral.vic.{VIC_II, VIC_II_Memory}
 import ucesoft.cbm.{CBMComponentType, ChipID, Clock, Log}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
@@ -24,7 +24,7 @@ trait MMUChangeListener {
   def _1571mode(_1571Mode:Boolean) : Unit
 }
 
-class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with ExpansionPortConfigurationListener with VICMemory with Z80.IOMemory {
+class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with ExpansionPortConfigurationListener with VIC_II_Memory with Z80.IOMemory {
   import ROM._
   val componentID = "128 MMU"
   val componentType: Type = CBMComponentType.MEMORY
@@ -77,7 +77,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   private[this] var lastByteOnBUS = 0
   // IO =======================================================================================
   private[this] var cia_dc00,cia_dd00 : CIA = _
-  private[this] var vic : VIC = _
+  private[this] var vic : VIC_II = _
   private[this] var sid : SID = _
   private[this] var vdc : VDC = _
   // Extended VIC registers ===================================================================
@@ -271,7 +271,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     data_out = 0
   }
   
-  final def setIO(cia_dc00:CIA,cia_dd00:CIA,vic:VIC,sid:SID,vdc:VDC) : Unit = {
+  final def setIO(cia_dc00:CIA, cia_dd00:CIA, vic:VIC_II, sid:SID, vdc:VDC) : Unit = {
     this.cia_dc00 = cia_dc00
     this.cia_dd00 = cia_dd00
     this.vic = vic

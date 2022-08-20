@@ -2,7 +2,7 @@ package ucesoft.cbm.trace
 
 import ucesoft.cbm.Log
 import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.peripheral.vic.{Display, VIC}
+import ucesoft.cbm.peripheral.vic.{Display, VIC_II}
 
 import java.awt.{BorderLayout, Color, FlowLayout}
 import java.io._
@@ -11,7 +11,7 @@ import javax.swing._
 import scala.collection.mutable.ListBuffer
 
 object TraceDialog {
-  def getTraceDialog(title:String,displayFrame: JFrame, mem: Memory,traceListener: TraceListener, display: Display, vic: VIC): TraceDialog = {
+  def getTraceDialog(title:String,displayFrame: JFrame, mem: Memory,traceListener: TraceListener, display: Display, vic: VIC_II): TraceDialog = {
     val dialog = new TraceDialog(title,displayFrame, mem, traceListener,Some(display),Some(vic))
     dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE)
     dialog.pack()
@@ -35,7 +35,7 @@ class TraceDialog private (title:String,
   var mem: Memory,
   var traceListener: TraceListener,
   display: Option[Display],
-  vic: Option[VIC]) extends JDialog(displayFrame, title) {
+  vic: Option[VIC_II]) extends JDialog(displayFrame, title) {
   private val notrace = new JButton("Tracing on")
   private val rasterLineSpinner = new JSpinner(new SpinnerNumberModel(0,0,312,1))
   private val traceSR = new JLabel
