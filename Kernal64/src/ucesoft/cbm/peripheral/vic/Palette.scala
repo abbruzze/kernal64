@@ -2,12 +2,14 @@ package ucesoft.cbm.peripheral.vic
 
 object Palette {
   object PaletteType extends Enumeration {
-    val VICE: PaletteType.Value = Value
-    val BRIGHT: PaletteType.Value = Value
-    val PEPTO: PaletteType.Value = Value
-    val COLORDORE: PaletteType.Value = Value
+    val VICE = Value
+    val BRIGHT = Value
+    val PEPTO = Value
+    val COLORDORE = Value
+    val VIC20_VICE = Value
   }
 
+  // ========================= C64/C128 VICII =============================
   private[this] val WINVICE_RGB = Array(
     0xFF000000, // 0 Black
     0xFFFFFFFF, // 1 White
@@ -81,6 +83,43 @@ object Palette {
     0xFF706DEB, // 14 Lt.Blue
     0xFFB2B2B2 // 15 Lt.Gray
   )
+  // ========================= VIC20 ======================================
+  /*private[this] val VIC20_WINVICE_RGB = Array(
+    0xFF000000, // 0 Black
+    0xFFFFFFFF, // 1 White
+    0xFFF00000, // 2 Red
+    0xFF00F0F0, // 3 Cyan
+    0xFF600060, // 4 Purple
+    0xFF00A000, // 5 Green
+    0xFF0000F0, // 6 Blue
+    0xFFD0D000, // 7 Yellow
+    0xFFC0A000, // 8 Orange
+    0xFFFFA000, // 9 Lt. Orange
+    0xFFF08080, // 10 Pink
+    0xFF00FFFF, // 11 Lt. Cyan
+    0xFFFF00FF, // 12 Lt. Purple
+    0xFF00FF00, // 13 Lt.Green
+    0xFF00A0FF, // 14 Lt.Blue
+    0xFFFFFF00 // 15 Lt.Yellow
+  )*/
+  private[this] val VIC20_WINVICE_RGB = Array(
+    0xFF000000, // 0 Black
+    0xFFFFFFFF, // 1 White
+    0xFFC63729, // 2 Red
+    0xFF99FFFF, // 3 Cyan
+    0xFFDB44F9, // 4 Purple
+    0xFF81FF5D, // 5 Green
+    0xFF4832FF, // 6 Blue
+    0xFFFFFF22, // 7 Yellow
+    0xFFE98F00, // 8 Orange
+    0xFFFFDC6F, // 9 Lt. Orange
+    0xFFFFB6AC, // 10 Pink
+    0xFFBCFFFF, // 11 Lt. Cyan
+    0xFFFFAEFF, // 12 Lt. Purple
+    0xFFBFFFA0, // 13 Lt.Green
+    0xFFBAAAFF, // 14 Lt.Blue
+    0xFFFFFF51 // 15 Lt.Yellow
+  )
 
   private def toRGB(c:Int) : java.awt.Color = {
     val b = c & 0xFF
@@ -90,18 +129,30 @@ object Palette {
     new java.awt.Color(r,g,b,alpha)
   }
 
-  private[this] val PALETTE_RGB : Map[PaletteType.Value,Array[java.awt.Color]] = Map(PaletteType.VICE -> (WINVICE_RGB map toRGB),PaletteType.BRIGHT -> (BRIGHT_RGB map toRGB),PaletteType.PEPTO -> (PEPTO_RGB map toRGB),PaletteType.COLORDORE -> (COLORDORE_RGB map toRGB))
-	private[this] val PALETTE_COLORS : Map[PaletteType.Value,Array[Int]] = Map(PaletteType.VICE -> WINVICE_RGB,PaletteType.BRIGHT -> BRIGHT_RGB,PaletteType.PEPTO -> PEPTO_RGB,PaletteType.COLORDORE -> COLORDORE_RGB)
+  private[this] val PALETTE_RGB : Map[PaletteType.Value,Array[java.awt.Color]] = Map(
+    PaletteType.VICE -> (WINVICE_RGB map toRGB),
+    PaletteType.BRIGHT -> (BRIGHT_RGB map toRGB),
+    PaletteType.PEPTO -> (PEPTO_RGB map toRGB),
+    PaletteType.COLORDORE -> (COLORDORE_RGB map toRGB),
+    PaletteType.VIC20_VICE -> (VIC20_WINVICE_RGB map toRGB)
+  )
+	private[this] val PALETTE_COLORS : Map[PaletteType.Value,Array[Int]] = Map(
+    PaletteType.VICE -> WINVICE_RGB,
+    PaletteType.BRIGHT -> BRIGHT_RGB,
+    PaletteType.PEPTO -> PEPTO_RGB,
+    PaletteType.COLORDORE -> COLORDORE_RGB,
+    PaletteType.VIC20_VICE -> VIC20_WINVICE_RGB
+  )
 
-	final val VIC_II_COLORS = Array.ofDim[java.awt.Color](16)
-  final val VIC_II_RGB = Array.ofDim[Int](16)
+	final val VIC_COLORS = Array.ofDim[java.awt.Color](16)
+  final val VIC_RGB = Array.ofDim[Int](16)
 
   setPalette(PaletteType.BRIGHT)
 
   def setPalette(pal:PaletteType.Value): Unit = {
     val colors = PALETTE_RGB(pal)
     val rgb = PALETTE_COLORS(pal)
-    System.arraycopy(colors,0,VIC_II_COLORS,0,colors.length)
-    System.arraycopy(rgb,0,VIC_II_RGB,0,rgb.length)
+    System.arraycopy(colors,0,VIC_COLORS,0,colors.length)
+    System.arraycopy(rgb,0,VIC_RGB,0,rgb.length)
   }
 }

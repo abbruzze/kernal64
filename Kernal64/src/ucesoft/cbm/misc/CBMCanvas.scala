@@ -131,7 +131,7 @@ class CBMCanvas(charRom: Memory,romCharBytes:Int,romCharHeight:Int) extends JCom
 
   override def paint(g: Graphics) : Unit = {
     val size = getSize()
-    g.setColor(Palette.VIC_II_COLORS(backgroundColor))
+    g.setColor(Palette.VIC_COLORS(backgroundColor))
     g.fillRect(0, 0, size.width - 1, size.height - 1)
 
     g.translate(0, scrollY)
@@ -142,7 +142,7 @@ class CBMCanvas(charRom: Memory,romCharBytes:Int,romCharHeight:Int) extends JCom
         var x = 0
         for (char <- line) {
           val byte = charRom.read(charRom.startAddress | (char.charCode * romCharBytes) | rc)
-          g.setColor(Palette.VIC_II_COLORS(char.fgColor))
+          g.setColor(Palette.VIC_COLORS(char.fgColor))
           var bit = 0x80
           var dx = 0
           while (bit > 0) {

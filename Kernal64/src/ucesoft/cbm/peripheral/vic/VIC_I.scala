@@ -1,27 +1,84 @@
 package ucesoft.cbm.peripheral.vic
 import ucesoft.cbm.ChipID.ID
+import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.io.{File, ObjectInputStream, ObjectOutputStream}
 
-class VIC_I extends VIC {
+object VIC_I {
+  private val romChar = java.nio.file.Files.readAllBytes(new File("""C:\Users\ealeame\Desktop\GTK3VICE-3.5-win64\VIC20\chargen""").toPath).map(_.toInt & 0xFF)
+
+  private val mem = new Memory {
+    override val isRom: Boolean = false
+    override val length: Int = 0
+    override val startAddress: Int = 0
+    override val name: String = ""
+
+    override def init(): Unit = {}
+    override def isActive: Boolean = true
+
+    override def read(address: Int, chipID: ID): Int = {
+      if (address >= 0x8000 && address < 0x9000) romChar(address & 0xFFF)
+      else if (address >= 0x1E00 && address < (0x1E00 + 22)) 1
+      else if (address >= 0x9600 && address < 0x9616) 6 + 8
+      else 6
+    }
+
+    override def write(address: Int, value: Int, chipID: ID): Unit = {}
+  }
+
+  private val vic = new VIC_I(mem)
+  def main(args:Array[String]): Unit = {
+    vic.write(0,12)
+    vic.write(1,38)
+    vic.write(2,150)
+    vic.write(3,46)
+    vic.write(5,240)
+    vic.write(14,0)
+    vic.write(15,27)
+    val clk = ucesoft.cbm.Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
+    clk.setClockHz(1108405.0d)
+    val frame = new javax.swing.JFrame("VIC-I")
+    val display = new Display(vic.SCREEN_WIDTH,vic.SCREEN_HEIGHT,"VIC-I",frame)
+    //display.setPreferredSize(new java.awt.Dimension((vic.SCREEN_WIDTH * 2.63).toInt,vic.SCREEN_HEIGHT << 1))
+    //display.setPreferredSize(new java.awt.Dimension(746,568))
+    display.setPreferredSize(new java.awt.Dimension(784,vic.VISIBLE_SCREEN_HEIGHT<<1))
+    //display.setRenderingHints(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+    vic.setDisplay(display)
+    frame.getContentPane.add("Center",display)
+    frame.pack()
+    frame.setVisible(true)
+    clk.play()
+  }
+
+  private def errorHandler(t:Throwable): Unit = {
+    t.printStackTrace()
+  }
+
+  private def mainLoop(cycles:Long): Unit = {
+    vic.clock()
+  }
+}
+
+class VIC_I(mem:Memory) extends VIC {
   override val componentID: String = "VIC_I"
   override val length: Int = 0x110
   override val startAddress: Int = 0x9000
   override val name: String = "VIC_I"
 
   private trait VState
-  private object TOP_BORDER extends VState
-  private object BOTTOM_BORDER extends VState
-  private object START_DISPLAY_AREA extends VState
-  private object END_DISPLAY_AREA extends VState
-  private object DISPLAY_AREA extends VState
+  private case object TOP_BORDER extends VState
+  private case object BOTTOM_BORDER extends VState
+  private case object START_DISPLAY_AREA extends VState
+  private case object END_DISPLAY_AREA extends VState
+  private case object DISPLAY_AREA extends VState
 
   private trait HState
-  private object IDLE_FETCH extends HState
-  private object START_FETCH extends HState
-  private object FETCH_MATRIX extends HState
-  private object FETCH_CHAR extends HState
-  private object END_FETCH extends HState
+  private case object IDLE_FETCH extends HState
+  private case object START_FETCH extends HState
+  private case object FETCH_MATRIX extends HState
+  private case object FETCH_CHAR extends HState
+  private case object END_FETCH extends HState
 
   /*
     36864 $8666 VICCR0
@@ -203,28 +260,57 @@ class VIC_I extends VIC {
   // VIC's registers
   final private val regs = Array.ofDim[Int](16)
   // Vertical & Horizontal state
-  private var vstate : VState = TOP_BORDER
-  private var hstate : HState = IDLE_FETCH
+  private var vState : VState = TOP_BORDER
+  private var hState : HState = IDLE_FETCH
   // VIC Model
   private var model : VICModel = _
   // raster line
   private var rasterLine = 0
   // raster cycle
-  private var cycle = 0
-  // number of columns so far
-  private var textCols = 0
-  // number of rows so far
-  private var textRows = 0
+  private var rasterCycle = 0
+  // display pointer
+  private var displayPtr = 0
+  // row counter
+  private var rowCounter = 0
   // Y position within current row
   private var rowY = 0
-  // absolute position within screen area
-  private var screenX, screenY = 0
   // latched value of number of columns
-  private var latched_columns = 0
+  private var latchedColumns = 0
   // latched value of number of rows
-  private var latched_rows = 0
+  private var latchedRows = 0
   // char height : 8 or 16
   private var charHeight = 8
+  // graphic buffer
+  private var gBuf = 0
+  // color buffer
+  private var cBuf = 0
+  // column index
+  private var displayCol = 0
+  // canvas X position
+  private var xpos = 0
+
+  private var leftBorderDelayCycleCounter = 0
+
+  private var display: Display = _
+  private var displayMem: Array[Int] = _
+  private val palette = Palette.VIC_RGB
+
+  // Constructor
+  Palette.setPalette(PaletteType.VIC20_VICE)
+  setVICModel(VIC_I_PAL)
+
+  def SCREEN_WIDTH: Int = model.RASTER_CYCLES << 2
+  def SCREEN_HEIGHT: Int = model.RASTER_LINES
+  def VISIBLE_SCREEN_WIDTH: Int = (model.BLANK_RIGHT_CYCLE - model.BLANK_LEFT_CYCLE) << 2
+  def VISIBLE_SCREEN_HEIGHT: Int = model.BLANK_BOTTOM_LINE - model.BLANK_TOP_LINE - 1
+  def SCREEN_ASPECT_RATIO: Double = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
+
+  override def setDisplay(display: Display): Unit = {
+    this.display = display
+    displayMem = display.displayMem
+
+    display.setClipArea(model.BLANK_LEFT_CYCLE << 2, model.BLANK_TOP_LINE, model.BLANK_RIGHT_CYCLE << 2, model.BLANK_BOTTOM_LINE)
+  }
 
 
   override def setVICModel(model: VICModel): Unit = {
@@ -234,11 +320,226 @@ class VIC_I extends VIC {
   override def reset(): Unit = ???
   override def init(): Unit = ???
 
-  override def read(address: Int, chipID: ID): Int = ???
-  override def write(address: Int, value: Int, chipID: ID): Unit = ???
+  override def read(address: Int, chipID: ID): Int = {
+    address & 0xF match {
+      case VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE =>
+        regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) | (rasterLine & 1) << 7
+      case VIC_CR4_RASTER_H =>
+        rasterLine >> 1
+      case adr =>
+        regs(adr)
+    }
+  }
+  override def write(address: Int, value: Int, chipID: ID): Unit = {
+    regs(address & 0xF) = value
+  }
+
+  @inline private def openVerticalBorder(): Unit = {
+    vState = START_DISPLAY_AREA
+    if (latchedRows == 0) closeVerticalBorder()
+  }
+
+  @inline private def closeVerticalBorder(): Unit = {
+    vState = END_DISPLAY_AREA
+    // TODO Display one more line if h-flipflop is already open
+  }
+  @inline private def openHorizontalBorder(): Unit = {
+    hState = FETCH_MATRIX
+    if (vState == START_DISPLAY_AREA) {
+      // first text character
+      vState = DISPLAY_AREA
+    }
+    displayCol = 0
+  }
+  @inline private def closeHorizontalBorder(): Unit = {
+    hState = END_FETCH
+  }
+
+  @inline private def startOfTextLine(): Unit = {
+  }
+  @inline private def endOfLine(): Unit = {
+    rasterCycle = 0
+    xpos = 0
+    hState = IDLE_FETCH
+    rasterLine += 1
+    //leftBorderDelayCycleCounter = 4
+
+    if (vState == DISPLAY_AREA/* || vState == START_DISPLAY_AREA*/) {
+      rowY += 1
+      //var displayInc = if (charHeight == 8) latchedColumns else 0
+
+      if (rowY == charHeight) { // go next line
+        rowY = 0
+        rowCounter += 1
+        if (rowCounter == latchedRows) closeVerticalBorder()
+        //displayInc = latchedColumns
+        displayPtr += latchedColumns
+      }
+    }
+  }
+  @inline private def endOfFrame(): Unit = {
+    displayPtr = 0
+    rowCounter = 0
+    rasterLine = 0
+    vState = TOP_BORDER
+
+    display.showFrame(0,0,SCREEN_WIDTH,SCREEN_HEIGHT)
+  }
+  @inline private def latchRowsNumber(): Unit = {
+    latchedRows = (regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) >> 1) & 0x3F
+  }
+
+  @inline private def latchColumnsNumber(): Unit = {
+    val colsCandidate = regs(VIC_CR2_COLS_SCREEN_MAP_ADDRESS_7) & 0x7F
+    latchedColumns = if (colsCandidate > model.MAX_COLUMNS) model.MAX_COLUMNS else colsCandidate
+  }
+
+  @inline private def screenMap(): Int =
+    (regs(VIC_CR5_SCREEN_MAP_CHAR_MAP_ADDRESS) & 0x70) << 6 | // mask to 0 bit 7, mapping the VIC pag. 129
+    (regs(VIC_CR2_COLS_SCREEN_MAP_ADDRESS_7) & 0x80) << 2
+
+  @inline private def charMap(): Int = {
+    val k = regs(VIC_CR5_SCREEN_MAP_CHAR_MAP_ADDRESS) & 0x7
+    (((regs(VIC_CR5_SCREEN_MAP_CHAR_MAP_ADDRESS) >> 3) & 1) ^ 1) << 15 | k << 10
+  }
+
+  @inline private def fetchMatrix(): Unit = {
+    // fetches both char code and color code
+    gBuf = mem.read(screenMap() + displayPtr + displayCol)
+    val colorBaseAddress = 0x9400 + ((regs(VIC_CR2_COLS_SCREEN_MAP_ADDRESS_7) & 0x80) << 2)
+    cBuf = mem.read(colorBaseAddress + displayPtr + displayCol)
+  }
+  @inline private def fetchChar(): Unit = {
+    val charShift = if ((regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) & 1) == 0) 3 else 4
+    gBuf = mem.read(charMap() + (gBuf << charShift) + rowY)
+
+    displayCol += 1
+  }
+
+  private def drawDisplayCycle(): Unit = {
+    val ypos = rasterLine * SCREEN_WIDTH
+
+    val borderColor = palette(regs(VIC_CRF_BACKGROUND_BORDER_INV) & 7)
+    val backgroundColor = regs(VIC_CRF_BACKGROUND_BORDER_INV) >> 4
+    val invertColors = (regs(VIC_CRF_BACKGROUND_BORDER_INV) & 8) == 0
+
+    val mc = (cBuf & 8) > 0
+    val color = cBuf & 7
+
+    var p = 0
+    if (!mc) { // ========== Multicolor mode ========================
+      val fg = palette(if (!invertColors) color else backgroundColor)
+      val bg = palette(if (!invertColors) backgroundColor else color)
+
+      while (p < 8) {
+        val pixel = gBuf & 0x80
+        gBuf <<= 1
+        displayMem(ypos + xpos) = if (pixel == 0) bg else fg
+        xpos += 1
+        p += 1
+      }
+    }
+    else { // ========== HiRes mode =============================
+      val auxColor = palette(regs(VIC_CRE_SOUND_VOLUME_AUX_COLOR) >> 4)
+      val fgColor = palette(color)
+      val bgColor = palette(backgroundColor)
+
+      while (p < 4) {
+        val pixel = gBuf & 0xC0
+        val mcColor = pixel match {
+          case 0x00 /* 00 */ => bgColor
+          case 0x40 /* 01 */ => borderColor
+          case 0x80 /* 10 */ => fgColor
+          case 0xC0 /* 11 */ => auxColor
+        }
+        gBuf <<= 2
+        displayMem(ypos + xpos) = mcColor
+        displayMem(ypos + xpos + 1) = mcColor
+        xpos += 2
+        p += 1
+      }
+    }
+  }
+
+  private def drawBorderCycle(): Unit = {
+    val ypos = rasterLine * SCREEN_WIDTH
+
+    val borderColor = palette(regs(VIC_CRF_BACKGROUND_BORDER_INV) & 7)
+    var p = 0
+    while (p < 4) {
+      displayMem(ypos + xpos) = borderColor
+      xpos += 1
+      p += 1
+    }
+    /*
+    val fromXpos = xpos
+    xpos += 4
+    java.util.Arrays.fill(displayMem,ypos + fromXpos,ypos + xpos,borderColor)
+     */
+  }
+
+  @inline private def fetchCycle(): Unit = {
+    hState match {
+      case IDLE_FETCH =>
+        // idle fetch => do nothing
+        drawBorderCycle()
+      case END_FETCH =>
+        drawBorderCycle()
+      case START_FETCH =>
+        if (latchedColumns == 0) closeHorizontalBorder()
+        else {
+          if (leftBorderDelayCycleCounter > 0) {
+            leftBorderDelayCycleCounter -= 1
+          }
+          else {
+            hState = FETCH_MATRIX
+            //fetchMatrix()
+          }
+          drawBorderCycle()
+        }
+      case FETCH_MATRIX =>
+        fetchMatrix()
+        hState = FETCH_CHAR
+      case FETCH_CHAR =>
+        fetchChar()
+        drawDisplayCycle()
+
+        if (displayCol == latchedColumns)
+          closeHorizontalBorder()
+        else
+          hState = FETCH_MATRIX
+    }
+  }
 
   final def clock() : Unit = {
+    // check vertical border for opening
+    if (vState == TOP_BORDER && regs(VIC_CR1_VORIGIN) == rasterLine >> 1) {
+      openVerticalBorder()
+    }
 
+    // check end of line
+    if (rasterCycle == model.RASTER_CYCLES) {
+      endOfLine()
+      if (rasterLine == model.RASTER_LINES) endOfFrame()
+    }
+    // check horizontal border for opening
+    if (vState == START_DISPLAY_AREA || vState == DISPLAY_AREA) {
+      if (hState == IDLE_FETCH && (regs(VIC_CR0_HORIGIN) & 0x7F) == rasterCycle) openHorizontalBorder()
+      // check for start of line
+      if (vState == DISPLAY_AREA && rasterCycle == 0) startOfTextLine()
+    }
+    // first raster check
+    if (rasterLine == 0) {
+      // latch rows number
+      if (rasterCycle == 2) latchRowsNumber()
+    }
+    // latch columns number
+    if (rasterCycle == 1) {
+      latchColumnsNumber()
+    }
+
+    fetchCycle()
+    rasterCycle += 1
   }
 
   override protected def saveState(out: ObjectOutputStream): Unit = ???

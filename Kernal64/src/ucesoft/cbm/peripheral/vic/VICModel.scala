@@ -24,11 +24,12 @@ object VIC_I_PAL extends VICModel {
   override final val CPU_FREQ = 1_108_405.0d
   override final val RASTER_LINES = 312
   override final val RASTER_CYCLES = 71
-  override final val BLANK_TOP_LINE = 0
-  override final val BLANK_BOTTOM_LINE = 0
-  override final val BLANK_LEFT_CYCLE = 0
-  override final val BLANK_RIGHT_CYCLE = 0
+  override final val BLANK_TOP_LINE = 28
+  override final val BLANK_BOTTOM_LINE = 312
+  override final val BLANK_LEFT_CYCLE = 6
+  override final val BLANK_RIGHT_CYCLE = 62
   override final val MAX_COLUMNS = 32
+  override final val MAX_ROWS = 37
 }
 
 object VIC_I_NTSC extends VICModel {
@@ -41,6 +42,7 @@ object VIC_I_NTSC extends VICModel {
   override final val BLANK_LEFT_CYCLE = 0
   override final val BLANK_RIGHT_CYCLE = 0
   override final val MAX_COLUMNS = 32
+  override final val MAX_ROWS = 31
 }
 
 sealed trait VIC_II_Model extends VICModel {

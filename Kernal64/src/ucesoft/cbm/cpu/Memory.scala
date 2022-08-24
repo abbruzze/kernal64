@@ -108,6 +108,17 @@ abstract class BridgeMemory extends RAMComponent {
 
 object Memory {
   val empty: Memory = dummyWith(0,0)
+  val dummy = new Memory {
+    val isRom = false
+    val length: Int = 0
+    val startAddress: Int = 0
+    val name = "DUMMY"
+
+    def init: Unit = {}
+    val isActive = true
+    def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = 0
+    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {}
+  }
   
   def dummyWith(address:Int,values:Int*): Memory = new Memory {
     private val mem = values.toArray

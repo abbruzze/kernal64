@@ -13,5 +13,7 @@ abstract class VIC extends RAMComponent {
 
   def setVICModel(model:VICModel): Unit
 
+  def setDisplay(display:Display): Unit
+
   def clock() : Unit
 }

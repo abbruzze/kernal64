@@ -1331,7 +1331,7 @@ final class VIC_II(mem: VIC_II_Memory,
   }
 
   @inline private[this] def drawPixel(index: Int, y: Int, pixel: Int): Unit = {
-    val color = VIC_II_RGB(pixel & 0x0F)
+    val color = VIC_RGB(pixel & 0x0F)
     if (displayMem(index) != color) {
       displayMem(index) = color
       if (firstModPixelX == -1) {
