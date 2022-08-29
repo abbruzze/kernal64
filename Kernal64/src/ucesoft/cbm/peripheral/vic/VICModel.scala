@@ -27,7 +27,7 @@ object VIC_I_PAL extends VICModel {
   override final val BLANK_TOP_LINE = 28
   override final val BLANK_BOTTOM_LINE = 312
   override final val BLANK_LEFT_CYCLE = 6
-  override final val BLANK_RIGHT_CYCLE = 62
+  override final val BLANK_RIGHT_CYCLE = 62//64
   override final val MAX_COLUMNS = 32
   override final val MAX_ROWS = 37
 }

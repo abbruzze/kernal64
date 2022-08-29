@@ -2,12 +2,13 @@ package ucesoft.cbm.peripheral.vic
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
+import ucesoft.cbm.vic20.VIC20MMU
 
 import java.io.{File, ObjectInputStream, ObjectOutputStream}
 
 object VIC_I {
   private val romChar = java.nio.file.Files.readAllBytes(new File("""C:\Users\ealeame\Desktop\GTK3VICE-3.5-win64\VIC20\chargen""").toPath).map(_.toInt & 0xFF)
-
+/*
   private val mem = new Memory {
     override val isRom: Boolean = false
     override val length: Int = 0
@@ -26,8 +27,16 @@ object VIC_I {
 
     override def write(address: Int, value: Int, chipID: ID): Unit = {}
   }
+*/
+  val mmu = new VIC20MMU
+  mmu.init()
+  for(m <- 0x1E00 until (0x1E00 + 22)) mmu.write(m,1)
+  for(m <- 0x9600 until 0x9616)
+    mmu.write(m,6 + 8)
+  for(m <- 0x9616 until 0x9800) mmu.write(m,6)
+  mmu.setCharROM(romChar)
 
-  private val vic = new VIC_I(mem)
+  private val vic = new VIC_I(mmu)
   def main(args:Array[String]): Unit = {
     vic.write(0,12)
     vic.write(1,38)
@@ -43,6 +52,7 @@ object VIC_I {
     //display.setPreferredSize(new java.awt.Dimension((vic.SCREEN_WIDTH * 2.63).toInt,vic.SCREEN_HEIGHT << 1))
     //display.setPreferredSize(new java.awt.Dimension(746,568))
     display.setPreferredSize(new java.awt.Dimension(784,vic.VISIBLE_SCREEN_HEIGHT<<1))
+    //display.setPreferredSize(new java.awt.Dimension(vic.VISIBLE_SCREEN_WIDTH<<1,vic.VISIBLE_SCREEN_HEIGHT<<1))
     //display.setRenderingHints(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
     vic.setDisplay(display)
     frame.getContentPane.add("Center",display)
@@ -68,14 +78,12 @@ class VIC_I(mem:Memory) extends VIC {
 
   private trait VState
   private case object TOP_BORDER extends VState
-  private case object BOTTOM_BORDER extends VState
   private case object START_DISPLAY_AREA extends VState
-  private case object END_DISPLAY_AREA extends VState
+  private case object BOTTOM_BORDER extends VState
   private case object DISPLAY_AREA extends VState
 
   private trait HState
   private case object IDLE_FETCH extends HState
-  private case object START_FETCH extends HState
   private case object FETCH_MATRIX extends HState
   private case object FETCH_CHAR extends HState
   private case object END_FETCH extends HState
@@ -289,8 +297,6 @@ class VIC_I(mem:Memory) extends VIC {
   // canvas X position
   private var xpos = 0
 
-  private var leftBorderDelayCycleCounter = 0
-
   private var display: Display = _
   private var displayMem: Array[Int] = _
   private val palette = Palette.VIC_RGB
@@ -302,7 +308,7 @@ class VIC_I(mem:Memory) extends VIC {
   def SCREEN_WIDTH: Int = model.RASTER_CYCLES << 2
   def SCREEN_HEIGHT: Int = model.RASTER_LINES
   def VISIBLE_SCREEN_WIDTH: Int = (model.BLANK_RIGHT_CYCLE - model.BLANK_LEFT_CYCLE) << 2
-  def VISIBLE_SCREEN_HEIGHT: Int = model.BLANK_BOTTOM_LINE - model.BLANK_TOP_LINE - 1
+  def VISIBLE_SCREEN_HEIGHT: Int = model.BLANK_BOTTOM_LINE - model.BLANK_TOP_LINE
   def SCREEN_ASPECT_RATIO: Double = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
 
   override def setDisplay(display: Display): Unit = {
@@ -340,7 +346,7 @@ class VIC_I(mem:Memory) extends VIC {
   }
 
   @inline private def closeVerticalBorder(): Unit = {
-    vState = END_DISPLAY_AREA
+    vState = BOTTOM_BORDER
     // TODO Display one more line if h-flipflop is already open
   }
   @inline private def openHorizontalBorder(): Unit = {
@@ -349,39 +355,39 @@ class VIC_I(mem:Memory) extends VIC {
       // first text character
       vState = DISPLAY_AREA
     }
+    if (latchedColumns == 0) closeHorizontalBorder()
     displayCol = 0
   }
   @inline private def closeHorizontalBorder(): Unit = {
     hState = END_FETCH
   }
 
-  @inline private def startOfTextLine(): Unit = {
-  }
+  @inline private def startOfTextLine(): Unit = {}
   @inline private def endOfLine(): Unit = {
     rasterCycle = 0
     xpos = 0
     hState = IDLE_FETCH
     rasterLine += 1
-    //leftBorderDelayCycleCounter = 4
 
-    if (vState == DISPLAY_AREA/* || vState == START_DISPLAY_AREA*/) {
+    if (vState == DISPLAY_AREA) {
       rowY += 1
-      //var displayInc = if (charHeight == 8) latchedColumns else 0
 
       if (rowY == charHeight) { // go next line
         rowY = 0
         rowCounter += 1
         if (rowCounter == latchedRows) closeVerticalBorder()
-        //displayInc = latchedColumns
         displayPtr += latchedColumns
       }
     }
   }
   @inline private def endOfFrame(): Unit = {
+    if (vState != BOTTOM_BORDER) closeVerticalBorder()
+
     displayPtr = 0
     rowCounter = 0
     rasterLine = 0
     vState = TOP_BORDER
+    rowY = 0
 
     display.showFrame(0,0,SCREEN_WIDTH,SCREEN_HEIGHT)
   }
@@ -419,30 +425,30 @@ class VIC_I(mem:Memory) extends VIC {
   private def drawDisplayCycle(): Unit = {
     val ypos = rasterLine * SCREEN_WIDTH
 
-    val borderColor = palette(regs(VIC_CRF_BACKGROUND_BORDER_INV) & 7)
-    val backgroundColor = regs(VIC_CRF_BACKGROUND_BORDER_INV) >> 4
+    val backgroundColorIndex = regs(VIC_CRF_BACKGROUND_BORDER_INV) >> 4
     val invertColors = (regs(VIC_CRF_BACKGROUND_BORDER_INV) & 8) == 0
 
     val mc = (cBuf & 8) > 0
-    val color = cBuf & 7
+    val fgColorIndex = cBuf & 7
 
     var p = 0
-    if (!mc) { // ========== Multicolor mode ========================
-      val fg = palette(if (!invertColors) color else backgroundColor)
-      val bg = palette(if (!invertColors) backgroundColor else color)
+    if (!mc) { // ========== HiRes mode =============================
+      val fgColor = palette(if (!invertColors) fgColorIndex else backgroundColorIndex)
+      val bgColor = palette(if (!invertColors) backgroundColorIndex else fgColorIndex)
 
       while (p < 8) {
         val pixel = gBuf & 0x80
         gBuf <<= 1
-        displayMem(ypos + xpos) = if (pixel == 0) bg else fg
+        displayMem(ypos + xpos) = if (pixel == 0) bgColor else fgColor
         xpos += 1
         p += 1
       }
     }
-    else { // ========== HiRes mode =============================
+    else { // ========== Multicolor mode ========================
       val auxColor = palette(regs(VIC_CRE_SOUND_VOLUME_AUX_COLOR) >> 4)
-      val fgColor = palette(color)
-      val bgColor = palette(backgroundColor)
+      val fgColor = palette(fgColorIndex)
+      val bgColor = palette(backgroundColorIndex)
+      val borderColor = palette(regs(VIC_CRF_BACKGROUND_BORDER_INV) & 7)
 
       while (p < 4) {
         val pixel = gBuf & 0xC0
@@ -471,32 +477,13 @@ class VIC_I(mem:Memory) extends VIC {
       xpos += 1
       p += 1
     }
-    /*
-    val fromXpos = xpos
-    xpos += 4
-    java.util.Arrays.fill(displayMem,ypos + fromXpos,ypos + xpos,borderColor)
-     */
   }
 
   @inline private def fetchCycle(): Unit = {
     hState match {
-      case IDLE_FETCH =>
+      case IDLE_FETCH|END_FETCH =>
         // idle fetch => do nothing
         drawBorderCycle()
-      case END_FETCH =>
-        drawBorderCycle()
-      case START_FETCH =>
-        if (latchedColumns == 0) closeHorizontalBorder()
-        else {
-          if (leftBorderDelayCycleCounter > 0) {
-            leftBorderDelayCycleCounter -= 1
-          }
-          else {
-            hState = FETCH_MATRIX
-            //fetchMatrix()
-          }
-          drawBorderCycle()
-        }
       case FETCH_MATRIX =>
         fetchMatrix()
         hState = FETCH_CHAR
