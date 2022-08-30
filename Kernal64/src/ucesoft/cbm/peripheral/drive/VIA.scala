@@ -49,11 +49,18 @@ abstract class VIA(val name:String,
   
   private[this] final val PA_LATCH_ENABLED = 0x01
   private[this] final val PB_LATCH_ENABLED = 0x02
+
+  // handshaking lines
+  protected var lastCA1,lastCB1,lastCA2,lastCB2 = false
   
   protected var active = true
 
   def init : Unit = {
     active = true
+    initCA1()
+    initCA2()
+    initCB1()
+    initCB2()
   }
 
   def reset : Unit = {
@@ -70,6 +77,10 @@ abstract class VIA(val name:String,
     oneshotB = false
     oneshotBNew = false
     acrNew = false
+    initCA1()
+    initCA2()
+    initCB1()
+    initCB2()
   }
     
   def setActive(active:Boolean) : Unit = {
@@ -192,10 +203,79 @@ abstract class VIA(val name:String,
       acrNew = true
       regs(ACR) = value
       oneshotBNew = !is_set(ACR,0x20)
+    case PCR =>
+      regs(PCR) = value
+      checkPCR()
     case ofs => 
       regs(ofs) = value
       Log.debug(s"$name writing reg $ofs => ${Integer.toBinaryString(value)}")
   }
+
+  // ============== Handshaking lines ==============================================
+
+  protected def checkPCR(): Unit = {
+    println(s"VIA($name) PCR set to ${regs(PCR)}")
+    // CA2
+    (regs(PCR) >> 1) & 7 match {
+      case 6 /*110 Manual output mode: CA2 = low */ => CA2Out(false)
+      case 7 /*111 Manual output mode: CA2 = high */ => CA2Out(true)
+      case _ =>
+    }
+    // CB2
+    (regs(PCR) >> 5) & 7 match {
+      case 6 /*110 Manual output mode: CA2 = low */ => CB2Out(false)
+      case 7 /*111 Manual output mode: CA2 = high */ => CB2Out(true)
+      case _ =>
+    }
+  }
+
+  protected def initCA1(): Unit = lastCA1 = false
+  protected def initCA2(): Unit = lastCA2 = false
+  protected def initCB1(): Unit = lastCB1 = false
+  protected def initCB2(): Unit = lastCB2 = false
+
+  protected def CA2Out(state:Boolean): Unit = {}
+  protected def CB2Out(state:Boolean): Unit = {}
+  def CA1In(state:Boolean): Unit = {
+    val ca1HighToLow = (regs(PCR) & 1) == 0
+    if (ca1HighToLow) {
+      if (lastCA1 && !state) irq_set(IRQ_CA1)
+    }
+    else {
+      if (!lastCA1 && state) irq_set(IRQ_CA1)
+    }
+    lastCA1 = state
+  }
+  def CB1In(state: Boolean): Unit = {
+    val cb1HighToLow = (regs(PCR) & 0x10) == 0
+    if (cb1HighToLow) {
+      if (lastCB1 && !state) irq_set(IRQ_CB1)
+    }
+    else {
+      if (!lastCB1 && state) irq_set(IRQ_CB1)
+    }
+    lastCA1 = state
+  }
+  def CA2In(state:Boolean): Unit = {
+    (regs(PCR) >> 1) & 7 match {
+      case 0 | 1=>
+        if (lastCA2 && !state) irq_set(IRQ_CA2)
+      case 2 | 3 =>
+        if (!lastCA2 && state) irq_set(IRQ_CA2)
+    }
+    lastCA2 = state
+  }
+
+  def CB2In(state: Boolean): Unit = {
+    (regs(PCR) >> 5) & 7 match {
+      case 0 | 1 =>
+        if (lastCB2 && !state) irq_set(IRQ_CB2)
+      case 2 | 3 =>
+        if (!lastCB2 && state) irq_set(IRQ_CB2)
+    }
+    lastCA2 = state
+  }
+  // ===============================================================================
   
   def clock(cycles:Long) : Unit = {
     if (active) {
