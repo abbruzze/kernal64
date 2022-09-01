@@ -113,8 +113,8 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     ExpansionPort.addConfigurationListener(mmu)    
     import cia._
     // control ports
-    val cia1CP1 = new CIA1Connectors.PortAConnector(keyb.asInstanceOf[HomeKeyboard],controlPortA)
-    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb.asInstanceOf[HomeKeyboard],controlPortB,() => { vicChip.triggerLightPen ; vdc.triggerLightPen })
+    val cia1CP1 = new CIA1Connectors.PortAConnector(keyb,controlPortA)
+    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb,controlPortB,() => { vicChip.triggerLightPen ; vdc.triggerLightPen })
     add(cia1CP1)
     add(cia1CP2)    
     
@@ -157,7 +157,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     add(ParallelCable)
     vicChip = new vic.VIC_II(vicMemory,mmu.colorRAM,irqSwitcher.setLine(Switcher.VIC,_),baLow _,true)
     // I/O set
-    mmu.setIO(cia1,cia2,vicChip,sid,vdc)
+    mmu.setIO(cia1,cia2,vicChip.asInstanceOf[vic.VIC_II],sid,vdc)
     // VIC display
     display = new vic.Display(vicChip.SCREEN_WIDTH,vicChip.SCREEN_HEIGHT,displayFrame.getTitle,displayFrame)
     add(display)
@@ -303,7 +303,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     else {
       ProgramLoader.checkLoadingInWarpMode(c64Mode)
       cpu.fetchAndExecute(1)
-      if (cpuFrequency == 2 && !mmu.isIOACC && !vicChip.isRefreshCycle) cpu.fetchAndExecute(1)
+      if (cpuFrequency == 2 && !mmu.isIOACC && !vicChip.asInstanceOf[vic.VIC_II].isRefreshCycle) cpu.fetchAndExecute(1)
     }
     // SID
     if (sidCycleExact) sid.clock
@@ -331,7 +331,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     mmuStatusPanel.frequencyChanged(f)
     cpuFrequency = f
     val _2MhzMode = f == 2
-    vicChip.set2MhzMode(_2MhzMode)
+    vicChip.asInstanceOf[vic.VIC_II].set2MhzMode(_2MhzMode)
   }
   def cpuChanged(is8502:Boolean) : Unit = {
     if (is8502) {

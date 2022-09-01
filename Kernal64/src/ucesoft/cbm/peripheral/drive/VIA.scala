@@ -214,7 +214,7 @@ abstract class VIA(val name:String,
   // ============== Handshaking lines ==============================================
 
   protected def checkPCR(): Unit = {
-    println(s"VIA($name) PCR set to ${regs(PCR)}")
+    //println(s"VIA($name) PCR set to ${regs(PCR)}")
     // CA2
     (regs(PCR) >> 1) & 7 match {
       case 6 /*110 Manual output mode: CA2 = low */ => CA2Out(false)

@@ -4,6 +4,7 @@ import ucesoft.cbm.{CBMComponentType, ChipID}
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.RAMComponent
+import ucesoft.cbm.peripheral.vic.coprocessor.VICCoprocessor
 
 abstract class VIC extends RAMComponent {
   override val componentType: Type = CBMComponentType.CHIP
@@ -11,9 +12,38 @@ abstract class VIC extends RAMComponent {
   val isActive = true
   val id: ID = ChipID.VIC
 
-  def setVICModel(model:VICModel): Unit
+  type Model <: VICModel
+
+  def setVICModel(model:Model): Unit
+
+  def getVICModel(): Model
 
   def setDisplay(display:Display): Unit
 
   def clock() : Unit
+
+  def SCREEN_WIDTH: Int
+
+  def SCREEN_HEIGHT: Int
+
+  def VISIBLE_SCREEN_WIDTH: Int
+
+  def VISIBLE_SCREEN_HEIGHT: Int
+
+  def SCREEN_ASPECT_RATIO: Double
+
+  def getRasterLine : Int
+  def getRasterCycle: Int
+
+  def setShowDebug(showDebug:Boolean) : Unit
+
+  def setCoprocessor(cop:VICCoprocessor) : Unit
+
+  def getCoprocessor : Option[VICCoprocessor]
+
+  def setDrawBorder(on:Boolean) : Unit
+
+  def enableLightPen(enabled: Boolean): Unit
+
+  def triggerLightPen(): Unit
 }

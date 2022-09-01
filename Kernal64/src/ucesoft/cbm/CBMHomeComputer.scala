@@ -26,7 +26,6 @@ import java.awt.datatransfer.DataFlavor
 import java.awt.event._
 import java.awt.{BorderLayout, Dimension, Toolkit}
 import java.io._
-import java.util.zip.{GZIPInputStream, GZIPOutputStream}
 import java.util.{Properties, ServiceLoader}
 import javax.swing._
 import javax.swing.filechooser.FileFilter
@@ -43,7 +42,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected var loadPRGasDisk = false // used with --prg-as-disk
   protected var disk8LoadedAsPRG = false
 
-  protected var vicChip : vic.VIC_II = _
+  protected var vicChip : vic.VIC = _
   protected var vicZoomFactor : Int = 1
   protected var cia1,cia2 : CIA = _
   protected val cia12Running: Array[Boolean] = Array(true,true)
@@ -51,7 +50,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected val nmiSwitcher = new Switcher("NMI",cpu.nmiRequest _)//new NMISwitcher(cpu.nmiRequest _)
   protected val irqSwitcher = new Switcher("IRQ",cpu.irqRequest _)//new IRQSwitcher(cpu.irqRequest _)
   protected val dmaSwitcher = new Switcher("DMA",setDMA _)
-  override protected lazy val keyb : Keyboard = new keyboard.HomeKeyboard(keybMapper,nmiSwitcher.setLine(Switcher.KB,_),!isC64Mode)	// key listener
+  override protected lazy val keyb = new keyboard.HomeKeyboard(keybMapper,nmiSwitcher.setLine(Switcher.KB,_),!isC64Mode)	// key listener
 
   protected val bus = new IECBus
   protected var dma = false
@@ -809,11 +808,23 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
   protected def setVICModel(model:VICType.Value,preserveDisplayDim:Boolean = false,resetFlag:Boolean,play:Boolean = true) : Unit = {
     if (play) clock.pause
-    val vicType = model match {
-      case VICType.PAL => VIC_II_PAL
-      case VICType.NTSC => VIC_II_NTSC
+    val vicType = cbmModel match {
+      case VIC20Model =>
+        val vicType = model match {
+          case VICType.PAL => VIC_I_PAL
+          case VICType.NTSC => VIC_I_NTSC
+        }
+        vicChip.asInstanceOf[vic.VIC_I].setVICModel(vicType)
+        vicType
+      case _ =>
+        val vicType = model match {
+          case VICType.PAL => VIC_II_PAL
+          case VICType.NTSC => VIC_II_NTSC
+        }
+        vicChip.asInstanceOf[vic.VIC_II].setVICModel(vicType)
+        vicType
     }
-    vicChip.setVICModel(vicType)
+
     clock.setClockHz(vicType.CPU_FREQ)
     display.setNewResolution(vicChip.SCREEN_HEIGHT,vicChip.SCREEN_WIDTH)
     vicChip.setDisplay(display)
@@ -877,7 +888,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     preferences.add(PREF_1541DOS,"Set 1541 dos rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.D1541_DOS_ROM_PROP,file) }
     preferences.add(PREF_1571DOS,"Set 1571 dos rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.D1571_DOS_ROM_PROP,file) }
     preferences.add(PREF_1581DOS,"Set 1581 dos rom path","",Set.empty,false) { file => if (file != "") reloadROM(ROM.D1581_DOS_ROM_PROP,file) }
-    preferences.add(PREF_VICIINEW,"Set VICII new model",false) { vicChip.setNEWVICModel(_) }
 
     preferences.add(PREF_TRACE,"Starts the emulator in trace mode",false,Set(),false) { trace =>
       traceOption = trace
@@ -1616,7 +1626,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     brItem.addActionListener( _ => preferences(PREF_BEAMRACERENABLED) = brItem.isSelected )
 
     preferences.add(PREF_BEAMRACERENABLED,"Install Beam Racer VIC's coprocessor",false) { br =>
-      vicChip.setCoprocessor(if (br) new VASYL(vicChip,cpu,dmaSwitcher.setLine(Switcher.EXT,_)) else null)
+      vicChip.setCoprocessor(if (br) new VASYL(vicChip.asInstanceOf[vic.VIC_II],cpu,dmaSwitcher.setLine(Switcher.EXT,_)) else null)
       brItem.setSelected(true)
     }
   }
@@ -1626,8 +1636,8 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     // NTSC ================================================================================================
     val vicModelItem = new JMenu("VIC model")
     val group = new ButtonGroup
-    val palItem = new JRadioButtonMenuItem("PAL (6569)")
-    val ntscItem = new JRadioButtonMenuItem("NTSC (6567R8)")
+    val palItem = new JRadioButtonMenuItem("PAL")
+    val ntscItem = new JRadioButtonMenuItem("NTSC")
     group.add(palItem)
     group.add(ntscItem)
     vicModelItem.add(palItem)

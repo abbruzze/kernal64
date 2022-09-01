@@ -1,7 +1,9 @@
 package ucesoft.cbm.peripheral.vic
+import ucesoft.cbm.ChipID
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
+import ucesoft.cbm.peripheral.vic.coprocessor.VICCoprocessor
 import ucesoft.cbm.vic20.VIC20MMU
 
 import java.io.{File, ObjectInputStream, ObjectOutputStream}
@@ -75,6 +77,8 @@ class VIC_I(mem:Memory) extends VIC {
   override val length: Int = 0x110
   override val startAddress: Int = 0x9000
   override val name: String = "VIC_I"
+
+  override type Model = VICModel
 
   private trait VState
   private case object TOP_BORDER extends VState
@@ -271,7 +275,7 @@ class VIC_I(mem:Memory) extends VIC {
   private var vState : VState = TOP_BORDER
   private var hState : HState = IDLE_FETCH
   // VIC Model
-  private var model : VICModel = _
+  private var model : Model = _
   // raster line
   private var rasterLine = 0
   // raster cycle
@@ -297,6 +301,9 @@ class VIC_I(mem:Memory) extends VIC {
   // canvas X position
   private var xpos = 0
 
+  private var drawBorderOn = true
+  private var lightPenEnabled = false
+
   private var display: Display = _
   private var displayMem: Array[Int] = _
   private val palette = Palette.VIC_RGB
@@ -305,11 +312,25 @@ class VIC_I(mem:Memory) extends VIC {
   Palette.setPalette(PaletteType.VIC20_VICE)
   setVICModel(VIC_I_PAL)
 
-  def SCREEN_WIDTH: Int = model.RASTER_CYCLES << 2
-  def SCREEN_HEIGHT: Int = model.RASTER_LINES
-  def VISIBLE_SCREEN_WIDTH: Int = (model.BLANK_RIGHT_CYCLE - model.BLANK_LEFT_CYCLE) << 2
-  def VISIBLE_SCREEN_HEIGHT: Int = model.BLANK_BOTTOM_LINE - model.BLANK_TOP_LINE
-  def SCREEN_ASPECT_RATIO: Double = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
+  override def SCREEN_WIDTH: Int = model.RASTER_CYCLES << 2
+  override def SCREEN_HEIGHT: Int = model.RASTER_LINES
+  override def VISIBLE_SCREEN_WIDTH: Int = (model.BLANK_RIGHT_CYCLE - model.BLANK_LEFT_CYCLE) << 2
+  override def VISIBLE_SCREEN_HEIGHT: Int = model.BLANK_BOTTOM_LINE - model.BLANK_TOP_LINE
+  override def SCREEN_ASPECT_RATIO: Double = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
+
+  override def getRasterLine = rasterLine
+
+  override def getRasterCycle = rasterCycle
+
+  override def setShowDebug(showDebug:Boolean) : Unit = {}
+  def setCoprocessor(cop:VICCoprocessor) : Unit = {}
+  def getCoprocessor : Option[VICCoprocessor] = None
+
+  def setDrawBorder(on:Boolean) : Unit = drawBorderOn = on
+
+  def enableLightPen(enabled: Boolean): Unit = lightPenEnabled = enabled
+
+  def triggerLightPen(): Unit = {}
 
   override def setDisplay(display: Display): Unit = {
     this.display = display
@@ -319,12 +340,16 @@ class VIC_I(mem:Memory) extends VIC {
   }
 
 
-  override def setVICModel(model: VICModel): Unit = {
+  override def setVICModel(model: Model): Unit = {
     this.model = model
   }
 
-  override def reset(): Unit = ???
-  override def init(): Unit = ???
+  override def getVICModel(): Model = model
+
+  override def reset(): Unit = {
+    // TODO
+  }
+  override def init(): Unit = {}
 
   override def read(address: Int, chipID: ID): Int = {
     address & 0xF match {
@@ -338,6 +363,11 @@ class VIC_I(mem:Memory) extends VIC {
   }
   override def write(address: Int, value: Int, chipID: ID): Unit = {
     regs(address & 0xF) = value
+    address & 0xF match {
+      case VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE =>
+        charHeight = if ((value & 1) == 0) 8 else 16
+      case _ =>
+    }
   }
 
   @inline private def openVerticalBorder(): Unit = {
@@ -400,24 +430,29 @@ class VIC_I(mem:Memory) extends VIC {
     latchedColumns = if (colsCandidate > model.MAX_COLUMNS) model.MAX_COLUMNS else colsCandidate
   }
 
-  @inline private def screenMap(): Int =
+  @inline private def screenMap(): Int = {
     (regs(VIC_CR5_SCREEN_MAP_CHAR_MAP_ADDRESS) & 0x70) << 6 | // mask to 0 bit 7, mapping the VIC pag. 129
     (regs(VIC_CR2_COLS_SCREEN_MAP_ADDRESS_7) & 0x80) << 2
+  }
 
-  @inline private def charMap(): Int = {
-    val k = regs(VIC_CR5_SCREEN_MAP_CHAR_MAP_ADDRESS) & 0x7
-    (((regs(VIC_CR5_SCREEN_MAP_CHAR_MAP_ADDRESS) >> 3) & 1) ^ 1) << 15 | k << 10
+  @inline private def charMap(conf:Int): Int = {
+    val k = conf & 0x7
+    (((conf >> 3) & 1) ^ 1) << 15 | k << 10
   }
 
   @inline private def fetchMatrix(): Unit = {
     // fetches both char code and color code
-    gBuf = mem.read(screenMap() + displayPtr + displayCol)
+    gBuf = mem.read(screenMap() + displayPtr + displayCol,ChipID.VIC)
     val colorBaseAddress = 0x9400 + ((regs(VIC_CR2_COLS_SCREEN_MAP_ADDRESS_7) & 0x80) << 2)
-    cBuf = mem.read(colorBaseAddress + displayPtr + displayCol)
+    cBuf = mem.read(colorBaseAddress + displayPtr + displayCol,ChipID.VIC)
   }
   @inline private def fetchChar(): Unit = {
     val charShift = if ((regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) & 1) == 0) 3 else 4
-    gBuf = mem.read(charMap() + (gBuf << charShift) + rowY)
+    val offset = (gBuf << charShift) + rowY
+    val blocks = offset >> 10
+    val conf = (regs(VIC_CR5_SCREEN_MAP_CHAR_MAP_ADDRESS) + blocks) & 0xF
+    val target = charMap(conf) + (offset & 0x3FF)
+    gBuf = mem.read(target,ChipID.VIC)
 
     displayCol += 1
   }

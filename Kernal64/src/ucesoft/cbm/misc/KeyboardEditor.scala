@@ -2,7 +2,7 @@ package ucesoft.cbm.misc
 
 import ucesoft.cbm.peripheral.keyboard.CKey.Key
 import ucesoft.cbm.peripheral.keyboard.{CKey, Keyboard, KeyboardMapper, KeyboardMapperStore}
-import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, CBMIIModel}
+import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, CBMIIModel, VIC20Model}
 
 import java.awt._
 import java.awt.event.{ActionEvent, ActionListener, KeyEvent, KeyListener}
@@ -29,10 +29,12 @@ class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerM
   
   private val keys = {
     model match {
+      case VIC20Model =>
+        (CKey.values filter { k => CKey.isVIC20Key(k) } filterNot { k => k == CKey.L_SHIFT || k == CKey.R_SHIFT } toArray) sortBy { k => k.toString }
       case C64Model =>
-        (CKey.values filter { k => !CKey.is128Key(k) && !CKey.isCBM2Key(k) } filterNot { k => k == CKey.L_SHIFT || k == CKey.R_SHIFT } toArray) sortBy { k => k.toString }
+        (CKey.values filter { k => CKey.isC64Key(k) } filterNot { k => k == CKey.L_SHIFT || k == CKey.R_SHIFT } toArray) sortBy { k => k.toString }
       case C128Model =>
-        (CKey.values filter { k => !CKey.isCBM2Key(k) } filterNot { k => k == CKey.L_SHIFT || k == CKey.R_SHIFT } toArray) sortBy { k => k.toString }
+        (CKey.values filter { k => CKey.isC64Key(k) || CKey.is128Key(k) } filterNot { k => k == CKey.L_SHIFT || k == CKey.R_SHIFT } toArray) sortBy { k => k.toString }
       case CBMIIModel =>
         (CKey.values filter { k => CKey.isCBM2Key(k) } filterNot { k => k == CKey.CBM2_SHIFT } toArray) sortBy { k => k.toString }
     }

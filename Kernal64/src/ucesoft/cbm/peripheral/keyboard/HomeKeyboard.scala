@@ -128,7 +128,7 @@ class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) =
           case None =>
           case Some(key) =>
             //Log.debug("Pressed: " + KeyEvent.getKeyText(e.getKeyCode) + " loc:" + e.getKeyLocation)
-            if (key == RESTORE) {
+            if (key == RESTORE || key == VIC20_RESTORE) {
               nmiAction(true)
               nmiAction(false) // clears immediately NMI
             }
@@ -155,7 +155,7 @@ class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) =
         case Some(key) =>
           if (key == L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed -= R_SHIFT
           else
-          if (key != RESTORE) keysPressed -= key// else nmiAction(false)
+          if (key != RESTORE && key != VIC20_RESTORE) keysPressed -= key// else nmiAction(false)
       }
     }
   }

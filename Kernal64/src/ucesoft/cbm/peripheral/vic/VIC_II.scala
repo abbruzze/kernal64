@@ -16,21 +16,20 @@ final class VIC_II(mem: VIC_II_Memory,
                    colorMem:Memory,
                    irqAction: Boolean => Unit,
                    baLow: Boolean => Unit,
-                   isVICIIe:Boolean = false) extends RAMComponent with VICContext {
+                   isVICIIe:Boolean = false) extends VIC with VICContext {
   override val componentType: Type = CBMComponentType.CHIP
   override lazy val componentID = "VICII"
   val name = "VIC"
-  val isRom = false
   val length = 1024
-  val isActive = true
   val startAddress = 0xD000
-  val id: ID = ChipID.VIC
 
-  private[this] var model : VIC_II_Model = _
+  override type Model = VIC_II_Model
+
+  private[this] var model : Model = _
 
   setVICModel(VIC_II_PAL)
 
-  def setVICModel(model:VIC_II_Model) : Unit = {
+  override def setVICModel(model:Model) : Unit = {
     this.model = model
     lastModPixelY = model.RASTER_LINES
     lastModPixelX = model.BLANK_RIGHT_CYCLE << 3
@@ -39,7 +38,7 @@ final class VIC_II(mem: VIC_II_Memory,
     xCoord = model.XCOORD
   }
 
-  override def getVICModel : VICModel = model
+  override def getVICModel : Model = model
 
   // ----------------------- Constants --------------------------------------------------------------------
   final private[this] val LEFT_RIGHT_FF_COMP = Array(Array(0x1F, 0x14F), Array(0x18, 0x158)) // first index is CSEL's value 0 or 1, second index is 0=left, 1=right
@@ -894,7 +893,7 @@ final class VIC_II(mem: VIC_II_Memory,
     pendingDrawBorderModeChange = true
   }
 
-  def setCoprocessor(cop:VICCoprocessor) : Unit = {
+  override def setCoprocessor(cop:VICCoprocessor) : Unit = {
     if (cop != null) {
       if (coprocessor != null) {
         remove(coprocessor)
@@ -910,7 +909,7 @@ final class VIC_II(mem: VIC_II_Memory,
     this.coprocessor = cop
   }
 
-  def getCoprocessor : Option[VICCoprocessor] = Option(coprocessor)
+  override def getCoprocessor : Option[VICCoprocessor] = Option(coprocessor)
 
   def setDisplay(display: Display): Unit = {
     this.display = display

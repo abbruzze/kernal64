@@ -2,11 +2,17 @@ package ucesoft.cbm.vic20
 
 import ucesoft.cbm.{CBMComponentType, ChipID}
 import ucesoft.cbm.ChipID.ID
-import ucesoft.cbm.cpu.RAMComponent
+import ucesoft.cbm.cpu.{RAMComponent, ROM}
 import ucesoft.cbm.peripheral.drive.VIA
 import ucesoft.cbm.peripheral.vic.VIC_I
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
+
+object VIC20MMU {
+  val KERNAL_ROM = new ROM(null, "Kernal", 0, 8192, ROM.VIC20_KERNAL_ROM_PROP)
+  val BASIC_ROM = new ROM(null, "Basic", 0, 8192, ROM.VIC20_BASIC_ROM_PROP)
+  val CHAR_ROM = new ROM(null, "Char", 0, 4096, ROM.VIC20_CHAR_ROM_PROP)
+}
 
 class VIC20MMU extends RAMComponent {
   override val isRom = false
@@ -27,7 +33,7 @@ class VIC20MMU extends RAMComponent {
   private var basicROM : Array[Int] = _
   private var kernelROM : Array[Int] = _
   private var charROM : Array[Int] = _
-  private var expansionBlocks = Array(false,false,false,false,false) // BLOCK 0 - BLOCK 4
+  private val expansionBlocks = Array(false,false,false,false,false) // BLOCK 0 - BLOCK 4
   private var lastByteOnBUS = 0
 
   private var via1,via2 : VIA = _
@@ -100,7 +106,7 @@ class VIC20MMU extends RAMComponent {
     val v2 = new CHIP_RW(via2,0xF)
     val v = new CHIP_RW(vic,0xF)
 
-    for(r <- 0 until 0xFFFF) {
+    for(r <- 0 until 0x10000) {
       memRW(r) =
         if (r < 0x400) RAM_RW
         else if (r < 0x1000) exp0

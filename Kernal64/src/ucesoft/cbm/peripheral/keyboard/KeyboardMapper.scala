@@ -1,6 +1,6 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, Log}
+import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, Log, VIC20Model}
 import ucesoft.cbm.peripheral.keyboard.CKey.Key
 
 import java.awt.event.KeyEvent
@@ -51,6 +51,7 @@ object KeyboardMapperStore {
       }
       catch {
         case t:Throwable =>
+          t.printStackTrace()
           Log.info(s"Can't load keyboard mapping '$name': " + t)
           None
       }
@@ -90,6 +91,9 @@ object KeyboardMapperStore {
       case C64Model | C128Model =>
         // add l-shift button
         e_map += KeyEvent.VK_SHIFT -> CKey.L_SHIFT
+      case VIC20Model =>
+        // add l-shift button
+        e_map += KeyEvent.VK_SHIFT -> CKey.VIC20_L_SHIFT
       case _ =>
     }
     

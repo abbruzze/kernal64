@@ -88,8 +88,8 @@ class SCPUC64 extends CBMHomeComputer {
     ExpansionPort.addConfigurationListener(vicMemory)
     import cia._
     // control ports
-    val cia1CP1 = new CIA1Connectors.PortAConnector(keyb.asInstanceOf[HomeKeyboard], controlPortA)
-    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb.asInstanceOf[HomeKeyboard], controlPortB, () => vicChip.triggerLightPen)
+    val cia1CP1 = new CIA1Connectors.PortAConnector(keyb, controlPortA)
+    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb, controlPortB, () => vicChip.triggerLightPen)
     add(cia1CP1)
     add(cia1CP2)
     add(irqSwitcher)
@@ -121,7 +121,7 @@ class SCPUC64 extends CBMHomeComputer {
     vicChip = new vic.VIC_II(vicMemory, mmu.COLOR_RAM, irqSwitcher.setLine(Switcher.VIC,_), baLow _)
     mmu.setLastByteReadMemory(vicMemory)
     // mapping I/O chips in memory
-    mmu.setIO(cia1, cia2, sid, vicChip)
+    mmu.setIO(cia1, cia2, sid, vicChip.asInstanceOf[vic.VIC_II])
     display = new vic.Display(vicChip.SCREEN_WIDTH, vicChip.SCREEN_HEIGHT, displayFrame.getTitle, displayFrame)
     add(display)
     display.setPreferredSize(new java.awt.Dimension(vicChip.VISIBLE_SCREEN_WIDTH, vicChip.VISIBLE_SCREEN_HEIGHT))

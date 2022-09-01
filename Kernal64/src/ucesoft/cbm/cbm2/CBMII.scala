@@ -565,9 +565,9 @@ class CBMII extends CBMComputer {
   }
 
   override def reset(): Unit = {
-    println("CBMII RESET!")
     clock.schedule(new ClockEvent("50_60Hz", clock.nextCycles, _50_60_Hz _))
-    // TODO
+    clock.maximumSpeed = false
+    maxSpeedItem.setSelected(false)
   }
 
   override def init(): Unit = {

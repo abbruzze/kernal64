@@ -75,8 +75,8 @@ class C64 extends CBMHomeComputer {
     ExpansionPort.addConfigurationListener(vicMemory)    
     import cia._
     // control ports
-    val cia1CP1 = new CIA1Connectors.PortAConnector(keyb.asInstanceOf[HomeKeyboard],controlPortA)
-    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb.asInstanceOf[HomeKeyboard],controlPortB,() => vicChip.triggerLightPen)
+    val cia1CP1 = new CIA1Connectors.PortAConnector(keyb,controlPortA)
+    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb,controlPortB,() => vicChip.triggerLightPen)
     add(cia1CP1)
     add(cia1CP2)
     add(irqSwitcher)    
@@ -389,6 +389,7 @@ class C64 extends CBMHomeComputer {
     super.setGlobalCommandLineOptions
     // CUSTOM-GLUE-LOGIC ==================================================================================
     preferences.add(PREF_CUSTOMGLUELOGIC,"Set internal glue logic to custom (C64C)",false) { vicMemory.setCustomGlueLogic(_) }
+    preferences.add(PREF_VICIINEW,"Set VICII new model",false) { vicChip.asInstanceOf[vic.VIC_II].setNEWVICModel(_) }
   }
   
   protected def saveSettings(save:Boolean) : Unit = {
