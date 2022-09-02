@@ -1,78 +1,14 @@
 package ucesoft.cbm.peripheral.vic
-import ucesoft.cbm.ChipID
+import ucesoft.cbm.{ChipID, Clock}
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.peripheral.sid.AudioDriverDevice
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 import ucesoft.cbm.peripheral.vic.coprocessor.VICCoprocessor
-import ucesoft.cbm.vic20.VIC20MMU
 
 import java.io.{File, ObjectInputStream, ObjectOutputStream}
 
-object VIC_I {
-  private val romChar = java.nio.file.Files.readAllBytes(new File("""C:\Users\ealeame\Desktop\GTK3VICE-3.5-win64\VIC20\chargen""").toPath).map(_.toInt & 0xFF)
-/*
-  private val mem = new Memory {
-    override val isRom: Boolean = false
-    override val length: Int = 0
-    override val startAddress: Int = 0
-    override val name: String = ""
-
-    override def init(): Unit = {}
-    override def isActive: Boolean = true
-
-    override def read(address: Int, chipID: ID): Int = {
-      if (address >= 0x8000 && address < 0x9000) romChar(address & 0xFFF)
-      else if (address >= 0x1E00 && address < (0x1E00 + 22)) 1
-      else if (address >= 0x9600 && address < 0x9616) 6 + 8
-      else 6
-    }
-
-    override def write(address: Int, value: Int, chipID: ID): Unit = {}
-  }
-*/
-  val mmu = new VIC20MMU
-  mmu.init()
-  for(m <- 0x1E00 until (0x1E00 + 22)) mmu.write(m,1)
-  for(m <- 0x9600 until 0x9616)
-    mmu.write(m,6 + 8)
-  for(m <- 0x9616 until 0x9800) mmu.write(m,6)
-  mmu.setCharROM(romChar)
-
-  private val vic = new VIC_I(mmu)
-  def main(args:Array[String]): Unit = {
-    vic.write(0,12)
-    vic.write(1,38)
-    vic.write(2,150)
-    vic.write(3,46)
-    vic.write(5,240)
-    vic.write(14,0)
-    vic.write(15,27)
-    val clk = ucesoft.cbm.Clock.setSystemClock(Some(errorHandler _))(mainLoop _)
-    clk.setClockHz(1108405.0d)
-    val frame = new javax.swing.JFrame("VIC-I")
-    val display = new Display(vic.SCREEN_WIDTH,vic.SCREEN_HEIGHT,"VIC-I",frame)
-    //display.setPreferredSize(new java.awt.Dimension((vic.SCREEN_WIDTH * 2.63).toInt,vic.SCREEN_HEIGHT << 1))
-    //display.setPreferredSize(new java.awt.Dimension(746,568))
-    display.setPreferredSize(new java.awt.Dimension(784,vic.VISIBLE_SCREEN_HEIGHT<<1))
-    //display.setPreferredSize(new java.awt.Dimension(vic.VISIBLE_SCREEN_WIDTH<<1,vic.VISIBLE_SCREEN_HEIGHT<<1))
-    //display.setRenderingHints(java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-    vic.setDisplay(display)
-    frame.getContentPane.add("Center",display)
-    frame.pack()
-    frame.setVisible(true)
-    clk.play()
-  }
-
-  private def errorHandler(t:Throwable): Unit = {
-    t.printStackTrace()
-  }
-
-  private def mainLoop(cycles:Long): Unit = {
-    vic.clock()
-  }
-}
-
-class VIC_I(mem:Memory) extends VIC {
+class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   override val componentID: String = "VIC_I"
   override val length: Int = 0x110
   override val startAddress: Int = 0x9000
@@ -92,6 +28,67 @@ class VIC_I(mem:Memory) extends VIC {
   private case object FETCH_CHAR extends HState
   private case object END_FETCH extends HState
 
+  // ======================== Sound stuff ==============================
+  private final val noisepattern = Array(7, 30, 30, 28, 28, 62, 60, 56, 120, 248, 124, 30, 31, 143, 7, 7, 193, 192, 224, 241, 224, 240, 227, 225, 192, 224, 120, 126, 60, 56, 224, 225, 195, 195, 135, 199, 7, 30, 28, 31, 14, 14, 30, 14, 15, 15, 195, 195, 241, 225, 227, 193, 227, 195, 195, 252, 60, 30, 15, 131, 195, 193, 193, 195, 195, 199, 135, 135, 199, 15, 14, 60, 124, 120, 60, 60, 60, 56, 62, 28, 124, 30, 60, 15, 14, 62, 120, 240, 240, 224, 225, 241, 193, 195, 199, 195, 225, 241, 224, 225, 240, 241, 227, 192, 240, 224, 248, 112, 227, 135, 135, 192, 240, 224, 241, 225, 225, 199, 131, 135, 131, 143, 135, 135, 199, 131, 195, 131, 195, 241, 225, 195, 199, 129, 207, 135, 3, 135, 199, 199, 135, 131, 225, 195, 7, 195, 135, 135, 7, 135, 195, 135, 131, 225, 195, 199, 195, 135, 135, 143, 15, 135, 135, 15, 207, 31, 135, 142, 14, 7, 129, 195, 227, 193, 224, 240, 224, 227, 131, 135, 7, 135, 142, 30, 15, 7, 135, 143, 31, 7, 135, 193, 240, 225, 225, 227, 199, 15, 3, 143, 135, 14, 30, 30, 15, 135, 135, 15, 135, 31, 15, 195, 195, 240, 248, 240, 112, 241, 240, 240, 225, 240, 224, 120, 124, 120, 124, 112, 113, 225, 225, 195, 195, 199, 135, 28, 60, 60, 28, 60, 124, 30, 30, 30, 28, 60, 120, 248, 248, 225, 195, 135, 30, 30, 60, 62, 15, 15, 135, 31, 142, 15, 15, 142, 30, 30, 30, 30, 15, 15, 143, 135, 135, 195, 131, 193, 225, 195, 193, 195, 199, 143, 15, 15, 15, 15, 131, 199, 195, 193, 225, 224, 248, 62, 60, 60, 60, 60, 60, 120, 62, 30, 30, 30, 15, 15, 15, 30, 14, 30, 30, 15, 15, 135, 31, 135, 135, 28, 62, 31, 15, 15, 142, 62, 14, 62, 30, 28, 60, 124, 252, 56, 120, 120, 56, 120, 112, 248, 124, 30, 60, 60, 48, 241, 240, 112, 112, 224, 248, 240, 248, 120, 120, 113, 225, 240, 227, 193, 240, 113, 227, 199, 135, 142, 62, 14, 30, 62, 15, 7, 135, 12, 62, 15, 135, 15, 30, 60, 60, 56, 120, 241, 231, 195, 195, 199, 142, 60, 56, 240, 224, 126, 30, 62, 14, 15, 15, 15, 3, 195, 195, 199, 135, 31, 14, 30, 28, 60, 60, 15, 7, 7, 199, 199, 135, 135, 143, 15, 192, 240, 248, 96, 240, 240, 225, 227, 227, 195, 195, 195, 135, 15, 135, 142, 30, 30, 63, 30, 14, 28, 60, 126, 30, 60, 56, 120, 120, 120, 56, 120, 60, 225, 227, 143, 31, 28, 120, 112, 126, 15, 135, 7, 195, 199, 15, 30, 60, 14, 15, 14, 30, 3, 240, 240, 241, 227, 193, 199, 192, 225, 225, 225, 225, 224, 112, 225, 240, 120, 112, 227, 199, 15, 193, 225, 227, 195, 192, 240, 252, 28, 60, 112, 248, 112, 248, 120, 60, 112, 240, 120, 112, 124, 124, 60, 56, 30, 62, 60, 126, 7, 131, 199, 193, 193, 225, 195, 195, 195, 225, 225, 240, 120, 124, 62, 15, 31, 7, 143, 15, 131, 135, 193, 227, 227, 195, 195, 225, 240, 248, 240, 60, 124, 60, 15, 142, 14, 31, 31, 14, 60, 56, 120, 112, 112, 240, 240, 248, 112, 112, 120, 56, 60, 112, 224, 240, 120, 241, 240, 120, 62, 60, 15, 7, 14, 62, 30, 63, 30, 14, 15, 135, 135, 7, 15, 7, 199, 143, 15, 135, 30, 30, 31, 30, 30, 60, 30, 28, 62, 15, 3, 195, 129, 224, 240, 252, 56, 60, 62, 14, 30, 28, 124, 30, 31, 14, 62, 28, 120, 120, 124, 30, 62, 30, 60, 31, 15, 31, 15, 15, 143, 28, 60, 120, 248, 240, 248, 112, 240, 120, 120, 60, 60, 120, 60, 31, 15, 7, 134, 28, 30, 28, 30, 30, 31, 3, 195, 199, 142, 60, 60, 28, 24, 240, 225, 195, 225, 193, 225, 227, 195, 195, 227, 195, 131, 135, 131, 135, 15, 7, 7, 225, 225, 224, 124, 120, 56, 120, 120, 60, 31, 15, 143, 14, 7, 15, 7, 131, 195, 195, 129, 240, 248, 241, 224, 227, 199, 28, 62, 30, 15, 15, 195, 240, 240, 227, 131, 195, 199, 7, 15, 15, 15, 15, 15, 7, 135, 15, 15, 14, 15, 15, 30, 15, 15, 135, 135, 135, 143, 199, 199, 131, 131, 195, 199, 143, 135, 7, 195, 142, 30, 56, 62, 60, 56, 124, 31, 28, 56, 60, 120, 124, 30, 28, 60, 63, 30, 14, 62, 28, 60, 31, 15, 7, 195, 227, 131, 135, 129, 193, 227, 207, 14, 15, 30, 62, 30, 31, 15, 143, 195, 135, 14, 3, 240, 240, 112, 224, 225, 225, 199, 142, 15, 15, 30, 14, 30, 31, 28, 120, 240, 241, 241, 224, 241, 225, 225, 224, 224, 241, 193, 240, 113, 225, 195, 131, 199, 131, 225, 225, 248, 112, 240, 240, 240, 240, 240, 112, 248, 112, 112, 97, 224, 240, 225, 224, 120, 113, 224, 240, 248, 56, 30, 28, 56, 112, 248, 96, 120, 56, 60, 63, 31, 15, 31, 15, 31, 135, 135, 131, 135, 131, 225, 225, 240, 120, 241, 240, 112, 56, 56, 112, 224, 227, 192, 224, 248, 120, 120, 248, 56, 241, 225, 225, 195, 135, 135, 14, 30, 31, 14, 14, 15, 15, 135, 195, 135, 7, 131, 192, 240, 56, 60, 60, 56, 240, 252, 62, 30, 28, 28, 56, 112, 240, 241, 224, 240, 224, 224, 241, 227, 224, 225, 240, 240, 120, 124, 120, 60, 120, 120, 56, 120, 120, 120, 120, 112, 227, 131, 131, 224, 195, 193, 225, 193, 193, 193, 227, 195, 199, 30, 14, 31, 30, 30, 15, 15, 14, 14, 14, 7, 131, 135, 135, 14, 7, 143, 15, 15, 15, 14, 28, 112, 225, 224, 113, 193, 131, 131, 135, 15, 30, 24, 120, 120, 124, 62, 28, 56, 240, 225, 224, 120, 112, 56, 60, 62, 30, 60, 30, 28, 112, 60, 56, 63)
+  private class Oscillator {
+    var shift = 0
+    var counter = 0
+    var frequency = 0
+    var enabled = false
+
+    def reset(): Unit = {
+      shift = 0
+      counter = 0
+      frequency = 0
+      enabled = false
+    }
+
+    def amp(): Int = if ((shift & 0x80) == 0x80) 0xFF else 0
+    def set(value: Int): Unit = {
+      enabled = (value & 0x80) == 0x80
+      frequency = value & 0x7F
+    }
+
+    def generate(): Unit = {
+      if (counter >= 127) {
+        counter = frequency
+        shift = shift << 1 | (shift >> 7 ^ 1) & (if (enabled) 1 else 0)
+      }
+      else counter += 1
+    }
+  }
+  private class Noise extends Oscillator {
+    private var noisectr = 0
+
+    override def reset(): Unit = {
+      super.reset()
+      noisectr = 0
+    }
+
+    override def generate(): Unit = {
+      if (counter >= 127) {
+        counter = frequency
+        val ff = enabled && (noisepattern(noisectr >> 3 & 0x3FF) >> (noisectr & 7) & 1) == 1
+        shift = if (ff) 0xFF else 0
+        noisectr += 1
+      }
+      else counter += 1
+    }
+  }
+
+  @inline private def getAudioSample(): Int = (osc(0).amp() + osc(1).amp() + osc(2).amp() + osc(3).shift + 1024) * soundVolume
+
+  def setCPUFrequency(f: Double): Unit = {
+    val CPU_FREQ = f.toInt
+    AUDIO_CLOCKS_PER_SAMPLE = CPU_FREQ / audioDriver.sampleRate
+  }
+
+  private final val osc = Array(new Oscillator,new Oscillator,new Oscillator,new Noise)
+  private var soundVolume = 0
+  private val clk = Clock.systemClock
+  private var AUDIO_CLOCKS_PER_SAMPLE = clk.getClockHz.toInt / audioDriver.sampleRate
+  private var audioClocksPerSampleCounter = 0
+  // ===================================================================
   /*
     36864 $8666 VICCR0
     Bit 7: Interlace scan bit. Default value: 0
@@ -311,6 +308,8 @@ class VIC_I(mem:Memory) extends VIC {
   // Constructor
   Palette.setPalette(PaletteType.VIC20_VICE)
   setVICModel(VIC_I_PAL)
+  setCPUFrequency(Clock.systemClock.getClockHz)
+  clk.addChangeFrequencyListener(setCPUFrequency _)
 
   override def SCREEN_WIDTH: Int = model.RASTER_CYCLES << 2
   override def SCREEN_HEIGHT: Int = model.RASTER_LINES
@@ -347,6 +346,8 @@ class VIC_I(mem:Memory) extends VIC {
   override def getVICModel(): Model = model
 
   override def reset(): Unit = {
+    soundVolume = 0
+    for(o <- osc) o.reset()
     // TODO
   }
   override def init(): Unit = {}
@@ -366,6 +367,16 @@ class VIC_I(mem:Memory) extends VIC {
     address & 0xF match {
       case VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE =>
         charHeight = if ((value & 1) == 0) 8 else 16
+      case 0xA =>
+        osc(0).set(value)
+      case 0xB =>
+        osc(1).set(value)
+      case 0xC =>
+        osc(2).set(value)
+      case 0xD =>
+        osc(3).set(value)
+      case 0xE =>
+        soundVolume = value & 0xF
       case _ =>
     }
   }
@@ -562,6 +573,29 @@ class VIC_I(mem:Memory) extends VIC {
 
     fetchCycle()
     rasterCycle += 1
+
+    audioClock()
+  }
+
+  private def audioClock(): Unit = {
+    val cycles = clk.currentCycles
+    if ((cycles & 4) == 4) {
+      osc(2).generate()
+      if ((cycles & 8) == 8) {
+        osc(1).generate()
+        if ((cycles & 0x10) == 0x10) {
+          osc(0).generate()
+          if ((cycles & 0x20) == 0x20) {
+            osc(3).generate()
+          }
+        }
+      }
+    }
+    audioClocksPerSampleCounter += 1
+    if (audioClocksPerSampleCounter == AUDIO_CLOCKS_PER_SAMPLE) {
+      audioClocksPerSampleCounter = 0
+      audioDriver.addSample(getAudioSample())
+    }
   }
 
   override protected def saveState(out: ObjectOutputStream): Unit = ???

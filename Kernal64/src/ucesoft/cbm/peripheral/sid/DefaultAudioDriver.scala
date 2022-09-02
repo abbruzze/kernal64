@@ -2,7 +2,7 @@ package ucesoft.cbm.peripheral.sid
 
 import javax.sound.sampled._
 
-class DefaultAudioDriver(sampleRate:Int,bufferSize:Int,isStereo:Boolean = false) extends AudioDriverDevice {
+class DefaultAudioDriver(override val sampleRate:Int,bufferSize:Int,isStereo:Boolean = false) extends AudioDriverDevice {
   private[this] val dataLine = {
     val af = new AudioFormat(sampleRate, 16,if (isStereo) 2 else 1, true, false)
     val dli = new DataLine.Info(classOf[SourceDataLine], af, bufferSize)

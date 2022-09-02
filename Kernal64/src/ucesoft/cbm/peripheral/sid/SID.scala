@@ -44,6 +44,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   private[this] var fullSpeed = false
   private[this] var driver = externalDriver.getOrElse(new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE * 2))
   private[this] val driverProxy : AudioDriverDevice = new AudioDriverDevice {
+    override val sampleRate: Int = driver.sampleRate
     def getMasterVolume : Int = driver.getMasterVolume
     def setMasterVolume(v:Int): Unit = driver.setMasterVolume(v)
     def setSoundOn(on:Boolean): Unit = driver.setSoundOn(on)

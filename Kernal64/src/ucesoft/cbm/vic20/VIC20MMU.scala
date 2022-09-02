@@ -12,9 +12,20 @@ object VIC20MMU {
   val KERNAL_ROM = new ROM(null, "Kernal", 0, 8192, ROM.VIC20_KERNAL_ROM_PROP)
   val BASIC_ROM = new ROM(null, "Basic", 0, 8192, ROM.VIC20_BASIC_ROM_PROP)
   val CHAR_ROM = new ROM(null, "Char", 0, 4096, ROM.VIC20_CHAR_ROM_PROP)
+
+  object VICExpansion extends Enumeration {
+    val _NO = Value(0)
+    val _3K = Value(1)
+    val _8K = Value(2)
+    val _16K = Value(2 + 4)
+    val _24K = Value(2 + 4 + 8)
+    val _ALL = Value(1 + 2 + 4 + 8 + 16)
+  }
 }
 
 class VIC20MMU extends RAMComponent {
+  import VIC20MMU.VICExpansion
+
   override val isRom = false
   override val length: Int = 0x10000
   override val startAddress = 0
@@ -33,6 +44,14 @@ class VIC20MMU extends RAMComponent {
   private var basicROM : Array[Int] = _
   private var kernelROM : Array[Int] = _
   private var charROM : Array[Int] = _
+  /*
+    Index   Memory
+    0       0400 - 0FFF
+    1       2000 - 3FFF
+    2       4000 - 5FFF
+    3       6000 - 7FFF
+    4       A000 - BFFF
+   */
   private val expansionBlocks = Array(false,false,false,false,false) // BLOCK 0 - BLOCK 4
   private var lastByteOnBUS = 0
 
@@ -43,7 +62,15 @@ class VIC20MMU extends RAMComponent {
   def setKernelROM(rom:Array[Int]): Unit = kernelROM = rom
   def setCharROM(rom:Array[Int]): Unit = charROM = rom
 
-  def setBlockExpansion(block:Int,enabled:Boolean): Unit = expansionBlocks(block) = enabled
+  def setExpansion(e:VICExpansion.Value): Unit = {
+    val exp = e.id
+    var b = 0
+    while (b < 5) {
+      val enabled = (exp & (1 << b)) > 0
+      expansionBlocks(b) = enabled
+      b += 1
+    }
+  }
 
   def setIO(via1:VIA,via2:VIA,vic:VIC_I): Unit = {
     this.via1 = via1
@@ -70,7 +97,8 @@ class VIC20MMU extends RAMComponent {
   private object COLOR_RW extends RW {
     override def read(address: Int, chipID: ID): Int = {
       val color = ram(address & 0xFFFF) & 0xF
-      if (chipID == ChipID.VIC) color else lastByteOnBUS & 0xF0 | color
+      if (chipID == ChipID.VIC) color
+      else lastByteOnBUS & 0xF0 | color
     }
     override def write(address: Int, value: Int): Unit = ram(address & 0xFFFF) = value & 0xF
   }
@@ -88,9 +116,24 @@ class VIC20MMU extends RAMComponent {
     override def read(address: Int, chipID: ID): Int = lastByteOnBUS
     override def write(address: Int, value: Int): Unit = {}
   }
-  private class CHIP_RW(chip: RAMComponent,mask:Int) extends RW {
-    override def read(address: Int, chipID: ID): Int = chip.read(address & mask)
-    override def write(address: Int, value: Int): Unit = chip.write(address & mask,value)
+  private object VIC_RW extends RW {
+    override def read(address: Int, chipID: ID): Int = vic.read(address)
+    override def write(address: Int, value: Int): Unit = vic.write(address,value)
+  }
+  private object VIA1_VIA2_RW extends RW {
+    override def read(address: Int, chipID: ID): Int = {
+      if ((address & 0x30) == 0) lastByteOnBUS
+      else {
+        var tmp = 0xFF
+        if ((address & 0x10) > 0) tmp = via1.read(address)
+        if ((address & 0x20) > 0) tmp = via2.read(address)
+        tmp
+      }
+    }
+    override def write(address: Int, value: Int): Unit = {
+      if ((address & 0x10) > 0) via1.write(address,value)
+      if ((address & 0x20) > 0) via2.write(address,value)
+    }
   }
 
   override def init(): Unit = {
@@ -99,12 +142,8 @@ class VIC20MMU extends RAMComponent {
     val exp2 = new EXPRAM_BLOCK_RW(2)
     val exp3 = new EXPRAM_BLOCK_RW(3)
     val exp4 = new EXPRAM_BLOCK_RW(4)
-    val io0 = new IOBLOCK_RW(0)
     val io1 = new IOBLOCK_RW(1)
     val io2 = new IOBLOCK_RW(2)
-    val v1 = new CHIP_RW(via1,0xF)
-    val v2 = new CHIP_RW(via2,0xF)
-    val v = new CHIP_RW(vic,0xF)
 
     for(r <- 0 until 0x10000) {
       memRW(r) =
@@ -115,10 +154,8 @@ class VIC20MMU extends RAMComponent {
         else if (r < 0x6000) exp2
         else if (r < 0x8000) exp3
         else if (r < 0x9000) CHARROM_RW
-        else if (r < 0x9110) v
-        else if (r < 0x9120) v1
-        else if (r < 0x9130) v2
-        else if (r < 0x9400) io0
+        else if (r < 0x90FF) VIC_RW
+        else if (r < 0x93FF) VIA1_VIA2_RW
         else if (r < 0x9800) COLOR_RW
         else if (r < 0x9C00) io1
         else if (r < 0xA000) io2

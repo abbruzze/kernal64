@@ -10,6 +10,7 @@ import ucesoft.cbm.peripheral._
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
+import ucesoft.cbm.peripheral.sid.DefaultAudioDriver
 import ucesoft.cbm.peripheral.vic.VICType
 import ucesoft.cbm.trace.TraceDialog
 
@@ -37,13 +38,23 @@ class VIC20 extends CBMHomeComputer {
 
   protected var via1 : VIC20Via1 = _
   protected var via2 : VIC20Via2 = _
+  protected val audioDriver = new DefaultAudioDriver(44100,44100 / 5)
+  override protected lazy val volumeDialog : JDialog = VolumeSettingsPanel.getDialog(displayFrame,audioDriver)
 
   override protected lazy val keyb = new keyboard.HomeKeyboard(keybMapper,low => via1.restoreKeyPressed(low),false)
+
+  override protected def warpMode(warpOn: Boolean, play: Boolean = true): Unit = {
+    super.warpMode(warpOn, play)
+    if (play) clock.pause
+    audioDriver.setSoundOn(!warpOn)
+    if (play) clock.play
+  }
 
   def reset: Unit = {
     clock.maximumSpeed = false
     maxSpeedItem.setSelected(false)
     ProgramLoader.reset
+    audioDriver.reset
   }
 
   def init: Unit = {
@@ -74,7 +85,7 @@ class VIC20 extends CBMHomeComputer {
     // -----------------------
     // TODO
     //rs232.setCIA12(cia1, cia2)
-    vicChip = new vic.VIC_I(mmu)
+    vicChip = new vic.VIC_I(mmu,audioDriver)
     add(vicChip)
     // tape
     datassette = new Datassette(() => via2.datassetteReadLine() )

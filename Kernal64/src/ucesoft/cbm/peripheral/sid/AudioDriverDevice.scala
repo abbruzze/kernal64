@@ -1,6 +1,7 @@
 package ucesoft.cbm.peripheral.sid
 
 trait AudioDriverDevice {
+  val sampleRate: Int
   def getMasterVolume : Int
   def setMasterVolume(v:Int) : Unit
   def setSoundOn(on:Boolean) : Unit
