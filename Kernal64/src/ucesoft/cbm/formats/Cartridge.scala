@@ -15,9 +15,22 @@ object Cartridge {
     tmpOut.close()
     tmpFile
   }
+
+  def main(args:Array[String]): Unit = {
+    println(new Cartridge(args(0)))
+  }
+
+  object CBMType extends Enumeration {
+    val C64   = Value("C64 CARTRIDGE   ")
+    val C128  = Value("C128 CARTRIDGE  ")
+    val VIC20 = Value("VIC20 CARTRIDGE ")
+    val CBMII = Value("CBM2 CARTRIDGE  ")
+  }
 }
 
 class Cartridge(val file:String) {
+  import Cartridge._
+
   class Chip {
     var bankNumber = 0
     var startingLoadAddress = 0
@@ -40,9 +53,9 @@ class Cartridge(val file:String) {
     
     override def toString = s"CHIP bank=$bankNumber loadAddress=${Integer.toHexString(startingLoadAddress)} romSize=$romSize"
   }
-  private val CRT_SIGN = "C64 CARTRIDGE   "
   var name = ""
-  var ctrType = 0 
+  var ctrType = 0
+  var cbmType : CBMType.Value = _
   var EXROM,GAME = false
   var chips : Array[Chip] = null
   lazy val kbSize: Int = (chips map { _.romSize } sum) / 1024
@@ -56,10 +69,18 @@ class Cartridge(val file:String) {
   }
   
   def load()  : Unit = {
-    println("Opening file " + file)
     val in = new RandomAccessFile(file,"r")
     try {
-      for(i <- 0 to 15) if (in.readByte != CRT_SIGN(i)) throw new IOException("Signature not found on index " + i)
+      val nameBuffer = Array.ofDim[Byte](16)
+      in.readFully(nameBuffer)
+      val signature = new String(nameBuffer)
+      try {
+        cbmType = CBMType.withName(signature)
+      }
+      catch {
+        case _:Exception =>
+          throw new IOException(s"Cart signature not supported: $signature")
+      }
       in.seek(0x16)
       ctrType = in.readByte * 256 + in.readByte
       EXROM = in.readByte == 1
@@ -88,7 +109,7 @@ class Cartridge(val file:String) {
     }
   }
   
-  override def toString = s"Cartridge $name type=$ctrType EXROM=$EXROM GAME=$GAME CHIPS=${chips.map{_.toString} mkString("[",",","]")}"
+  override def toString = s"Cartridge[$cbmType] $name type=$ctrType EXROM=$EXROM GAME=$GAME CHIPS=${chips.map{_.toString} mkString("[",",","]")}"
 }
 
 class CartridgeBuilder(crt:String,name:String,crtType:Int,exrom:Boolean,game:Boolean) {

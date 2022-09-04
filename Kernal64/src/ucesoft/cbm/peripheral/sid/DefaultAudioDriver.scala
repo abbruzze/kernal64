@@ -2,10 +2,10 @@ package ucesoft.cbm.peripheral.sid
 
 import javax.sound.sampled._
 
-class DefaultAudioDriver(override val sampleRate:Int,bufferSize:Int,isStereo:Boolean = false) extends AudioDriverDevice {
+class DefaultAudioDriver(override val sampleRate:Int,bufferSizeInMillis:Int,isStereo:Boolean = false) extends AudioDriverDevice {
   private[this] val dataLine = {
     val af = new AudioFormat(sampleRate, 16,if (isStereo) 2 else 1, true, false)
-    val dli = new DataLine.Info(classOf[SourceDataLine], af, bufferSize)
+    val dli = new DataLine.Info(classOf[SourceDataLine], af)
     val dataLine = try {
       AudioSystem.getLine(dli).asInstanceOf[SourceDataLine] 
     }
@@ -15,12 +15,12 @@ class DefaultAudioDriver(override val sampleRate:Int,bufferSize:Int,isStereo:Boo
         null
     }
     
-    if (dataLine != null) dataLine.open(dataLine.getFormat,bufferSize)
+    if (dataLine != null) dataLine.open(dataLine.getFormat)
     dataLine    
   }
   private[this] val volume : FloatControl = if (dataLine != null) dataLine.getControl(FloatControl.Type.MASTER_GAIN).asInstanceOf[FloatControl] else null
   private[this] var vol = 0
-  private[this] val buffer = Array.ofDim[Byte](40)
+  private[this] val buffer = Array.ofDim[Byte](2 * (sampleRate * bufferSizeInMillis / 1000.0).toInt)
   private[this] var pos = 0
   private[this] var muted = false
   private[this] var soundOn = true

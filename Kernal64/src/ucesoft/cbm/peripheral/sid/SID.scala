@@ -42,7 +42,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   private[this] var nextSample = 0
   private[this] var cycleExact = false
   private[this] var fullSpeed = false
-  private[this] var driver = externalDriver.getOrElse(new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE * 2))
+  private[this] var driver = externalDriver.getOrElse(new DefaultAudioDriver(SAMPLE_RATE, 100))
   private[this] val driverProxy : AudioDriverDevice = new AudioDriverDevice {
     override val sampleRate: Int = driver.sampleRate
     def getMasterVolume : Int = driver.getMasterVolume
@@ -80,7 +80,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     externalDriver match {
       case None =>
         driver.discard
-        driver = new DefaultAudioDriver(SAMPLE_RATE, SAMPLE_RATE * 2,isStereo)
+        driver = new DefaultAudioDriver(SAMPLE_RATE, 100,isStereo)
       case Some(_) =>
     }
 

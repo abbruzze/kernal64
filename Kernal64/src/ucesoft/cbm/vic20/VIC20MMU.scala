@@ -3,6 +3,7 @@ package ucesoft.cbm.vic20
 import ucesoft.cbm.{CBMComponentType, ChipID}
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.{RAMComponent, ROM}
+import ucesoft.cbm.misc.TestCart
 import ucesoft.cbm.peripheral.drive.VIA
 import ucesoft.cbm.peripheral.vic.VIC_I
 
@@ -54,6 +55,7 @@ class VIC20MMU extends RAMComponent {
    */
   private val expansionBlocks = Array(false,false,false,false,false) // BLOCK 0 - BLOCK 4
   private var lastByteOnBUS = 0
+  private var dontUpdateLastByteOnBUS = false
 
   private var via1,via2 : VIA = _
   private var vic : VIC_I = _
@@ -90,6 +92,7 @@ class VIC20MMU extends RAMComponent {
     override def read(address: Int, chipID: ID): Int = charROM(address & 0xFFF)
     override def write(address: Int, value: Int): Unit = {}
   }
+
   private object RAM_RW extends RW {
     override def read(address: Int, chipID: ID): Int = ram(address & 0xFFFF)
     override def write(address: Int, value: Int): Unit = ram(address & 0xFFFF) = value
@@ -97,14 +100,18 @@ class VIC20MMU extends RAMComponent {
   private object COLOR_RW extends RW {
     override def read(address: Int, chipID: ID): Int = {
       val color = ram(address & 0xFFFF) & 0xF
-      if (chipID == ChipID.VIC) color
+      if (chipID == ChipID.VIC) {
+        dontUpdateLastByteOnBUS = true
+        color
+      }
       else lastByteOnBUS & 0xF0 | color
     }
     override def write(address: Int, value: Int): Unit = ram(address & 0xFFFF) = value & 0xF
   }
   private class EXPRAM_BLOCK_RW(block:Int) extends RW {
     override def read(address: Int, chipID: ID): Int = {
-      if (chipID == ChipID.VIC) lastByteOnBUS
+      if (chipID == ChipID.VIC)
+        lastByteOnBUS
       else {
         if (expansionBlocks(block)) ram(address & 0xFFFF)
         else lastByteOnBUS
@@ -167,11 +174,14 @@ class VIC20MMU extends RAMComponent {
   override def reset(): Unit = {}
 
   final override def read(address: Int, chipID: ID): Int = {
-    lastByteOnBUS = memRW(address).read(address, chipID)
-    lastByteOnBUS
+    val read = memRW(address).read(address, chipID)
+    if (!dontUpdateLastByteOnBUS) lastByteOnBUS = read
+    dontUpdateLastByteOnBUS = false
+    read
   }
   final override def write(address: Int, value: Int, chipID: ID): Unit = {
     memRW(address).write(address, value)
+    TestCart.write(address,value)
     lastByteOnBUS = value
   }
 

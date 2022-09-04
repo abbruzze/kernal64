@@ -117,6 +117,7 @@ object ExpansionPortFactory {
   def loadExpansionPort(crtName: String, irqAction: (Boolean) => Unit, nmiAction: (Boolean) => Unit, ram: Memory,forwardRam:Memory,config:Properties): ExpansionPort = {
     import cart._
     val crt = new Cartridge(crtName)
+    if (crt.cbmType != Cartridge.CBMType.C64) throw new IllegalArgumentException(s"Unsupported cartridge signature '${crt.cbmType}'")
     crt.ctrType match {
       case 1 => new ActionReplay(crt,nmiAction,ram)
       case 2 => new KCS(crt,ram,nmiAction)
