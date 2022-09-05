@@ -908,6 +908,16 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
+  protected def setCartMenu(fileMenu:JMenu) : Unit = {
+    import Preferences._
+    val attachCtrItem = new JMenuItem("Attach cartridge ...")
+    attachCtrItem.addActionListener(_ => attachCtr)
+    fileMenu.add(attachCtrItem)
+    preferences.add(PREF_CART, "Attach the given cartridge", "") { cart =>
+      if (cart != "") loadCartridgeFile(new File(cart))
+    }
+  }
+
   protected def setFileMenu(fileMenu:JMenu) : Unit = {
     import Preferences._
     // WARP ON LOAD =======================================================================================
@@ -1089,12 +1099,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     fileMenu.addSeparator()
 
     // CART ================================================================================================
-    val attachCtrItem = new JMenuItem("Attach cartridge ...")
-    attachCtrItem.addActionListener(_ => attachCtr )
-    fileMenu.add(attachCtrItem)
-    preferences.add(PREF_CART,"Attach the given cartridge","") { cart =>
-      if (cart != "") loadCartridgeFile(new File(cart))
-    }
+    setCartMenu(fileMenu)
     // ====================================================================================================
 
     detachCtrItem.setEnabled(false)

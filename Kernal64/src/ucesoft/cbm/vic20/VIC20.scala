@@ -198,6 +198,61 @@ class VIC20 extends CBMHomeComputer {
     }
   }
 
+  override protected def setCartMenu(fileMenu: JMenu): Unit = {
+    import Preferences._
+    val attachCtrItem = new JMenuItem("Attach cartridge ...")
+    attachCtrItem.addActionListener(_ => attachCtr)
+    fileMenu.add(attachCtrItem)
+    preferences.add(PREF_CART, "Attach the given cartridge", "") { cart =>
+      if (cart != "") loadCartridgeFile(new File(cart))
+    }
+    val attachRawCtrItem = new JMenuItem("Attach raw cartridge ...")
+    attachRawCtrItem.addActionListener(_ => attachRawCtr())
+    fileMenu.add(attachRawCtrItem)
+    preferences.add(PREF_RAW_CART, "Attach the given raw cartridge", "") { cart =>
+      if (cart != "") loadRawCartridgeFile(new File(cart))
+    }
+  }
+
+  override def detachCtr(): Unit = {
+    // TODO
+  }
+
+  protected def attachRawCtr(): Unit = {
+    // TODO
+  }
+
+  protected def loadRawCartridgeFile(file:File): Unit = {
+    // TODO
+  }
+
+  override protected def loadCartridgeFile(file: File, stateLoading: Boolean = false): Unit = {
+    // TODO
+    try {
+      if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
+      ExpansionPort.getExpansionPort.eject
+      val ep = ExpansionPortFactory.loadExpansionPort(file.toString, irqSwitcher.setLine(Switcher.CRT, _), nmiSwitcher.setLine(Switcher.CRT, _), getRAM, mmu, configuration)
+      println(ep)
+      cartMenu.setVisible(true)
+      ExpansionPort.setExpansionPort(ep)
+      ExpansionPort.currentCartFileName = file.toString
+      Log.info(s"Attached cartridge ${ExpansionPort.getExpansionPort.name}")
+      preferences.updateWithoutNotify(Preferences.PREF_CART, file.toString)
+      if (!stateLoading) reset(false)
+      configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
+      detachCtrItem.setEnabled(true)
+    }
+    catch {
+      case t: Throwable =>
+        if (traceDialog != null) t.printStackTrace(traceDialog.logPanel.writer)
+
+        showError("Cartridge loading error", t.toString)
+    }
+    finally {
+      if (!stateLoading) clock.play
+    }
+  }
+
   protected def setSettingsMenu(optionMenu: JMenu): Unit = {
     setDriveMenu(optionMenu)
 

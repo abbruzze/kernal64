@@ -497,9 +497,10 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     latchedColumns = if (colsCandidate > model.MAX_COLUMNS) model.MAX_COLUMNS else colsCandidate
   }
 
-  @inline private def screenMap(): Int = {
-    (regs(VIC_CR5_SCREEN_MAP_CHAR_MAP_ADDRESS) & 0x70) << 6 | // mask to 0 bit 7, mapping the VIC pag. 129
-    (regs(VIC_CR2_COLS_SCREEN_MAP_ADDRESS_7) & 0x80) << 2
+  @inline private def screenAddr(): Int = {
+    val addr = ((regs(VIC_CR5_SCREEN_MAP_CHAR_MAP_ADDRESS) & 0xF0) << 6 | (regs(VIC_CR2_COLS_SCREEN_MAP_ADDRESS_7) & 0x80) << 2)  + displayPtr + displayCol
+    val msb = ~((addr & 0x2000) << 2) & 0x8000
+    (addr & 0x1fff) | msb
   }
 
   @inline private def charMap(conf:Int): Int = {
@@ -509,7 +510,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
 
   @inline private def fetchMatrix(): Unit = {
     // fetches both char code and color code
-    gBuf = mem.read(screenMap() + displayPtr + displayCol,ChipID.VIC)
+    gBuf = mem.read(screenAddr(),ChipID.VIC)
     val colorBaseAddress = 0x9400 + ((regs(VIC_CR2_COLS_SCREEN_MAP_ADDRESS_7) & 0x80) << 2)
     var colorAddress = colorBaseAddress + displayPtr + displayCol
     if (colorAddress > 0x97FF) colorAddress = 0x9400 + (colorAddress & 0x3FF) // color address wrap-around

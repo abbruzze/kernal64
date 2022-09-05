@@ -60,6 +60,9 @@ class VIC20MMU extends RAMComponent {
   private var via1,via2 : VIA = _
   private var vic : VIC_I = _
 
+  // Constructor
+  setExpansion(VICExpansion._NO)
+
   def setBasicROM(rom:Array[Int]): Unit = basicROM = rom
   def setKernelROM(rom:Array[Int]): Unit = kernelROM = rom
   def setCharROM(rom:Array[Int]): Unit = charROM = rom
