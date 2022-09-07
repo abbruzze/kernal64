@@ -21,6 +21,9 @@ object VIC20MMU {
     val _16K = Value(2 + 4)
     val _24K = Value(2 + 4 + 8)
     val _ALL = Value(1 + 2 + 4 + 8 + 16)
+    val _6_A = Value(8 + 16)
+    val _2_A = Value(2 + 16)
+    val _4_6 = Value(4 + 8)
   }
 }
 
@@ -61,7 +64,7 @@ class VIC20MMU extends RAMComponent {
   private var vic : VIC_I = _
 
   // Constructor
-  setExpansion(VICExpansion._NO)
+  setExpansion(VICExpansion._2_A)
 
   def setBasicROM(rom:Array[Int]): Unit = basicROM = rom
   def setKernelROM(rom:Array[Int]): Unit = kernelROM = rom
@@ -73,6 +76,7 @@ class VIC20MMU extends RAMComponent {
     while (b < 5) {
       val enabled = (exp & (1 << b)) > 0
       expansionBlocks(b) = enabled
+      if (enabled) println(s"Block $b enabled")
       b += 1
     }
   }

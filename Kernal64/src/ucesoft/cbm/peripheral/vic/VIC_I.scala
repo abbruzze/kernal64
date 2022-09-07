@@ -404,7 +404,14 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   override def reset(): Unit = {
     soundVolume = 0
     for(o <- osc) o.reset()
-    // TODO
+    java.util.Arrays.fill(regs,0)
+    rasterCycle = 0
+    rasterLine = 0
+    charHeight = 8
+    displayPtr = 0
+    rowCounter = 0
+    rowY = 0
+    xpos = 0
   }
   override def init(): Unit = {}
 

@@ -30,6 +30,7 @@ class VIC20Via2(bus:IECBus,
                 datassette:Datassette,
                 irqAction:Boolean => Unit,
                 busListener: IECBusListener) extends VIA("VIA_2",0x9120,irqAction) {
+  override lazy val componentID = "VIA2 (9120)"
 
   override def read(address: Int, chipID: ChipID.ID): Int = address & 0x0F match {
     case PA|PA2 =>
@@ -44,7 +45,7 @@ class VIC20Via2(bus:IECBus,
   }
 
   override def write(address: Int, value: Int, chipID: ChipID.ID): Unit = address & 0x0F match {
-    case PA =>
+    case PA|PA2 =>
       super.write(address, value, chipID)
       kb.selectRow(value)
     case PB =>

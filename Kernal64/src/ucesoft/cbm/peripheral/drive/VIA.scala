@@ -143,10 +143,10 @@ abstract class VIA(val name:String,
   def write(address: Int, value: Int, chipID: ChipID.ID): Unit = (address & 0x0F) match {
     case DDRA =>
       regs(DDRA) = value
-      write(startAddress + PA,regs(PA) | ~value,chipID)
+      write(startAddress + PA,(regs(PA) | ~value) & 0xFF,chipID)
     case DDRB =>
       regs(DDRB) = value
-      write(startAddress + PB,regs(PB) | ~value,chipID)
+      write(startAddress + PB,(regs(PB) | ~value) & 0xFF,chipID)
     case PA =>
       irq_clr(IRQ_CA1)
       val PCR_CA2_CTRL = (regs(PCR) >> 1) & 7
@@ -339,6 +339,7 @@ abstract class VIA(val name:String,
     properties.setProperty("T1 counter",Integer.toHexString(regs(T1LC) | regs(T1HC) << 8))
     properties.setProperty("T2 counter",Integer.toHexString(regs(T2LC) | regs(T2HC) << 8))
     properties.setProperty("T1 free running mode",is_set(ACR,0x40).toString)
+    properties.setProperty("IFR / IER",s"${regs(IFR).toHexString} / ${regs(IER).toHexString}")
     super.getProperties
   }
   // state

@@ -52,6 +52,7 @@ class VIC20Via1(bus:IECBus,
                 datassette:Datassette,
                 nmiAction:Boolean => Unit) extends VIA("VIA_1",0x9110,nmiAction) with IECBusListener {
   override val busid = "VIA_I_buslistener"
+  override lazy val componentID = "VIA1 (9110)"
   override val isController = true
 
   bus.registerListener(this)
