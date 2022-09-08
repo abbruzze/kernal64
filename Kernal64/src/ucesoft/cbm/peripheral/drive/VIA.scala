@@ -75,8 +75,8 @@ abstract class VIA(val name:String,
     reload_t1 = false
     reload_t2 = false
     oneshotB = false
-    oneshotBNew = false
-    acrNew = false
+    oneshotBNew = true // because ACR5 = 0 => oneshot
+    acrNew = true
     initCA1()
     initCA2()
     initCB1()
@@ -102,7 +102,7 @@ abstract class VIA(val name:String,
   @inline private def checkIRQ() : Unit ={
     val irq = (regs(IFR) & regs(IER)) > 0
     if (irq) regs(IFR) |= 0x80 else regs(IFR) &= 0x7F
-    irqAction(irq)  
+    irqAction(irq)
   }
   
   @inline private def is_set(reg:Int,bits:Int) = (regs(reg) & bits) > 0
@@ -134,7 +134,10 @@ abstract class VIA(val name:String,
 	  case T2LC =>
   	  irq_clr(IRQ_TIMER_2)
   	  regs(T2LC)
-    case ofs => regs(ofs)
+    case IER =>
+      regs(IER) | 0x80
+    case ofs =>
+      regs(ofs)
   }
   
   /*
@@ -195,8 +198,7 @@ abstract class VIA(val name:String,
       Log.debug(s"$name writing IFR => IFR=${Integer.toBinaryString(regs(IFR))}")
       checkIRQ            
     case IER =>
-      if ((value & 0x80) > 0) regs(IER) |= value & 0x7F
-      else regs(IER) &= ~value
+      if ((value & 0x80) > 0) regs(IER) |= value & 0x7F else regs(IER) &= ~value
       Log.debug(s"$name writing IER => IER=${Integer.toBinaryString(regs(IER))}")
       checkIRQ
     case ACR =>
@@ -340,6 +342,10 @@ abstract class VIA(val name:String,
     properties.setProperty("T2 counter",Integer.toHexString(regs(T2LC) | regs(T2HC) << 8))
     properties.setProperty("T1 free running mode",is_set(ACR,0x40).toString)
     properties.setProperty("IFR / IER",s"${regs(IFR).toHexString} / ${regs(IER).toHexString}")
+    properties.setProperty("T1 counter reload",reload_t1.toString)
+    properties.setProperty("T2 counter reload",reload_t2.toString)
+    properties.setProperty("T1 counter pending",pending_t1.toString)
+    properties.setProperty("T2 counter pending",pending_t2.toString)
     super.getProperties
   }
   // state
