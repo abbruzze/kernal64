@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-abstract class PouetSpi(genre:String) extends GameProvider {
+abstract class PouetSpi(genre:String,platform:String) extends GameProvider {
   private case object LastConstraint extends SyncConstraint {
     override def toString = s"Last added"
   }  
@@ -28,7 +28,7 @@ abstract class PouetSpi(genre:String) extends GameProvider {
   
   def setProgressListener(l:GameLoadingProgressListener): Unit = progressListener = Some(l)
   
-  private def makeUrl(page:Int) = s"https://www.pouet.net/prodlist.php?type%5B%5D=$genre&order=release&platform%5B%5D=Commodore+64&page=$page"
+  private def makeUrl(page:Int) = s"https://www.pouet.net/prodlist.php?type%5B%5D=$genre&order=release&platform%5B%5D=${platform}&page=$page"
   
   private def openURL[T](url:String)(action: Iterator[String] => T) : T = {
     val src = io.Source.fromURL(url,"UTF-8")
@@ -172,4 +172,5 @@ abstract class PouetSpi(genre:String) extends GameProvider {
   val syncConstraints : List[SyncConstraint] = constraints
 }
 
-class PouetDemoSpi extends PouetSpi("demo") { val name = "Pouet - Demo" }
+class PouetDemoSpi extends PouetSpi("demo","Commodore+64") { val name = "Pouet - Demo" }
+class PouetDemoVIC20Spi extends PouetSpi("demo","VIC+20") { val name = "Pouet VIC20 - Demo" }

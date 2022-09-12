@@ -23,7 +23,10 @@ object VIC20 extends App {
 }
 
 class VIC20 extends CBMHomeComputer {
+  override protected def PRG_LOAD_ADDRESS() = 0x1001
   override protected val cbmModel: CBMComputerModel = VIC20Model
+
+  override  protected val DEFAULT_GAME_PROVIDERS = java.util.Arrays.asList((new ucesoft.cbm.game.PouetDemoVIC20Spi).asInstanceOf[ucesoft.cbm.game.GameProvider])
 
   val componentID = "Commodore VIC 20"
   val componentType: Type = CBMComponentType.INTERNAL
@@ -100,8 +103,8 @@ class VIC20 extends CBMHomeComputer {
     display = new vic.Display(vicChip.SCREEN_WIDTH, vicChip.SCREEN_HEIGHT, displayFrame.getTitle, displayFrame)
     add(display)
     // TODO
-    //display.setPreferredSize(new java.awt.Dimension(vicChip.VISIBLE_SCREEN_WIDTH, vicChip.VISIBLE_SCREEN_HEIGHT))
-    display.setPreferredSize(new java.awt.Dimension(784,vicChip.VISIBLE_SCREEN_HEIGHT<<1))
+    display.setPreferredSize(vicChip.STANDARD_DIMENSION)
+    //display.setPreferredSize(new java.awt.Dimension(784,vicChip.VISIBLE_SCREEN_HEIGHT<<1))
     //TODO testbench screen dim => display.setPreferredSize(new java.awt.Dimension(568,284))
     vicChip.setDisplay(display)
     displayFrame.getContentPane.add("Center", display)
@@ -166,6 +169,15 @@ class VIC20 extends CBMHomeComputer {
 
   override def isHeadless: Boolean = headless
 
+  override protected def vicZoom(f: Int): Unit = {
+    val dim = f match {
+      case 1 => new Dimension(vicChip.VISIBLE_SCREEN_WIDTH << 1, vicChip.VISIBLE_SCREEN_HEIGHT)
+      case 2 => vicChip.STANDARD_DIMENSION
+    }
+    vicZoomFactor = f
+    updateVICScreenDimension(dim)
+  }
+
   // ======================================== Settings ==============================================
   override protected def enableDrive(id: Int, enabled: Boolean, updateFrame: Boolean): Unit = {
     super.enableDrive(id, enabled, updateFrame)
@@ -215,28 +227,64 @@ class VIC20 extends CBMHomeComputer {
   }
 
   override def detachCtr(): Unit = {
-    // TODO
+    if (Thread.currentThread != Clock.systemClock) clock.pause
+    mmu.detachAllCarts()
+    reset(true)
+    detachCtrItem.setEnabled(false)
+    cartMenu.setVisible(false)
   }
 
   protected def attachRawCtr(): Unit = {
-    // TODO
+    val fc = new JFileChooser
+    fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR, "./")))
+    fc.setFileView(new C64FileView)
+    fc.showOpenDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        loadRawCartridgeFile(fc.getSelectedFile)
+      case _ =>
+    }
   }
 
-  protected def loadRawCartridgeFile(file:File): Unit = {
-    // TODO
+  protected def loadRawCartridgeFile(file:File, stateLoading: Boolean = false): Unit = {
+    try {
+      if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
+      val crt = new Cartridge(file.toString,true)
+      if (!mmu.attachCart(crt)) {
+        showError("Cartridge error", s"Cannot attach cartridge: address not valid or conflict with another cartridge")
+        return
+      }
+      crt.cbmType = Cartridge.CBMType.VIC20
+      println(crt)
+      cartMenu.setVisible(true)
+      Log.info(s"Attached raw cartridge ${crt.name}")
+      preferences.updateWithoutNotify(Preferences.PREF_RAW_CART, file.toString)
+      if (!stateLoading) reset(false)
+      configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
+      detachCtrItem.setEnabled(true)
+    }
+    catch {
+      case t: Throwable =>
+        if (traceDialog != null) t.printStackTrace(traceDialog.logPanel.writer)
+
+        showError("Cartridge loading error", t.toString)
+    }
+    finally {
+      if (!stateLoading) clock.play
+    }
   }
 
   override protected def loadCartridgeFile(file: File, stateLoading: Boolean = false): Unit = {
-    // TODO
     try {
       if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
-      ExpansionPort.getExpansionPort.eject
-      val ep = ExpansionPortFactory.loadExpansionPort(file.toString, irqSwitcher.setLine(Switcher.CRT, _), nmiSwitcher.setLine(Switcher.CRT, _), getRAM, mmu, configuration)
-      println(ep)
+      val crt = new Cartridge(file.toString)
+      if (crt.cbmType != Cartridge.CBMType.VIC20) throw new IllegalArgumentException(s"Unsupported cartridge signature '${crt.cbmType}'")
+      if (!mmu.attachCart(crt)) {
+        showError("Cartridge error",s"Cannot attach cartridge: address not valid or conflict with another cartridge")
+        return
+      }
+      println(crt)
       cartMenu.setVisible(true)
-      ExpansionPort.setExpansionPort(ep)
-      ExpansionPort.currentCartFileName = file.toString
-      Log.info(s"Attached cartridge ${ExpansionPort.getExpansionPort.name}")
+      Log.info(s"Attached cartridge ${crt.name}")
       preferences.updateWithoutNotify(Preferences.PREF_CART, file.toString)
       if (!stateLoading) reset(false)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
@@ -251,6 +299,18 @@ class VIC20 extends CBMHomeComputer {
     finally {
       if (!stateLoading) clock.play
     }
+  }
+
+  override protected def showCartInfo: Unit = {
+    val cols: Array[Object] = Array("Name","Type", "Addresses")
+    val data : Array[Array[Object]] = for(cart <- mmu.getAttachedCarts().toArray) yield {
+      Array(cart.name,cart.ctrType.toString,cart.chips.map(_.startingLoadAddress.toHexString).mkString(","))
+    }
+    val table = new JTable(data, cols)
+    val sp = new JScrollPane(table)
+    val panel = new JPanel(new BorderLayout)
+    panel.add("Center", sp)
+    JOptionPane.showMessageDialog(displayFrame, panel, "Cart info", JOptionPane.INFORMATION_MESSAGE, new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
   }
 
   protected def setSettingsMenu(optionMenu: JMenu): Unit = {
@@ -278,21 +338,15 @@ class VIC20 extends CBMHomeComputer {
 
     optionMenu.addSeparator()
 
-    val adjustRatioItem = new JMenuItem("Adjust display ratio")
-    adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    adjustRatioItem.addActionListener(_ => adjustRatio)
-    optionMenu.add(adjustRatioItem)
-
     val zoomItem = new JMenu("Zoom")
     val groupZ = new ButtonGroup
     optionMenu.add(zoomItem)
-    for (z <- 1 to 3) {
+    for (z <- 1 to 2) {
       val zoom1Item = new JRadioButtonMenuItem(s"Zoom x $z")
       zoom1Item.addActionListener(_ => vicZoom(z))
       val kea = z match {
         case 1 => java.awt.event.KeyEvent.VK_1
         case 2 => java.awt.event.KeyEvent.VK_2
-        case 3 => java.awt.event.KeyEvent.VK_3
       }
       zoom1Item.setAccelerator(KeyStroke.getKeyStroke(kea, java.awt.event.InputEvent.ALT_DOWN_MASK))
       zoomItem.add(zoom1Item)

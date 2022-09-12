@@ -6,24 +6,26 @@ import ucesoft.cbm.peripheral.sid.AudioDriverDevice
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 import ucesoft.cbm.peripheral.vic.coprocessor.VICCoprocessor
 
-import java.io.{File, ObjectInputStream, ObjectOutputStream}
+import java.awt.Dimension
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   override val componentID: String = "VIC_I"
-  override val length: Int = 0x110
+  override val length: Int = 0x100
   override val startAddress: Int = 0x9000
   override val name: String = "VIC_I"
 
   override type Model = VICModel
 
-  private trait VState
+  private sealed trait VState
   private case object TOP_BORDER extends VState
   private case object START_DISPLAY_AREA extends VState
   private case object BOTTOM_BORDER extends VState
   private case object DISPLAY_AREA extends VState
 
-  private trait HState
+  private sealed trait HState
   private case object IDLE_FETCH extends HState
+  private case object FETCH_DELAY extends HState
   private case object FETCH_MATRIX extends HState
   private case object FETCH_CHAR extends HState
   private case object END_FETCH extends HState
@@ -321,19 +323,23 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
    */
   final private val VIC_CRF_BACKGROUND_BORDER_INV = 0xF
 
+  final private val FETCH_DELAY_COUNT = 3
+
   // VIC's registers
   final private val regs = Array.ofDim[Int](16)
   // Vertical & Horizontal state
   private var vState : VState = TOP_BORDER
   private var hState : HState = IDLE_FETCH
   // VIC Model
-  private var model : Model = _
+  private var model : Model = VIC_I_PAL
   // raster line
   private var rasterLine = 0
   // raster cycle
   private var rasterCycle = 0
   // display pointer
   private var displayPtr = 0
+  // line increment
+  private var displayPtrInc = 0
   // row counter
   private var rowCounter = 0
   // Y position within current row
@@ -360,6 +366,12 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   private var displayMem: Array[Int] = _
   private val palette = Palette.VIC_RGB
 
+  private var firstModPixelX, firstModPixelY = 0 // first x,y pixel coordinate modified
+  private var lastModPixelX = model.BLANK_RIGHT_CYCLE << 2
+  private var lastModPixelY = 0 // last y pixel coordinate modified
+
+  private var potx, poty = 0xFF
+
   // Constructor
   Palette.setPalette(PaletteType.VIC20_VICE)
   setVICModel(VIC_I_PAL)
@@ -371,6 +383,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   override def VISIBLE_SCREEN_WIDTH: Int = (model.BLANK_RIGHT_CYCLE - model.BLANK_LEFT_CYCLE) << 2
   override def VISIBLE_SCREEN_HEIGHT: Int = model.BLANK_BOTTOM_LINE - model.BLANK_TOP_LINE
   override def SCREEN_ASPECT_RATIO: Double = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
+  override def STANDARD_DIMENSION : Dimension = new Dimension(746,VISIBLE_SCREEN_HEIGHT << 1)
 
   override def getRasterLine = rasterLine
 
@@ -397,6 +410,10 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
 
   override def setVICModel(model: Model): Unit = {
     this.model = model
+    lastModPixelY = model.RASTER_LINES
+    lastModPixelX = model.BLANK_RIGHT_CYCLE << 2
+    firstModPixelX = -1
+    firstModPixelY = 0
   }
 
   override def getVICModel(): Model = model
@@ -410,8 +427,18 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     charHeight = 8
     displayPtr = 0
     rowCounter = 0
+    displayPtrInc = 0
+    displayCol = 0
     rowY = 0
     xpos = 0
+
+    lastModPixelY = model.RASTER_LINES
+    lastModPixelX = model.BLANK_RIGHT_CYCLE << 2
+    firstModPixelX = -1
+    firstModPixelY = 0
+
+    potx = 0xFF
+    poty = 0xFF
   }
   override def init(): Unit = {}
 
@@ -421,6 +448,8 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
         regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) | (rasterLine & 1) << 7
       case VIC_CR4_RASTER_H =>
         rasterLine >> 1
+      case VIC_CR8_PADDLE_X => potx
+      case VIC_CR9_PADDLE_Y => poty
       case adr =>
         regs(adr)
     }
@@ -430,15 +459,15 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     address & 0xF match {
       case VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE =>
         charHeight = if ((value & 1) == 0) 8 else 16
-      case 0xA =>
+      case VIC_CRA_SOUND_OSC_1 =>
         osc(0).set(value)
-      case 0xB =>
+      case VIC_CRB_SOUND_OSC_2 =>
         osc(1).set(value)
-      case 0xC =>
+      case VIC_CRC_SOUND_OSC_3 =>
         osc(2).set(value)
-      case 0xD =>
+      case VIC_CRD_SOUND_OSC_4 =>
         osc(3).set(value)
-      case 0xE =>
+      case VIC_CRE_SOUND_VOLUME_AUX_COLOR =>
         soundVolume = value & 0xF
       case _ =>
     }
@@ -454,46 +483,52 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     // TODO Display one more line if h-flipflop is already open
   }
   @inline private def openHorizontalBorder(): Unit = {
-    hState = FETCH_MATRIX
+    hState = FETCH_DELAY
     if (vState == START_DISPLAY_AREA) {
       // first text character
       vState = DISPLAY_AREA
     }
     if (latchedColumns == 0) closeHorizontalBorder()
-    displayCol = 0
+    displayCol = FETCH_DELAY_COUNT
+    displayPtrInc = 0
   }
   @inline private def closeHorizontalBorder(): Unit = {
     hState = END_FETCH
   }
 
-  @inline private def startOfTextLine(): Unit = {}
   @inline private def endOfLine(): Unit = {
+    rasterLine += 1
     rasterCycle = 0
     xpos = 0
     hState = IDLE_FETCH
-    rasterLine += 1
 
     if (vState == DISPLAY_AREA) {
       rowY += 1
 
-      if (rowY == charHeight) { // go next line
+      if ((rowY & (charHeight - 1)) == 0) { // go next line
         rowY = 0
         rowCounter += 1
         if (rowCounter == latchedRows) closeVerticalBorder()
-        displayPtr += latchedColumns
+        displayPtrInc = latchedColumns
       }
+
+      displayPtr += displayPtrInc
+      displayPtrInc = 0
     }
   }
   @inline private def endOfFrame(): Unit = {
     if (vState != BOTTOM_BORDER) closeVerticalBorder()
 
     displayPtr = 0
+    displayPtrInc = 0
     rowCounter = 0
     rasterLine = 0
     vState = TOP_BORDER
     rowY = 0
 
-    display.showFrame(0,0,SCREEN_WIDTH,SCREEN_HEIGHT)
+    //display.showFrame(0,0,SCREEN_WIDTH,SCREEN_HEIGHT)
+    display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY + 1)
+    firstModPixelX = -1
   }
   @inline private def latchRowsNumber(): Unit = {
     latchedRows = (regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) >> 1) & 0x3F
@@ -525,13 +560,25 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   }
   @inline private def fetchChar(): Unit = {
     val charShift = if ((regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) & 1) == 0) 3 else 4
-    val offset = (gBuf << charShift) + rowY
+    val offset = (gBuf << charShift) + (rowY & (charHeight - 1))
     val blocks = offset >> 10
     val conf = (regs(VIC_CR5_SCREEN_MAP_CHAR_MAP_ADDRESS) + blocks) & 0xF
     val target = charMap(conf) + (offset & 0x3FF)
     gBuf = mem.read(target,ChipID.VIC)
 
     displayCol += 1
+    if (rowY == (charHeight - 1)) displayPtrInc = displayCol
+  }
+
+  @inline private def drawPixel(index:Int,color:Int): Unit = {
+    if (displayMem(index) != color) {
+      displayMem(index) = color
+      if (firstModPixelX == -1) {
+        firstModPixelY = rasterLine
+        firstModPixelX = model.BLANK_LEFT_CYCLE << 2
+      }
+      lastModPixelY = rasterLine
+    }
   }
 
   private def drawDisplayCycle(): Unit = {
@@ -551,7 +598,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
       while (p < 8) {
         val pixel = gBuf & 0x80
         gBuf <<= 1
-        displayMem(ypos + xpos) = if (pixel == 0) bgColor else fgColor
+        drawPixel(ypos + xpos,if (pixel == 0) bgColor else fgColor)
         xpos += 1
         p += 1
       }
@@ -571,8 +618,8 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
           case 0xC0 /* 11 */ => auxColor
         }
         gBuf <<= 2
-        displayMem(ypos + xpos) = mcColor
-        displayMem(ypos + xpos + 1) = mcColor
+        drawPixel(ypos + xpos,mcColor)
+        drawPixel(ypos + xpos + 1,mcColor)
         xpos += 2
         p += 1
       }
@@ -585,7 +632,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     val borderColor = palette(regs(VIC_CRF_BACKGROUND_BORDER_INV) & 7)
     var p = 0
     while (p < 4) {
-      displayMem(ypos + xpos) = borderColor
+      drawPixel(ypos + xpos,borderColor)
       xpos += 1
       p += 1
     }
@@ -596,6 +643,9 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
       case IDLE_FETCH|END_FETCH =>
         // idle fetch => do nothing
         drawBorderCycle()
+      case FETCH_DELAY =>
+        if (displayCol > 0) displayCol -= 1
+        else hState = FETCH_MATRIX
       case FETCH_MATRIX =>
         fetchMatrix()
         hState = FETCH_CHAR
@@ -624,8 +674,6 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     // check horizontal border for opening
     if (vState == START_DISPLAY_AREA || vState == DISPLAY_AREA) {
       if (hState == IDLE_FETCH && (regs(VIC_CR0_HORIGIN) & 0x7F) == rasterCycle) openHorizontalBorder()
-      // check for start of line
-      if (vState == DISPLAY_AREA && rasterCycle == 0) startOfTextLine()
     }
     // first raster check
     if (rasterLine == 0) {

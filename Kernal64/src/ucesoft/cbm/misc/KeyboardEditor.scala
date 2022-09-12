@@ -30,7 +30,7 @@ class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerM
   private val keys = {
     model match {
       case VIC20Model =>
-        (CKey.values filter { k => CKey.isVIC20Key(k) } filterNot { k => k == CKey.L_SHIFT || k == CKey.R_SHIFT } toArray) sortBy { k => k.toString }
+        (CKey.values filter { k => CKey.isVIC20Key(k) } filterNot { k => k == CKey.VIC20_L_SHIFT || k == CKey.VIC20_R_SHIFT } toArray) sortBy { k => k.toString }
       case C64Model =>
         (CKey.values filter { k => CKey.isC64Key(k) } filterNot { k => k == CKey.L_SHIFT || k == CKey.R_SHIFT } toArray) sortBy { k => k.toString }
       case C128Model =>
@@ -66,7 +66,11 @@ class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerM
   }
   private val tiles = for(k <- keys.zip(buttons)) yield new JPanel {
     setLayout(new FlowLayout(FlowLayout.LEFT))
-    val keyName = if (model == CBMIIModel) k._1.toString.substring(5) else k._1.toString
+    val keyName = model match {
+      case CBMIIModel => k._1.toString.substring(5)
+      case VIC20Model => k._1.toString.substring(6)
+      case _ => k._1.toString
+    }
     val lab: String = keyName + (" " * (maxKeyLen - k._1.toString.length))
     val jlabel = new JLabel(lab)
     add(jlabel)

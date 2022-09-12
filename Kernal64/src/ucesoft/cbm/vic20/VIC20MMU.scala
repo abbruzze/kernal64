@@ -3,6 +3,7 @@ package ucesoft.cbm.vic20
 import ucesoft.cbm.{CBMComponentType, ChipID}
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.{RAMComponent, ROM}
+import ucesoft.cbm.formats.Cartridge
 import ucesoft.cbm.misc.TestCart
 import ucesoft.cbm.peripheral.drive.VIA
 import ucesoft.cbm.peripheral.vic.VIC_I
@@ -14,21 +15,16 @@ object VIC20MMU {
   val BASIC_ROM = new ROM(null, "Basic", 0, 8192, ROM.VIC20_BASIC_ROM_PROP)
   val CHAR_ROM = new ROM(null, "Char", 0, 4096, ROM.VIC20_CHAR_ROM_PROP)
 
-  object VICExpansion extends Enumeration {
-    val _NO = Value(0)
-    val _3K = Value(1)
-    val _8K = Value(2)
-    val _16K = Value(2 + 4)
-    val _24K = Value(2 + 4 + 8)
-    val _ALL = Value(1 + 2 + 4 + 8 + 16)
-    val _6_A = Value(8 + 16)
-    val _2_A = Value(2 + 16)
-    val _4_6 = Value(4 + 8)
-  }
+  final val NO_EXP   = 0
+  final val EXP_BLK0 = 1
+  final val EXP_BLK1 = 2
+  final val EXP_BLK2 = 4
+  final val EXP_BLK3 = 8
+  final val EXP_BLK5 = 16
 }
 
 class VIC20MMU extends RAMComponent {
-  import VIC20MMU.VICExpansion
+  import VIC20MMU._
 
   override val isRom = false
   override val length: Int = 0x10000
@@ -56,30 +52,77 @@ class VIC20MMU extends RAMComponent {
     3       6000 - 7FFF
     4       A000 - BFFF
    */
-  private val expansionBlocks = Array(false,false,false,false,false) // BLOCK 0 - BLOCK 4
+  private val expansionBlocks = Array(
+    new EXPRAM_BLOCK_RW(0x400),
+    new EXPRAM_BLOCK_RW(0x2000),
+    new EXPRAM_BLOCK_RW(0x4000),
+    new EXPRAM_BLOCK_RW(0x6000),
+    new EXPRAM_BLOCK_RW(0xA000)
+  )
+  private val ioBlocks = Array(
+    new IOBLOCK_RW(),
+    new IOBLOCK_RW()
+  )
+  private val expansionBlockMAP = expansionBlocks map { e => (e.address,e) } toMap
   private var lastByteOnBUS = 0
   private var dontUpdateLastByteOnBUS = false
 
   private var via1,via2 : VIA = _
   private var vic : VIC_I = _
 
+  private var carts : List[Cartridge] = Nil
+
   // Constructor
-  setExpansion(VICExpansion._2_A)
+  setExpansion(NO_EXP)
 
   def setBasicROM(rom:Array[Int]): Unit = basicROM = rom
   def setKernelROM(rom:Array[Int]): Unit = kernelROM = rom
   def setCharROM(rom:Array[Int]): Unit = charROM = rom
 
-  def setExpansion(e:VICExpansion.Value): Unit = {
-    val exp = e.id
+  def setIO2RAM(enabled:Boolean): Unit = ioBlocks(0).enabled = enabled
+  def setIO3RAM(enabled:Boolean): Unit = ioBlocks(1).enabled = enabled
+  def isIO2RAMEnabled(): Boolean = ioBlocks(0).enabled
+  def isIO3RAMEnabled(): Boolean = ioBlocks(1).enabled
+
+  def setExpansion(exp:Int): Unit = {
     var b = 0
     while (b < 5) {
       val enabled = (exp & (1 << b)) > 0
-      expansionBlocks(b) = enabled
-      if (enabled) println(s"Block $b enabled")
+      expansionBlocks(b).enabled = enabled
       b += 1
     }
   }
+
+  def getExpansionSettings(): Int = {
+    var e = 0
+    var i = 0
+    while (i < 5) {
+      if (expansionBlocks(i).enabled) e |= 1 << i
+      i += 1
+    }
+    e
+  }
+
+  def attachCart(crt:Cartridge): Boolean = {
+    for (chip <- crt.chips) {
+      expansionBlockMAP get chip.startingLoadAddress match {
+        case Some(exp) =>
+          if (exp.hasROM()) return false
+          exp.setROM(chip.romData)
+        case None =>
+          return false
+      }
+    }
+    carts ::= crt
+    true
+  }
+
+  def detachAllCarts(): Unit = {
+    for(e <- expansionBlocks) e.removeROM()
+    carts = Nil
+  }
+
+  def getAttachedCarts(): List[Cartridge] = carts
 
   def setIO(via1:VIA,via2:VIA,vic:VIC_I): Unit = {
     this.via1 = via1
@@ -115,20 +158,39 @@ class VIC20MMU extends RAMComponent {
     }
     override def write(address: Int, value: Int): Unit = ram(address & 0xFFFF) = value & 0xF
   }
-  private class EXPRAM_BLOCK_RW(block:Int) extends RW {
+  private class EXPRAM_BLOCK_RW(val address:Int) extends RW {
+    private var rom : Array[Int] = _
+    var enabled = false
+
+    def setROM(rom:Array[Int]): Unit = this.rom = rom
+    def removeROM(): Unit = rom = null
+    def hasROM(): Boolean = rom != null
+
     override def read(address: Int, chipID: ID): Int = {
       if (chipID == ChipID.VIC)
         lastByteOnBUS
       else {
-        if (expansionBlocks(block)) ram(address & 0xFFFF)
-        else lastByteOnBUS
+        if (rom == null) {
+          if (enabled) ram(address)
+          else lastByteOnBUS
+        }
+        else rom(address % rom.length)
       }
     }
-    override def write(address: Int, value: Int): Unit = if (expansionBlocks(block)) ram(address & 0xFFFF) = value
+    override def write(address: Int, value: Int): Unit = {
+      if (rom == null) {
+        if (enabled) ram(address & 0xFFFF) = value
+      }
+    }
   }
-  private class IOBLOCK_RW(block:Int) extends RW {
-    override def read(address: Int, chipID: ID): Int = lastByteOnBUS
-    override def write(address: Int, value: Int): Unit = {}
+  private class IOBLOCK_RW extends RW {
+    var enabled = false
+    override def read(address: Int, chipID: ID): Int = {
+      if (enabled) ram(address) else lastByteOnBUS
+    }
+    override def write(address: Int, value: Int): Unit = {
+      if (enabled) ram(address) = value
+    }
   }
   private object VIC_RW extends RW {
     override def read(address: Int, chipID: ID): Int = vic.read(address)
@@ -151,34 +213,33 @@ class VIC20MMU extends RAMComponent {
   }
 
   override def init(): Unit = {
-    val exp0 = new EXPRAM_BLOCK_RW(0)
-    val exp1 = new EXPRAM_BLOCK_RW(1)
-    val exp2 = new EXPRAM_BLOCK_RW(2)
-    val exp3 = new EXPRAM_BLOCK_RW(3)
-    val exp4 = new EXPRAM_BLOCK_RW(4)
-    val io1 = new IOBLOCK_RW(1)
-    val io2 = new IOBLOCK_RW(2)
-
     for(r <- 0 until 0x10000) {
       memRW(r) =
         if (r < 0x400) RAM_RW
-        else if (r < 0x1000) exp0
+        else if (r < 0x1000) expansionBlocks(0)
         else if (r < 0x2000) RAM_RW
-        else if (r < 0x4000) exp1
-        else if (r < 0x6000) exp2
-        else if (r < 0x8000) exp3
+        else if (r < 0x4000) expansionBlocks(1)
+        else if (r < 0x6000) expansionBlocks(2)
+        else if (r < 0x8000) expansionBlocks(3)
         else if (r < 0x9000) CHARROM_RW
         else if (r < 0x90FF) VIC_RW
         else if (r < 0x93FF) VIA1_VIA2_RW
         else if (r < 0x9800) COLOR_RW
-        else if (r < 0x9C00) io1
-        else if (r < 0xA000) io2
-        else if (r < 0xC000) exp4
+        else if (r < 0x9C00) ioBlocks(0)
+        else if (r < 0xA000) ioBlocks(1)
+        else if (r < 0xC000) expansionBlocks(4)
         else if (r < 0xE000) BASICROM_RW
         else KERNELROM_RW
     }
   }
   override def reset(): Unit = {}
+
+  override def hardReset(): Unit = {
+    for(e <- expansionBlocks) {
+      e.removeROM()
+      e.enabled = false
+    }
+  }
 
   final override def read(address: Int, chipID: ID): Int = {
     val read = memRW(address).read(address, chipID)

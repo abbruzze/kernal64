@@ -35,6 +35,8 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   override protected val ALLOWED_DRIVE_TYPES = DrivesConfigPanel.ALL_IEC_DRIVES_ALLOWED
   protected val CONFIGURATION_GMOD2_FILE = "gmod2.file"
 
+  protected val DEFAULT_GAME_PROVIDERS = java.util.Arrays.asList((new ucesoft.cbm.game.CSDBSpi).asInstanceOf[ucesoft.cbm.game.GameProvider],(new ucesoft.cbm.game.GameBaseSpi).asInstanceOf[ucesoft.cbm.game.GameProvider],(new ucesoft.cbm.game.PouetDemoSpi).asInstanceOf[ucesoft.cbm.game.GameProvider])
+
   protected val detachCtrItem = new JMenuItem("Detach cartridge")
   protected val easyFlashWriteChangesItem = new JMenuItem("Write changes")
   protected val GMOD3WriteChangesItem = new JMenuItem("GMOD3 Write changes")
@@ -1132,7 +1134,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     val loader = ServiceLoader.load(classOf[ucesoft.cbm.game.GameProvider])
     var providers = loader.iterator
     try {
-      if (!providers.hasNext) providers = java.util.Arrays.asList((new ucesoft.cbm.game.CSDBSpi).asInstanceOf[ucesoft.cbm.game.GameProvider],(new ucesoft.cbm.game.GameBaseSpi).asInstanceOf[ucesoft.cbm.game.GameProvider],(new ucesoft.cbm.game.PouetDemoSpi).asInstanceOf[ucesoft.cbm.game.GameProvider]).iterator
+      if (!providers.hasNext) providers = DEFAULT_GAME_PROVIDERS.iterator
       val names = new collection.mutable.HashSet[String]
       while (providers.hasNext) {
         val provider = providers.next

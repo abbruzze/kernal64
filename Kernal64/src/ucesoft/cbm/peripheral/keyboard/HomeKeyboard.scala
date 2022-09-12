@@ -134,6 +134,7 @@ class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) =
             }
             else
             if (key == L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed += R_SHIFT
+            else if (key == VIC20_L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed += VIC20_R_SHIFT
             else keysPressed += key
         }      
       }
@@ -154,8 +155,8 @@ class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) =
         case None =>
         case Some(key) =>
           if (key == L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed -= R_SHIFT
-          else
-          if (key != RESTORE && key != VIC20_RESTORE) keysPressed -= key// else nmiAction(false)
+          else if (key == VIC20_L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed -= VIC20_R_SHIFT
+          else if (key != RESTORE && key != VIC20_RESTORE) keysPressed -= key// else nmiAction(false)
       }
     }
   }

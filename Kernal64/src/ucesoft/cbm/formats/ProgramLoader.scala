@@ -116,9 +116,13 @@ object ProgramLoader {
     (3,3 + size)
   }
 
-  def loadPRG(mem:Memory,file:File,c64Mode:Boolean,drive:Int): (Int,Int) = {
+  def loadPRG(mem:Memory,file:File,c64Mode:Boolean,drive:Int,startAddress:Option[Int] = None): (Int,Int) = {
     val in = new FileInputStream(file)
-    val start = in.read | in.read << 8
+    var start = in.read | in.read << 8
+    startAddress match {
+      case Some(s) => start = s
+      case None =>
+    }
     var m = start
     var b = in.read
     var size = 0

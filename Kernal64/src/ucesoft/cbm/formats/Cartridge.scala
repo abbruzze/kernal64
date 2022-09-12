@@ -17,7 +17,7 @@ object Cartridge {
   }
 
   def main(args:Array[String]): Unit = {
-    println(new Cartridge(args(0)))
+    println(new Cartridge(args(0),true))
   }
 
   object CBMType extends Enumeration {
@@ -28,7 +28,7 @@ object Cartridge {
   }
 }
 
-class Cartridge(val file:String) {
+class Cartridge(val file:String,raw:Boolean = false) {
   import Cartridge._
 
   class Chip {
@@ -60,15 +60,41 @@ class Cartridge(val file:String) {
   var chips : Array[Chip] = null
   lazy val kbSize: Int = (chips map { _.romSize } sum) / 1024
   
-  load
+  if (raw) loadRaw() else load()
+
+  private def addChip(romAddress:Int,romSize:Int,rom:Array[Int],bank:Int = 0): Unit = {
+    val chip = new Chip
+    chip.bankNumber = bank
+    chip.startingLoadAddress = romAddress
+    chip.romSize = romSize
+    chip.romData = rom
+    if (chips == null) chips = Array(chip)
+    else chips = chips ++ Array(chip)
+  }
 
   def saveState(out:ObjectOutputStream) : Unit = {
     val f = new File(file)
     out.writeInt(f.length.toInt)
     java.nio.file.Files.copy(f.toPath,out)
   }
+
+  def saveStateWithRaw(out: ObjectOutputStream): Unit = {
+    val f = new File(file)
+    out.writeBoolean(raw)
+    out.writeInt(f.length.toInt)
+    java.nio.file.Files.copy(f.toPath, out)
+  }
+
+  private def loadRaw()  : Unit = {
+    val f = new File(file)
+    val buffer = java.nio.file.Files.readAllBytes(f.toPath)
+    val address = (buffer(1) << 8 | buffer(0)) & 0xFFFF
+    val rom = buffer.drop(2).map(_.toInt & 0xFF)
+    addChip(address,buffer.length - 2,rom)
+    name = f.getName
+  }
   
-  def load()  : Unit = {
+  private def load()  : Unit = {
     val in = new RandomAccessFile(file,"r")
     try {
       val nameBuffer = Array.ofDim[Byte](16)

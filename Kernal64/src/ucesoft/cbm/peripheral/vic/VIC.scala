@@ -6,6 +6,8 @@ import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.RAMComponent
 import ucesoft.cbm.peripheral.vic.coprocessor.VICCoprocessor
 
+import java.awt.Dimension
+
 abstract class VIC extends RAMComponent {
   override val componentType: Type = CBMComponentType.CHIP
   val isRom = false
@@ -31,6 +33,8 @@ abstract class VIC extends RAMComponent {
   def VISIBLE_SCREEN_HEIGHT: Int
 
   def SCREEN_ASPECT_RATIO: Double
+
+  def STANDARD_DIMENSION : Dimension = new Dimension(0,0)
 
   def getRasterLine : Int
   def getRasterCycle: Int
