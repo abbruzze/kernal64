@@ -9,4 +9,4 @@ if [ ! -x $JAVA_HOME/bin/java ]; then
 else
         JAVA=$JAVA_HOME/bin/java
 fi
-$JAVA -cp $CP ucesoft.cbm.cpu.asm.Assembler $*
+$JAVA -cp $CP ucesoft.cbm.cpu.asm.Assembler "$@"

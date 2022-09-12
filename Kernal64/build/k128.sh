@@ -9,4 +9,4 @@ if [ ! -x $JAVA_HOME/bin/java ]; then
 else
         JAVA=$JAVA_HOME/bin/java
 fi
-$JAVA -server -Xms64M -Xmx128M -cp $CP -Djava.library.path=$LIB ucesoft.cbm.c128.C128 $*
+$JAVA -server -Xms64M -Xmx128M -cp $CP -Djava.library.path=$LIB ucesoft.cbm.c128.C128 "$@"
