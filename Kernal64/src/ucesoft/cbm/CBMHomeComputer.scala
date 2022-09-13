@@ -24,7 +24,7 @@ import ucesoft.cbm.trace.{InspectPanel, TraceListener}
 
 import java.awt.datatransfer.DataFlavor
 import java.awt.event._
-import java.awt.{BorderLayout, Dimension, Toolkit}
+import java.awt.{BorderLayout, Cursor, Dimension, Toolkit}
 import java.io._
 import java.util.{Properties, ServiceLoader}
 import javax.swing._
@@ -212,7 +212,8 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
           val cmd = s"""LOAD"$fn",$drive,1""" + 13.toChar + (if (autorun) "RUN" + 13.toChar else "")
           HomeKeyboard.insertTextIntoKeyboardBuffer(cmd,mmu,isC64Mode)
         case None if autorun =>
-          HomeKeyboard.insertSmallTextIntoKeyboardBuffer(s"""LOAD"*",$drive,1""" + 13.toChar + "RUN" + 13.toChar,mmu,isC64Mode)
+          //HomeKeyboard.insertSmallTextIntoKeyboardBuffer(s"""LOAD"*",$drive,1""" + 13.toChar + "RUN" + 13.toChar,mmu,isC64Mode)
+          HomeKeyboard.insertTextIntoKeyboardBuffer(s"""LOAD"*",$drive,1""" + 13.toChar + "RUN" + 13.toChar,mmu,isC64Mode)
         case _ =>
       }
       driveLeds(driveID).setToolTipText(disk.toString)
@@ -606,6 +607,8 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     lightPenButtonEmulation = setting
     vicChip.enableLightPen(setting != LIGHT_PEN_NO_BUTTON)
     controlPortB.setLightPenEmulation(setting != LIGHT_PEN_NO_BUTTON)
+    if (setting == LIGHT_PEN_NO_BUTTON) display.setCursor(Cursor.getDefaultCursor)
+    else display.setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR))
   }
 
   protected def choose16MREU(): Unit = {
@@ -1227,7 +1230,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     parent.add(swapJoyAItem)
   }
 
-  protected def setLightPenSettings(parent:JMenu) : Unit = {
+  protected def setLightPenSettings(parent:JMenu,port:String = "2") : Unit = {
     val lightPenMenu = new JMenu("Light pen")
     parent.add(lightPenMenu)
     val group3 = new ButtonGroup
@@ -1241,11 +1244,11 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }) :: resetSettingsActions
     group3.add(noPenItem)
     lightPenMenu.add(noPenItem)
-    val penUp = new JRadioButtonMenuItem("Light pen with button up on control port 2")
+    val penUp = new JRadioButtonMenuItem(s"Light pen with button up on control port $port")
     penUp.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_UP) )
     group3.add(penUp)
     lightPenMenu.add(penUp)
-    val penLeft = new JRadioButtonMenuItem("Light pen with button left on control port 2")
+    val penLeft = new JRadioButtonMenuItem(s"Light pen with button left on control port $port")
     penLeft.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_LEFT) )
     group3.add(penLeft)
     lightPenMenu.add(penLeft)

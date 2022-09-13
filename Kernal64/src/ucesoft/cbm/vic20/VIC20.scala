@@ -78,7 +78,7 @@ class VIC20 extends CBMHomeComputer {
     add(mmu)
     add(cpu)
     add(keyb)
-    add(controlPortA)
+    add(controlPortB)
     add(bus)
     add(rs232)
     // ROMs
@@ -94,8 +94,8 @@ class VIC20 extends CBMHomeComputer {
     datassette = new Datassette(() => via2.datassetteReadLine() )
     add(datassette)
     // VIAs
-    via1 = new VIC20Via1(bus,controlPortA,datassette,cpu.nmiRequest _)
-    via2 = new VIC20Via2(bus,keyb,controlPortA,datassette,cpu.irqRequest _,via1)
+    via1 = new VIC20Via1(bus,controlPortB,datassette,cpu.nmiRequest _)
+    via2 = new VIC20Via2(bus,keyb,controlPortB,datassette,cpu.irqRequest _,via1)
     add(via1)
     add(via2)
     // mapping I/O chips in memory
@@ -196,7 +196,7 @@ class VIC20 extends CBMHomeComputer {
     Log.info(s"BASIC program loaded from $start to $end")
     configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
     if (autorun) {
-      HomeKeyboard.insertSmallTextIntoKeyboardBuffer("RUN" + 13.toChar, mmu, true)
+      HomeKeyboard.insertTextIntoKeyboardBuffer("RUN" + 13.toChar, mmu, true)
     }
   }
 
@@ -372,7 +372,7 @@ class VIC20 extends CBMHomeComputer {
 
     setJoysticsSettings(optionMenu)
 
-    setLightPenSettings(optionMenu)
+    setLightPenSettings(optionMenu,"")
 
     setMouseSettings(optionMenu)
 
