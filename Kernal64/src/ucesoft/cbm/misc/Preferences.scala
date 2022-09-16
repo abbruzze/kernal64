@@ -64,6 +64,10 @@ object Preferences {
   val PREF_WIC64_NETWORK      = "wic64-network-name"
   val PREF_WIC64_ENABLED      = "wic64-enabled"
   val PREF_MOUSE_DELAY_MILLIS = "mouse-delay-millis"
+  // ================== VIC 20 ===================================
+  val PREF_VIC20_MEM_CONFIG   = "exp"
+  val PREF_VIC20_IO2_ENABLED  = "io2"
+  val PREF_VIC20_IO3_ENABLED  = "io3"
   // =============================================================
   class PreferenceIllegalArgumentException(msg:String) extends Exception(msg)
 

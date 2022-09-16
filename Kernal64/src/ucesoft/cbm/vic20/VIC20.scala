@@ -2,7 +2,7 @@ package ucesoft.cbm.vic20
 
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm._
-import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.cpu.{Memory, ROM}
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.formats._
 import ucesoft.cbm.misc._
@@ -11,7 +11,8 @@ import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.sid.DefaultAudioDriver
-import ucesoft.cbm.peripheral.vic.VICType
+import ucesoft.cbm.peripheral.vic.Palette.PaletteType
+import ucesoft.cbm.peripheral.vic.{Palette, VICType}
 import ucesoft.cbm.trace.TraceDialog
 
 import java.awt._
@@ -94,7 +95,7 @@ class VIC20 extends CBMHomeComputer {
     datassette = new Datassette(() => via2.datassetteReadLine() )
     add(datassette)
     // VIAs
-    via1 = new VIC20Via1(bus,controlPortB,datassette,cpu.nmiRequest _)
+    via1 = new VIC20Via1(bus,controlPortB,datassette,cpu.nmiRequest _, vicChip.triggerLightPen _)
     via2 = new VIC20Via2(bus,keyb,controlPortB,datassette,cpu.irqRequest _,via1)
     add(via1)
     add(via2)
@@ -313,10 +314,77 @@ class VIC20 extends CBMHomeComputer {
     JOptionPane.showMessageDialog(displayFrame, panel, "Cart info", JOptionPane.INFORMATION_MESSAGE, new ImageIcon(getClass.getResource("/resources/commodore_file.png")))
   }
 
-  protected def setSettingsMenu(optionMenu: JMenu): Unit = {
-    setDriveMenu(optionMenu)
+  protected def showRAMConfig(): Unit = {
 
-    optionMenu.addSeparator()
+  }
+
+  protected def updateMemoryConfig(config:Int): Unit = {
+    clock.pause()
+    mmu.setExpansion(config)
+    //reset(true)
+    clock.play()
+  }
+
+  override protected def setRenderingSettings(parent: JMenu): Unit = {
+    import Preferences._
+    // VIC-PALETTE =========================================================================================
+    val paletteItem = new JMenu("Palette")
+    parent.add(paletteItem)
+    val groupP = new ButtonGroup
+    val vicePalItem = new JRadioButtonMenuItem("VICE")
+    vicePalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "vice")
+    vicePalItem.setSelected(true)
+    paletteItem.add(vicePalItem)
+    groupP.add(vicePalItem)
+    val peptoPalItem = new JRadioButtonMenuItem("Pepto")
+    peptoPalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "pepto")
+    paletteItem.add(peptoPalItem)
+    groupP.add(peptoPalItem)
+    val colordorePalItem = new JRadioButtonMenuItem("Colodore")
+    colordorePalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "colodore")
+    paletteItem.add(colordorePalItem)
+    groupP.add(colordorePalItem)
+
+    preferences.add(PREF_VICPALETTE, "Set the palette type (vice,pepto,colodore)", "", Set("bright", "vice", "pepto", "colodore")) { pal =>
+      pal match {
+        case "vice" | "" =>
+          Palette.setPalette(PaletteType.VIC20_VICE)
+          vicePalItem.setSelected(true)
+        case "pepto" =>
+          Palette.setPalette(PaletteType.PEPTO)
+          peptoPalItem.setSelected(true)
+        case "colodore" =>
+          Palette.setPalette(PaletteType.VIC20_COLODORE)
+          colordorePalItem.setSelected(true)
+        case _ =>
+      }
+    }
+    // =====================================================================================================
+  }
+
+  protected def setSettingsMenu(optionMenu: JMenu): Unit = {
+    import Preferences._
+    val ramConfigItem = new JMenuItem("RAM configuration ...")
+    ramConfigItem.addActionListener(_ => showRAMConfig() )
+    optionMenu.add(ramConfigItem)
+    preferences.add(PREF_VIC20_MEM_CONFIG, "memory configuration: comma separated list of enabled memory block. Memory blocks: 400,2000,4000,6000,A000", "") { config =>
+      if (!config.isEmpty) {
+        val blocks = config.split(",").map(_.toUpperCase() match {
+          case "400"  => VIC20MMU.EXP_BLK0
+          case "2000" => VIC20MMU.EXP_BLK1
+          case "4000" => VIC20MMU.EXP_BLK2
+          case "6000" => VIC20MMU.EXP_BLK3
+          case "A000" => VIC20MMU.EXP_BLK5
+          case _      => VIC20MMU.NO_EXP
+        }).reduce(_ | _)
+
+        updateMemoryConfig(blocks)
+      }
+    }
+    preferences.add(PREF_VIC20_IO2_ENABLED, "enables IO2 memory block as RAM", false) { enabled => mmu.setIO2RAM(enabled) }
+    preferences.add(PREF_VIC20_IO3_ENABLED, "enables IO3 memory block as RAM", false) { enabled => mmu.setIO3RAM(enabled) }
+
+    setDriveMenu(optionMenu)
 
     val keybMenu = new JMenu("Keyboard")
     optionMenu.add(keybMenu)
@@ -424,7 +492,7 @@ class VIC20 extends CBMHomeComputer {
     optionMenu.add(romItem)
     romItem.addActionListener(_ => {
       clock.pause
-      ROMPanel.showROMPanel(displayFrame, configuration, true, false, () => {
+      ROMPanel.showROMPanel(displayFrame, configuration, cbmModel, false, () => {
         saveSettings(false)
         reset(false)
       })
@@ -434,8 +502,67 @@ class VIC20 extends CBMHomeComputer {
 
   override protected def setGlobalCommandLineOptions: Unit = {
     import Preferences._
-    super.setGlobalCommandLineOptions
-    // TODO
+    // non-saveable settings
+    preferences.add(PREF_WARP, "Run warp mode", false) { w =>
+      val isAdjusting = preferences.get(PREF_WARP).get.isAdjusting
+      warpMode(w, !isAdjusting)
+    }
+    preferences.add(PREF_HEADLESS, "Activate headless mode", false, Set(), false) {
+      headless = _
+    }
+    preferences.add(PREF_TESTCART, "Activate testcart mode", false, Set(), false) {
+      TestCart.enabled = _
+    }
+    preferences.add(PREF_LIMITCYCLES, "Run at most the number of cycles specified", "", Set(), false) { cycles =>
+      if (cycles != "" && cycles.toLong > 0) clock.limitCyclesTo(cycles.toLong)
+    }
+    preferences.add(PREF_RUNFILE, "Run the given file taken from the attached disk", null: String, Set(), false) { file => }
+    preferences.add(PREF_SCREENSHOT, "Take a screenshot of VIC screen and save it on the given file path. Used with --testcart only.", "") { file =>
+      if (file != "") {
+        TestCart.screenshotFile = Some(file)
+        TestCart.screeshotHandler = display.waitFrameSaveSnapshot _
+      }
+    }
+    preferences.add(PREF_CPUJAMCONTINUE, "On cpu jam continue execution", false, Set(), false) {
+      cpujamContinue = _
+    }
+    preferences.add(PREF_LOADSTATE, "Load a previous saved state.", "", Set(), false) { file =>
+      if (file != "") {
+        try {
+          loadStateFromOptions = true
+          loadState(Some(file))
+        }
+        finally loadStateFromOptions = false
+      }
+    }
+    preferences.add(PREF_SCREENDIM, "Zoom factor. Valued accepted are 0,1,2", 0, Set(0,1,2), false) { dim =>
+      vicZoom(dim)
+      zoomOverride = true
+    }
+    preferences.add(PREF_FULLSCREEN, "Starts the emulator in full screen mode", false, Set(), false) {
+      fullScreenAtBoot = _
+    }
+    preferences.add(PREF_IGNORE_CONFIG_FILE, "Ignore configuration file and starts emulator with default configuration", false, Set(), false) {
+      ignoreConfig = _
+    }
+    preferences.add(PREF_KERNEL, "Set kernel rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.VIC20_KERNAL_ROM_PROP, file) }
+    preferences.add(PREF_BASIC, "Set basic rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.VIC20_BASIC_ROM_PROP, file) }
+    preferences.add(PREF_CHARROM, "Set char rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.VIC20_CHAR_ROM_PROP, file) }
+    preferences.add(PREF_1541DOS, "Set 1541 dos rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.D1541_DOS_ROM_PROP, file) }
+    preferences.add(PREF_1571DOS, "Set 1571 dos rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.D1571_DOS_ROM_PROP, file) }
+    preferences.add(PREF_1581DOS, "Set 1581 dos rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.D1581_DOS_ROM_PROP, file) }
+
+    preferences.add(PREF_TRACE, "Starts the emulator in trace mode", false, Set(), false) { trace =>
+      traceOption = trace
+      if (trace && traceDialog != null) {
+        traceDialog.forceTracing(true)
+        traceDialog.setVisible(true)
+        traceItem.setSelected(true)
+      }
+    }
+    preferences.add(PREF_MOUSE_DELAY_MILLIS, "Sets the mouse delay parameter in millis", 20) { delay =>
+      MouseCage.setRatioMillis(delay)
+    }
   }
 
   protected def saveSettings(save: Boolean): Unit = {

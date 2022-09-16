@@ -50,7 +50,8 @@ import ucesoft.cbm.peripheral.drive.VIA
 class VIC20Via1(bus:IECBus,
                 controlPort:ControlPort,
                 datassette:Datassette,
-                nmiAction:Boolean => Unit) extends VIA("VIA_1",0x9110,nmiAction) with IECBusListener {
+                nmiAction:Boolean => Unit,
+                lightPenTriggerHandler: () => Unit) extends VIA("VIA_1",0x9110,nmiAction) with IECBusListener {
   override val busid = "VIA_I_buslistener"
   override lazy val componentID = "VIA1 (9110)"
   override val isController = true
@@ -69,9 +70,11 @@ class VIC20Via1(bus:IECBus,
   }
 
   override def write(address: Int, value: Int, chipID: ChipID.ID): Unit = address & 0x0F match {
-    case PA|PA2 =>
+    case adr@(PA|PA2) =>
+      val oldValue = regs(adr)
       super.write(address, value, chipID)
       bus.setLine(this,IECBusLine.ATN,if ((value & 0x80) > 0) GROUND else VOLTAGE)
+      if ((regs(DDRA) & 0x20) > 0 && (oldValue & 0x20) > 0 && (value & 0x20) == 0) lightPenTriggerHandler() // raising edge
     case _ =>
       super.write(address, value, chipID)
   }

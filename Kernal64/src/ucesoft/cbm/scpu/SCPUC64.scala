@@ -393,7 +393,7 @@ class SCPUC64 extends CBMHomeComputer {
     optionMenu.add(romItem)
     romItem.addActionListener(_ => {
       clock.pause
-      ROMPanel.showROMPanel(displayFrame, configuration, true,true, () => {
+      ROMPanel.showROMPanel(displayFrame, configuration, cbmModel,true, () => {
         saveSettings(false)
         reset(false)
       })

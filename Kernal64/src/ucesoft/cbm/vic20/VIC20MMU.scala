@@ -89,6 +89,7 @@ class VIC20MMU extends RAMComponent {
     while (b < 5) {
       val enabled = (exp & (1 << b)) > 0
       expansionBlocks(b).enabled = enabled
+      if (enabled && expansionBlocks(b).hasROM()) expansionBlocks(b).removeROM()
       b += 1
     }
   }

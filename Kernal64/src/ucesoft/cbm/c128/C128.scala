@@ -742,7 +742,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     optionMenu.add(romItem)
     romItem.addActionListener( _ => {
       clock.pause
-      ROMPanel.showROMPanel(displayFrame,configuration,false,false,() => {
+      ROMPanel.showROMPanel(displayFrame,configuration,cbmModel,false,() => {
         saveSettings(false)
         checkFunctionROMS
         reset(false)
