@@ -63,8 +63,8 @@ class VIC20Via1(bus:IECBus,
       super.read(address,chipID)
       val joy = controlPort.readPort
       val joy012Fire = (joy & 7) << 2 | (joy & 0x10) << 1
-      val serial = (~(bus.clk | bus.data << 1/* | bus.atn << 7*/)) & 0x3
-      serial | joy012Fire | (if (datassette.isPlayPressed) 0 else 0x40)
+      val serial = (~(bus.clk | bus.data << 1)) & 0x3
+      0x80 | serial | joy012Fire | (if (datassette.isPlayPressed) 0 else 0x40) // 0x80 = atn in
     case _ =>
       super.read(address,chipID)
   }
