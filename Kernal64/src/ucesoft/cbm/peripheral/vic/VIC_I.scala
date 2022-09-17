@@ -29,7 +29,11 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   private final val FETCH_DELAY         = 1
   private final val FETCH_MATRIX        = 2
   private final val FETCH_CHAR          = 3
-  private final val END_FETCH           = 4
+  private final val FETCH_MATRIX_DRAW   = 4
+  private final val FETCH_CHAR_DRAW     = 5
+  private final val FETCH_MATRIX_DRAW2  = 6
+  private final val FETCH_CHAR_DRAW2    = 7
+  private final val END_FETCH           = 8
 
   /*
     36864 $8666 VICCR0
@@ -235,9 +239,13 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   private var latchedRows = 0
   // char height : 8 or 16
   private var charHeight = 8
-  // graphic buffer
+  // fetched char code
+  private var charCode = 0
+  // graphic buffer pipeline
   private var gBuf = 0
-  // color buffer
+  // data to be displayed
+  private var gData = 0
+  // color buffer pipeline
   private var cBuf = 0
   // column index
   private var displayCol = 0
@@ -442,19 +450,19 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
 
   @inline private def fetchMatrix(): Unit = {
     // fetches both char code and color code
-    gBuf = mem.read(screenAddr(),ChipID.VIC)
+    charCode = mem.read(screenAddr(),ChipID.VIC)
     val colorBaseAddress = 0x9400 + ((regs(VIC_CR2_COLS_SCREEN_MAP_ADDRESS_7) & 0x80) << 2)
     var colorAddress = colorBaseAddress + displayPtr + displayCol
     if (colorAddress > 0x97FF) colorAddress = 0x9400 + (colorAddress & 0x3FF) // color address wrap-around
-    cBuf = mem.read(colorAddress,ChipID.VIC)
+    cBuf |= mem.read(colorAddress,ChipID.VIC) << 8
   }
   @inline private def fetchChar(): Unit = {
     val charShift = if ((regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) & 1) == 0) 3 else 4
-    val offset = (gBuf << charShift) + (rowY & (charHeight - 1))
+    val offset = (charCode << charShift) + (rowY & (charHeight - 1))
     val blocks = offset >> 10
     val conf = (regs(VIC_CR5_SCREEN_MAP_CHAR_MAP_ADDRESS) + blocks) & 0xF
     val target = charMap(conf) + (offset & 0x3FF)
-    gBuf = mem.read(target,ChipID.VIC)
+    gBuf |= mem.read(target,ChipID.VIC) << 8
 
     displayCol += 1
     if (rowY == (charHeight - 1)) displayPtrInc = displayCol
@@ -479,7 +487,13 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     }
   }
 
-  private def drawDisplayCycle(): Unit = {
+  private def drawDisplayCycle(shift:Boolean): Unit = {
+    if (shift) {
+      cBuf >>= 8
+      gBuf >>= 8
+      gData = gBuf & 0xFF
+    }
+
     val ypos = rasterLine * SCREEN_WIDTH
 
     val backgroundColorIndex = regs(VIC_CRF_BACKGROUND_BORDER_INV) >> 4
@@ -493,9 +507,9 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
       val fgColor = palette(if (!invertColors) fgColorIndex else backgroundColorIndex)
       val bgColor = palette(if (!invertColors) backgroundColorIndex else fgColorIndex)
 
-      while (p < 8) {
-        val pixel = gBuf & 0x80
-        gBuf <<= 1
+      while (p < 4) {
+        val pixel = gData & 0x80
+        gData <<= 1
         drawPixel(ypos + xpos,if (pixel == 0) bgColor else fgColor)
         xpos += 1
         p += 1
@@ -507,15 +521,15 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
       val bgColor = palette(backgroundColorIndex)
       val borderColor = palette(regs(VIC_CRF_BACKGROUND_BORDER_INV) & 7)
 
-      while (p < 4) {
-        val pixel = gBuf & 0xC0
+      while (p < 2) {
+        val pixel = gData & 0xC0
         val mcColor = pixel match {
           case 0x00 /* 00 */ => bgColor
           case 0x40 /* 01 */ => borderColor
           case 0x80 /* 10 */ => fgColor
           case 0xC0 /* 11 */ => auxColor
         }
-        gBuf <<= 2
+        gData <<= 2
         drawPixel(ypos + xpos,mcColor)
         drawPixel(ypos + xpos + 1,mcColor)
         xpos += 2
@@ -542,19 +556,28 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
         // idle fetch => do nothing
         drawBorderCycle()
       case FETCH_DELAY =>
-        if (displayCol > 0) displayCol -= 1
-        else hState = FETCH_MATRIX
+        if (displayCol == 0) hState = FETCH_MATRIX
+        else displayCol -= 1
       case FETCH_MATRIX =>
         fetchMatrix()
         hState = FETCH_CHAR
       case FETCH_CHAR =>
         fetchChar()
-        drawDisplayCycle()
-
-        if (displayCol == latchedColumns)
-          closeHorizontalBorder()
-        else
-          hState = FETCH_MATRIX
+        hState = if (displayCol == latchedColumns) FETCH_MATRIX_DRAW2 else FETCH_MATRIX_DRAW
+      case FETCH_MATRIX_DRAW =>
+        drawDisplayCycle(true)
+        fetchMatrix()
+        hState = FETCH_CHAR_DRAW
+      case FETCH_CHAR_DRAW =>
+        drawDisplayCycle(false)
+        fetchChar()
+        hState = if (displayCol == latchedColumns) FETCH_MATRIX_DRAW2 else FETCH_MATRIX_DRAW
+      case FETCH_MATRIX_DRAW2 =>
+        drawDisplayCycle(true)
+        hState = FETCH_CHAR_DRAW2
+      case FETCH_CHAR_DRAW2 =>
+        drawDisplayCycle(false)
+        closeHorizontalBorder()
     }
   }
 
