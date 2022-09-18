@@ -587,11 +587,13 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
       openVerticalBorder()
     }
 
+    rasterCycle += 1
     // check end of line
     if (rasterCycle == model.RASTER_CYCLES) {
       endOfLine()
       if (rasterLine == model.RASTER_LINES) endOfFrame()
     }
+
     // check horizontal border for opening
     if (vState == START_DISPLAY_AREA || vState == DISPLAY_AREA) {
       if (hState == IDLE_FETCH && (regs(VIC_CR0_HORIGIN) & 0x7F) == rasterCycle) openHorizontalBorder()
@@ -607,7 +609,6 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     }
 
     fetchCycle()
-    rasterCycle += 1
 
     audio.audioClock()
   }
