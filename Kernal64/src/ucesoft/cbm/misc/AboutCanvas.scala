@@ -33,9 +33,9 @@ class AboutCanvas(charRom:Memory,version:String,romCharBytes:Int = 8,romCharHeig
   add(center("SCALA VERSION " + scalaVersion,WIDTH)).newLine
   newLine
   white
-  add(center("A COMMODORE 64/128/CBMII EMULATOR WRITTEN IN SCALA",WIDTH)).newLine
+  add(center(" A COMMODORE 64/128/CBMII/VIC20 EMULATOR ",WIDTH)).newLine
   newLine
-  add(center("BY ALESSANDRO ABBRUZZETTI",WIDTH)).newLine
+  add(center("WRITTEN IN SCALA BY ALESSANDRO ABBRUZZETTI",WIDTH)).newLine
   newLine
   add(center("2013-2022",WIDTH)).newLine
   newLine

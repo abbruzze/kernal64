@@ -9,6 +9,7 @@ import ucesoft.cbm.peripheral.drive.VIA
 import ucesoft.cbm.peripheral.vic.VIC_I
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
+import scala.collection.mutable
 
 object VIC20MMU {
   val KERNAL_ROM = new ROM(null, "Kernal", 0, 8192, ROM.VIC20_KERNAL_ROM_PROP)
@@ -21,6 +22,27 @@ object VIC20MMU {
   final val EXP_BLK2 = 4
   final val EXP_BLK3 = 8
   final val EXP_BLK5 = 16
+
+  def parseConfig(config:String,updateMemoryConfig: Int => Unit): Unit = {
+    if (!config.isEmpty) {
+      val blocks = config.split(",").map(_.toUpperCase() match {
+        case "400" => VIC20MMU.EXP_BLK0
+        case "2000" => VIC20MMU.EXP_BLK1
+        case "4000" => VIC20MMU.EXP_BLK2
+        case "6000" => VIC20MMU.EXP_BLK3
+        case "A000" => VIC20MMU.EXP_BLK5
+        case _ => VIC20MMU.NO_EXP
+      }).reduce(_ | _)
+
+      updateMemoryConfig(blocks)
+    }
+  }
+
+  def getStringConfig(config:Int): String = {
+    Array((EXP_BLK0,"400"),(EXP_BLK1,"2000"),(EXP_BLK2,"4000"),(EXP_BLK3,"6000"),(EXP_BLK5,"A000")).flatMap { e =>
+      if ((config & e._1) > 0) Some(e._2) else None
+    }.mkString(",")
+  }
 }
 
 class VIC20MMU extends RAMComponent {

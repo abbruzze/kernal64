@@ -16,6 +16,7 @@ import ucesoft.cbm.peripheral.vic.{Palette, VICType}
 import ucesoft.cbm.trace.TraceDialog
 
 import java.awt._
+import java.awt.event.{ActionEvent, ActionListener}
 import java.io._
 import javax.swing._
 
@@ -315,7 +316,109 @@ class VIC20 extends CBMHomeComputer {
   }
 
   protected def showRAMConfig(): Unit = {
+    import VIC20MMU._
 
+    val configPanel = new JPanel(new GridLayout(0,1))
+    //configPanel.setLayout(new BoxLayout(configPanel,BoxLayout.Y_AXIS))
+    val configTemplate = new JComboBox[String](Array("No expansion","3K (block 0)","8K (block 1)","16K (block 1|2)","24K (block 1|2|3)","All (block 0|1|2|3|5)","Custom"))
+    val bChecks = Array(
+      new JCheckBox("3K (0400 - 0FFF)"),
+      new JCheckBox("8K (2000 - 3FFF)"),
+      new JCheckBox("8K (4000 - 5FFF)"),
+      new JCheckBox("8K (6000 - 7FFF)"),
+      new JCheckBox("8K (A000 - BFFF)")
+    )
+
+    def updateConfig(config:Int): Unit = {
+      if (config == NO_EXP) {
+        configTemplate.setSelectedIndex(0)
+        for(b <- bChecks) b.setSelected(false)
+      }
+      else if (config == EXP_BLK0) {
+        configTemplate.setSelectedIndex(1)
+        bChecks(0).setSelected(true)
+        for(b <- 0 until bChecks.length) bChecks(b).setSelected(b == 0)
+      }
+      else if (config == EXP_BLK1) {
+        configTemplate.setSelectedIndex(2)
+        for(b <- 0 until bChecks.length) bChecks(b).setSelected(b == 1)
+      }
+      else if (config == (EXP_BLK1 | EXP_BLK2)) {
+        configTemplate.setSelectedIndex(3)
+        for(b <- 0 until bChecks.length) bChecks(b).setSelected(b == 1 || b == 2)
+      }
+      else if (config == (EXP_BLK1 | EXP_BLK2 | EXP_BLK3)) {
+        configTemplate.setSelectedIndex(4)
+        for(b <- 0 until bChecks.length) bChecks(b).setSelected(b == 1 || b == 2 || b == 3)
+      }
+      else if (config == (EXP_BLK0 | EXP_BLK1 | EXP_BLK2 | EXP_BLK3 | EXP_BLK5)) {
+        configTemplate.setSelectedIndex(5)
+        for(b <- bChecks) b.setSelected(true)
+      }
+      else configTemplate.setSelectedIndex(6)
+    }
+
+    val oldConfig = mmu.getExpansionSettings()
+    var config = oldConfig
+    updateConfig(config)
+
+    val checkAction = new ActionListener {
+      override def actionPerformed(e: ActionEvent): Unit = {
+        config = 0
+        if (bChecks(0).isSelected) config |= EXP_BLK0
+        if (bChecks(1).isSelected) config |= EXP_BLK1
+        if (bChecks(2).isSelected) config |= EXP_BLK2
+        if (bChecks(3).isSelected) config |= EXP_BLK3
+        if (bChecks(4).isSelected) config |= EXP_BLK5
+        updateConfig(config)
+      }
+    }
+
+    for(b <- bChecks) b.addActionListener(checkAction)
+    configTemplate.addActionListener(_ => {
+      configTemplate.getSelectedIndex match {
+        case 0 => config = NO_EXP ; updateConfig(config)
+        case 1 => config = EXP_BLK0 ; updateConfig(config)
+        case 2 => config = EXP_BLK1 ; updateConfig(config)
+        case 3 => config = EXP_BLK1 | EXP_BLK2 ; updateConfig(config)
+        case 4 => config = EXP_BLK1 | EXP_BLK2 | EXP_BLK3 ; updateConfig(config)
+        case 5 => config = EXP_BLK0 | EXP_BLK1 | EXP_BLK2 | EXP_BLK3 | EXP_BLK5; updateConfig(config)
+        case 6 =>
+      }
+    })
+
+    val comboPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
+    comboPanel.add(new JLabel("Memory templates:"))
+    comboPanel.add(configTemplate)
+    configPanel.add(comboPanel)
+    var dummyPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
+    dummyPanel.add(new JLabel("Memory blocks:"))
+    configPanel.add(dummyPanel)
+    for(b <- bChecks) {
+      dummyPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT))
+      dummyPanel.add(b)
+      configPanel.add(dummyPanel)
+    }
+
+    dummyPanel = new JPanel(new FlowLayout(FlowLayout.CENTER))
+    val okB = new JButton("Apply")
+    val cancelB = new JButton("Cancel")
+    dummyPanel.add(okB)
+    dummyPanel.add(cancelB)
+
+    val dialog = new JDialog(displayFrame,"Memory configuration",true)
+    okB.addActionListener(_ => {
+      updateMemoryConfig(config)
+      dialog.dispose()
+    })
+    cancelB.addActionListener(_ => dialog.dispose() )
+
+    dialog.getContentPane.add("Center",configPanel)
+    dialog.getContentPane.add("South",dummyPanel)
+    dialog.pack()
+    dialog.setLocationRelativeTo(displayFrame)
+    dialog.setResizable(false)
+    dialog.setVisible(true)
   }
 
   protected def updateMemoryConfig(config:Int): Unit = {
@@ -336,8 +439,8 @@ class VIC20 extends CBMHomeComputer {
     vicePalItem.setSelected(true)
     paletteItem.add(vicePalItem)
     groupP.add(vicePalItem)
-    val peptoPalItem = new JRadioButtonMenuItem("Pepto")
-    peptoPalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "pepto")
+    val peptoPalItem = new JRadioButtonMenuItem("Mike's PAL")
+    peptoPalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "mike_pal")
     paletteItem.add(peptoPalItem)
     groupP.add(peptoPalItem)
     val colordorePalItem = new JRadioButtonMenuItem("Colodore")
@@ -345,13 +448,13 @@ class VIC20 extends CBMHomeComputer {
     paletteItem.add(colordorePalItem)
     groupP.add(colordorePalItem)
 
-    preferences.add(PREF_VICPALETTE, "Set the palette type (vice,pepto,colodore)", "", Set("bright", "vice", "pepto", "colodore")) { pal =>
+    preferences.add(PREF_VICPALETTE, "Set the palette type (vice,mike_pal,colodore)", "", Set("vice", "mike_pal", "colodore")) { pal =>
       pal match {
         case "vice" | "" =>
           Palette.setPalette(PaletteType.VIC20_VICE)
           vicePalItem.setSelected(true)
-        case "pepto" =>
-          Palette.setPalette(PaletteType.PEPTO)
+        case "mike_pal" =>
+          Palette.setPalette(PaletteType.VIC20_MIKE_PAL)
           peptoPalItem.setSelected(true)
         case "colodore" =>
           Palette.setPalette(PaletteType.VIC20_COLODORE)
@@ -365,21 +468,11 @@ class VIC20 extends CBMHomeComputer {
   protected def setSettingsMenu(optionMenu: JMenu): Unit = {
     import Preferences._
     val ramConfigItem = new JMenuItem("RAM configuration ...")
+    ramConfigItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_M, java.awt.event.InputEvent.ALT_DOWN_MASK))
     ramConfigItem.addActionListener(_ => showRAMConfig() )
     optionMenu.add(ramConfigItem)
     preferences.add(PREF_VIC20_MEM_CONFIG, "memory configuration: comma separated list of enabled memory block. Memory blocks: 400,2000,4000,6000,A000", "") { config =>
-      if (!config.isEmpty) {
-        val blocks = config.split(",").map(_.toUpperCase() match {
-          case "400"  => VIC20MMU.EXP_BLK0
-          case "2000" => VIC20MMU.EXP_BLK1
-          case "4000" => VIC20MMU.EXP_BLK2
-          case "6000" => VIC20MMU.EXP_BLK3
-          case "A000" => VIC20MMU.EXP_BLK5
-          case _      => VIC20MMU.NO_EXP
-        }).reduce(_ | _)
-
-        updateMemoryConfig(blocks)
-      }
+      VIC20MMU.parseConfig(config,updateMemoryConfig _)
     }
     preferences.add(PREF_VIC20_IO2_ENABLED, "enables IO2 memory block as RAM", false) { enabled => mmu.setIO2RAM(enabled) }
     preferences.add(PREF_VIC20_IO3_ENABLED, "enables IO3 memory block as RAM", false) { enabled => mmu.setIO3RAM(enabled) }
