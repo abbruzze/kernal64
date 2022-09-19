@@ -125,6 +125,11 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     lastCorrectionCycles = cycles
   }
 
+  override def hardReset(): Unit = {
+    cycles = 0
+    reset
+  }
+
   final override def run()  : Unit = {
     running = true
     while (running) {
@@ -231,16 +236,6 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   }
   def halt(): Unit = running = false
   def printEvents()  : Unit = { println(if (events != null) events else "No events") }
-
-  def waitFor(millis:Long): Unit = {
-    if (Thread.currentThread == this) {
-      cycles += (C64_CLOCK_HZ * millis / 1000).toLong - 1
-      Thread.sleep(millis)
-    }
-    else {
-      println
-    }
-  }
 
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {

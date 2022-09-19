@@ -125,7 +125,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   }
 
   override def afterInitHook : Unit = {
-    inspectDialog = InspectPanel.getInspectDialog(displayFrame, this)
+    inspectDialog = InspectPanel.getInspectDialog(displayFrame, this,cbmModel)
     // deactivate drives > 8
     for(d <- 1 until TOTAL_DRIVES) {
       drives(d).setActive(false)
@@ -1225,7 +1225,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     joyAItem.addActionListener(_ => joySettings )
     parent.add(joyAItem)
 
-    val swapJoyAItem = new JMenuItem("Swap joysticks")
+    val swapJoyAItem = new JCheckBoxMenuItem("Swap joysticks")
     swapJoyAItem.addActionListener(_ => swapJoysticks )
     parent.add(swapJoyAItem)
   }

@@ -712,7 +712,7 @@ class CBMII extends CBMComputer {
     crt.initComponent()
     //crt.play()
     mmu.setIO(crt,ciaieee,ciaip,tpiKb,tpiIeee,sid,acia)
-    inspectDialog = InspectPanel.getInspectDialog(displayFrame, this)
+    inspectDialog = InspectPanel.getInspectDialog(displayFrame, this,cbmModel)
   }
 
   protected def setModel(newModel:CBM2Model): Unit = {

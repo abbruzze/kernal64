@@ -1,6 +1,6 @@
 package ucesoft.cbm.trace
 
-import ucesoft.cbm.CBMComponent
+import ucesoft.cbm.{C128Model, C64Model, CBMComponent, CBMComputerModel, CBMIIModel, VIC20Model}
 import ucesoft.cbm.cpu.{Memory, RAMComponent}
 
 import java.awt.event.MouseEvent
@@ -11,11 +11,11 @@ import javax.swing.event.{ChangeEvent, ChangeListener}
 import javax.swing.tree.{DefaultMutableTreeNode, DefaultTreeCellEditor, DefaultTreeCellRenderer, DefaultTreeModel}
 
 object InspectPanel {
-  def getInspectDialog(f: JFrame, root: CBMComponent) = new InspectPanelDialog(f,root)
+  def getInspectDialog(f: JFrame, root: CBMComponent,model:CBMComputerModel) = new InspectPanelDialog(f,root,model)
 }
 
-class InspectPanelDialog(f: JFrame,root: CBMComponent) extends JDialog(f, "Inspect panel") {
-  private[this] var panel = new InspectPanel(root)
+class InspectPanelDialog(f: JFrame,root: CBMComponent,model:CBMComputerModel) extends JDialog(f, "Inspect panel") {
+  private[this] var panel = new InspectPanel(root,model)
   
   override def setVisible(visible: Boolean) : Unit = {
     super.setVisible(visible)
@@ -28,13 +28,13 @@ class InspectPanelDialog(f: JFrame,root: CBMComponent) extends JDialog(f, "Inspe
   
   def updateRoot() : Unit = {
     getContentPane.remove(panel)
-    panel = new InspectPanel(root)
+    panel = new InspectPanel(root,model)
     getContentPane.add("Center", panel)
     revalidate()
   }
 }
 
-private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnable with ChangeListener {
+private[trace] class InspectPanel(root: CBMComponent,model:CBMComputerModel) extends JPanel with Runnable with ChangeListener {
   private[this] val treeRoot = createTree(root)
   private[this] val lock = new Object
   private[this] val tree = new JTree(treeRoot)
@@ -45,7 +45,13 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
   spin.setValue(sleepPeriod)
   spin.addChangeListener(this)
   setLayout(new BorderLayout)
-  add("North", new JLabel(new ImageIcon(getClass.getResource("/resources/logo_bar_mini.png"))))
+  val logo = model match {
+    case C64Model => "/resources/logo_bar_mini.png"
+    case C128Model => "/resources/logo_bar_mini_128.png"
+    case VIC20Model => "/resources/logo_bar_mini_vic20.png"
+    case CBMIIModel => "/resources/logo_bar_mini_cbm2.png"
+  }
+  add("North", new JLabel(new ImageIcon(getClass.getResource(logo))))
   add("Center", new JScrollPane(tree))
   val southPanel = new JPanel(new FlowLayout)
   southPanel.add(new JLabel("Refresh period in millis:"))

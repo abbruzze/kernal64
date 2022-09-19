@@ -1,5 +1,6 @@
 package ucesoft.cbm.formats
 
+import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, VIC20Model}
 import ucesoft.cbm.cbm2.CBM2MMU
 import ucesoft.cbm.cpu.{CPU65xx, Memory}
 
@@ -12,32 +13,47 @@ object ProgramLoader {
   var loadingWithWarpEnabled = false
   var warpModeListener : (Boolean) => Unit = _
 
-  def checkLoadingInWarpMode(c64Mode:Boolean): Unit = {
-    if (c64Mode) {
-      if (loadingWithWarpEnabled) {
-        val pc = cpu.getCurrentInstructionPC
-        if (pc == 0xF4E0 && !loadingWithWarp) { // F4A5 is the load entry point routine, but we must skip error conditions
-          loadingWithWarp = true
-          if (warpModeListener != null) warpModeListener(true)
+  def checkLoadingInWarpMode(model:CBMComputerModel,c64Mode:Boolean): Unit = {
+    model match {
+      case C64Model|C128Model =>
+        if (c64Mode) {
+          if (loadingWithWarpEnabled) {
+            val pc = cpu.getCurrentInstructionPC
+            if (pc == 0xF4E0 && !loadingWithWarp) { // F4A5 is the load entry point routine, but we must skip error conditions
+              loadingWithWarp = true
+              if (warpModeListener != null) warpModeListener(true)
+            }
+            else if (loadingWithWarp && (pc == 0xF52B || pc == 0xF633)) {
+              loadingWithWarp = false
+              if (warpModeListener != null) warpModeListener(false)
+            }
+          }
         }
-        else if (loadingWithWarp && (pc == 0xF52B || pc == 0xF633)) {
-          loadingWithWarp = false
-          if (warpModeListener != null) warpModeListener(false)
+        else {
+          if (loadingWithWarpEnabled) {
+            val pc = cpu.getCurrentInstructionPC
+            if ((pc == 0xF421 || pc == 0xF2CF) && !loadingWithWarp) {
+              loadingWithWarp = true
+              if (warpModeListener != null) warpModeListener(true)
+            }
+            else if (loadingWithWarp && (pc == 0xF4A6 || pc == 0xF498 || pc == 0xF48C || pc == 0xF39B || pc == 0xF323)) {
+              loadingWithWarp = false
+              if (warpModeListener != null) warpModeListener(false)
+            }
+          }
         }
-      }
-    }
-    else {
-      if (loadingWithWarpEnabled) {
-        val pc = cpu.getCurrentInstructionPC
-        if ((pc == 0xF421 || pc == 0xF2CF) && !loadingWithWarp) {
-          loadingWithWarp = true
-          if (warpModeListener != null) warpModeListener(true)
+      case VIC20Model =>
+        if (loadingWithWarpEnabled) {
+          val pc = cpu.getCurrentInstructionPC
+          if (pc == 0xF5B5 && !loadingWithWarp) {
+            loadingWithWarp = true
+            if (warpModeListener != null) warpModeListener(true)
+          }
+          else if (loadingWithWarp && (pc == 0xF5BF || pc == 0xF595)) {
+            loadingWithWarp = false
+            if (warpModeListener != null) warpModeListener(false)
+          }
         }
-        else if (loadingWithWarp && (pc == 0xF4A6 || pc == 0xF498 || pc == 0xF48C || pc == 0xF39B || pc == 0xF323)) {
-          loadingWithWarp = false
-          if (warpModeListener != null) warpModeListener(false)
-        }
-      }
     }
   }
 

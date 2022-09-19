@@ -301,7 +301,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     }
     if (z80Active) z80.clock(cycles,z80ScaleFactor) // 2Mhz / 985248 = 2.0299
     else {
-      ProgramLoader.checkLoadingInWarpMode(c64Mode)
+      ProgramLoader.checkLoadingInWarpMode(cbmModel,c64Mode)
       cpu.fetchAndExecute(1)
       if (cpuFrequency == 2 && !mmu.isIOACC && !vicChip.asInstanceOf[vic.VIC_II].isRefreshCycle) cpu.fetchAndExecute(1)
     }

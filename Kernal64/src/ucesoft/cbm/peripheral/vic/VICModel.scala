@@ -38,9 +38,9 @@ object VIC_I_NTSC extends VICModel {
   override final val RASTER_LINES = 261
   override final val RASTER_CYCLES = 65
   override final val BLANK_TOP_LINE = 0
-  override final val BLANK_BOTTOM_LINE = 0
-  override final val BLANK_LEFT_CYCLE = 0
-  override final val BLANK_RIGHT_CYCLE = 0
+  override final val BLANK_BOTTOM_LINE = RASTER_LINES
+  override final val BLANK_LEFT_CYCLE = 6
+  override final val BLANK_RIGHT_CYCLE = 59
   override final val MAX_COLUMNS = 32
   override final val MAX_ROWS = 31
 }

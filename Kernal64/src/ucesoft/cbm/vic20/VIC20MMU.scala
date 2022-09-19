@@ -38,10 +38,20 @@ object VIC20MMU {
     }
   }
 
-  def getStringConfig(config:Int): String = {
-    Array((EXP_BLK0,"400"),(EXP_BLK1,"2000"),(EXP_BLK2,"4000"),(EXP_BLK3,"6000"),(EXP_BLK5,"A000")).flatMap { e =>
+  def getStringConfig(config:Int,blocks:Boolean = false,sep:String = ","): String = {
+    val labels = if (blocks) Array("B0","B1","B2","B3","B5") else Array("400","2000","4000","6000","A000")
+    Array(EXP_BLK0,EXP_BLK1,EXP_BLK2,EXP_BLK3,EXP_BLK5).zip(labels).flatMap { e =>
       if ((config & e._1) > 0) Some(e._2) else None
-    }.mkString(",")
+    }.mkString(sep)
+  }
+
+  def getLabelConfig(config:Int): String = {
+    if (config == NO_EXP) ""
+    else if (config == EXP_BLK0) "3K"
+    else if (config == EXP_BLK1) "8K"
+    else if (config == (EXP_BLK1 | EXP_BLK2)) "16K"
+    else if (config == (EXP_BLK1 | EXP_BLK2 | EXP_BLK3)) "24K"
+    else getStringConfig(config,true,"|")
   }
 }
 
@@ -260,7 +270,7 @@ class VIC20MMU extends RAMComponent {
   override def hardReset(): Unit = {
     for(e <- expansionBlocks) {
       e.removeROM()
-      e.enabled = false
+      //e.enabled = false
     }
   }
 

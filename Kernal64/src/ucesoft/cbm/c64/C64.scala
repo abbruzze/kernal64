@@ -170,7 +170,7 @@ class C64 extends CBMHomeComputer {
       ExpansionPort.getExpansionPort.freezeButton
     }
     // CPU PHI2
-    ProgramLoader.checkLoadingInWarpMode(true)
+    ProgramLoader.checkLoadingInWarpMode(cbmModel,true)
     cpu.fetchAndExecute(1)
     // SID
     if (sidCycleExact) sid.clock

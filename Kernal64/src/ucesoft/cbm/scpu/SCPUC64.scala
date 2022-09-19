@@ -185,7 +185,7 @@ class SCPUC64 extends CBMHomeComputer {
       ExpansionPort.getExpansionPort.freezeButton
     }
     // CPU PHI2
-    ProgramLoader.checkLoadingInWarpMode(true)
+    ProgramLoader.checkLoadingInWarpMode(cbmModel,true)
     cpu.fetchAndExecute(cpuClocks)
     // SID
     if (sidCycleExact) sid.clock

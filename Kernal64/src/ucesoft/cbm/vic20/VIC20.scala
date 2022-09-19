@@ -25,7 +25,6 @@ object VIC20 extends App {
 }
 
 class VIC20 extends CBMHomeComputer {
-  override protected def PRG_LOAD_ADDRESS() = 0x1001
   override protected val cbmModel: CBMComputerModel = VIC20Model
 
   override  protected val DEFAULT_GAME_PROVIDERS = java.util.Arrays.asList((new ucesoft.cbm.game.PouetDemoVIC20Spi).asInstanceOf[ucesoft.cbm.game.GameProvider])
@@ -47,6 +46,23 @@ class VIC20 extends CBMHomeComputer {
   override protected lazy val volumeDialog : JDialog = VolumeSettingsPanel.getDialog(displayFrame,audioDriver)
 
   override protected lazy val keyb = new keyboard.HomeKeyboard(keybMapper,low => via1.restoreKeyPressed(low),false)
+
+  protected val memoryConfigLabel = new JLabel()
+
+  override protected def PRG_LOAD_ADDRESS() = {
+    import VIC20MMU._
+    val config = mmu.getExpansionSettings()
+    if (config == NO_EXP || config == EXP_BLK0) 0x1001 else 0x1201
+  }
+
+  override def PRG_RUN_DELAY_CYCLES: Int = {
+    import VIC20MMU._
+    val config = mmu.getExpansionSettings()
+    if (config == EXP_BLK1) 1600000
+    else if (config == (EXP_BLK1 | EXP_BLK2)) 2160000
+    else if (config == (EXP_BLK1 | EXP_BLK2 | EXP_BLK3)) 2760000
+    else super.PRG_RUN_DELAY_CYCLES
+  }
 
   override protected def warpMode(warpOn: Boolean, play: Boolean = true): Unit = {
     super.warpMode(warpOn, play)
@@ -131,7 +147,11 @@ class VIC20 extends CBMHomeComputer {
     // printer
     add(printer)
 
-    displayFrame.getContentPane.add("South", makeInfoPanel(true))
+    val infoPanel = makeInfoPanel(true)
+    val memPanel = new JPanel(new FlowLayout(FlowLayout.CENTER))
+    memPanel.add(memoryConfigLabel)
+    infoPanel.add("West",memPanel)
+    displayFrame.getContentPane.add("South", infoPanel)
     displayFrame.setTransferHandler(DNDHandler)
     Log.info(sw.toString)
 
@@ -162,8 +182,7 @@ class VIC20 extends CBMHomeComputer {
     // printer
     if (printerEnabled) printer.clock(cycles)
     // CPU PHI2
-    // TODO
-    //ProgramLoader.checkLoadingInWarpMode(true)
+    ProgramLoader.checkLoadingInWarpMode(cbmModel,true)
     cpu.fetchAndExecute(1)
   }
 
@@ -422,8 +441,11 @@ class VIC20 extends CBMHomeComputer {
   }
 
   protected def updateMemoryConfig(config:Int): Unit = {
+    import Preferences._
     clock.pause()
     mmu.setExpansion(config)
+    memoryConfigLabel.setText(VIC20MMU.getLabelConfig(config))
+    preferences.update(PREF_VIC20_MEM_CONFIG,VIC20MMU.getStringConfig(config))
     //reset(true)
     clock.play()
   }
