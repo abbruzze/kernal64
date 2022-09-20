@@ -61,6 +61,7 @@ class VIC20 extends CBMHomeComputer {
     if (config == EXP_BLK1) 1600000
     else if (config == (EXP_BLK1 | EXP_BLK2)) 2160000
     else if (config == (EXP_BLK1 | EXP_BLK2 | EXP_BLK3)) 2760000
+    else if (config == (EXP_BLK0 | EXP_BLK1 | EXP_BLK2 | EXP_BLK3 | EXP_BLK5)) 2900000
     else super.PRG_RUN_DELAY_CYCLES
   }
 
@@ -194,6 +195,7 @@ class VIC20 extends CBMHomeComputer {
     val dim = f match {
       case 1 => new Dimension(vicChip.VISIBLE_SCREEN_WIDTH << 1, vicChip.VISIBLE_SCREEN_HEIGHT)
       case 2 => vicChip.STANDARD_DIMENSION
+      case 3 => vicChip.TESTBENCH_DIMENSION
     }
     vicZoomFactor = f
     updateVICScreenDimension(dim)
@@ -487,6 +489,24 @@ class VIC20 extends CBMHomeComputer {
     // =====================================================================================================
   }
 
+  override protected def setVICModel(model:VICType.Value,preserveDisplayDim:Boolean = false,resetFlag:Boolean,play:Boolean = true) : Unit = {
+    super.setVICModel(model,preserveDisplayDim, resetFlag, play)
+    updateVICScreenDimension(vicChip.STANDARD_DIMENSION)
+    mmu.setVICType(model)
+  }
+
+  override protected def updateVICScreenDimension(dim: Dimension): Unit = {
+    display.setPreferredSize(dim)
+    display.invalidate()
+    display.repaint()
+    displayFrame.pack()
+    if (vicZoomFactor == 3) {
+      vicChip.asInstanceOf[vic.VIC_I].setTestBenchMode(true)
+    }
+    else vicChip.asInstanceOf[vic.VIC_I].setTestBenchMode(false)
+    // TODO: vicZoomFactor
+  }
+
   protected def setSettingsMenu(optionMenu: JMenu): Unit = {
     import Preferences._
     val ramConfigItem = new JMenuItem("RAM configuration ...")
@@ -495,6 +515,18 @@ class VIC20 extends CBMHomeComputer {
     optionMenu.add(ramConfigItem)
     preferences.add(PREF_VIC20_MEM_CONFIG, "memory configuration: comma separated list of enabled memory block. Memory blocks: 400,2000,4000,6000,A000", "") { config =>
       VIC20MMU.parseConfig(config,updateMemoryConfig _)
+    }
+    preferences.add(PREF_VIC20_8K_EXP, "8K RAM expansion", false,Set(),false) { _8K =>
+      if (_8K) updateMemoryConfig(VIC20MMU.EXP_BLK1)
+    }
+    preferences.add(PREF_VIC20_16K_EXP, "16K RAM expansion", false, Set(), false) { _16K =>
+      if (_16K) updateMemoryConfig(VIC20MMU.EXP_BLK1 | VIC20MMU.EXP_BLK2)
+    }
+    preferences.add(PREF_VIC20_24K_EXP, "24K RAM expansion", false, Set(), false) { _24K =>
+      if (_24K) updateMemoryConfig(VIC20MMU.EXP_BLK1 | VIC20MMU.EXP_BLK2 | VIC20MMU.EXP_BLK3)
+    }
+    preferences.add(PREF_VIC20_32K_EXP, "32K RAM expansion", false, Set(), false) { _32K =>
+      if (_32K) updateMemoryConfig(VIC20MMU.EXP_BLK1 | VIC20MMU.EXP_BLK2 | VIC20MMU.EXP_BLK3 | VIC20MMU.EXP_BLK5)
     }
     preferences.add(PREF_VIC20_IO2_ENABLED, "enables IO2 memory block as RAM", false) { enabled => mmu.setIO2RAM(enabled) }
     preferences.add(PREF_VIC20_IO3_ENABLED, "enables IO3 memory block as RAM", false) { enabled => mmu.setIO3RAM(enabled) }
@@ -650,7 +682,7 @@ class VIC20 extends CBMHomeComputer {
         finally loadStateFromOptions = false
       }
     }
-    preferences.add(PREF_SCREENDIM, "Zoom factor. Valued accepted are 0,1,2", 0, Set(0,1,2), false) { dim =>
+    preferences.add(PREF_SCREENDIM, "Zoom factor. Valued accepted are 1,2,3. 3 is for testbench only", 0, Set(1,2,3), false) { dim =>
       vicZoom(dim)
       zoomOverride = true
     }

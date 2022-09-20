@@ -6,10 +6,9 @@ import ucesoft.cbm.cpu.{RAMComponent, ROM}
 import ucesoft.cbm.formats.Cartridge
 import ucesoft.cbm.misc.TestCart
 import ucesoft.cbm.peripheral.drive.VIA
-import ucesoft.cbm.peripheral.vic.VIC_I
+import ucesoft.cbm.peripheral.vic.{VICModel, VICType, VIC_I}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
-import scala.collection.mutable
 
 object VIC20MMU {
   val KERNAL_ROM = new ROM(null, "Kernal", 0, 8192, ROM.VIC20_KERNAL_ROM_PROP)
@@ -104,8 +103,12 @@ class VIC20MMU extends RAMComponent {
 
   private var carts : List[Cartridge] = Nil
 
+  private var vicType: VICType.Value = VICType.PAL
+
   // Constructor
   setExpansion(NO_EXP)
+
+  def setVICType(vicModel:VICType.Value): Unit = this.vicType = vicModel
 
   def setBasicROM(rom:Array[Int]): Unit = basicROM = rom
   def setKernelROM(rom:Array[Int]): Unit = kernelROM = rom
@@ -168,7 +171,16 @@ class VIC20MMU extends RAMComponent {
     override def write(address: Int, value: Int): Unit = {}
   }
   private object KERNELROM_RW extends RW {
-    override def read(address: Int, chipID: ID): Int = kernelROM(address & 0x1FFF)
+    override def read(address: Int, chipID: ID): Int = {
+      address match {
+        case 0xEDE4 =>
+          if (vicType == VICType.PAL) 12 else 5
+        case 0xEDE5 =>
+          if (vicType == VICType.PAL) 38 else 18
+        case _ =>
+          kernelROM(address & 0x1FFF)
+      }
+    }
     override def write(address: Int, value: Int): Unit = {}
   }
   private object CHARROM_RW extends RW {

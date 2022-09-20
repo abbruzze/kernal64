@@ -216,7 +216,9 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
    */
   final private val VIC_CRF_BACKGROUND_BORDER_INV = 0xF
 
-  final private val FETCH_DELAY_COUNT = 3
+  final private val FETCH_DELAY_COUNT_PAL = 3
+  final private val FETCH_DELAY_COUNT_NTSC = 2
+
 
   // VIC's registers
   final private val regs = Array.ofDim[Int](16)
@@ -262,12 +264,13 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   private val palette = Palette.VIC_RGB
 
   private var firstModPixelX, firstModPixelY = 0 // first x,y pixel coordinate modified
-  private var lastModPixelX = model.BLANK_RIGHT_CYCLE << 2
   private var lastModPixelY = 0 // last y pixel coordinate modified
 
   private var potx, poty = 0xFF
 
   private val audio = new VIC_I_Audio(audioDriver)
+
+  private var testBenchMode = false
 
   // Constructor
   Palette.setPalette(PaletteType.VIC20_VICE)
@@ -280,7 +283,17 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   override def VISIBLE_SCREEN_WIDTH: Int = (model.BLANK_RIGHT_CYCLE - model.BLANK_LEFT_CYCLE) << 2
   override def VISIBLE_SCREEN_HEIGHT: Int = model.BLANK_BOTTOM_LINE - model.BLANK_TOP_LINE
   override def SCREEN_ASPECT_RATIO: Double = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
-  override def STANDARD_DIMENSION : Dimension = new Dimension(746,VISIBLE_SCREEN_HEIGHT << 1)
+  override def STANDARD_DIMENSION : Dimension = model match {
+    case VIC_I_PAL => new Dimension(746,VISIBLE_SCREEN_HEIGHT << 1)
+    case VIC_I_NTSC => new Dimension(730,VISIBLE_SCREEN_HEIGHT << 1)
+  }
+  override def TESTBENCH_DIMENSION : Dimension = new Dimension(568,284)
+
+  def setTestBenchMode(enabled:Boolean): Unit = {
+    testBenchMode = enabled
+    if (enabled) display.setClipArea(0, 28,284,312)
+    else display.setClipArea(model.BLANK_LEFT_CYCLE << 2, model.BLANK_TOP_LINE, model.BLANK_RIGHT_CYCLE << 2, model.BLANK_BOTTOM_LINE)
+  }
 
   override def getRasterLine = rasterLine
 
@@ -301,14 +314,12 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     displayMem = display.displayMem
 
     display.setClipArea(model.BLANK_LEFT_CYCLE << 2, model.BLANK_TOP_LINE, model.BLANK_RIGHT_CYCLE << 2, model.BLANK_BOTTOM_LINE)
-    //TODO: use for testbench => display.setClipArea(0, 28,284,312)
   }
 
 
   override def setVICModel(model: Model): Unit = {
     this.model = model
     lastModPixelY = model.RASTER_LINES
-    lastModPixelX = model.BLANK_RIGHT_CYCLE << 2
     firstModPixelX = -1
     firstModPixelY = 0
   }
@@ -328,7 +339,6 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     xpos = 0
 
     lastModPixelY = model.RASTER_LINES
-    lastModPixelX = model.BLANK_RIGHT_CYCLE << 2
     firstModPixelX = -1
     firstModPixelY = 0
 
@@ -391,7 +401,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
       vState = DISPLAY_AREA
     }
     if (latchedColumns == 0) closeHorizontalBorder()
-    displayCol = FETCH_DELAY_COUNT
+    displayCol = if (model == VIC_I_PAL) FETCH_DELAY_COUNT_PAL else FETCH_DELAY_COUNT_NTSC
     displayPtrInc = 0
   }
   @inline private def closeHorizontalBorder(): Unit = {
@@ -399,10 +409,14 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   }
 
   @inline private def endOfLine(): Unit = {
+    if (testBenchMode) {
+      while (xpos < SCREEN_WIDTH) drawBorderCycle()
+    }
+
     rasterLine += 1
     rasterCycle = 0
-    xpos = 0
     hState = IDLE_FETCH
+    xpos = 0
 
     if (vState == DISPLAY_AREA) {
       rowY += 1
@@ -430,7 +444,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     lightPenTriggered = false
 
     //display.showFrame(0,0,SCREEN_WIDTH,SCREEN_HEIGHT)
-    display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY + 1)
+    display.showFrame(firstModPixelX, firstModPixelY, SCREEN_WIDTH, lastModPixelY + 1)
     firstModPixelX = -1
   }
   @inline private def latchRowsNumber(): Unit = {
@@ -478,7 +492,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
       displayMem(index) = color
       if (firstModPixelX == -1) {
         firstModPixelY = rasterLine
-        firstModPixelX = model.BLANK_LEFT_CYCLE << 2
+        firstModPixelX = 0//model.BLANK_LEFT_CYCLE << 2
       }
       lastModPixelY = rasterLine
     }

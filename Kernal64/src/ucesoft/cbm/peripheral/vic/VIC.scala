@@ -36,6 +36,8 @@ abstract class VIC extends RAMComponent {
 
   def STANDARD_DIMENSION : Dimension = new Dimension(0,0)
 
+  def TESTBENCH_DIMENSION : Dimension = new Dimension()
+
   def getRasterLine : Int
   def getRasterCycle: Int
 

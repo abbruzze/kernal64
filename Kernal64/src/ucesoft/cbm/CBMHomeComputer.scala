@@ -839,7 +839,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       displayFrame.pack()
     }
 
-    if (resetFlag) reset()
+    if (resetFlag) reset(false)
     if (play) clock.play
   }
 

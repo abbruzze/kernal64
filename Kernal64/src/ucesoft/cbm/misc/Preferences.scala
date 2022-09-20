@@ -68,6 +68,10 @@ object Preferences {
   val PREF_VIC20_MEM_CONFIG   = "exp"
   val PREF_VIC20_IO2_ENABLED  = "io2"
   val PREF_VIC20_IO3_ENABLED  = "io3"
+  val PREF_VIC20_8K_EXP       = "8k"
+  val PREF_VIC20_16K_EXP      = "16k"
+  val PREF_VIC20_24K_EXP      = "24k"
+  val PREF_VIC20_32K_EXP      = "32k"
   // =============================================================
   class PreferenceIllegalArgumentException(msg:String) extends Exception(msg)
 
