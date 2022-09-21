@@ -42,7 +42,8 @@ class ROMPanel(prop:Properties, model:CBMComputerModel, scpu:Boolean = false) ex
     ROM("Drive 1541 Kernal",D1541_DOS_ROM_PROP,DRIVE),
     ROM("Drive 1571 Kernal",D1571_DOS_ROM_PROP,DRIVE),
     ROM("Drive 1581 Kernal",D1581_DOS_ROM_PROP,DRIVE),
-    ROM("VIC20 Kernal", VIC20_KERNAL_ROM_PROP, VIC20),
+    ROM("VIC20 PAL Kernal", VIC20_KERNAL_PAL_ROM_PROP, VIC20),
+    ROM("VIC20 NTSC Kernal", VIC20_KERNAL_NTSC_ROM_PROP, VIC20),
     ROM("VIC20 Basic", VIC20_BASIC_ROM_PROP, VIC20),
     ROM("VIC20 Char", VIC20_CHAR_ROM_PROP, VIC20)
   )

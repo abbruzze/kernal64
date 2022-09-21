@@ -11,7 +11,8 @@ import ucesoft.cbm.peripheral.vic.{VICModel, VICType, VIC_I}
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
 object VIC20MMU {
-  val KERNAL_ROM = new ROM(null, "Kernal", 0, 8192, ROM.VIC20_KERNAL_ROM_PROP)
+  val KERNAL_PAL_ROM = new ROM(null, "KernalPal", 0, 8192, ROM.VIC20_KERNAL_PAL_ROM_PROP)
+  val KERNAL_NTSC_ROM = new ROM(null, "KernalNtsc", 0, 8192, ROM.VIC20_KERNAL_NTSC_ROM_PROP)
   val BASIC_ROM = new ROM(null, "Basic", 0, 8192, ROM.VIC20_BASIC_ROM_PROP)
   val CHAR_ROM = new ROM(null, "Char", 0, 4096, ROM.VIC20_CHAR_ROM_PROP)
 
@@ -73,7 +74,7 @@ class VIC20MMU extends RAMComponent {
   private val memRW = Array.ofDim[RW](0x10000)
   private val ram = Array.ofDim[Int](0x10000)
   private var basicROM : Array[Int] = _
-  private var kernelROM : Array[Int] = _
+  private var kernelROM_PAL,kernelROM_NTSC,kernelROM : Array[Int] = _
   private var charROM : Array[Int] = _
   /*
     Index   Memory
@@ -108,10 +109,17 @@ class VIC20MMU extends RAMComponent {
   // Constructor
   setExpansion(NO_EXP)
 
-  def setVICType(vicModel:VICType.Value): Unit = this.vicType = vicModel
+  def setVICType(vicModel:VICType.Value): Unit = {
+    this.vicType = vicModel
+    kernelROM = vicType match {
+      case VICType.PAL => kernelROM_PAL
+      case VICType.NTSC => kernelROM_NTSC
+    }
+  }
 
   def setBasicROM(rom:Array[Int]): Unit = basicROM = rom
-  def setKernelROM(rom:Array[Int]): Unit = kernelROM = rom
+  def setKernelPALROM(rom:Array[Int]): Unit = kernelROM_PAL = rom
+  def setKernelNTSCROM(rom: Array[Int]): Unit = kernelROM_NTSC = rom
   def setCharROM(rom:Array[Int]): Unit = charROM = rom
 
   def setIO2RAM(enabled:Boolean): Unit = ioBlocks(0).enabled = enabled
@@ -171,16 +179,7 @@ class VIC20MMU extends RAMComponent {
     override def write(address: Int, value: Int): Unit = {}
   }
   private object KERNELROM_RW extends RW {
-    override def read(address: Int, chipID: ID): Int = {
-      address match {
-        case 0xEDE4 =>
-          if (vicType == VICType.PAL) 12 else 5
-        case 0xEDE5 =>
-          if (vicType == VICType.PAL) 38 else 18
-        case _ =>
-          kernelROM(address & 0x1FFF)
-      }
-    }
+    override def read(address: Int, chipID: ID): Int = kernelROM(address & 0x1FFF)
     override def write(address: Int, value: Int): Unit = {}
   }
   private object CHARROM_RW extends RW {

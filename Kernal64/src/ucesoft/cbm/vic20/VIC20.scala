@@ -18,6 +18,7 @@ import ucesoft.cbm.trace.TraceDialog
 import java.awt._
 import java.awt.event.{ActionEvent, ActionListener}
 import java.io._
+import java.util.Properties
 import javax.swing._
 
 object VIC20 extends App {
@@ -102,7 +103,8 @@ class VIC20 extends CBMHomeComputer {
     add(rs232)
     // ROMs
     add(VIC20MMU.CHAR_ROM)
-    add(VIC20MMU.KERNAL_ROM)
+    add(VIC20MMU.KERNAL_PAL_ROM)
+    add(VIC20MMU.KERNAL_NTSC_ROM)
     add(VIC20MMU.BASIC_ROM)
     // -----------------------
     // TODO
@@ -163,8 +165,10 @@ class VIC20 extends CBMHomeComputer {
   override def afterInitHook : Unit = {
     super.afterInitHook
     mmu.setCharROM(VIC20MMU.CHAR_ROM.getROMBytes())
-    mmu.setKernelROM(VIC20MMU.KERNAL_ROM.getROMBytes())
+    mmu.setKernelPALROM(VIC20MMU.KERNAL_PAL_ROM.getROMBytes())
+    mmu.setKernelNTSCROM(VIC20MMU.KERNAL_NTSC_ROM.getROMBytes())
     mmu.setBasicROM(VIC20MMU.BASIC_ROM.getROMBytes())
+    mmu.setVICType(VICType.PAL)
   }
 
   protected def mainLoop(cycles: Long): Unit = {
@@ -692,7 +696,18 @@ class VIC20 extends CBMHomeComputer {
     preferences.add(PREF_IGNORE_CONFIG_FILE, "Ignore configuration file and starts emulator with default configuration", false, Set(), false) {
       ignoreConfig = _
     }
-    preferences.add(PREF_KERNEL, "Set kernel rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.VIC20_KERNAL_ROM_PROP, file) }
+    preferences.add(VIC20_PREF_KERNEL_PAL, "Set pal kernel rom path", "", Set.empty, false) { file =>
+      if (file != "") {
+        reloadROM(ROM.VIC20_KERNAL_PAL_ROM_PROP, file)
+        mmu.setKernelPALROM(VIC20MMU.KERNAL_PAL_ROM.getROMBytes())
+      }
+    }
+    preferences.add(VIC20_PREF_KERNEL_NTSC, "Set ntsc kernel rom path", "", Set.empty, false) { file =>
+      if (file != "") {
+        reloadROM(ROM.VIC20_KERNAL_NTSC_ROM_PROP, file)
+        mmu.setKernelNTSCROM(VIC20MMU.KERNAL_NTSC_ROM.getROMBytes())
+      }
+    }
     preferences.add(PREF_BASIC, "Set basic rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.VIC20_BASIC_ROM_PROP, file) }
     preferences.add(PREF_CHARROM, "Set char rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.VIC20_CHAR_ROM_PROP, file) }
     preferences.add(PREF_1541DOS, "Set 1541 dos rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.D1541_DOS_ROM_PROP, file) }
@@ -725,6 +740,12 @@ class VIC20 extends CBMHomeComputer {
       }
       saveConfigurationFile
     }
+  }
+
+  override protected def setDefaultProperties(configuration: Properties): Unit = {
+    import Preferences._
+    configuration.setProperty(PREF_RENDERINGTYPE, "default")
+    configuration.setProperty(PREF_WRITEONDISK, "true")
   }
 
   protected def getRAM: Memory = mmu

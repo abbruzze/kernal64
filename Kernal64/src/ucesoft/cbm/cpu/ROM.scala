@@ -92,7 +92,8 @@ object ROM {
   val C128_INTERNAL_ROM_PROP = "internal128.function.rom.file"
   val C128_EXTERNAL_ROM_PROP = "external128.function.rom.file"
 
-  val VIC20_KERNAL_ROM_PROP = "kernal20.rom.file"
+  val VIC20_KERNAL_PAL_ROM_PROP = "kernal_pal20.rom.file"
+  val VIC20_KERNAL_NTSC_ROM_PROP = "kernal_ntsc20.rom.file"
   val VIC20_BASIC_ROM_PROP = "basic20.rom.file"
   val VIC20_CHAR_ROM_PROP = "char20.rom.file"
 
@@ -112,7 +113,8 @@ object ROM {
     C64_BASIC_ROM_PROP -> "roms/basic.rom",
     C64_CHAR_ROM_PROP -> "roms/chargen.rom",
     // VIC20
-    VIC20_KERNAL_ROM_PROP -> "roms/vic20/kernal",
+    VIC20_KERNAL_PAL_ROM_PROP -> "roms/vic20/kernal",
+    VIC20_KERNAL_NTSC_ROM_PROP -> "roms/vic20/kernal_ntsc",
     VIC20_BASIC_ROM_PROP -> "roms/vic20/basic",
     VIC20_CHAR_ROM_PROP -> "roms/vic20/chargen",
     // SCPU
