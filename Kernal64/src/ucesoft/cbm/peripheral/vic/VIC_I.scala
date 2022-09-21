@@ -307,7 +307,13 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
 
   def enableLightPen(enabled: Boolean): Unit = lightPenEnabled = enabled
 
-  def triggerLightPen(): Unit = {}
+  def triggerLightPen(): Unit = {
+    if (!lightPenTriggered) {
+      lightPenTriggered = true
+      lpX = (xpos >> 1) & 0xFF
+      lpY = (rasterLine >> 1) & 0xFF
+    }
+  }
 
   override def setDisplay(display: Display): Unit = {
     this.display = display
@@ -498,11 +504,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     }
 
     if (lightPenEnabled) {
-      if (!lightPenTriggered && rasterLine == display.getLightPenY && xpos == display.getLightPenX) {
-        lightPenTriggered = true
-        lpX = (xpos >> 1) & 0xFF
-        lpY = (rasterLine >> 1) & 0xFF
-      }
+      if (rasterLine == display.getLightPenY && xpos == display.getLightPenX) triggerLightPen()
     }
   }
 
@@ -646,8 +648,43 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   }
 
   override protected def saveState(out: ObjectOutputStream): Unit = {
-
+    out.writeObject(regs)
+    out.writeInt(vState)
+    out.writeInt(hState)
+    // model is injected from outside
+    out.writeInt(rasterLine)
+    out.writeInt(rasterCycle)
+    out.writeInt(displayPtr)
+    out.writeInt(displayPtrInc)
+    out.writeInt(rowCounter)
+    out.writeInt(rowY)
+    out.writeInt(latchedColumns)
+    out.writeInt(latchedRows)
+    out.writeInt(charHeight)
+    out.writeInt(charCode)
+    out.writeObject(gBuf)
+    out.writeObject(cBuf)
+    out.writeInt(displayCol)
+    out.writeInt(xpos)
   }
-  override protected def loadState(in: ObjectInputStream): Unit = ???
+  override protected def loadState(in: ObjectInputStream): Unit = {
+    loadMemory(regs,in)
+    vState = in.readInt()
+    hState = in.readInt()
+    rasterLine = in.readInt()
+    rasterCycle = in.readInt()
+    displayPtr = in.readInt()
+    displayPtrInc = in.readInt()
+    rowCounter = in.readInt()
+    rowY = in.readInt()
+    latchedColumns = in.readInt()
+    latchedRows = in.readInt()
+    charHeight = in.readInt()
+    charCode = in.readInt()
+    loadMemory(gBuf,in)
+    loadMemory(cBuf,in)
+    displayCol = in.readInt()
+    xpos = in.readInt()
+  }
   override protected def allowsStateRestoring: Boolean = true
 }

@@ -355,30 +355,29 @@ class VIC20 extends CBMHomeComputer {
     )
 
     def updateConfig(config:Int): Unit = {
+      bChecks(0).setSelected((config & EXP_BLK0) > 0)
+      bChecks(1).setSelected((config & EXP_BLK1) > 0)
+      bChecks(2).setSelected((config & EXP_BLK2) > 0)
+      bChecks(3).setSelected((config & EXP_BLK3) > 0)
+      bChecks(4).setSelected((config & EXP_BLK5) > 0)
+
       if (config == NO_EXP) {
         configTemplate.setSelectedIndex(0)
-        for(b <- bChecks) b.setSelected(false)
       }
       else if (config == EXP_BLK0) {
         configTemplate.setSelectedIndex(1)
-        bChecks(0).setSelected(true)
-        for(b <- 0 until bChecks.length) bChecks(b).setSelected(b == 0)
       }
       else if (config == EXP_BLK1) {
         configTemplate.setSelectedIndex(2)
-        for(b <- 0 until bChecks.length) bChecks(b).setSelected(b == 1)
       }
       else if (config == (EXP_BLK1 | EXP_BLK2)) {
         configTemplate.setSelectedIndex(3)
-        for(b <- 0 until bChecks.length) bChecks(b).setSelected(b == 1 || b == 2)
       }
       else if (config == (EXP_BLK1 | EXP_BLK2 | EXP_BLK3)) {
         configTemplate.setSelectedIndex(4)
-        for(b <- 0 until bChecks.length) bChecks(b).setSelected(b == 1 || b == 2 || b == 3)
       }
       else if (config == (EXP_BLK0 | EXP_BLK1 | EXP_BLK2 | EXP_BLK3 | EXP_BLK5)) {
         configTemplate.setSelectedIndex(5)
-        for(b <- bChecks) b.setSelected(true)
       }
       else configTemplate.setSelectedIndex(6)
     }
