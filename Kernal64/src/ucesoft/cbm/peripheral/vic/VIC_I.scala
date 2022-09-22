@@ -272,6 +272,13 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
 
   private var testBenchMode = false
 
+  // interlace handling
+  private var frameEven = true
+  private var interlaceMode = false
+  private var interlaceModePending = false
+  private var interlaceModePendingValue = false
+  private var interlaceModeListener : Boolean => Unit = _
+
   // Constructor
   Palette.setPalette(PaletteType.VIC20_VICE)
   setVICModel(VIC_I_PAL)
@@ -279,7 +286,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   Clock.systemClock.addChangeFrequencyListener(audio.setCPUFrequency _)
 
   override def SCREEN_WIDTH: Int = model.RASTER_CYCLES << 2
-  override def SCREEN_HEIGHT: Int = model.RASTER_LINES
+  override def SCREEN_HEIGHT: Int = if (model == VIC_I_PAL) model.RASTER_LINES else model.RASTER_LINES + 2
   override def VISIBLE_SCREEN_WIDTH: Int = (model.BLANK_RIGHT_CYCLE - model.BLANK_LEFT_CYCLE) << 2
   override def VISIBLE_SCREEN_HEIGHT: Int = model.BLANK_BOTTOM_LINE - model.BLANK_TOP_LINE
   override def SCREEN_ASPECT_RATIO: Double = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
@@ -294,6 +301,8 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     if (enabled) display.setClipArea(0, 28,284,312)
     else display.setClipArea(model.BLANK_LEFT_CYCLE << 2, model.BLANK_TOP_LINE, model.BLANK_RIGHT_CYCLE << 2, model.BLANK_BOTTOM_LINE)
   }
+
+  def setInterlaceModeListener(l:Boolean => Unit): Unit = interlaceModeListener = l
 
   override def getRasterLine = rasterLine
 
@@ -319,7 +328,10 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     this.display = display
     displayMem = display.displayMem
 
-    display.setClipArea(model.BLANK_LEFT_CYCLE << 2, model.BLANK_TOP_LINE, model.BLANK_RIGHT_CYCLE << 2, model.BLANK_BOTTOM_LINE)
+    if (!interlaceMode)
+      display.setClipArea(model.BLANK_LEFT_CYCLE << 2, model.BLANK_TOP_LINE, model.BLANK_RIGHT_CYCLE << 2, model.BLANK_BOTTOM_LINE)
+    else
+      display.setClipArea(model.BLANK_LEFT_CYCLE << 2, model.BLANK_TOP_LINE << 1, model.BLANK_RIGHT_CYCLE << 2, model.BLANK_BOTTOM_LINE << 1)
   }
 
 
@@ -353,6 +365,10 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
 
     vState = TOP_BORDER
     hState = IDLE_FETCH
+
+    frameEven = true
+    interlaceMode = false
+    interlaceModePending = false
   }
   override def init(): Unit = {
     add(audio)
@@ -375,6 +391,15 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   override def write(address: Int, value: Int, chipID: ID): Unit = {
     regs(address & 0xF) = value
     address & 0xF match {
+      case VIC_CR0_HORIGIN =>
+        if (model == VIC_I_NTSC) {
+          val newInterlaceMode = (value & 0x80) > 0
+          if (newInterlaceMode != interlaceMode) {
+            interlaceModePendingValue = newInterlaceMode
+            if (interlaceModeListener != null) interlaceModeListener(newInterlaceMode)
+            interlaceModePending = true
+          }
+        }
       case VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE =>
         charHeight = if ((value & 1) == 0) 8 else 16
       case VIC_CRA_SOUND_OSC_1 =>
@@ -448,8 +473,18 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     vState = TOP_BORDER
     rowY = 0
     lightPenTriggered = false
+    frameEven ^= true
+    if (interlaceModePending) {
+      interlaceModePending = false
+      interlaceMode = interlaceModePendingValue
+      if (interlaceMode)
+        display.setNewResolution(526,SCREEN_WIDTH)
+      else
+        display.setNewResolution(SCREEN_HEIGHT,SCREEN_WIDTH)
+      setDisplay(display)
+    }
 
-    //display.showFrame(0,0,SCREEN_WIDTH,SCREEN_HEIGHT)
+    //if (interlaceMode) display.showFrame(0,0,SCREEN_WIDTH,SCREEN_HEIGHT << 1) else display.showFrame(0,0,SCREEN_WIDTH,SCREEN_HEIGHT)
     display.showFrame(firstModPixelX, firstModPixelY, SCREEN_WIDTH, lastModPixelY + 1)
     firstModPixelX = -1
   }
@@ -497,10 +532,10 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     if (displayMem(index) != color) {
       displayMem(index) = color
       if (firstModPixelX == -1) {
-        firstModPixelY = rasterLine
+        firstModPixelY = rasterLineToDraw()
         firstModPixelX = 0//model.BLANK_LEFT_CYCLE << 2
       }
-      lastModPixelY = rasterLine
+      lastModPixelY = rasterLineToDraw()
     }
 
     if (lightPenEnabled) {
@@ -508,11 +543,18 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     }
   }
 
+  @inline private def rasterLineToDraw(): Int = {
+    if (interlaceMode) {
+      if (frameEven) rasterLine << 1 else (rasterLine << 1) + 1
+    }
+    else rasterLine
+  }
+
   private def drawDisplayCycle(): Unit = {
     val index = if (displayCol - 2 >= 0) 2 else 1
     var gData = gBuf(displayCol - index)
 
-    val ypos = rasterLine * SCREEN_WIDTH
+    val ypos = rasterLineToDraw() * SCREEN_WIDTH
 
     val backgroundColorIndex = regs(VIC_CRF_BACKGROUND_BORDER_INV) >> 4
     val invertColors = (regs(VIC_CRF_BACKGROUND_BORDER_INV) & 8) == 0
@@ -559,7 +601,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   }
 
   private def drawBorderCycle(): Unit = {
-    val ypos = rasterLine * SCREEN_WIDTH
+    val ypos = rasterLineToDraw() * SCREEN_WIDTH
 
     val borderColor = palette(regs(VIC_CRF_BACKGROUND_BORDER_INV) & 7)
     var p = 0
@@ -625,7 +667,12 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     // check end of line
     if (rasterCycle == model.RASTER_CYCLES) {
       endOfLine()
-      if (rasterLine == model.RASTER_LINES) endOfFrame()
+      val rasterLines = if (interlaceMode) {
+        if (frameEven) model.RASTER_LINES + 1
+        else model.RASTER_LINES + 2
+      }
+      else model.RASTER_LINES
+      if (rasterLine == rasterLines) endOfFrame()
     }
 
     // check horizontal border for opening

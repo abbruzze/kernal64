@@ -49,6 +49,7 @@ class VIC20 extends CBMHomeComputer {
   override protected lazy val keyb = new keyboard.HomeKeyboard(keybMapper,low => via1.restoreKeyPressed(low),false)
 
   protected val memoryConfigLabel = new JLabel()
+  protected val interlaceModeLabel = new JLabel()
 
   override protected def PRG_LOAD_ADDRESS() = {
     import VIC20MMU._
@@ -152,7 +153,11 @@ class VIC20 extends CBMHomeComputer {
 
     val infoPanel = makeInfoPanel(true)
     val memPanel = new JPanel(new FlowLayout(FlowLayout.CENTER))
+    memPanel.add(interlaceModeLabel)
     memPanel.add(memoryConfigLabel)
+    vicChip.asInstanceOf[vic.VIC_I].setInterlaceModeListener(enabled => {
+      if (enabled) interlaceModeLabel.setText("Interlace on") else interlaceModeLabel.setText("")
+    })
     infoPanel.add("West",memPanel)
     displayFrame.getContentPane.add("South", infoPanel)
     displayFrame.setTransferHandler(DNDHandler)

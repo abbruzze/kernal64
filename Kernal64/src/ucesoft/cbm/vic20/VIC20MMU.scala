@@ -279,6 +279,7 @@ class VIC20MMU extends RAMComponent {
   override def reset(): Unit = {}
 
   override def hardReset(): Unit = {
+    java.util.Arrays.fill(ram,0)
     for(e <- expansionBlocks) {
       e.removeROM()
       //e.enabled = false
