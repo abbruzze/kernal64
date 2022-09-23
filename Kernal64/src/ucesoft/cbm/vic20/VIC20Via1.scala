@@ -6,6 +6,7 @@ import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.controlport.ControlPort
 import ucesoft.cbm.peripheral.drive.VIA
+import ucesoft.cbm.peripheral.rs232.RS232
 
 /*
 9110-911F  37136-37151 6522 VIA#1
@@ -49,6 +50,8 @@ import ucesoft.cbm.peripheral.drive.VIA
  */
 class VIC20Via1(bus:IECBus,
                 controlPort:ControlPort,
+                userPort:ControlPort,
+                rs232: RS232,
                 datassette:Datassette,
                 nmiAction:Boolean => Unit,
                 lightPenTriggerHandler: () => Unit) extends VIA("VIA_1",0x9110,nmiAction) with IECBusListener {
@@ -65,6 +68,21 @@ class VIC20Via1(bus:IECBus,
       val joy012Fire = (joy & 7) << 2 | (joy & 0x10) << 1
       val serial = (~(bus.clk | bus.data << 1)) & 0x3
       0x80 | serial | joy012Fire | (if (datassette.isPlayPressed) 0 else 0x40) // 0x80 = atn in
+    case PB =>
+      /*
+        Second joystick on User Port
+        PB1 = joy 3 (right = 8)
+        PB2 = joy 0 (up = 1)
+        PB3 = joy 1 (down = 2)
+        PB4 = joy 2 (left = 4)
+        PB5 = fire ( = 16)
+       */
+      super.read(address, chipID)
+      val joy = userPort.readPort
+      val userJoy = (joy & 7) << 2 | (joy & 8) >> 2 | (joy & 16) << 1 | 0xC1
+      val user = userJoy & (if (rs232.isEnabled) rs232.getOthers else 0xFF)
+      println(user)
+      user
     case _ =>
       super.read(address,chipID)
   }
@@ -82,4 +100,5 @@ class VIC20Via1(bus:IECBus,
   def restoreKeyPressed(pressed:Boolean): Unit = CA1In(pressed)
 
   override def CA2Out(state: Boolean): Unit = datassette.setMotor(!state)
+  override def CB2Out(state: Boolean): Unit = rs232.setTXD(if (state) 1 else 0)
 }

@@ -8,7 +8,7 @@ import java.awt.{Dimension, GridLayout, Point}
 import java.util.Properties
 import javax.swing._
 
-class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:GamePadControlPort) extends JDialog(parent, "Joystick settings", true) with ActionListener {
+class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:GamePadControlPort,joyLabels:Array[String] = Array("Port #1","Port #2")) extends JDialog(parent, "Joystick settings", true) with ActionListener {
   private[this] var joyButtonSelected = ""
   private[this] var joystickDialog : JDialog = null
   private[this] var keyboardDialog : JDialog = null
@@ -78,9 +78,9 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
   }
   
   val port1Panel = new JPanel
-  port1Panel.add(new JLabel("Port #1:", SwingConstants.RIGHT))
+  port1Panel.add(new JLabel(s"${joyLabels(0)}:", SwingConstants.RIGHT))
   val port2Panel = new JPanel
-  port2Panel.add(new JLabel("Port #2:", SwingConstants.RIGHT))
+  port2Panel.add(new JLabel(s"${joyLabels(1)}:", SwingConstants.RIGHT))
   val port1JoyCombo = new JComboBox(Array("Keypad", "Gamepad", "Keyboard", "None"))
   port1Panel.add(port1JoyCombo)
   val port2JoyCombo = new JComboBox(Array("Keypad", "Gamepad", "Keyboard" , "None"))

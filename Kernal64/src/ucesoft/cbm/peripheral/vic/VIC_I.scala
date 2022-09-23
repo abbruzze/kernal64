@@ -366,20 +366,44 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     vState = TOP_BORDER
     hState = IDLE_FETCH
 
+    if (interlaceMode) {
+      interlaceMode = false
+      display.setNewResolution(SCREEN_HEIGHT,SCREEN_WIDTH)
+      setDisplay(display)
+      if (interlaceModeListener != null) interlaceModeListener(false)
+    }
     frameEven = true
-    interlaceMode = false
     interlaceModePending = false
   }
   override def init(): Unit = {
     add(audio)
   }
 
+  @inline private def readRasterLine(): Int = {
+    model match {
+      case VIC_I_NTSC =>
+        if (rasterCycle >= 28) {
+          val lastLine =
+          if (interlaceMode) {
+            if (frameEven) 262 else 263
+          }
+          else 261
+
+          if (rasterLine == lastLine) 0 else rasterLine + 1
+        }
+        else
+          rasterLine
+      case VIC_I_PAL =>
+        rasterLine
+    }
+  }
+
   override def read(address: Int, chipID: ID): Int = {
     address & 0xF match {
       case VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE =>
-        regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) | (rasterLine & 1) << 7
+        regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) | (readRasterLine() & 1) << 7
       case VIC_CR4_RASTER_H =>
-        rasterLine >> 1
+        readRasterLine() >> 1
       case VIC_CR6_H_LIGHTPEN => lpX
       case VIC_CR7_V_LIGHTPEN => lpY
       case VIC_CR8_PADDLE_X => potx
@@ -668,8 +692,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     if (rasterCycle == model.RASTER_CYCLES) {
       endOfLine()
       val rasterLines = if (interlaceMode) {
-        if (frameEven) model.RASTER_LINES + 1
-        else model.RASTER_LINES + 2
+        if (frameEven) 262 else 263
       }
       else model.RASTER_LINES
       if (rasterLine == rasterLines) endOfFrame()

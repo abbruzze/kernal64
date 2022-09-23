@@ -8,6 +8,7 @@ import ucesoft.cbm.formats._
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
 import ucesoft.cbm.peripheral.c2n.Datassette
+import ucesoft.cbm.peripheral.controlport.JoystickSettingDialog
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.sid.DefaultAudioDriver
@@ -108,15 +109,13 @@ class VIC20 extends CBMHomeComputer {
     add(VIC20MMU.KERNAL_NTSC_ROM)
     add(VIC20MMU.BASIC_ROM)
     // -----------------------
-    // TODO
-    //rs232.setCIA12(cia1, cia2)
     vicChip = new vic.VIC_I(mmu,audioDriver)
     add(vicChip)
     // tape
     datassette = new Datassette(() => via2.datassetteReadLine() )
     add(datassette)
     // VIAs
-    via1 = new VIC20Via1(bus,controlPortB,datassette,cpu.nmiRequest _, vicChip.triggerLightPen _)
+    via1 = new VIC20Via1(bus,controlPortB,controlPortA,rs232,datassette,cpu.nmiRequest _, vicChip.triggerLightPen _)
     via2 = new VIC20Via2(bus,keyb,controlPortB,datassette,cpu.irqRequest _,via1)
     add(via1)
     add(via2)
@@ -515,6 +514,18 @@ class VIC20 extends CBMHomeComputer {
     // TODO: vicZoomFactor
   }
 
+  override protected def joySettings(): Unit = {
+    Clock.systemClock.pause
+    try {
+      val dialog = new JoystickSettingDialog(displayFrame, configuration, gameControlPort,Array("Control Port","User Port"))
+      dialog.setVisible(true)
+      configureJoystick
+    }
+    finally {
+      Clock.systemClock.play
+    }
+  }
+
   protected def setSettingsMenu(optionMenu: JMenu): Unit = {
     import Preferences._
     val ramConfigItem = new JMenuItem("RAM configuration ...")
@@ -640,8 +651,6 @@ class VIC20 extends CBMHomeComputer {
     IOItem.add(rs232Item)
 
     // -----------------------------------
-
-    IOItem.addSeparator()
 
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
