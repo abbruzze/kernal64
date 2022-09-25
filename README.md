@@ -1,4 +1,6 @@
 [![Build Status](https://app.travis-ci.com/abbruzze/kernal64.svg?branch=master)](https://app.travis-ci.com/abbruzze/kernal64)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=abbruzze_kernal64&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=abbruzze_kernal64)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=abbruzze_kernal64&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=abbruzze_kernal64)
 [![Release](https://img.shields.io/github/v/release/abbruzze/kernal64)](https://github.com/abbruzze/kernal64/releases)
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
