@@ -152,7 +152,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     WiC64.flag2Action = cia2.setFlagLow _
     wic64Panel = new WiC64Panel(displayFrame,preferences)
     WiC64.setListener(wic64Panel)
-    rs232.setCIA12(cia1,cia2)
+    rs232.setBitReceivedListener(cia2.setFlagLow _)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
     vicChip = new vic.VIC_II(vicMemory,mmu.colorRAM,irqSwitcher.setLine(Switcher.VIC,_),baLow _,true)

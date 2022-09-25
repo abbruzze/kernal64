@@ -7,7 +7,7 @@ import ucesoft.cbm.{Clock, ClockEvent, Log}
 import java.util.Properties
 
 abstract class AbstractRS232 extends RS232 with ModemCommandListener {
-  protected var cia1,cia2 : CIA = _
+  protected var bitReceivedListener : () => Unit = _
   private[this] var txd,others = 0
   private[this] var stop,parity,bits,length = 0
   protected var dsr: Int = DSR
@@ -73,11 +73,8 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     properties.setProperty("Total bytes sent",totalByteSent.toString)
     properties
   }
-  
-  def setCIA12(cia1:CIA,cia2:CIA) : Unit = {
-    this.cia2 = cia2
-    this.cia1 = cia1
-  }
+
+  def setBitReceivedListener(listener: () => Unit) : Unit = bitReceivedListener = listener
   
   def setTXD(high:Int) : Unit = {
     txd = high
@@ -227,7 +224,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     sendState = 0
     // send start bit
     rxd = 0
-    cia2.setFlagLow
+    bitReceivedListener()
     //sendRXD(false)
     bitsent = 1
     tmpParity = 0
@@ -253,7 +250,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
             else sendState += 1
           } // skip parity
         }
-        if (rxd == 0) cia2.setFlagLow
+        if (rxd == 0) bitReceivedListener()
         sendRXD(rxd > 0)
         true
       case 1 => // PARITY
@@ -265,7 +262,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
         }
         if (stopin == 0) sendState = 4
         else sendState += 1
-        if (rxd == 0) cia2.setFlagLow
+        if (rxd == 0) bitReceivedListener()
         sendRXD(rxd > 0)
         true
       case 2 => // STOP #1

@@ -65,6 +65,7 @@ class VIC20 extends CBMHomeComputer {
     else if (config == (EXP_BLK1 | EXP_BLK2)) 2160000
     else if (config == (EXP_BLK1 | EXP_BLK2 | EXP_BLK3)) 2760000
     else if (config == (EXP_BLK0 | EXP_BLK1 | EXP_BLK2 | EXP_BLK3 | EXP_BLK5)) 2900000
+    else if (config == (EXP_BLK1 | EXP_BLK2 | EXP_BLK3 | EXP_BLK5)) 2900000
     else super.PRG_RUN_DELAY_CYCLES
   }
 
@@ -449,14 +450,14 @@ class VIC20 extends CBMHomeComputer {
     dialog.setVisible(true)
   }
 
-  protected def updateMemoryConfig(config:Int): Unit = {
+  protected def updateMemoryConfig(config:Int,play:Boolean = true): Unit = {
     import Preferences._
     clock.pause()
     mmu.setExpansion(config)
     memoryConfigLabel.setText(VIC20MMU.getLabelConfig(config))
     preferences.update(PREF_VIC20_MEM_CONFIG,VIC20MMU.getStringConfig(config))
     //reset(true)
-    clock.play()
+    if (play) clock.play()
   }
 
   override protected def setRenderingSettings(parent: JMenu): Unit = {
@@ -526,6 +527,68 @@ class VIC20 extends CBMHomeComputer {
     }
   }
 
+  override protected def setGEORamSettings(parent: JMenu): Unit = {
+    import Preferences._
+    // GEO-RAM =============================================================================================
+    val geoItem = new JMenu("GeoRAM")
+    val groupgeo = new ButtonGroup
+    val noGeoItem = new JRadioButtonMenuItem("None")
+    noGeoItem.setSelected(true)
+    noGeoItem.addActionListener(_ => preferences(PREF_GEORAM) = "none")
+    groupgeo.add(noGeoItem)
+    geoItem.add(noGeoItem)
+    val _512kGeoItem = new JRadioButtonMenuItem("512K")
+    _512kGeoItem.addActionListener(_ => preferences(PREF_GEORAM) = "512")
+    groupgeo.add(_512kGeoItem)
+    geoItem.add(_512kGeoItem)
+    val _1024kGeoItem = new JRadioButtonMenuItem("1024K")
+    _1024kGeoItem.addActionListener(_ => preferences(PREF_GEORAM) = "1024")
+    groupgeo.add(_1024kGeoItem)
+    geoItem.add(_1024kGeoItem)
+    val _2048kGeoItem = new JRadioButtonMenuItem("2048K")
+    _2048kGeoItem.addActionListener(_ => preferences(PREF_GEORAM) = "2048")
+    groupgeo.add(_2048kGeoItem)
+    geoItem.add(_2048kGeoItem)
+    val _4096kGeoItem = new JRadioButtonMenuItem("4096K")
+    _4096kGeoItem.addActionListener(_ => preferences(PREF_GEORAM) = "4096")
+    groupgeo.add(_4096kGeoItem)
+    geoItem.add(_4096kGeoItem)
+
+    parent.add(geoItem)
+    preferences.add(PREF_GEORAM, "Set the georam size (none,512,1024,2048,4096)", "none", Set("none","512","1024","2048","4096")) { geo =>
+      if (geo == "512") {
+        _512kGeoItem.setSelected(true)
+        setGeoRAM(true, 512)
+      }
+      else if (geo == "1024") {
+        _1024kGeoItem.setSelected(true)
+        setGeoRAM(true, 1024)
+      }
+      else if (geo == "2048") {
+        _2048kGeoItem.setSelected(true)
+        setGeoRAM(true, 2048)
+      }
+      else if (geo == "4096") {
+        _4096kGeoItem.setSelected(true)
+        setGeoRAM(true, 4096)
+      }
+      else setGeoRAM(false)
+    }
+
+    // reset setting
+    resetSettingsActions = (() => {
+      noGeoItem.setSelected(true)
+      setGeoRAM(false)
+    }) :: resetSettingsActions
+  }
+
+  override protected def setGeoRAM(enabled:Boolean,size:Int = 0): Unit = {
+    if (!enabled) mmu.detachSpecialCart()
+    else {
+      mmu.attachSpecialCart(new VIC20GeoRAM(size,cpu.irqRequest _,cpu.nmiRequest _,mmu))
+    }
+  }
+
   protected def setSettingsMenu(optionMenu: JMenu): Unit = {
     import Preferences._
     val ramConfigItem = new JMenuItem("RAM configuration ...")
@@ -533,19 +596,19 @@ class VIC20 extends CBMHomeComputer {
     ramConfigItem.addActionListener(_ => showRAMConfig() )
     optionMenu.add(ramConfigItem)
     preferences.add(PREF_VIC20_MEM_CONFIG, "memory configuration: comma separated list of enabled memory block. Memory blocks: 400,2000,4000,6000,A000", "") { config =>
-      VIC20MMU.parseConfig(config,updateMemoryConfig _)
+      VIC20MMU.parseConfig(config,updateMemoryConfig(_,false) )
     }
     preferences.add(PREF_VIC20_8K_EXP, "8K RAM expansion", false,Set(),false) { _8K =>
-      if (_8K) updateMemoryConfig(VIC20MMU.EXP_BLK1)
+      if (_8K) updateMemoryConfig(VIC20MMU.EXP_BLK1,false)
     }
     preferences.add(PREF_VIC20_16K_EXP, "16K RAM expansion", false, Set(), false) { _16K =>
-      if (_16K) updateMemoryConfig(VIC20MMU.EXP_BLK1 | VIC20MMU.EXP_BLK2)
+      if (_16K) updateMemoryConfig(VIC20MMU.EXP_BLK1 | VIC20MMU.EXP_BLK2,false)
     }
     preferences.add(PREF_VIC20_24K_EXP, "24K RAM expansion", false, Set(), false) { _24K =>
-      if (_24K) updateMemoryConfig(VIC20MMU.EXP_BLK1 | VIC20MMU.EXP_BLK2 | VIC20MMU.EXP_BLK3)
+      if (_24K) updateMemoryConfig(VIC20MMU.EXP_BLK1 | VIC20MMU.EXP_BLK2 | VIC20MMU.EXP_BLK3,false)
     }
     preferences.add(PREF_VIC20_32K_EXP, "32K RAM expansion", false, Set(), false) { _32K =>
-      if (_32K) updateMemoryConfig(VIC20MMU.EXP_BLK1 | VIC20MMU.EXP_BLK2 | VIC20MMU.EXP_BLK3 | VIC20MMU.EXP_BLK5)
+      if (_32K) updateMemoryConfig(VIC20MMU.EXP_BLK1 | VIC20MMU.EXP_BLK2 | VIC20MMU.EXP_BLK3 | VIC20MMU.EXP_BLK5,false)
     }
     preferences.add(PREF_VIC20_IO2_ENABLED, "enables IO2 memory block as RAM", false) { enabled => mmu.setIO2RAM(enabled) }
     preferences.add(PREF_VIC20_IO3_ENABLED, "enables IO3 memory block as RAM", false) { enabled => mmu.setIO3RAM(enabled) }
@@ -649,6 +712,8 @@ class VIC20 extends CBMHomeComputer {
     val rs232Item = new JMenuItem("RS-232 ...")
     rs232Item.addActionListener(_ => manageRS232)
     IOItem.add(rs232Item)
+
+    setGEORamSettings(IOItem)
 
     // -----------------------------------
 

@@ -58,6 +58,10 @@ function kernal64vic20_get_options
                 exitoptions="--32k"
                 memory_expansion_enabled="32K"
             ;;
+          "geo512k")
+                exitoptions="-geo-ram 512"
+                georam_enabled=1
+            ;;
         *)
                 exitoptions=""
                 if [ "${1:0:9}" == "mountd64:" ]; then

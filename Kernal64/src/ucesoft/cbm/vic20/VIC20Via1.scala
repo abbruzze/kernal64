@@ -60,6 +60,10 @@ class VIC20Via1(bus:IECBus,
   override val isController = true
 
   bus.registerListener(this)
+  rs232.setBitReceivedListener( () => {
+    CB1In(false)
+    CB1In(true)
+  })
 
   override def read(address: Int, chipID: ChipID.ID): Int = address & 0x0F match {
     case PA|PA2 =>
@@ -81,7 +85,6 @@ class VIC20Via1(bus:IECBus,
       val joy = userPort.readPort
       val userJoy = (joy & 7) << 2 | (joy & 8) >> 2 | (joy & 16) << 1 | 0xC1
       val user = userJoy & (if (rs232.isEnabled) rs232.getOthers else 0xFF)
-      println(user)
       user
     case _ =>
       super.read(address,chipID)

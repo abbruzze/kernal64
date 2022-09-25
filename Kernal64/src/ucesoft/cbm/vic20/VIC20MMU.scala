@@ -1,12 +1,13 @@
 package ucesoft.cbm.vic20
 
-import ucesoft.cbm.{CBMComponentType, ChipID}
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.{RAMComponent, ROM}
+import ucesoft.cbm.expansion.VIC20ExpansionPort
 import ucesoft.cbm.formats.Cartridge
 import ucesoft.cbm.misc.TestCart
 import ucesoft.cbm.peripheral.drive.VIA
-import ucesoft.cbm.peripheral.vic.{VICModel, VICType, VIC_I}
+import ucesoft.cbm.peripheral.vic.{VICType, VIC_I}
+import ucesoft.cbm.{CBMComponentType, ChipID}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
@@ -103,6 +104,7 @@ class VIC20MMU extends RAMComponent {
   private var vic : VIC_I = _
 
   private var carts : List[Cartridge] = Nil
+  private var specialCart: VIC20ExpansionPort = _
 
   private var vicType: VICType.Value = VICType.PAL
 
@@ -160,6 +162,9 @@ class VIC20MMU extends RAMComponent {
     carts ::= crt
     true
   }
+
+  def attachSpecialCart(cart:VIC20ExpansionPort): Unit = specialCart = cart
+  def detachSpecialCart(): Unit = specialCart = null
 
   def detachAllCarts(): Unit = {
     for(e <- expansionBlocks) e.removeROM()
@@ -287,6 +292,15 @@ class VIC20MMU extends RAMComponent {
   }
 
   final override def read(address: Int, chipID: ID): Int = {
+    if (specialCart != null) {
+      specialCart.read(address) match {
+        case None =>
+        case Some(v) =>
+          if (!dontUpdateLastByteOnBUS) lastByteOnBUS = v
+          return v
+      }
+    }
+
     val read = memRW(address).read(address, chipID)
     if (!dontUpdateLastByteOnBUS) lastByteOnBUS = read
     dontUpdateLastByteOnBUS = false
@@ -294,6 +308,7 @@ class VIC20MMU extends RAMComponent {
   }
   final override def write(address: Int, value: Int, chipID: ID): Unit = {
     memRW(address).write(address, value)
+    if (specialCart != null) specialCart.write(address,value)
     TestCart.write(address,value)
     lastByteOnBUS = value
   }

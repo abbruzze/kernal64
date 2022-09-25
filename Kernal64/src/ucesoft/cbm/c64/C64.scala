@@ -102,7 +102,7 @@ class C64 extends CBMHomeComputer {
     wic64Panel = new WiC64Panel(displayFrame,preferences)
     WiC64.setListener(wic64Panel)
     add(WiC64)
-    rs232.setCIA12(cia1,cia2)
+    rs232.setBitReceivedListener(cia2.setFlagLow _)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
     vicChip = new vic.VIC_II(vicMemory,mmu.COLOR_RAM,irqSwitcher.setLine(Switcher.VIC,_),baLow _)

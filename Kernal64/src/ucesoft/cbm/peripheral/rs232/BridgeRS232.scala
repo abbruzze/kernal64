@@ -10,7 +10,7 @@ object BridgeRS232 extends RS232 {
   private[this] var rs232 : RS232 = _
   private[this] var txd = 1
   private[this] var others = 0XFF
-  private[this] var cia1,cia2 : CIA = _
+  private[this] var bitReceivedListener : () => Unit = _
   private[this] var statusListener : RS232StatusListener = _
   
   def init : Unit = {}
@@ -35,10 +35,7 @@ object BridgeRS232 extends RS232 {
   def getConfiguration : String = if (rs232 == null) "" else rs232.getConfiguration
   def isEnabled : Boolean = if (rs232 != null) rs232.isEnabled else false
   def setEnabled(enabled:Boolean): Unit = if (rs232 != null) rs232.setEnabled(enabled)
-  def setCIA12(cia1:CIA,cia2:CIA): Unit = {
-    this.cia1 = cia1
-    this.cia2 = cia2
-  }
+  def setBitReceivedListener(listener: () => Unit) : Unit = bitReceivedListener = listener
   def getDescription : String = "No RS-232 attached"
   def connectionInfo: String = if (rs232 != null) rs232.connectionInfo else ""
   override def setFlowControlEnabled(enabled:Boolean) : Unit = {
@@ -50,7 +47,7 @@ object BridgeRS232 extends RS232 {
   def setRS232(rs232:RS232) : Unit = {
     this.rs232 = rs232
     rs232.setRS232Listener(statusListener)
-    rs232.setCIA12(cia1,cia2)
+    rs232.setBitReceivedListener(bitReceivedListener)
     rs232.setOthers(others)
     rs232.setFlowControlEnabled(flowControlEnabled)
   }

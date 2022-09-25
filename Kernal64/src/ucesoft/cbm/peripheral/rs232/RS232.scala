@@ -1,7 +1,6 @@
 package ucesoft.cbm.peripheral.rs232
 
 import ucesoft.cbm.CBMComponentType.Type
-import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.{CBMComponent, CBMComponentType}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
@@ -58,7 +57,7 @@ trait RS232 extends CBMComponent {
   def isEnabled : Boolean
   def setEnabled(enabled:Boolean) : Unit
   
-  def setCIA12(cia1:CIA,cia2:CIA) : Unit
+  def setBitReceivedListener(listener: () => Unit) : Unit
   
   def getDescription : String
   

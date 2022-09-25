@@ -150,7 +150,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     }
   }
   
-  def setCIA12(cia1:CIA,cia2:CIA) : Unit = {}
+  def setBitReceivedListener(l: () => Unit) : Unit = {}
   
   def getDescription = "<html>SwiftLink TCP/IP cartridge.<br>Connection string: <i>host:port</i> or leave empty to connect later via <i>atdt host:port</i> modem command</html>"
   

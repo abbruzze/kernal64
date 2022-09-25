@@ -499,6 +499,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     lightPenTriggered = false
     frameEven ^= true
     if (interlaceModePending) {
+      frameEven = true
       interlaceModePending = false
       interlaceMode = interlaceModePendingValue
       if (interlaceMode)
@@ -692,7 +693,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
     if (rasterCycle == model.RASTER_CYCLES) {
       endOfLine()
       val rasterLines = if (interlaceMode) {
-        if (frameEven) 262 else 263
+        if (frameEven) 263 else 262
       }
       else model.RASTER_LINES
       if (rasterLine == rasterLines) endOfFrame()
