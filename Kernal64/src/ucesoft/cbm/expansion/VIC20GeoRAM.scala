@@ -33,11 +33,11 @@ class VIC20GeoRAM(size:Int,
   }
 
   override def write(address: Int, value: Int): Unit = {
-    if (address == 0x9CFF) {
+    if (address == 0x9CFF || address == 0x9FFF) {
       block = value & blockMask
       rampage = ram(block)(page)
     }
-    else if (address == 0x9CFE) {
+    else if (address == 0x9CFE || address == 0x9FFE) {
       page = value & 0x3F
       rampage = ram(block)(page)
     }
