@@ -1169,33 +1169,37 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   }
 
   override protected def setRenderingSettings(parent:JMenu) : Unit = {
-    import Preferences._
     super.setRenderingSettings(parent)
+    setPaletteSettings(parent)
+  }
+
+  protected def setPaletteSettings(parent:JMenu): Unit = {
+    import Preferences._
     // VIC-PALETTE =========================================================================================
     val paletteItem = new JMenu("Palette")
     parent.add(paletteItem)
     val groupP = new ButtonGroup
     val vicePalItem = new JRadioButtonMenuItem("VICE")
-    vicePalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "vice" )
+    vicePalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "vice")
     paletteItem.add(vicePalItem)
     groupP.add(vicePalItem)
     val brightPalItem = new JRadioButtonMenuItem("Bright")
     brightPalItem.setSelected(true)
-    brightPalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "bright" )
+    brightPalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "bright")
     paletteItem.add(brightPalItem)
     groupP.add(brightPalItem)
     val peptoPalItem = new JRadioButtonMenuItem("Pepto")
-    peptoPalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "pepto" )
+    peptoPalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "pepto")
     paletteItem.add(peptoPalItem)
     groupP.add(peptoPalItem)
     val colordorePalItem = new JRadioButtonMenuItem("Colodore")
-    colordorePalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "colodore" )
+    colordorePalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "colodore")
     paletteItem.add(colordorePalItem)
     groupP.add(colordorePalItem)
 
-    preferences.add(PREF_VICPALETTE,"Set the palette type (bright,vice,pepto,colodore)","",Set("bright","vice","pepto","colodore")) { pal =>
+    preferences.add(PREF_VICPALETTE, "Set the palette type (bright,vice,pepto,colodore)", "", Set("bright", "vice", "pepto", "colodore")) { pal =>
       pal match {
-        case "bright"|"" =>
+        case "bright" | "" =>
           Palette.setPalette(PaletteType.BRIGHT)
           brightPalItem.setSelected(true)
         case "vice" =>

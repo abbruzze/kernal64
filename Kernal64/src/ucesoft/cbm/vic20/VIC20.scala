@@ -218,7 +218,11 @@ class VIC20 extends CBMHomeComputer {
 
   private def adjustRatio(): Unit = {
     val dim = display.asInstanceOf[java.awt.Component].getSize
-    dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).round.toInt
+    val stdDim = vicChip.STANDARD_DIMENSION
+    if (dim.width > stdDim.width)
+      dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).round.toInt
+    else
+      dim.width = (dim.height * vicChip.SCREEN_ASPECT_RATIO).round.toInt
     display.setPreferredSize(dim)
     displayFrame.pack()
   }
@@ -460,7 +464,7 @@ class VIC20 extends CBMHomeComputer {
     if (play) clock.play()
   }
 
-  override protected def setRenderingSettings(parent: JMenu): Unit = {
+  override protected def setPaletteSettings(parent:JMenu): Unit = {
     import Preferences._
     // VIC-PALETTE =========================================================================================
     val paletteItem = new JMenu("Palette")
@@ -650,6 +654,11 @@ class VIC20 extends CBMHomeComputer {
       groupZ.add(zoom1Item)
     }
 
+    val adjustRatioItem = new JMenuItem("Adjust display ratio")
+    adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A, java.awt.event.InputEvent.ALT_DOWN_MASK))
+    adjustRatioItem.addActionListener(_ => adjustRatio)
+    optionMenu.add(adjustRatioItem)
+
     val vicItem = new JMenu("VIC")
     optionMenu.add(vicItem)
     setRenderingSettings(vicItem)
@@ -658,8 +667,6 @@ class VIC20 extends CBMHomeComputer {
     vicDisplayEffectsItem.addActionListener(_ => DisplayEffectPanel.createDisplayEffectPanel(displayFrame, display, "VIC").setVisible(true))
 
     setVICModel(vicItem)
-
-    setVICBorderMode(vicItem)
 
     setFullScreenSettings(optionMenu)
     setOneFrameMode(vicItem, display, java.awt.event.KeyEvent.VK_N)
@@ -670,8 +677,6 @@ class VIC20 extends CBMHomeComputer {
     setJoysticsSettings(optionMenu)
 
     setLightPenSettings(optionMenu,"")
-
-    setMouseSettings(optionMenu)
 
     optionMenu.addSeparator()
 
@@ -693,12 +698,9 @@ class VIC20 extends CBMHomeComputer {
 
     setPrinterSettings(optionMenu)
 
-    // -----------------------------------
     optionMenu.addSeparator()
 
     setDrivesSettings
-
-    optionMenu.addSeparator()
 
     setRemotingSettings(optionMenu)
 
@@ -799,9 +801,6 @@ class VIC20 extends CBMHomeComputer {
         traceDialog.setVisible(true)
         traceItem.setSelected(true)
       }
-    }
-    preferences.add(PREF_MOUSE_DELAY_MILLIS, "Sets the mouse delay parameter in millis", 20) { delay =>
-      MouseCage.setRatioMillis(delay)
     }
   }
 

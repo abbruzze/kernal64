@@ -289,16 +289,29 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   override def SCREEN_HEIGHT: Int = if (model == VIC_I_PAL) model.RASTER_LINES else model.RASTER_LINES + 2
   override def VISIBLE_SCREEN_WIDTH: Int = (model.BLANK_RIGHT_CYCLE - model.BLANK_LEFT_CYCLE) << 2
   override def VISIBLE_SCREEN_HEIGHT: Int = model.BLANK_BOTTOM_LINE - model.BLANK_TOP_LINE
-  override def SCREEN_ASPECT_RATIO: Double = VISIBLE_SCREEN_WIDTH.toDouble / VISIBLE_SCREEN_HEIGHT
+  override def SCREEN_ASPECT_RATIO: Double = {
+    val dim = STANDARD_DIMENSION
+    dim.width.toDouble / dim.height
+  }
   override def STANDARD_DIMENSION : Dimension = model match {
     case VIC_I_PAL => new Dimension(746,VISIBLE_SCREEN_HEIGHT << 1)
-    case VIC_I_NTSC => new Dimension(730,VISIBLE_SCREEN_HEIGHT << 1)
+    case VIC_I_NTSC => new Dimension(730,568)
   }
-  override def TESTBENCH_DIMENSION : Dimension = new Dimension(568,284)
+  override def TESTBENCH_DIMENSION : Dimension = model match {
+    case VIC_I_PAL => new Dimension(568,284)
+    case VIC_I_NTSC => new Dimension(520,233) // to be verified
+  }
 
   def setTestBenchMode(enabled:Boolean): Unit = {
     testBenchMode = enabled
-    if (enabled) display.setClipArea(0, 28,284,312)
+    if (enabled) {
+      model match {
+        case VIC_I_PAL =>
+          display.setClipArea(0, 28,284,model.RASTER_LINES)
+        case VIC_I_NTSC =>
+          display.setClipArea(0, 28,260,model.RASTER_LINES)
+      }
+    }
     else display.setClipArea(model.BLANK_LEFT_CYCLE << 2, model.BLANK_TOP_LINE, model.BLANK_RIGHT_CYCLE << 2, model.BLANK_BOTTOM_LINE)
   }
 
