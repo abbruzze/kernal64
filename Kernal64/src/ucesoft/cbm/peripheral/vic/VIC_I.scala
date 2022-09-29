@@ -414,7 +414,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   override def read(address: Int, chipID: ID): Int = {
     address & 0xF match {
       case VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE =>
-        regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) | (readRasterLine() & 1) << 7
+        regs(VIC_CR3_TEXT_ROW_DISPLAYED_RASTER_L_CHAR_SIZE) & 0x7F | (readRasterLine() & 1) << 7
       case VIC_CR4_RASTER_H =>
         readRasterLine() >> 1
       case VIC_CR6_H_LIGHTPEN => lpX
