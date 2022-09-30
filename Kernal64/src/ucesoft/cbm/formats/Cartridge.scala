@@ -4,16 +4,17 @@ import java.io._
 import scala.language.postfixOps
 
 object Cartridge {
-  def createCRTFileFromState(in:ObjectInputStream) : File = {
-    val tmpFile = File.createTempFile("CRT",null)
+  def createCRTFileFromState(in: ObjectInputStream): (File,Boolean) = {
+    val tmpFile = File.createTempFile("CRT", null)
     tmpFile.deleteOnExit()
     val tmpOut = new FileOutputStream(tmpFile)
+    val raw = in.readBoolean()
     val len = in.readInt
     val buffer = Array.ofDim[Byte](len)
     in.readFully(buffer)
     tmpOut.write(buffer)
     tmpOut.close()
-    tmpFile
+    (tmpFile,raw)
   }
 
   def main(args:Array[String]): Unit = {
@@ -74,15 +75,9 @@ class Cartridge(val file:String,raw:Boolean = false) {
 
   def saveState(out:ObjectOutputStream) : Unit = {
     val f = new File(file)
-    out.writeInt(f.length.toInt)
-    java.nio.file.Files.copy(f.toPath,out)
-  }
-
-  def saveStateWithRaw(out: ObjectOutputStream): Unit = {
-    val f = new File(file)
     out.writeBoolean(raw)
     out.writeInt(f.length.toInt)
-    java.nio.file.Files.copy(f.toPath, out)
+    java.nio.file.Files.copy(f.toPath,out)
   }
 
   private def loadRaw()  : Unit = {

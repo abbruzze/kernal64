@@ -236,7 +236,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
     portType match {
       case CRT =>
-        val crtFile = Cartridge.createCRTFileFromState(in)
+        val (crtFile,_) = Cartridge.createCRTFileFromState(in)
         loadCartridgeFile(crtFile,true)
       case CPM =>
         preferences(PREF_CPMCARTENABLED) = true
@@ -331,7 +331,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  protected def loadCartridgeFile(file:File,stateLoading : Boolean = false) : Unit = {
+  protected def loadCartridgeFile(file:File,stateLoading : Boolean = false) : Option[Cartridge] = {
     try {
       if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
       ExpansionPort.getExpansionPort.eject
@@ -359,6 +359,8 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     finally {
       if (!stateLoading) clock.play
     }
+
+    None
   }
 
   protected def loadFileFromAttachedFile(driveID:Int,relocate:Boolean,c64Mode:Boolean) : Unit = {

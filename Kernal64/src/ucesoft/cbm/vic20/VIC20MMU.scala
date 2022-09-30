@@ -163,8 +163,14 @@ class VIC20MMU extends RAMComponent {
     true
   }
 
-  def attachSpecialCart(cart:VIC20ExpansionPort): Unit = specialCart = cart
-  def detachSpecialCart(): Unit = specialCart = null
+  def attachSpecialCart(cart:VIC20ExpansionPort): Unit = {
+    if (specialCart != null) specialCart.eject()
+    specialCart = cart
+  }
+  def detachSpecialCart(): Unit = {
+    if (specialCart != null) specialCart.eject()
+    specialCart = null
+  }
 
   def detachAllCarts(): Unit = {
     for(e <- expansionBlocks) e.removeROM()
@@ -172,6 +178,7 @@ class VIC20MMU extends RAMComponent {
   }
 
   def getAttachedCarts(): List[Cartridge] = carts
+  def getAttachedSpecialCart(): Option[VIC20ExpansionPort] = Option(specialCart)
 
   def setIO(via1:VIA,via2:VIA,vic:VIC_I): Unit = {
     this.via1 = via1
@@ -281,14 +288,16 @@ class VIC20MMU extends RAMComponent {
         else KERNELROM_RW
     }
   }
-  override def reset(): Unit = {}
+  override def reset(): Unit = {
+    if (specialCart != null) specialCart.reset()
+  }
 
   override def hardReset(): Unit = {
     java.util.Arrays.fill(ram,0)
     for(e <- expansionBlocks) {
       e.removeROM()
-      //e.enabled = false
     }
+    if (specialCart != null) specialCart.hardReset()
   }
 
   final override def read(address: Int, chipID: ID): Int = {
@@ -307,13 +316,22 @@ class VIC20MMU extends RAMComponent {
     read
   }
   final override def write(address: Int, value: Int, chipID: ID): Unit = {
-    memRW(address).write(address, value)
-    if (specialCart != null) specialCart.write(address,value)
-    TestCart.write(address,value)
+    TestCart.write(address, value)
     lastByteOnBUS = value
+
+    if (specialCart != null) {
+      if (specialCart.write(address,value)) return
+    }
+    memRW(address).write(address, value)
   }
 
-  override protected def saveState(out: ObjectOutputStream): Unit = ???
-  override protected def loadState(in: ObjectInputStream): Unit = ???
+  override protected def saveState(out: ObjectOutputStream): Unit = {
+    out.writeObject(ram)
+    out.writeInt(getExpansionSettings())
+  }
+  override protected def loadState(in: ObjectInputStream): Unit = {
+    loadMemory(ram,in)
+    setExpansion(in.readInt())
+  }
   override protected def allowsStateRestoring: Boolean = true
 }

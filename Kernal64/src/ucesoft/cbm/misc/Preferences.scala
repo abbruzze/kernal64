@@ -74,6 +74,7 @@ object Preferences {
   val PREF_VIC20_16K_EXP      = "16k"
   val PREF_VIC20_24K_EXP      = "24k"
   val PREF_VIC20_32K_EXP      = "32k"
+  val PREF_VIC20_ULTIMEM      = "ultimem"
   // =============================================================
   class PreferenceIllegalArgumentException(msg:String) extends Exception(msg)
 

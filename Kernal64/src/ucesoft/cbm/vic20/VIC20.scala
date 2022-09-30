@@ -52,6 +52,11 @@ class VIC20 extends CBMHomeComputer {
   protected val memoryConfigLabel = new JLabel()
   protected val interlaceModeLabel = new JLabel()
 
+  protected val specialCartLoaderMap : Map[VIC20ExpansionPort.VICExpansionPortType.Value,VIC20ExpansionPort.VIC20ExpansionPortStateHandler] = Map(
+    VIC20ExpansionPort.VICExpansionPortType.ULTIMEM -> VIC20Ultimem,
+    VIC20ExpansionPort.VICExpansionPortType.GEORAM -> VIC20GeoRAM
+  )
+
   override protected def PRG_LOAD_ADDRESS() = {
     import VIC20MMU._
     val config = mmu.getExpansionSettings()
@@ -281,13 +286,13 @@ class VIC20 extends CBMHomeComputer {
     }
   }
 
-  protected def loadRawCartridgeFile(file:File, stateLoading: Boolean = false): Unit = {
+  protected def loadRawCartridgeFile(file:File, stateLoading: Boolean = false): Option[Cartridge] = {
     try {
       if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
       val crt = new Cartridge(file.toString,true)
       if (!mmu.attachCart(crt)) {
         showError("Cartridge error", s"Cannot attach cartridge: address not valid or conflict with another cartridge")
-        return
+        return None
       }
       crt.cbmType = Cartridge.CBMType.VIC20
       println(crt)
@@ -297,26 +302,29 @@ class VIC20 extends CBMHomeComputer {
       if (!stateLoading) reset(false)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
       detachCtrItem.setEnabled(true)
+      Some(crt)
     }
     catch {
       case t: Throwable =>
         if (traceDialog != null) t.printStackTrace(traceDialog.logPanel.writer)
 
         showError("Cartridge loading error", t.toString)
+
+        None
     }
     finally {
       if (!stateLoading) clock.play
     }
   }
 
-  override protected def loadCartridgeFile(file: File, stateLoading: Boolean = false): Unit = {
+  override protected def loadCartridgeFile(file: File, stateLoading: Boolean = false): Option[Cartridge] = {
     try {
       if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
       val crt = new Cartridge(file.toString)
       if (crt.cbmType != Cartridge.CBMType.VIC20) throw new IllegalArgumentException(s"Unsupported cartridge signature '${crt.cbmType}'")
       if (!mmu.attachCart(crt)) {
         showError("Cartridge error",s"Cannot attach cartridge: address not valid or conflict with another cartridge")
-        return
+        return None
       }
       println(crt)
       cartMenu.setVisible(true)
@@ -325,12 +333,14 @@ class VIC20 extends CBMHomeComputer {
       if (!stateLoading) reset(false)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
       detachCtrItem.setEnabled(true)
+      Some(crt)
     }
     catch {
       case t: Throwable =>
         if (traceDialog != null) t.printStackTrace(traceDialog.logPanel.writer)
 
         showError("Cartridge loading error", t.toString)
+        None
     }
     finally {
       if (!stateLoading) clock.play
@@ -589,7 +599,35 @@ class VIC20 extends CBMHomeComputer {
   override protected def setGeoRAM(enabled:Boolean,size:Int = 0): Unit = {
     if (!enabled) mmu.detachSpecialCart()
     else {
-      mmu.attachSpecialCart(new VIC20GeoRAM(size,cpu.irqRequest _,cpu.nmiRequest _,mmu))
+      mmu.attachSpecialCart(new VIC20GeoRAM(size,cpu.irqRequest _,cpu.nmiRequest _,mmu,() => reset(true)))
+    }
+  }
+
+  protected def setUltimemSettings(parent:JMenu): Unit = {
+    import Preferences._
+    val showUlti = new JMenuItem("Ultimem configuration ...")
+    showUlti.addActionListener(_ => showUltimemConfig() )
+    parent.add(showUlti)
+
+    preferences.add(PREF_VIC20_ULTIMEM, "enables ultimem cartridge with the given rom", "") { filePath =>
+      if (!filePath.isEmpty) setUltimem(filePath)
+    }
+  }
+
+  protected def showUltimemConfig(): Unit = {
+    VIC20Ultimem.showConfPanel(displayFrame,preferences,(enabled,romPath) => {
+      clock.pause()
+      if (enabled) setUltimem(romPath) else mmu.detachSpecialCart()
+      reset(true)
+    })
+  }
+
+  protected def setUltimem(romPath:String): Unit = {
+    VIC20Ultimem.make(romPath,cpu.irqRequest _,cpu.nmiRequest _,mmu,() => reset(true)) match {
+      case Right(ultimem) =>
+        mmu.attachSpecialCart(ultimem)
+      case Left(t) =>
+        showError("Ultimem cartridge",s"Rom loading error: $t")
     }
   }
 
@@ -716,6 +754,7 @@ class VIC20 extends CBMHomeComputer {
     IOItem.add(rs232Item)
 
     setGEORamSettings(IOItem)
+    setUltimemSettings(IOItem)
 
     // -----------------------------------
 
@@ -835,6 +874,28 @@ class VIC20 extends CBMHomeComputer {
     out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
     out.writeObject(vicChip.getVICModel.VIC_TYPE.toString)
+
+    // Special carts
+    mmu.getAttachedSpecialCart() match {
+      case Some(cart) =>
+        out.writeBoolean(true)
+        out.writeObject(cart.portType.toString)
+        specialCartLoaderMap.get(cart.portType) match {
+          case Some(saver) =>
+            saver.save(cart,out)
+          case None =>
+            throw new IllegalArgumentException(s"Cannot save special cartridge of type: ${cart.portType}")
+        }
+      case None =>
+        out.writeBoolean(false)
+    }
+
+    // Carts
+    val carts = mmu.getAttachedCarts()
+    out.writeInt(carts.length)
+    for(cart <- carts) {
+      cart.saveState(out)
+    }
   }
 
   protected def loadState(in: ObjectInputStream): Unit = {
@@ -843,6 +904,34 @@ class VIC20 extends CBMHomeComputer {
     printerEnabled = in.readBoolean
     val vicModel = VICType.withName(in.readObject.toString)
     setVICModel(vicModel, false, false, false)
+
+    mmu.detachSpecialCart()
+    mmu.detachAllCarts()
+
+    // Special carts
+    if (in.readBoolean()) {
+      val portType = VIC20ExpansionPort.VICExpansionPortType.withName(in.readObject().toString)
+      specialCartLoaderMap.get(portType) match {
+        case Some(loader) =>
+          val cart = loader.load(in,preferences,cpu.irqRequest _,cpu.nmiRequest _,mmu,() => reset(true))
+          cart.load(in)
+          mmu.attachSpecialCart(cart)
+        case None =>
+          throw new IllegalArgumentException(s"Cannot load special cartridge of type: $portType")
+      }
+    }
+    // Carts
+    val cartSize = in.readInt()
+    for(_ <- 1 to cartSize) {
+      val (file,raw) = Cartridge.createCRTFileFromState(in)
+      val cart = if (raw) loadRawCartridgeFile(file,true) else loadCartridgeFile(file,true)
+      cart match {
+        case Some(c) =>
+          if (!mmu.attachCart(c)) println(s"Cannot load state from a cartridge")
+        case None =>
+          println(s"Cannot load state from a cartridge")
+      }
+    }
   }
 
   protected def allowsStateRestoring: Boolean = true
