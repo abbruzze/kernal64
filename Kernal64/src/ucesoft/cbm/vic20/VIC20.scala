@@ -7,6 +7,7 @@ import ucesoft.cbm.expansion._
 import ucesoft.cbm.formats._
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
+import ucesoft.cbm.peripheral.bus.IEEE488Bus
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.controlport.JoystickSettingDialog
 import ucesoft.cbm.peripheral.drive._
@@ -54,8 +55,11 @@ class VIC20 extends CBMHomeComputer {
 
   protected val specialCartLoaderMap : Map[VIC20ExpansionPort.VICExpansionPortType.Value,VIC20ExpansionPort.VIC20ExpansionPortStateHandler] = Map(
     VIC20ExpansionPort.VICExpansionPortType.ULTIMEM -> VIC20Ultimem,
-    VIC20ExpansionPort.VICExpansionPortType.GEORAM -> VIC20GeoRAM
+    VIC20ExpansionPort.VICExpansionPortType.GEORAM -> VIC20GeoRAM,
+    VIC20ExpansionPort.VICExpansionPortType.IEEE488 -> VIC201112IEEE488
   )
+
+  protected var signals : VIC20ExpansionPort.Signals = _
 
   override protected def PRG_LOAD_ADDRESS() = {
     import VIC20MMU._
@@ -108,6 +112,7 @@ class VIC20 extends CBMHomeComputer {
     add(keyb)
     add(controlPortB)
     add(bus)
+    add(ieee488Bus)
     add(rs232)
     // ROMs
     add(VIC20MMU.CHAR_ROM)
@@ -170,6 +175,8 @@ class VIC20 extends CBMHomeComputer {
 
     // GIF Recorder
     gifRecorder = GIFPanel.createGIFPanel(displayFrame, Array(display), Array("VIC"))
+
+    signals = VIC20ExpansionPort.Signals(preferences,cpu.irqRequest _,cpu.nmiRequest _,() => reset(true),bus,ieee488Bus,mmu)
   }
 
   override def afterInitHook : Unit = {
@@ -199,6 +206,8 @@ class VIC20 extends CBMHomeComputer {
     // CPU PHI2
     ProgramLoader.checkLoadingInWarpMode(cbmModel,true)
     cpu.fetchAndExecute(1)
+    // special cart
+    mmu.clock(cycles)
   }
 
   protected def setDMA(dma: Boolean): Unit = {}
@@ -586,7 +595,10 @@ class VIC20 extends CBMHomeComputer {
         _4096kGeoItem.setSelected(true)
         setGeoRAM(true, 4096)
       }
-      else setGeoRAM(false)
+      else {
+        noGeoItem.setSelected(true)
+        setGeoRAM(false)
+      }
     }
 
     // reset setting
@@ -599,7 +611,7 @@ class VIC20 extends CBMHomeComputer {
   override protected def setGeoRAM(enabled:Boolean,size:Int = 0): Unit = {
     if (!enabled) mmu.detachSpecialCart()
     else {
-      mmu.attachSpecialCart(new VIC20GeoRAM(size,cpu.irqRequest _,cpu.nmiRequest _,mmu,() => reset(true)))
+      mmu.attachSpecialCart(new VIC20GeoRAM(size,signals))
     }
   }
 
@@ -623,11 +635,39 @@ class VIC20 extends CBMHomeComputer {
   }
 
   protected def setUltimem(romPath:String): Unit = {
-    VIC20Ultimem.make(romPath,cpu.irqRequest _,cpu.nmiRequest _,mmu,() => reset(true)) match {
+    VIC20Ultimem.make(romPath,signals) match {
       case Right(ultimem) =>
         mmu.attachSpecialCart(ultimem)
       case Left(t) =>
         showError("Ultimem cartridge",s"Rom loading error: $t")
+    }
+  }
+
+  protected def showVIC1112IEEE488Config(): Unit = {
+    VIC201112IEEE488.showConfPanel(displayFrame, preferences, (enabled, romPath) => {
+      clock.pause()
+      if (enabled) setVIC1112IEEE488(romPath) else mmu.detachSpecialCart()
+      reset(true)
+    })
+  }
+
+  protected def setVIC1112IEEE488Settings(parent: JMenu): Unit = {
+    import Preferences._
+    val showUlti = new JMenuItem("IEEE488 (VIC 1112) configuration ...")
+    showUlti.addActionListener(_ => showVIC1112IEEE488Config())
+    parent.add(showUlti)
+
+    preferences.add(PREF_IEEE488_ROM, "enables vic 1112 IEEE488 cartridge with the given rom", "") { filePath =>
+      if (!filePath.isEmpty) setVIC1112IEEE488(filePath)
+    }
+  }
+
+  protected def setVIC1112IEEE488(romPath: String): Unit = {
+    VIC201112IEEE488.make(romPath, signals) match {
+      case Right(ieee488) =>
+        mmu.attachSpecialCart(ieee488)
+      case Left(t) =>
+        showError("VIC 1112 IEEE488", s"Rom loading error: $t")
     }
   }
 
@@ -755,6 +795,7 @@ class VIC20 extends CBMHomeComputer {
 
     setGEORamSettings(IOItem)
     setUltimemSettings(IOItem)
+    setVIC1112IEEE488Settings(IOItem)
 
     // -----------------------------------
 
@@ -913,7 +954,7 @@ class VIC20 extends CBMHomeComputer {
       val portType = VIC20ExpansionPort.VICExpansionPortType.withName(in.readObject().toString)
       specialCartLoaderMap.get(portType) match {
         case Some(loader) =>
-          val cart = loader.load(in,preferences,cpu.irqRequest _,cpu.nmiRequest _,mmu,() => reset(true))
+          val cart = loader.load(in,signals)
           cart.load(in)
           mmu.attachSpecialCart(cart)
         case None =>

@@ -1,7 +1,6 @@
 package ucesoft.cbm.expansion
 
-import ucesoft.cbm.cpu.RAMComponent
-import ucesoft.cbm.expansion.VIC20ExpansionPort.VIC20ExpansionPortStateHandler
+import ucesoft.cbm.expansion.VIC20ExpansionPort.{Signals, VIC20ExpansionPortStateHandler}
 import ucesoft.cbm.misc.Preferences
 
 import java.awt.{BorderLayout, FlowLayout, GridLayout}
@@ -16,14 +15,12 @@ object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
   private var switch0 = false
 
   def make(romPath:String,
-           irqHandler: Boolean => Unit,
-           nmiHandler: Boolean => Unit,
-           mmu: RAMComponent, resetHandler: () => Unit): Either[Throwable,VIC20Ultimem] = {
+           signals:Signals): Either[Throwable,VIC20Ultimem] = {
     try {
       val f = new File(romPath)
       if (f.length() != _512K && f.length() != _8M) throw new IllegalArgumentException("Ultimem ROM length must be 512K or 8M")
       val rom = java.nio.file.Files.readAllBytes(f.toPath).map(_.toInt & 0xFF)
-      Right(new VIC20Ultimem(rom, irqHandler, nmiHandler, mmu, resetHandler))
+      Right(new VIC20Ultimem(rom, signals))
     }
     catch {
       case io: Throwable =>
@@ -32,11 +29,7 @@ object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
   }
 
   override def load(in: ObjectInputStream,
-                    pref:Preferences,
-                    irqHandler: Boolean => Unit,
-                    nmiHandler: Boolean => Unit,
-                    mmu: RAMComponent,
-                    resetHandler: () => Unit): VIC20ExpansionPort = {
+                    signals:Signals): VIC20ExpansionPort = {
     import Preferences._
     val rom = in.readObject().asInstanceOf[Array[Int]]
     val tmpFile = File.createTempFile("ultimem","")
@@ -45,8 +38,8 @@ object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
     val out = new FileOutputStream(tmpFile)
     out.write(romBytes)
     out.close()
-    pref.updateWithoutNotify(PREF_VIC20_ULTIMEM,tmpFile.toString)
-    new VIC20Ultimem(rom, irqHandler, nmiHandler, mmu, resetHandler)
+    signals.pref.updateWithoutNotify(PREF_VIC20_ULTIMEM,tmpFile.toString)
+    new VIC20Ultimem(rom, signals)
   }
 
   override def save(cart: VIC20ExpansionPort, out: ObjectOutputStream): Unit = {
@@ -159,10 +152,7 @@ object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
 }
 
 class VIC20Ultimem(val rom:Array[Int],
-                   override val irqHandler: Boolean => Unit,
-                   override val nmiHandler: Boolean => Unit,
-                   override val mmu:RAMComponent,
-                   override val resetHandler: () => Unit) extends VIC20ExpansionPort(irqHandler,nmiHandler, mmu,resetHandler) {
+                   override val signals:Signals) extends VIC20ExpansionPort(signals) {
   import VIC20Ultimem._
 
   override val portType = VIC20ExpansionPort.VICExpansionPortType.ULTIMEM
@@ -202,6 +192,11 @@ class VIC20Ultimem(val rom:Array[Int],
   @inline private def set_blk5_config(v:Int): Unit = regs(2) = (regs(2) & 0x3F) | (v & 3) << 6
 
   reset()
+
+  override def eject(): Unit = {
+    import ucesoft.cbm.misc.Preferences._
+    signals.pref.update(PREF_VIC20_ULTIMEM, "")
+  }
 
   final override def reset(): Unit = {
     if ((regs(0) & 0x40) == 0) {
@@ -292,7 +287,7 @@ class VIC20Ultimem(val rom:Array[Int],
     //println(s"Write reg $r = $value")
 
     if (r == 0) {
-      if ((value & 0x40) > 0) resetHandler()
+      if ((value & 0x40) > 0) signals.resetHandler()
     }
   }
 

@@ -64,6 +64,7 @@ object Preferences {
   val PREF_WIC64_NETWORK      = "wic64-network-name"
   val PREF_WIC64_ENABLED      = "wic64-enabled"
   val PREF_MOUSE_DELAY_MILLIS = "mouse-delay-millis"
+  val PREF_IEEE488_ROM        = "ieee488rom"
   // ================== VIC 20 ===================================
   val VIC20_PREF_KERNEL_PAL   = "kernel-pal"
   val VIC20_PREF_KERNEL_NTSC  = "kernel-ntsc"

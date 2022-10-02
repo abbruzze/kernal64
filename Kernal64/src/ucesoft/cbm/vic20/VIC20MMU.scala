@@ -288,15 +288,22 @@ class VIC20MMU extends RAMComponent {
         else KERNELROM_RW
     }
   }
+
+  final def clock(cycles:Long): Unit = {
+    if (specialCart != null) specialCart.clock(cycles)
+  }
+
   override def reset(): Unit = {
     if (specialCart != null) specialCart.reset()
   }
 
   override def hardReset(): Unit = {
     java.util.Arrays.fill(ram,0)
+    /*
     for(e <- expansionBlocks) {
       e.removeROM()
     }
+     */
     if (specialCart != null) specialCart.hardReset()
   }
 

@@ -66,6 +66,10 @@ class IEEE488Drive(override val name:String,
   // INIT
   setStatus(STATUS_POWERUP)
 
+  override def disconnect(): Unit = {
+    bus.unregisterListener(listener)
+  }
+
   override def reset: Unit = {
     super.reset
     driveLedListener.turnOff()

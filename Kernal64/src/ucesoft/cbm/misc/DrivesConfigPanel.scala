@@ -124,7 +124,7 @@ object DrivesConfigPanel {
         driveTypePanel.add(_1581CB)
       }
       if (allowedDriveTypes(DriveType._8050)) {
-        val _8050CB = new JRadioButton("8050")
+        val _8050CB = new JRadioButton("8050 (IEEE488)")
         toBeDisabled = _8050CB :: toBeDisabled
         _8050CB.setAlignmentX(Component.LEFT_ALIGNMENT)
         group.add(_8050CB)

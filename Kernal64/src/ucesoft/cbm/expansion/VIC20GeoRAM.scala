@@ -1,6 +1,6 @@
 package ucesoft.cbm.expansion
 
-import ucesoft.cbm.cpu.RAMComponent
+import ucesoft.cbm.expansion.VIC20ExpansionPort.Signals
 import ucesoft.cbm.misc.Preferences
 import ucesoft.cbm.vic20.VIC20MMU
 
@@ -8,15 +8,11 @@ import java.io.{ObjectInputStream, ObjectOutputStream}
 
 object VIC20GeoRAM extends VIC20ExpansionPort.VIC20ExpansionPortStateHandler {
   override def load(in: ObjectInputStream,
-                    pref: Preferences,
-                    irqHandler: Boolean => Unit,
-                    nmiHandler: Boolean => Unit,
-                    mmu: RAMComponent,
-                    resetHandler: () => Unit): VIC20ExpansionPort = {
+                    signals:Signals): VIC20ExpansionPort = {
     import ucesoft.cbm.misc.Preferences._
     val size = in.readInt()
-    pref.update(PREF_GEORAM,size.toString)
-    mmu.asInstanceOf[VIC20MMU].getAttachedSpecialCart().get.asInstanceOf[VIC20GeoRAM]
+    signals.pref.update(PREF_GEORAM,size.toString)
+    signals.mmu.asInstanceOf[VIC20MMU].getAttachedSpecialCart().get.asInstanceOf[VIC20GeoRAM]
   }
 
   override def save(cart: VIC20ExpansionPort, out: ObjectOutputStream): Unit = {
@@ -26,10 +22,7 @@ object VIC20GeoRAM extends VIC20ExpansionPort.VIC20ExpansionPortStateHandler {
 }
 
 class VIC20GeoRAM(val size:Int,
-                  override val irqHandler: Boolean => Unit,
-                  override val nmiHandler: Boolean => Unit,
-                  override val mmu:RAMComponent,
-                  override val resetHandler: () => Unit) extends VIC20ExpansionPort(irqHandler,nmiHandler, mmu,resetHandler) {
+                  override val signals:Signals) extends VIC20ExpansionPort(signals) {
 
   override val portType = VIC20ExpansionPort.VICExpansionPortType.GEORAM
   override val componentID: String = "VIC20GeoRAM"
@@ -37,6 +30,11 @@ class VIC20GeoRAM(val size:Int,
   final private val blockMask = size / 16 - 1
   private var rampage: Array[Int] = ram(0)(0)
   private var block, page = 0
+
+  override def eject(): Unit = {
+    import ucesoft.cbm.misc.Preferences._
+    signals.pref.update(PREF_GEORAM,"none")
+  }
 
   final override def reset: Unit = {
     block = 0

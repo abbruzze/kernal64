@@ -7,12 +7,12 @@ import ucesoft.cbm.formats._
 import ucesoft.cbm.formats.cart.{EasyFlash, GMOD3}
 import ucesoft.cbm.game.{GamePlayer, GameUI}
 import ucesoft.cbm.misc._
-import ucesoft.cbm.peripheral.bus.IECBus
+import ucesoft.cbm.peripheral.bus.{IECBus, IEEE488Bus}
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.controlport.Joysticks._
 import ucesoft.cbm.peripheral.controlport.{ControlPort, JoystickSettingDialog}
 import ucesoft.cbm.peripheral.drive._
-import ucesoft.cbm.peripheral.keyboard.{HomeKeyboard, Keyboard}
+import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.printer.{MPS803, Printer}
 import ucesoft.cbm.peripheral.rs232._
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
@@ -32,7 +32,7 @@ import javax.swing.filechooser.FileFilter
 import scala.util.{Failure, Success}
 
 abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListener { cbmComputer =>
-  override protected val ALLOWED_DRIVE_TYPES = DrivesConfigPanel.ALL_IEC_DRIVES_ALLOWED
+  override protected val ALLOWED_DRIVE_TYPES = DrivesConfigPanel.ALL_DRIVES_ALLOWED
   protected val CONFIGURATION_GMOD2_FILE = "gmod2.file"
 
   protected val DEFAULT_GAME_PROVIDERS = java.util.Arrays.asList((new ucesoft.cbm.game.CSDBSpi).asInstanceOf[ucesoft.cbm.game.GameProvider],(new ucesoft.cbm.game.GameBaseSpi).asInstanceOf[ucesoft.cbm.game.GameProvider],(new ucesoft.cbm.game.PouetDemoSpi).asInstanceOf[ucesoft.cbm.game.GameProvider])
@@ -55,6 +55,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   override protected lazy val keyb = new keyboard.HomeKeyboard(keybMapper,nmiSwitcher.setLine(Switcher.KB,_),!isC64Mode)	// key listener
 
   protected val bus = new IECBus
+  protected val ieee488Bus = new IEEE488Bus
   protected var dma = false
   protected val expansionPort: ExpansionPort = ExpansionPort.getExpansionPort
 
@@ -520,6 +521,9 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       case DriveType._1581 =>
         driveLedListeners(id).setPowerLedMode(true)
         new D1581(id,bus,driveLedListeners(id))
+      case DriveType._8050 =>
+        driveLedListeners(id).setPowerLedMode(false)
+        new IEEE488Drive(s"IEEE488Drive_${id + 8}",id + 8,ieee488Bus,driveLedListeners(id))
     }
 
     old match {
@@ -1395,7 +1399,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     import Preferences._
     for(drive <- 0 until TOTAL_DRIVES) {
       // DRIVE-X-TYPE ========================================================================================
-      preferences.add(PREF_DRIVE_X_TYPE(drive),"Set the driver's type (1541,1571,1581)","",Set("1541","1571","1581")) { dt =>
+      preferences.add(PREF_DRIVE_X_TYPE(drive),"Set the driver's type (1541,1571,1581,8050)","",Set("1541","1571","1581","8050")) { dt =>
         dt match {
           case "1541" =>
             setDriveType(drive,DriveType._1541, true)
@@ -1403,6 +1407,8 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
             setDriveType(drive,DriveType._1571, true)
           case "1581" =>
             setDriveType(drive,DriveType._1581, true)
+          case "8050" =>
+            setDriveType(drive, DriveType._8050, true)
           case _ =>
         }
       }
@@ -1545,7 +1551,10 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
         _256kGeoItem.setSelected(true)
         setGeoRAM(true,256)
       }
-      else setGeoRAM(false)
+      else {
+        noGeoItem.setSelected(true)
+        setGeoRAM(false)
+      }
     }
 
     // reset setting
