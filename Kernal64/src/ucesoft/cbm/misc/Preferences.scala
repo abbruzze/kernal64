@@ -65,9 +65,11 @@ object Preferences {
   val PREF_WIC64_ENABLED      = "wic64-enabled"
   val PREF_MOUSE_DELAY_MILLIS = "mouse-delay-millis"
   val PREF_IEEE488_ROM        = "ieee488rom"
+  // ================== CBM II ===================================
+  val PREF_CBM2_MODEL         = "model"
   // ================== VIC 20 ===================================
-  val VIC20_PREF_KERNEL_PAL   = "kernel-pal"
-  val VIC20_PREF_KERNEL_NTSC  = "kernel-ntsc"
+  val PREF_VIC20_KERNEL_PAL   = "kernel-pal"
+  val PREF_VIC20_KERNEL_NTSC  = "kernel-ntsc"
   val PREF_VIC20_MEM_CONFIG   = "exp"
   val PREF_VIC20_IO2_ENABLED  = "io2"
   val PREF_VIC20_IO3_ENABLED  = "io3"

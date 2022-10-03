@@ -856,13 +856,13 @@ class VIC20 extends CBMHomeComputer {
     preferences.add(PREF_IGNORE_CONFIG_FILE, "Ignore configuration file and starts emulator with default configuration", false, Set(), false) {
       ignoreConfig = _
     }
-    preferences.add(VIC20_PREF_KERNEL_PAL, "Set pal kernel rom path", "", Set.empty, false) { file =>
+    preferences.add(PREF_VIC20_KERNEL_PAL, "Set pal kernel rom path", "", Set.empty, false) { file =>
       if (file != "") {
         reloadROM(ROM.VIC20_KERNAL_PAL_ROM_PROP, file)
         mmu.setKernelPALROM(VIC20MMU.KERNAL_PAL_ROM.getROMBytes())
       }
     }
-    preferences.add(VIC20_PREF_KERNEL_NTSC, "Set ntsc kernel rom path", "", Set.empty, false) { file =>
+    preferences.add(PREF_VIC20_KERNEL_NTSC, "Set ntsc kernel rom path", "", Set.empty, false) { file =>
       if (file != "") {
         reloadROM(ROM.VIC20_KERNAL_NTSC_ROM_PROP, file)
         mmu.setKernelNTSCROM(VIC20MMU.KERNAL_NTSC_ROM.getROMBytes())

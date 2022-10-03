@@ -142,6 +142,8 @@ class CBM2MMU extends RAMComponent {
     init
   }
 
+  def getModel(): CBM2Model = model
+
   override final def read(address: Int, chipID: ID): Int = readBank(address)
 
   final def readBank(address: Int, forcedBank: Int = -1): Int = {

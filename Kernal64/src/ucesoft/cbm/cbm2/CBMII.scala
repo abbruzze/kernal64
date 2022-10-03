@@ -59,7 +59,7 @@ class CBMII extends CBMComputer {
   protected var model : CBM2Model = _610PAL
 
   override protected def PRG_LOAD_ADDRESS() = 0x3
-  override protected def PRG_RUN_DELAY_CYCLES = 2200000 // TODO
+  override protected def PRG_RUN_DELAY_CYCLES = mmu.getModel().prgDelayCycles
 
   def turnOn(args: Array[String]): Unit = {
     swing {
@@ -107,6 +107,57 @@ class CBMII extends CBMComputer {
     // PLAY
     clock.play
     crt.play()
+  }
+
+  override protected def setGlobalCommandLineOptions: Unit = {
+    import Preferences._
+    // non-saveable settings
+    preferences.add(PREF_WARP, "Run warp mode", false) { w =>
+      val isAdjusting = preferences.get(PREF_WARP).get.isAdjusting
+      warpMode(w, !isAdjusting)
+    }
+    preferences.add(PREF_HEADLESS, "Activate headless mode", false, Set(), false) {
+      headless = _
+    }
+    preferences.add(PREF_TESTCART, "Activate testcart mode", false, Set(), false) {
+      TestCart.enabled = _
+    }
+    preferences.add(PREF_LIMITCYCLES, "Run at most the number of cycles specified", "", Set(), false) { cycles =>
+      if (cycles != "" && cycles.toLong > 0) clock.limitCyclesTo(cycles.toLong)
+    }
+    preferences.add(PREF_RUNFILE, "Run the given file taken from the attached disk", null: String, Set(), false) { file => }
+    preferences.add(PREF_SCREENSHOT, "Take a screenshot of VIC screen and save it on the given file path. Used with --testcart only.", "") { file =>
+      if (file != "") {
+        TestCart.screenshotFile = Some(file)
+        TestCart.screeshotHandler = display.waitFrameSaveSnapshot _
+      }
+    }
+    preferences.add(PREF_CPUJAMCONTINUE, "On cpu jam continue execution", false, Set(), false) {
+      cpujamContinue = _
+    }
+    preferences.add(PREF_LOADSTATE, "Load a previous saved state.", "", Set(), false) { file =>
+      if (file != "") {
+        try {
+          loadStateFromOptions = true
+          loadState(Some(file))
+        }
+        finally loadStateFromOptions = false
+      }
+    }
+    preferences.add(PREF_FULLSCREEN, "Starts the emulator in full screen mode", false, Set(), false) {
+      fullScreenAtBoot = _
+    }
+    preferences.add(PREF_IGNORE_CONFIG_FILE, "Ignore configuration file and starts emulator with default configuration", false, Set(), false) {
+      ignoreConfig = _
+    }
+    preferences.add(PREF_TRACE, "Starts the emulator in trace mode", false, Set(), false) { trace =>
+      traceOption = trace
+      if (trace && traceDialog != null) {
+        traceDialog.forceTracing(true)
+        traceDialog.setVisible(true)
+        traceItem.setSelected(true)
+      }
+    }
   }
 
   protected def updateScreenDimension(dim:Dimension): Unit = {
@@ -433,16 +484,35 @@ class CBMII extends CBMComputer {
     val modelMenu = new JMenu("Model")
     optionMenu.add(modelMenu)
     val groupR = new ButtonGroup
-    for (m <- Array(_610PAL, _610NTSC, _620PAL, _620NTSC, _710NTSC, _720NTSC)) {
+    val items = for (m <- Array(_610PAL, _610NTSC, _620PAL, _620NTSC, _710NTSC, _720NTSC)) yield {
       val item = new JRadioButtonMenuItem(m.name)
       groupR.add(item)
       if (m == _610PAL) item.setSelected(true)
       modelMenu.add(item)
-      item.addActionListener(_ => {
-        clock.pause()
-        setModel(m)
-        hardReset(true)
-      })
+      item.addActionListener(_ => setModel(m,true) )
+      item
+    }
+    preferences.add(PREF_CBM2_MODEL, "Set the model (610pal,610ntsc,620pal,620ntsc,710ntsc,720ntsc)", "610pal", Set("610pal","610ntsc","620pal","620ntsc","710ntsc","720ntsc")) { model =>
+      model match {
+        case "610pal" =>
+          items(0).setSelected(true)
+          setModel(_610PAL,false)
+        case "610ntsc" =>
+          items(1).setSelected(true)
+          setModel(_610NTSC, false)
+        case "620pal" =>
+          items(2).setSelected(true)
+          setModel(_620PAL, false)
+        case "620ntsc" =>
+          items(3).setSelected(true)
+          setModel(_620NTSC, false)
+        case "710ntsc" =>
+          items(4).setSelected(true)
+          setModel(_710NTSC, false)
+        case "720ntsc" =>
+          items(5).setSelected(true)
+          setModel(_720NTSC, false)
+      }
     }
 
     optionMenu.addSeparator()
@@ -646,7 +716,6 @@ class CBMII extends CBMComputer {
     clock.schedule(new ClockEvent("50_60Hz", clock.nextCycles, _50_60_Hz _))
 
     TestCart.setCartLocation(0xFDAFF)
-    //TestCart.enabled = true
 
     // ============== DISPLAY ===============================================
     display = new Display(CRTC6845.SCREEN_WIDTH, CRTC6845.SCREEN_HEIGHT, displayFrame.getTitle, displayFrame)
@@ -715,8 +784,9 @@ class CBMII extends CBMComputer {
     inspectDialog = InspectPanel.getInspectDialog(displayFrame, this,cbmModel)
   }
 
-  protected def setModel(newModel:CBM2Model): Unit = {
+  protected def setModel(newModel:CBM2Model,play:Boolean): Unit = {
     if (model != newModel) {
+      clock.pause()
       model = newModel
       crt.setClipping(model.crtClip._1, model.crtClip._2, model.crtClip._3, model.crtClip._4)
       updateScreenDimension(model.preferredFrameSize)
@@ -727,6 +797,8 @@ class CBMII extends CBMComputer {
       CBM2MMU.BASIC_ROM.reload()
       mmu.setBasicROM(CBM2MMU.BASIC_ROM.getROMBytes())
       mmu.setModel(model)
+      preferences.updateWithoutNotify(PREF_CBM2_MODEL,model.toString.toLowerCase.substring(1))
+      if (play) hardReset(true)
     }
   }
 

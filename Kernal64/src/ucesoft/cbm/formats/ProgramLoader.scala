@@ -114,7 +114,7 @@ object ProgramLoader {
     var m = 3
     var b = in.read
     while (b != -1) {
-      mem.writeBank(m,b,2)
+      mem.writeBank(m,b,1)
       m += 1
       b = in.read
     }

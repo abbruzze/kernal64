@@ -1,6 +1,8 @@
 package ucesoft.cbm.peripheral.mos6551
 
-import java.io.{InputStream, OutputStream}
+import ucesoft.cbm.Log
+
+import java.io.{IOException, InputStream, OutputStream}
 
 class ACIA6551(irqLow: Boolean => Unit) {
   private var commandRegister,controlRegister = 0
@@ -8,21 +10,19 @@ class ACIA6551(irqLow: Boolean => Unit) {
   private var inputStream : InputStream = null
   private var outputStream : OutputStream = null
   private var irqMasterEnabled,irqReceiverEnabled,irqTransmitterEnabled = false
+  private var connectionDownHandler: () => Unit = _
+  private var convertToUpper = false
 
-  /*
-  new Thread() {
-    override def run(): Unit = {
-      Thread.sleep(10000)
-      dcd = true
-      dsr = true
+  def setStreams(in:InputStream,out:OutputStream,connectionDownHandler: () => Unit): Unit = {
+    inputStream = in
+    outputStream = out
+    this.connectionDownHandler = connectionDownHandler
+    dcd = in != null
+    dsr = in != null
+  }
 
-      val s = new Socket("8bit.hoyvision.com",6400)
-      inputStream = s.getInputStream
-      outputStream = s.getOutputStream
-      println("ACIA ready.")
-    }
-  }.start()
-  */
+  def setConvertToUpperCase(convert:Boolean): Unit = convertToUpper = convert
+
   def write(register:Int,value:Int): Unit = {
     //println(s"ACIA write to ${register & 3} = $value")
     register & 3 match {
@@ -74,23 +74,38 @@ class ACIA6551(irqLow: Boolean => Unit) {
     st
   }
   private def readReceiverDataRegister(): Int = {
-    val rec = if (inputStream != null) inputStream.read() else 0
-    if (inputStream != null && inputStream.available() > 0 && irqReceiverEnabled) {
-      irq = true
-      checkIRQ()
-    }
-    //println(s"ACIA read data ${rec.toChar}")
-    rec.toChar.toUpper.toInt
-  }
-  private def writeTransmitDataRegister(data:Int): Unit = {
-    println(s"ACIA Transmitting $data")
-    if (outputStream != null) {
-      outputStream.write(data)
-      outputStream.flush()
-      if (irqTransmitterEnabled) {
+    try {
+      val rec = if (inputStream != null) inputStream.read() else 0
+      if (inputStream != null && inputStream.available() > 0 && irqReceiverEnabled) {
         irq = true
         checkIRQ()
       }
+      //println(s"ACIA read data ${rec.toChar}")
+      if (convertToUpper) rec.toChar.toUpper.toInt else rec
+    }
+    catch {
+      case io:IOException =>
+        Log.info(s"ACIA connection error: $io")
+        connectionDownHandler()
+        0
+    }
+  }
+  private def writeTransmitDataRegister(data:Int): Unit = {
+    //println(s"ACIA Transmitting $data")
+    try {
+      if (outputStream != null) {
+        outputStream.write(data)
+        outputStream.flush()
+        if (irqTransmitterEnabled) {
+          irq = true
+          checkIRQ()
+        }
+      }
+    }
+    catch {
+      case io:IOException =>
+        Log.info(s"ACIA connection error: $io")
+        connectionDownHandler()
     }
   }
   private def writeCommandRegister(data:Int): Unit = {
