@@ -574,6 +574,17 @@ class CBMII extends CBMComputer {
     optionMenu.addSeparator()
 
     setPrinterSettings(optionMenu)
+
+    val IOItem = new JMenu("I/O")
+    optionMenu.add(IOItem)
+
+    val aciaItem = new JMenuItem("ACIA Internet configuration ...")
+    aciaItem.addActionListener(_ => showACIAConfigPanel() )
+    IOItem.add(aciaItem)
+  }
+
+  protected def showACIAConfigPanel(): Unit = {
+    ACIA6551.showConfigDialog(displayFrame)
   }
 
   protected def setCRTOwnThread(enabled:Boolean): Unit = {
@@ -652,10 +663,6 @@ class CBMII extends CBMComputer {
 
     val irq = new Switcher("IRQ",low => cpu.irqRequest(low))
 
-    // frequency 2Mhz
-    sid.setCPUFrequency(2000000)
-    clock.setClockHz(2000000)
-
     // chips
     // ============== CIA-IEEE ==============================================
     val ciaConnectorA = new CIAIEEE488ConnectorA(bus)
@@ -711,6 +718,7 @@ class CBMII extends CBMComputer {
     )
     // ============== ACIA ==================================================
     acia = new ACIA6551(irq => tpiIeee.setInterruptPin(MOS6525.INT_I4,if (irq) 0 else 1))
+    ACIA6551.setACIA(acia)
 
     // 50/60 Hz source
     clock.schedule(new ClockEvent("50_60Hz", clock.nextCycles, _50_60_Hz _))
@@ -771,6 +779,10 @@ class CBMII extends CBMComputer {
   }
 
   override def afterInitHook(): Unit = {
+    // frequency 2Mhz: here to notify all listeners
+    sid.setCPUFrequency(2000000)
+    clock.setClockHz(2000000)
+
     mmu.setBasicROM(CBM2MMU.BASIC_ROM.getROMBytes())
     mmu.setKernalROM(CBM2MMU.KERNAL_ROM.getROMBytes())
 
