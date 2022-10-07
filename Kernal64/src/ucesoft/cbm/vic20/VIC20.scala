@@ -856,19 +856,25 @@ class VIC20 extends CBMHomeComputer {
     preferences.add(PREF_IGNORE_CONFIG_FILE, "Ignore configuration file and starts emulator with default configuration", false, Set(), false) {
       ignoreConfig = _
     }
+    ROM.addReloadListener { res =>
+      if (res == ROM.VIC20_KERNAL_PAL_ROM_PROP) mmu.setKernelPALROM(VIC20MMU.KERNAL_PAL_ROM.getROMBytes())
+    }
     preferences.add(PREF_VIC20_KERNEL_PAL, "Set pal kernel rom path", "", Set.empty, false) { file =>
-      if (file != "") {
-        reloadROM(ROM.VIC20_KERNAL_PAL_ROM_PROP, file)
-        mmu.setKernelPALROM(VIC20MMU.KERNAL_PAL_ROM.getROMBytes())
-      }
+      if (file != "") reloadROM(ROM.VIC20_KERNAL_PAL_ROM_PROP, file)
+    }
+    ROM.addReloadListener { res =>
+      if (res == ROM.VIC20_KERNAL_NTSC_ROM_PROP) mmu.setKernelNTSCROM(VIC20MMU.KERNAL_NTSC_ROM.getROMBytes())
     }
     preferences.add(PREF_VIC20_KERNEL_NTSC, "Set ntsc kernel rom path", "", Set.empty, false) { file =>
-      if (file != "") {
-        reloadROM(ROM.VIC20_KERNAL_NTSC_ROM_PROP, file)
-        mmu.setKernelNTSCROM(VIC20MMU.KERNAL_NTSC_ROM.getROMBytes())
-      }
+      if (file != "") reloadROM(ROM.VIC20_KERNAL_NTSC_ROM_PROP, file)
+    }
+    ROM.addReloadListener { res =>
+      if (res == ROM.VIC20_BASIC_ROM_PROP) mmu.setBasicROM(VIC20MMU.BASIC_ROM.getROMBytes())
     }
     preferences.add(PREF_BASIC, "Set basic rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.VIC20_BASIC_ROM_PROP, file) }
+    ROM.addReloadListener { res =>
+      if (res == ROM.VIC20_CHAR_ROM_PROP) mmu.setCharROM(VIC20MMU.CHAR_ROM.getROMBytes())
+    }
     preferences.add(PREF_CHARROM, "Set char rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.VIC20_CHAR_ROM_PROP, file) }
     preferences.add(PREF_1541DOS, "Set 1541 dos rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.D1541_DOS_ROM_PROP, file) }
     preferences.add(PREF_1571DOS, "Set 1571 dos rom path", "", Set.empty, false) { file => if (file != "") reloadROM(ROM.D1571_DOS_ROM_PROP, file) }

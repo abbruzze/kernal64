@@ -1,5 +1,6 @@
 package ucesoft.cbm.peripheral.bus
 
+import java.io.{ObjectInputStream, ObjectOutputStream}
 import scala.collection.mutable.ListBuffer
 
 abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: IEEE488Bus) extends IEEE488BusHandshake(name,bus) {
@@ -288,4 +289,18 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
   }
 
   protected def commandReceived(cmd:Command): Unit = {}
+
+  override protected def saveState(out: ObjectOutputStream): Unit = {
+   super.save(out)
+    out.writeInt(secondaryAddress)
+    out.writeObject(channels)
+    out.writeObject(buffers)
+  }
+
+  override protected def loadState(in: ObjectInputStream): Unit = {
+    super.loadState(in)
+    secondaryAddress = in.readInt()
+    loadMemory(channels,in)
+    loadMemory(buffers,in)
+  }
 }

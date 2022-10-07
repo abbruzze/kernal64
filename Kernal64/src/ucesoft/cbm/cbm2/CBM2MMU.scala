@@ -249,11 +249,48 @@ class CBM2MMU extends RAMComponent {
   }
 
   override protected def saveState(out: ObjectOutputStream): Unit = {
-    // TODO
+    out.writeObject(ram)
+    out.writeObject(screenRam)
+    for(r <- 0 to 3) {
+      if (romSlot(3) != null) {
+        out.writeBoolean(true)
+        out.writeObject(romSlot(r))
+      }
+      else
+        out.writeBoolean(false)
+    }
+    out.writeObject(romSlotRAMAccess)
+
+    out.writeObject(model)
+    for(b <- 0 to 15) {
+      if (banks(b) != null) {
+        out.writeBoolean(true)
+        out.writeObject(banks(b))
+      }
+      else
+        out.writeBoolean(false)
+    }
+
+    out.writeInt(codeBank)
+    out.writeInt(dataBank)
   }
 
   override protected def loadState(in: ObjectInputStream): Unit = {
-    // TODO
+    loadMemory(ram,in)
+    loadMemory(screenRam,in)
+    for(r <- 0 to 3) {
+      if (in.readBoolean()) romSlot(r) = in.readObject().asInstanceOf[Array[Int]]
+      else romSlot(r) = null
+    }
+    loadMemory(romSlotRAMAccess,in)
+    model = in.readObject().asInstanceOf[CBM2Model]
+    for(b <- 0 to 15) {
+      if (in.readBoolean()) banks(b) = in.readObject().asInstanceOf[Array[Int]]
+      else banks(b) = null
+    }
+
+    codeBank = in.readInt()
+    dataBank = in.readInt()
   }
 
   override protected def allowsStateRestoring: Boolean = true

@@ -11,9 +11,4 @@ trait Printer extends CBMComponent {
 
   def clock(cycles: Long) : Unit
   def setActive(active:Boolean): Unit
-
-  // state
-  protected def saveState(out:ObjectOutputStream) : Unit = {}
-  protected def loadState(in:ObjectInputStream) : Unit = {}
-  protected def allowsStateRestoring : Boolean = true
 }

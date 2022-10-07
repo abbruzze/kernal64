@@ -1,6 +1,6 @@
 package ucesoft.cbm.misc
 
-import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, VIC20Model}
+import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, CBMIIModel, VIC20Model}
 import ucesoft.cbm.c128.FunctionROMType
 
 import java.awt.{Container, GridBagConstraints, GridBagLayout, Insets}
@@ -19,13 +19,23 @@ class ROMPanel(prop:Properties, model:CBMComputerModel, scpu:Boolean = false) ex
   private val C128_E_F_ROM = 16
   private val SCPU = 32
   private val VIC20 = 64
+  private val CBM2 = 128
+  private val CBM2_ROM = 256
   private case class ROM(label:String,propName:String,romType:Int,var path:Option[String] = None,var item:Option[String] = None) {
-    def apply(prop:Properties): Unit = {
+    def apply(prop:Properties): Boolean = {
       val value = if (!path.isDefined || path.get == "") "" else {
         if (item.isDefined) path.get + "," + item.get else path.get
       }
-      prop.setProperty(propName,value)
-      ucesoft.cbm.cpu.ROM.reload(propName)
+      try {
+        prop.setProperty(propName, value)
+        ucesoft.cbm.cpu.ROM.reload(propName)
+        true
+      }
+      catch {
+        case e:Exception =>
+          JOptionPane.showMessageDialog(ROMPanel.this,s"Error while applying rom changes: $e","ROM Configuration error",JOptionPane.ERROR_MESSAGE)
+          false
+      }
     }
   }
 
@@ -45,13 +55,19 @@ class ROMPanel(prop:Properties, model:CBMComputerModel, scpu:Boolean = false) ex
     ROM("VIC20 PAL Kernal", VIC20_KERNAL_PAL_ROM_PROP, VIC20),
     ROM("VIC20 NTSC Kernal", VIC20_KERNAL_NTSC_ROM_PROP, VIC20),
     ROM("VIC20 Basic", VIC20_BASIC_ROM_PROP, VIC20),
-    ROM("VIC20 Char", VIC20_CHAR_ROM_PROP, VIC20)
+    ROM("VIC20 Char", VIC20_CHAR_ROM_PROP, VIC20),
+    ROM("CBM2 Kernal", CBM2_KERNAL_ROM_PROP, CBM2),
+    ROM("CBM2 Basic 128", CBM2_BASIC128_ROM_PROP, CBM2),
+    ROM("CBM2 Basic 256", CBM2_BASIC256_ROM_PROP, CBM2),
+    ROM("CBM2 Char 600", CBM2_CHAR600_ROM_PROP, CBM2),
+    ROM("CBM2 Char 700", CBM2_CHAR700_ROM_PROP, CBM2),
+    ROM("CBM2 ROM at $1000", CBM2_ROMAT1000_PROP, CBM2_ROM),
+    ROM("CBM2 ROM at $2000", CBM2_ROMAT2000_PROP, CBM2_ROM),
+    ROM("CBM2 ROM at $4000", CBM2_ROMAT4000_PROP, CBM2_ROM),
+    ROM("CBM2 ROM at $6000", CBM2_ROMAT6000_PROP, CBM2_ROM)
   )
 
   private val romMap : Map[String,ROM] = romList filter { r =>
-    /*if (scpu) (r.romType & SCPU) == SCPU || r.romType == DRIVE
-    else if (c64Only) r.romType == C64 || r.romType == DRIVE
-    else true*/
     model match {
       case C64Model =>
         if (scpu) (r.romType & SCPU) == SCPU || r.romType == DRIVE
@@ -60,15 +76,17 @@ class ROMPanel(prop:Properties, model:CBMComputerModel, scpu:Boolean = false) ex
         true
       case VIC20Model =>
         r.romType == VIC20 || r.romType == DRIVE
+      case CBMIIModel =>
+        r.romType == CBM2 || r.romType == CBM2_ROM
     }
   } map { r => r.propName -> r } toMap
   private var lastDir = "./"
 
-  def applyUpdates() : Unit = {
-    for(rom <- romList) {
-      rom.apply(prop)
-    }
+  def applyUpdates() : Boolean = {
+    selectedROMs.map(_.apply(prop)).reduce(_ && _)
   }
+
+  private var selectedROMs : List[ROM] = Nil
 
   private def makePanel(name:String,romType:Int) : JPanel = {
     val roms = romList filter { r => (r.romType & romType) > 0 }
@@ -76,8 +94,9 @@ class ROMPanel(prop:Properties, model:CBMComputerModel, scpu:Boolean = false) ex
     val p = new JPanel(new GridBagLayout)
     p.setBorder(BorderFactory.createTitledBorder(name))
     for((rom,y) <- roms.zipWithIndex) {
+      selectedROMs ::= rom
       val tf = new JTextField(30)
-      val cb = new JCheckBox(if (rom.romType == C128_I_F_ROM || rom.romType == C128_E_F_ROM) "none" else "default")
+      val cb = new JCheckBox(if (rom.romType == C128_I_F_ROM || rom.romType == C128_E_F_ROM || rom.romType == CBM2_ROM) "none" else "default")
       val button = new JButton("Browse ...")
       cb.setSelected(!rom.path.isDefined)
       tf.setEnabled(rom.path.isDefined)
@@ -176,6 +195,8 @@ class ROMPanel(prop:Properties, model:CBMComputerModel, scpu:Boolean = false) ex
       add(makePanel("Commodore 128",C128 | C128_I_F_ROM | C128_E_F_ROM))
     case VIC20Model =>
       add(makePanel("Commodore VIC 20",VIC20))
+    case CBMIIModel =>
+      add(makePanel("Commodore CBMII",CBM2|CBM2_ROM))
   }
 
   add(makePanel("Drives",DRIVE))
@@ -196,9 +217,10 @@ object ROMPanel {
     val cancelB = new JButton("Cancel")
     cancelB.addActionListener(_ => f.dispose() )
     okB.addActionListener(_ => {
-      romPanel.applyUpdates
-      f.dispose()
-      applyCallBack()
+      if (romPanel.applyUpdates) {
+        f.dispose()
+        applyCallBack()
+      }
     })
     buttonPanel.add(okB)
     buttonPanel.add(cancelB)

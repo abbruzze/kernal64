@@ -2,6 +2,8 @@ package ucesoft.cbm.peripheral.bus
 
 import ucesoft.cbm.{CBMComponent, Clock, ClockEvent}
 
+import java.io.{ObjectInputStream, ObjectOutputStream}
+
 abstract class IEEE488BusHandshake(val name:String, bus: IEEE488Bus) extends CBMComponent {
   import IEEE488Bus._
   import LineType._
@@ -109,4 +111,20 @@ abstract class IEEE488BusHandshake(val name:String, bus: IEEE488Bus) extends CBM
 
   // BUS Registration
   bus.registerListener(listener)
+
+  override protected def saveState(out: ObjectOutputStream): Unit = {
+    out.writeBoolean(atnLow)
+    out.writeBoolean(eoiLow)
+    out.writeObject(role.toString)
+    out.writeBoolean(sendScheduled)
+  }
+
+  override protected def loadState(in: ObjectInputStream): Unit = {
+    atnLow = in.readBoolean()
+    eoiLow = in.readBoolean()
+    role = Role.withName(in.readObject().toString)
+    sendScheduled = in.readBoolean()
+  }
+
+  override protected def allowsStateRestoring: Boolean = true
 }

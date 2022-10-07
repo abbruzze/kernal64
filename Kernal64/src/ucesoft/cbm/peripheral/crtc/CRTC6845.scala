@@ -417,7 +417,7 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
       bitmap = display.displayMem
       if (borderWidth < X_LEFT_CLIP_COLS) display.setClipArea(borderWidth,Y_TOP_CLIP_ROWS,screenWidth,screenHeight - Y_BOTTOM_CLIP_ROWS)
       else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS * (if (interlaceMode) 2 else 1),screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS * (if (interlaceMode) 2 else 1))
-      println(s"New screen width: $screenWidth")
+      //println(s"New screen width: $screenWidth")
     }
 
     if (debug) println(s"New screen res. width=$screenWidth htotal=$htotal hdisplayed=$hdisplayed hsync=$hsync hsync_width=${(regs(3) & 0x0F) - 1} rborder=$rborder lborder=$lborder rester=$rasterLine")

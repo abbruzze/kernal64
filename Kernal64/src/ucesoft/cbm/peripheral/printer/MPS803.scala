@@ -3,6 +3,8 @@ package ucesoft.cbm.peripheral.printer
 import ucesoft.cbm.CBMComponent
 import ucesoft.cbm.peripheral.bus.{BusDataIterator, IECBus, IECBusDevice}
 
+import java.io.{ObjectInputStream, ObjectOutputStream}
+
 class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevice(bus,device) with CBMComponent with Printer {
   val busid = "MPS803"
     
@@ -31,4 +33,8 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
     channels(channel).clear
     driver.print(byte)
   }
+
+  override protected def saveState(out: ObjectOutputStream): Unit = {}
+  override protected def loadState(in: ObjectInputStream): Unit = {}
+  override protected def allowsStateRestoring: Boolean = true
 }

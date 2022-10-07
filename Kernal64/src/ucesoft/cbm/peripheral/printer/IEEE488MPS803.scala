@@ -2,6 +2,8 @@ package ucesoft.cbm.peripheral.printer
 
 import ucesoft.cbm.peripheral.bus.{IEEE488Bus, IEEE488BusCommand}
 
+import java.io.{ObjectInputStream, ObjectOutputStream}
+
 class IEEE488MPS803(override val name:String,override val deviceID:Int,bus: IEEE488Bus,driver:PrinterDriver) extends IEEE488BusCommand(name,deviceID, bus) with Printer {
   private var active = false
 
@@ -19,7 +21,7 @@ class IEEE488MPS803(override val name:String,override val deviceID:Int,bus: IEEE
        // no named channels
       case _ =>
         if (checkData(data)) {
-          println(s"PRINTING $data '${data.toChar}''")
+          //println(s"PRINTING $data '${data.toChar}''")
           driver.print(data)
         }
     }
@@ -28,4 +30,7 @@ class IEEE488MPS803(override val name:String,override val deviceID:Int,bus: IEEE
   override def clock(cycles: Long): Unit = {}
 
   override def setActive(active: Boolean): Unit = this.active = active
+
+  override protected def saveState(out: ObjectOutputStream): Unit = {}
+  override protected def loadState(in: ObjectInputStream): Unit = {}
 }

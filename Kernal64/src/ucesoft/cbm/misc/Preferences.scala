@@ -67,6 +67,14 @@ object Preferences {
   val PREF_IEEE488_ROM        = "ieee488rom"
   // ================== CBM II ===================================
   val PREF_CBM2_MODEL         = "model"
+  val PREF_CBM2_BASIC128      = "basic128"
+  val PREF_CBM2_BASIC256      = "basic256"
+  val PREF_CBM2_CHAR600       = "char600"
+  val PREF_CBM2_CHAR700       = "char700"
+  val PREF_CBM2_ROM1000       = "rom1000"
+  val PREF_CBM2_ROM2000       = "rom2000"
+  val PREF_CBM2_ROM4000       = "rom4000"
+  val PREF_CBM2_ROM6000       = "rom6000"
   // ================== VIC 20 ===================================
   val PREF_VIC20_KERNEL_PAL   = "kernel-pal"
   val PREF_VIC20_KERNEL_NTSC  = "kernel-ntsc"

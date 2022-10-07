@@ -618,10 +618,12 @@ class IEEE488Drive(override val name:String,
     }
   }
 
-  override protected def saveState(out: ObjectOutputStream): Unit = ???
-  override protected def loadState(in: ObjectInputStream): Unit = ???
-  override protected def allowsStateRestoring: Boolean = true
-
+  override protected def saveState(out: ObjectOutputStream): Unit = {
+    out.writeInt(status.st)
+  }
+  override protected def loadState(in: ObjectInputStream): Unit = {
+    status.st = in.readInt()
+  }
   // Trace listener
   override def setTraceOnFile(out: PrintWriter, enabled: Boolean): Unit = {}
   override def setTrace(traceOn: Boolean): Unit = {}

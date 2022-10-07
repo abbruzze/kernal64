@@ -100,7 +100,7 @@ object IEEE488Connectors {
       byte
     }
     override def write(value: Int): Unit = {
-      val datassetteMotor = (value & 0x40) == 0
+      val datassetteMotor = (value & 0x40) > 0 // TODO to be verified
       val datassetteWrite = (value & 0x20) == 0
       datassette.setMotor(datassetteMotor)
       datassette.setWriteLine(datassetteWrite)

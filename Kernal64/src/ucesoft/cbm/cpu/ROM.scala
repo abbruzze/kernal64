@@ -102,6 +102,10 @@ object ROM {
   val CBM2_BASIC256_ROM_PROP = "cbm2.basic256.rom.file"
   val CBM2_CHAR600_ROM_PROP = "cbm2.char600.rom.file"
   val CBM2_CHAR700_ROM_PROP = "cbm2.char700.rom.file"
+  val CBM2_ROMAT1000_PROP = "cbm2.1000.rom.file"
+  val CBM2_ROMAT2000_PROP = "cbm2.2000.rom.file"
+  val CBM2_ROMAT4000_PROP = "cbm2.4000.rom.file"
+  val CBM2_ROMAT6000_PROP = "cbm2.6000.rom.file"
 
   val D1541_DOS_ROM_PROP = "drive1541.rom.file"
   val D1571_DOS_ROM_PROP = "drive1571.rom.file"
@@ -137,6 +141,9 @@ object ROM {
 
   var props : Properties = new Properties()
   private val registeredROMMap = new collection.mutable.HashMap[String,ROM]
+  private var reloadListeners : List[String => Unit] = Nil
+
+  def addReloadListener(l: String => Unit): Unit = reloadListeners ::= l
 
   def reload(resource:String) : Unit = {
     registeredROMMap get resource match {
@@ -144,6 +151,7 @@ object ROM {
         rom.reload
       case None =>
     }
+    reloadListeners.foreach(_(resource))
   }
 
   def getROMInputStream(rom:ROM,resource:String) : InputStream = {

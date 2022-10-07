@@ -2,7 +2,7 @@ package ucesoft.cbm.cbm2
 
 import ucesoft.cbm._
 import ucesoft.cbm.cbm2.IEEE488Connectors.{CIAIEEE488ConnectorA, CIAIEEE488ConnectorB, IEEE488InterfaceA, IEEE488InterfaceB}
-import ucesoft.cbm.cpu.{CPU6510_CE, Memory}
+import ucesoft.cbm.cpu.{CPU6510_CE, Memory, ROM}
 import ucesoft.cbm.formats.{Diskette, ProgramLoader, TAP}
 import ucesoft.cbm.misc.Preferences._
 import ucesoft.cbm.misc._
@@ -158,6 +158,79 @@ class CBMII extends CBMComputer {
         traceItem.setSelected(true)
       }
     }
+    ROM.addReloadListener { res =>
+      if (res == ROM.CBM2_KERNAL_ROM_PROP) mmu.setKernalROM(CBM2MMU.KERNAL_ROM.getROMBytes())
+    }
+    preferences.add(PREF_KERNEL, "Set kernel rom path", "", Set.empty, false) { file =>
+      if (file != "") reloadROM(ROM.CBM2_KERNAL_ROM_PROP, file)
+    }
+    ROM.addReloadListener { res =>
+      if (res == ROM.CBM2_BASIC128_ROM_PROP && mmu.getModel().memoryK == 128) mmu.setBasicROM(CBM2MMU.BASIC_ROM.getROMBytes())
+    }
+    preferences.add(PREF_CBM2_BASIC128, "Set basic 128 rom path", "", Set.empty, false) { file =>
+      if (file != "") reloadROM(ROM.CBM2_BASIC128_ROM_PROP, file)
+    }
+    ROM.addReloadListener { res =>
+      if (res == ROM.CBM2_BASIC256_ROM_PROP && mmu.getModel().memoryK == 256) mmu.setBasicROM(CBM2MMU.BASIC_ROM.getROMBytes())
+    }
+    preferences.add(PREF_CBM2_BASIC256, "Set basic 256 rom path", "", Set.empty, false) { file =>
+      if (file != "") reloadROM(ROM.CBM2_BASIC256_ROM_PROP, file)
+    }
+    ROM.addReloadListener { res =>
+      if (res == ROM.CBM2_CHAR600_ROM_PROP && mmu.getModel().lowProfile) crt.charRom = CBM2MMU.CHAR_ROM.getROMBytes()
+    }
+    preferences.add(PREF_CBM2_CHAR600, "Set 600 char rom path", "", Set.empty, false) { file =>
+      if (file != "") reloadROM(ROM.CBM2_CHAR600_ROM_PROP, file)
+    }
+    ROM.addReloadListener { res =>
+      if (res == ROM.CBM2_CHAR700_ROM_PROP && !mmu.getModel().lowProfile) crt.charRom = CBM2MMU.CHAR_ROM.getROMBytes()
+    }
+    preferences.add(PREF_CBM2_CHAR700, "Set 700 char rom path", "", Set.empty, false) { file =>
+      if (file != "") reloadROM(ROM.CBM2_CHAR700_ROM_PROP, file)
+    }
+    ROM.addReloadListener { res =>
+      if (res == ROM.CBM2_ROMAT1000_PROP) {
+        val rom = configuration.getProperty(ROM.CBM2_ROMAT1000_PROP)
+        if (rom.isEmpty) mmu.setROM1000(null) else mmu.setROM1000(loadInternalROM(rom))
+      }
+    }
+    preferences.add(PREF_CBM2_ROM1000, "Set rom at 1000 path", "", Set.empty, false) { file =>
+      if (file != "") mmu.setROM1000(loadInternalROM(file))
+      else mmu.setROM1000(null)
+    }
+    ROM.addReloadListener { res =>
+      if (res == ROM.CBM2_ROMAT2000_PROP) {
+        val rom = configuration.getProperty(ROM.CBM2_ROMAT2000_PROP)
+        if (rom.isEmpty) mmu.setROM2000(null) else mmu.setROM2000(loadInternalROM(rom))
+      }
+    }
+    preferences.add(PREF_CBM2_ROM2000, "Set rom at 2000 path", "", Set.empty, false) { file =>
+      if (file != "") mmu.setROM2000(loadInternalROM(file)) else mmu.setROM2000(null)
+    }
+    ROM.addReloadListener { res =>
+      if (res == ROM.CBM2_ROMAT4000_PROP) {
+        val rom = configuration.getProperty(ROM.CBM2_ROMAT4000_PROP)
+        if (rom.isEmpty) mmu.setROM4000(null) else mmu.setROM4000(loadInternalROM(rom))
+      }
+    }
+    preferences.add(PREF_CBM2_ROM4000, "Set rom at 4000 path", "", Set.empty, false) { file =>
+      if (file != "") mmu.setROM4000(loadInternalROM(file)) else mmu.setROM4000(null)
+    }
+    ROM.addReloadListener { res =>
+      if (res == ROM.CBM2_ROMAT6000_PROP) {
+        val rom = configuration.getProperty(ROM.CBM2_ROMAT6000_PROP)
+        if (rom.isEmpty) mmu.setROM6000(null) else mmu.setROM6000(loadInternalROM(rom))
+      }
+    }
+    preferences.add(PREF_CBM2_ROM6000, "Set rom at 6000 path", "", Set.empty, false) { file =>
+      if (file != "") mmu.setROM6000(loadInternalROM(file)) else mmu.setROM6000(null)
+    }
+  }
+
+  protected def loadInternalROM(file:String): Array[Int] = {
+    val f = new File(file)
+    if (f.length != 0x2000) throw new IllegalArgumentException(s"Invalid ROM size: expected 8192 bytes, found ${file.length}")
+    java.nio.file.Files.readAllBytes(f.toPath).map(_.toInt & 0xFF)
   }
 
   protected def updateScreenDimension(dim:Dimension): Unit = {
@@ -581,6 +654,19 @@ class CBMII extends CBMComputer {
     val aciaItem = new JMenuItem("ACIA Internet configuration ...")
     aciaItem.addActionListener(_ => showACIAConfigPanel() )
     IOItem.add(aciaItem)
+
+    optionMenu.addSeparator()
+
+    val romItem = new JMenuItem("ROMs ...")
+    optionMenu.add(romItem)
+    romItem.addActionListener(_ => {
+      clock.pause
+      ROMPanel.showROMPanel(displayFrame, configuration, cbmModel, false, () => {
+        saveSettings(false)
+        reset(false)
+      })
+      clock.play
+    })
   }
 
   protected def showACIAConfigPanel(): Unit = {
@@ -849,9 +935,9 @@ class CBMII extends CBMComputer {
       keyb)
   }
 
-  override protected def saveState(out: ObjectOutputStream): Unit = ???
+  override protected def saveState(out: ObjectOutputStream): Unit = {}
 
-  override protected def loadState(in: ObjectInputStream): Unit = ???
+  override protected def loadState(in: ObjectInputStream): Unit = {}
 
-  override protected def allowsStateRestoring: Boolean = ???
+  override protected def allowsStateRestoring: Boolean = true
 }
