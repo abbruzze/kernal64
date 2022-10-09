@@ -95,13 +95,13 @@ trait CBMComponent {
   protected def loadState(in:ObjectInputStream) : Unit
   protected def allowsStateRestoring : Boolean
   
-  final def save(out:ObjectOutputStream) : Unit = {
+  def save(out:ObjectOutputStream) : Unit = {
     Log.info(s"Saving $componentID/$componentType's state ...")
     out.writeObject(componentID)
     saveState(out)
     for(c <- _components) c.save(out)    
   }
-  final def load(in:ObjectInputStream) : Unit = {
+  def load(in:ObjectInputStream) : Unit = {
     Log.info(s"Loading $componentID/$componentType's state ...")
     val id = in.readObject.asInstanceOf[String]
     if (id != componentID) componentIDMismatchHandling(id)

@@ -234,8 +234,9 @@ class CBMII extends CBMComputer {
   }
 
   protected def updateScreenDimension(dim:Dimension): Unit = {
+    displayFrame.getContentPane.remove(display)
     display.setPreferredSize(dim)
-    display.repaint()
+    displayFrame.getContentPane.add("Center",display)
     displayFrame.pack()
   }
 
@@ -732,6 +733,7 @@ class CBMII extends CBMComputer {
   }
 
   override def reset(): Unit = {
+    clock.cancel("50_60Hz")
     clock.schedule(new ClockEvent("50_60Hz", clock.nextCycles, _50_60_Hz _))
     clock.maximumSpeed = false
     maxSpeedItem.setSelected(false)
@@ -882,7 +884,7 @@ class CBMII extends CBMComputer {
     inspectDialog = InspectPanel.getInspectDialog(displayFrame, this,cbmModel)
   }
 
-  protected def setModel(newModel:CBM2Model,play:Boolean): Unit = {
+  protected def setModel(newModel:CBM2Model,play:Boolean,updateMMU:Boolean = true): Unit = {
     if (model != newModel) {
       clock.pause()
       model = newModel
@@ -894,7 +896,7 @@ class CBMII extends CBMComputer {
       crt.charRom = CBM2MMU.CHAR_ROM.getROMBytes()
       CBM2MMU.BASIC_ROM.reload()
       mmu.setBasicROM(CBM2MMU.BASIC_ROM.getROMBytes())
-      mmu.setModel(model)
+      if (updateMMU) mmu.setModel(model)
       preferences.updateWithoutNotify(PREF_CBM2_MODEL,model.toString.toLowerCase.substring(1))
       if (play) hardReset(true)
     }
@@ -935,9 +937,21 @@ class CBMII extends CBMComputer {
       keyb)
   }
 
-  override protected def saveState(out: ObjectOutputStream): Unit = {}
+  override protected def saveState(out: ObjectOutputStream): Unit = {
+    out.writeObject(model)
+  }
 
-  override protected def loadState(in: ObjectInputStream): Unit = {}
+  override protected def loadState(in: ObjectInputStream): Unit = {
+    val model = in.readObject().asInstanceOf[CBM2Model]
+    preferences.update(PREF_CBM2_MODEL,model.option)
+    setModel(model,false,false)
+  }
+
+  override def load(in:ObjectInputStream) : Unit = {
+    super.load(in)
+    clock.cancel("50_60Hz")
+    clock.schedule(new ClockEvent("50_60Hz", clock.nextCycles, _50_60_Hz _))
+  }
 
   override protected def allowsStateRestoring: Boolean = true
 }

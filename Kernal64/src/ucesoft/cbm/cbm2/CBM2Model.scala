@@ -6,6 +6,7 @@ import java.awt.Dimension
 
 sealed trait CBM2Model {
   val name : String
+  val option : String
   val memoryK : Int
   val isPAL : Boolean
   val lowProfile : Boolean
@@ -18,6 +19,7 @@ sealed trait CBM2Model {
 
 case object _610PAL extends CBM2Model {
   override val name = "610 PAL"
+  override val option = "610pal"
   override val memoryK = 128
   override val isPAL = true
   override val lowProfile = true
@@ -31,6 +33,7 @@ case object _610PAL extends CBM2Model {
 
 case object _610NTSC extends CBM2Model {
   override val name = "610 NTSC"
+  override val option = "610ntsc"
   override val memoryK = 128
   override val isPAL = false
   override val lowProfile = true
@@ -44,6 +47,7 @@ case object _610NTSC extends CBM2Model {
 
 case object _620PAL extends CBM2Model {
   override val name = "620 PAL"
+  override val option = "620pal"
   override val memoryK = 256
   override val isPAL  = true
   override val lowProfile = true
@@ -56,6 +60,7 @@ case object _620PAL extends CBM2Model {
 
 case object _620NTSC extends CBM2Model {
   override val name = "620 NTSC"
+  override val option = "620ntsc"
   override val memoryK = 256
   override val isPAL  = false
   override val lowProfile = true
@@ -68,6 +73,7 @@ case object _620NTSC extends CBM2Model {
 
 case object _710NTSC extends CBM2Model {
   override val name = "710 NTSC"
+  override val option = "710ntsc"
   override val memoryK = 128
   override val isPAL  = false
   override val lowProfile = false
@@ -80,6 +86,7 @@ case object _710NTSC extends CBM2Model {
 
 case object _710PAL extends CBM2Model {
   override val name = "710 PAL"
+  override val option = "710pal"
   override val memoryK = 128
   override val isPAL  = true
   override val lowProfile = false
@@ -92,6 +99,7 @@ case object _710PAL extends CBM2Model {
 
 case object _720NTSC extends CBM2Model {
   override val name = "720 NTSC"
+  override val option = "720ntsc"
   override val memoryK = 256
   override val isPAL  = false
   override val lowProfile = false
