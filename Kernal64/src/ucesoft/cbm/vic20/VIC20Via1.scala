@@ -71,7 +71,8 @@ class VIC20Via1(bus:IECBus,
       val joy = controlPort.readPort
       val joy012Fire = (joy & 7) << 2 | (joy & 0x10) << 1
       val serial = (~(bus.clk | bus.data << 1)) & 0x3
-      0x80 | serial | joy012Fire | (if (datassette.isPlayPressed) 0 else 0x40) // 0x80 = atn in
+      val byte = 0x80 | serial | joy012Fire | (if (datassette.isPlayPressed) 0 else 0x40) // 0x80 = atn in
+      byte & (regs(PA) | ~regs(DDRA))
     case PB =>
       /*
         Second joystick on User Port
@@ -85,7 +86,7 @@ class VIC20Via1(bus:IECBus,
       val joy = userPort.readPort
       val userJoy = (joy & 7) << 2 | (joy & 8) >> 2 | (joy & 16) << 1 | 0xC1
       val user = userJoy & (if (rs232.isEnabled) rs232.getOthers else 0xFF)
-      user
+      user & (regs(PB) | ~regs(DDRB))
     case _ =>
       super.read(address,chipID)
   }
