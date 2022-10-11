@@ -1,10 +1,10 @@
-package ucesoft.cbm.expansion
+package ucesoft.cbm.expansion.vic20
 
-import ucesoft.cbm.{CBMComponent, CBMComponentType}
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.cpu.RAMComponent
 import ucesoft.cbm.misc.Preferences
 import ucesoft.cbm.peripheral.bus.{IECBus, IEEE488Bus}
+import ucesoft.cbm.{CBMComponent, CBMComponentType}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
@@ -13,6 +13,7 @@ object VIC20ExpansionPort {
     val GEORAM = Value
     val ULTIMEM = Value
     val IEEE488 = Value
+    val FE3 = Value
   }
 
   case class Signals(pref:Preferences,

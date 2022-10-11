@@ -4,6 +4,7 @@ import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm._
 import ucesoft.cbm.cpu.{Memory, ROM}
 import ucesoft.cbm.expansion._
+import ucesoft.cbm.expansion.vic20.{VIC201112IEEE488, VIC20ExpansionPort, VIC20FE3, VIC20GeoRAM, VIC20Ultimem}
 import ucesoft.cbm.formats._
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
@@ -177,6 +178,12 @@ class VIC20 extends CBMHomeComputer {
     gifRecorder = GIFPanel.createGIFPanel(displayFrame, Array(display), Array("VIC"))
 
     signals = VIC20ExpansionPort.Signals(preferences,cpu.irqRequest _,cpu.nmiRequest _,() => reset(true),bus,ieee488Bus,mmu)
+
+    VIC20FE3.make("/Users/ealeame/Desktop/fe3firmware",signals) match {
+      case Right(cart) =>
+        mmu.attachSpecialCart(cart)
+      case Left(ex) => throw ex
+    }
   }
 
   override def afterInitHook : Unit = {
@@ -505,10 +512,10 @@ class VIC20 extends CBMHomeComputer {
 
     preferences.add(PREF_VICPALETTE, "Set the palette type (vice,mike_pal,colodore)", "", Set("vice", "mike_pal", "colodore")) { pal =>
       pal match {
-        case "vice" | "" =>
+        case "vice" =>
           Palette.setPalette(PaletteType.VIC20_VICE)
           vicePalItem.setSelected(true)
-        case "mike_pal" =>
+        case "mike_pal"| "" =>
           Palette.setPalette(PaletteType.VIC20_MIKE_PAL)
           peptoPalItem.setSelected(true)
         case "colodore" =>

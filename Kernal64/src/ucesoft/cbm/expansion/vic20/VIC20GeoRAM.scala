@@ -1,7 +1,6 @@
-package ucesoft.cbm.expansion
+package ucesoft.cbm.expansion.vic20
 
-import ucesoft.cbm.expansion.VIC20ExpansionPort.Signals
-import ucesoft.cbm.misc.Preferences
+import ucesoft.cbm.expansion.vic20.VIC20ExpansionPort.Signals
 import ucesoft.cbm.vic20.VIC20MMU
 
 import java.io.{ObjectInputStream, ObjectOutputStream}

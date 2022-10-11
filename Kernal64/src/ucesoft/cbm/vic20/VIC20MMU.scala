@@ -2,7 +2,7 @@ package ucesoft.cbm.vic20
 
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.{RAMComponent, ROM}
-import ucesoft.cbm.expansion.VIC20ExpansionPort
+import ucesoft.cbm.expansion.vic20.VIC20ExpansionPort
 import ucesoft.cbm.formats.Cartridge
 import ucesoft.cbm.misc.TestCart
 import ucesoft.cbm.peripheral.drive.VIA

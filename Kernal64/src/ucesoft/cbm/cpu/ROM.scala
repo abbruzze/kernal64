@@ -158,16 +158,19 @@ object ROM {
     if (!registeredROMMap.contains(resource)) registeredROMMap += resource -> rom
     val prop = props.getProperty(resource)
     if (prop != null && prop != "") {
-      if (!new File(prop).exists) throw new FileNotFoundException(s"ROM '$prop' not found")
-      Log.info(s"Loading ROM '$prop' ...")
-      new FileInputStream(prop)
+      val file = new File(prop)
+      //if (!new File(prop).exists) throw new FileNotFoundException(s"ROM '$prop' not found")
+      if (!file.exists()) println(s"Warning: '$prop' not found. Using default one.")
+      else {
+        Log.info(s"Loading ROM '$prop' ...")
+        return new FileInputStream(prop)
+      }
     }
-    else {
-      val defROM = ROM_DEFAULT_MAP(resource)
-      val in = ClassLoader.getSystemClassLoader.getResourceAsStream(defROM)
-      if (in == null) throw new FileNotFoundException(s"Default ROM '$defROM' not found")
-      Log.info(s"Loading default ROM '$defROM' ...")
-      in
-    }
+
+    val defROM = ROM_DEFAULT_MAP(resource)
+    val in = ClassLoader.getSystemClassLoader.getResourceAsStream(defROM)
+    if (in == null) throw new FileNotFoundException(s"Default ROM '$defROM' not found")
+    Log.info(s"Loading default ROM '$defROM' ...")
+    in
   }
 }

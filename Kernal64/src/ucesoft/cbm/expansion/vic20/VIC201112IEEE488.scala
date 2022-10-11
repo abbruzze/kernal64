@@ -1,8 +1,8 @@
-package ucesoft.cbm.expansion
+package ucesoft.cbm.expansion.vic20
 
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.ChipID.ID
-import ucesoft.cbm.expansion.VIC20ExpansionPort.{Signals, VIC20ExpansionPortStateHandler}
+import ucesoft.cbm.expansion.vic20.VIC20ExpansionPort.{Signals, VIC20ExpansionPortStateHandler}
 import ucesoft.cbm.misc.Preferences
 import ucesoft.cbm.peripheral.bus.IEEE488Bus
 import ucesoft.cbm.peripheral.drive.VIA
