@@ -1,5 +1,7 @@
 package ucesoft.cbm.expansion.vic20
 
+import ucesoft.cbm.{Clock, ClockEvent}
+import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.expansion.vic20.VIC20ExpansionPort.{Signals, VIC20ExpansionPortStateHandler}
 
 import java.io.{File, ObjectInputStream, ObjectOutputStream}
@@ -24,6 +26,116 @@ object VIC20FE3 extends VIC20ExpansionPortStateHandler {
   override def save(cart: VIC20ExpansionPort, out: ObjectOutputStream): Unit = ???
 }
 
+class AMF29F040(address:Int,val rom:Array[Int]) {
+  private final val READMODE_NORMAL = 0
+  private final val READMODE_AUTO = 1
+  private final val READMODE_POLLING = 2
+  private val mask5555 = address | 0x555
+  private val mask2aaa = address | 0x2AA
+  private var readMode = READMODE_NORMAL
+  private var step = 0
+  private val clk = Clock.systemClock
+  private var status = 0
+
+  def write(address:Int, value:Int) : Unit = {
+    this.step match {
+      case 0 =>
+        if (value == 0xF0) {
+          readMode = READMODE_NORMAL
+          return
+        }
+        if ((address == mask5555) && (value == 0xAA)) {
+          step += 1
+          return
+        }
+        readMode = READMODE_NORMAL
+        return
+      case 1|4 =>
+        if ((address == mask2aaa) & (value == 0x55)) {
+          step += 1
+          return
+        }
+        step = 0
+        readMode = READMODE_NORMAL
+        return
+      case 2 =>
+        if (address != mask5555) return
+        value match {
+          case 0xF0 =>
+            step = 0
+            readMode = READMODE_NORMAL
+            return
+          case 0x90 =>
+            readMode = READMODE_AUTO
+            step = 0
+            return
+          case 0xA0 =>
+            step = 6
+            return
+          case 0x80 =>
+            step += 1
+            return
+          case _ =>
+            step = 0
+            readMode = READMODE_NORMAL
+            return
+        }
+      case 3 =>
+        if ((address == mask5555) && (value == 0xAA)) {
+          step += 1
+          return
+        }
+        step = 0
+        readMode = READMODE_NORMAL
+        return
+      case 5 =>
+        if ((address == mask5555) && (value == 0x10)) {
+          println(s"Erase chip: ${address.toHexString}")
+          // chip erase ignored
+          return
+        }
+        if (value == 0x30) {
+          //flash.eraseSector
+          println(s"Erase sector: ${address.toHexString}")
+          status = (value & 0x80) ^ 0x80
+          readMode = READMODE_POLLING
+          val cycles = clk.getClockHz.toInt // 1 second (see datasheet)
+          clk.schedule(new ClockEvent("AMF290F040_ERASE",clk.currentCycles + cycles, _ => readMode = READMODE_NORMAL ))
+          step = 0
+          return
+        }
+        step = 0
+        readMode = READMODE_NORMAL
+        return
+      case 6 =>
+        //flash.flash(address & 0x1FFF,value,low)
+        rom(address) = value
+        status = (value & 0x80) ^ 0x80
+        readMode = READMODE_POLLING
+        val cycles = 7 // 7 microseconds (ignore differences between PAL/NTSC) (see datasheet)
+        clk.schedule(new ClockEvent("AMF290F040_WRITE",clk.currentCycles + cycles, _ => readMode = READMODE_NORMAL ))
+    }
+
+    step = 0
+  }
+
+  def read(address:Int) : Int = {
+    readMode match {
+      case READMODE_AUTO =>
+        address & 3 match { // autoselect codes for AMF29F040
+          case 0 => 1
+          case 1 => 0xA4
+          case 2 => 0
+        }
+      case READMODE_POLLING =>
+        status ^= 0x40
+        status
+      case _ =>
+        if (rom != null) rom(address) else 0xF1
+    }
+  }
+}
+
 class VIC20FE3(val rom:Array[Int],
                override val signals:Signals) extends VIC20ExpansionPort(signals) {
 
@@ -33,6 +145,7 @@ class VIC20FE3(val rom:Array[Int],
   private val ram = Array.ofDim[Int](0x80000)
   private var lockbit = true
   private val regs = Array.ofDim[Int](2)
+  private val flash = new AMF29F040(0x2000,rom)
 
   final private val BASE_RAM123   = 4
   final private val BASE_BLK1     = 0
@@ -61,11 +174,11 @@ class VIC20FE3(val rom:Array[Int],
   @inline private def isBLK5Enabled(): Boolean = (regs(1) & 0x10) == 0
   @inline private def blockBit(block:Int): Int = {
     block match {
-      case BASE_RAM123 => 0
-      case BASE_BLK1 => 1
-      case BASE_BLK2 => 2
-      case BASE_BLK3 => 3
-      case BASE_BLK5 => 4
+      case BASE_RAM123 => 1
+      case BASE_BLK1 => 2
+      case BASE_BLK2 => 4
+      case BASE_BLK3 => 8
+      case BASE_BLK5 => 16
     }
   }
   @inline private def isRAM123WP(): Boolean = (regs(0) & 1) > 0
@@ -170,7 +283,8 @@ class VIC20FE3(val rom:Array[Int],
   protected def write_RAM1_MODE(address: Int, value: Int, block: Int): Boolean = {
     block match {
       case BASE_RAM123 =>
-        if (!isRAM123WP()) ram(calcAddress(0, block, address)) = value
+        if (!isRAM123WP())
+          ram(calcAddress(0, block, address)) = value
         true
       case _ =>
         val bank = if ((regs(0) & blockBit(block)) == 0) 1 else 2
@@ -191,7 +305,8 @@ class VIC20FE3(val rom:Array[Int],
   protected def write_RAM2_MODE(address: Int, value: Int, block: Int): Boolean = {
     block match {
       case BASE_RAM123 =>
-        if (!isRAM123WP()) ram(calcAddress(0, block, address)) = value
+        if (!isRAM123WP())
+          ram(calcAddress(0, block, address)) = value
         true
       case _ =>
         ram(calcAddress(1, block, address)) = value
@@ -232,7 +347,8 @@ class VIC20FE3(val rom:Array[Int],
   protected def write_RAM_ROM_MODE(address: Int, value: Int, block: Int): Boolean = {
     block match {
       case BASE_RAM123 =>
-        if (!isRAM123WP()) ram(calcAddress(0, block, address)) = value
+        if (!isRAM123WP())
+          ram(calcAddress(0, block, address)) = value
         true
       case _ =>
         val bank = if ((regs(0) & blockBit(block)) == 0) 1 else 2
@@ -262,7 +378,8 @@ class VIC20FE3(val rom:Array[Int],
   }
   // ==================================================================================
   protected def read_eeprom(address:Int): Int = {
-    rom(address)
+    //rom(address)
+    flash.read(address)
   }
 
   protected def flash_eeprom(address:Int,value:Int): Unit = {
@@ -305,21 +422,16 @@ class VIC20FE3(val rom:Array[Int],
   }
 
   override def write(address: Int, value: Int): Boolean = {
-    if (address == 0x2555 || address == 0x2AAA) {
-      println(s"${address.toHexString} mode = ${mode()} value=${value.toHexString}")
-    }
     address match {
       case 0x9C02 =>
         if (isRegsAccessible()) {
           regs(0) = value
-          println(s"A = $value")
           true
         }
         else false
       case 0x9C03 =>
         if (isRegsAccessible()) {
           regs(1) = value
-          println(s"B = $value")
           true
         }
         else false
@@ -330,6 +442,7 @@ class VIC20FE3(val rom:Array[Int],
         }
         else if (address >= 0x2000 && address < 0x4000) { // BLK1
           if (!isBLK1Enabled()) return false
+          flash.write(address, value)
           writeMode(address,value,BASE_BLK1)
         }
         else if (address >= 0x4000 && address < 0x6000) { // BLK2
