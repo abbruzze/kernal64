@@ -24,7 +24,7 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
     def isActive = true
     def init  : Unit = {}
 
-    private val amf29f040 = new AMF29F040(startAddress,low,this)
+    private val amf29f040 = new AMF29F040(AMF29F040.AMF29F040TypeB,low,this)
     val bankErasedMap: Array[Boolean] = Array.ofDim[Boolean](64)
 
     updateROMBank
@@ -37,7 +37,7 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
       }
     }
 
-    override def eraseSector: Unit = {
+    override def eraseSector(address:Int): Unit = {
       val bank = (if (low) romlBankIndex else romhBankIndex) & 0xF8
       for(b <- bank until bank + 8) {
         val rom = getOrCreateBank(Some(b)).asInstanceOf[ROM]
@@ -66,7 +66,7 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
 
     override def flash(address: Int, value: Int, low: Boolean): Unit = {
       val rom = getOrCreateBank(None)
-      rom.asInstanceOf[ROM].data(address) = value // flash value
+      rom.asInstanceOf[ROM].data(address & 0x1FFF) = value // flash value
       val bank = if (low) romlBankIndex else romhBankIndex
       bankErasedMap(bank) = false
       //println("FLASHING[%5b] bank %2d address %4X value %2X bank present=%5b".format(low,if (low) romlBankIndex else romhBankIndex,address,value,if (low) romlBanks.contains(romlBankIndex) else romhBanks.contains(romhBankIndex)))

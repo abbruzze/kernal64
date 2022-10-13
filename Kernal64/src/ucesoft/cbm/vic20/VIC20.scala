@@ -1041,4 +1041,9 @@ class VIC20 extends CBMHomeComputer {
     // PLAY
     clock.play
   }
+
+  override def shutdown(): Unit = {
+    mmu.detachAllCarts()
+    mmu.detachSpecialCart()
+  }
 }

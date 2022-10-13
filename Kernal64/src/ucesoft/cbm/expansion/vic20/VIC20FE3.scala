@@ -1,8 +1,7 @@
 package ucesoft.cbm.expansion.vic20
 
-import ucesoft.cbm.{Clock, ClockEvent}
-import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.expansion.vic20.VIC20ExpansionPort.{Signals, VIC20ExpansionPortStateHandler}
+import ucesoft.cbm.misc.AMF29F040
 
 import java.io.{File, ObjectInputStream, ObjectOutputStream}
 
@@ -25,33 +24,35 @@ object VIC20FE3 extends VIC20ExpansionPortStateHandler {
   override def load(in: ObjectInputStream, signals: Signals): VIC20ExpansionPort = ???
   override def save(cart: VIC20ExpansionPort, out: ObjectOutputStream): Unit = ???
 }
-
+/*
 class AMF29F040(address:Int,val rom:Array[Int]) {
   private final val READMODE_NORMAL = 0
   private final val READMODE_AUTO = 1
   private final val READMODE_POLLING = 2
-  private val mask5555 = address | 0x555
-  private val mask2aaa = address | 0x2AA
+  private val magic = Array(Array(0x555,0xFFF),Array(0x2AA,0xFFF))
   private var readMode = READMODE_NORMAL
   private var step = 0
   private val clk = Clock.systemClock
   private var status = 0
 
+  @inline private def isMagic(index:Int,address:Int): Boolean = (address & magic(index)(1)) == magic(index)(0)
+
   def write(address:Int, value:Int) : Unit = {
     this.step match {
       case 0 =>
         if (value == 0xF0) {
+          println("RESET")
           readMode = READMODE_NORMAL
           return
         }
-        if ((address == mask5555) && (value == 0xAA)) {
+        if (isMagic(0,address) && (value == 0xAA)) {
           step += 1
           return
         }
         readMode = READMODE_NORMAL
         return
       case 1|4 =>
-        if ((address == mask2aaa) & (value == 0x55)) {
+        if (isMagic(1,address) & (value == 0x55)) {
           step += 1
           return
         }
@@ -59,7 +60,7 @@ class AMF29F040(address:Int,val rom:Array[Int]) {
         readMode = READMODE_NORMAL
         return
       case 2 =>
-        if (address != mask5555) return
+        if (!isMagic(0,address)) return
         value match {
           case 0xF0 =>
             step = 0
@@ -81,7 +82,7 @@ class AMF29F040(address:Int,val rom:Array[Int]) {
             return
         }
       case 3 =>
-        if ((address == mask5555) && (value == 0xAA)) {
+        if (isMagic(0,address) && (value == 0xAA)) {
           step += 1
           return
         }
@@ -89,14 +90,15 @@ class AMF29F040(address:Int,val rom:Array[Int]) {
         readMode = READMODE_NORMAL
         return
       case 5 =>
-        if ((address == mask5555) && (value == 0x10)) {
+        if (isMagic(0,address) && (value == 0x10)) {
           println(s"Erase chip: ${address.toHexString}")
           // chip erase ignored
           return
         }
         if (value == 0x30) {
           //flash.eraseSector
-          println(s"Erase sector: ${address.toHexString}")
+          println(s"Erase sector: ${address.toHexString} => sector erasing ${(address & 0x70000).toHexString} - ${((address & 0x70000) + 0xFFFF).toHexString}")
+          java.util.Arrays.fill(rom,address & 0x70000,(address & 0x70000) + 0xFFFF,0xFF)
           status = (value & 0x80) ^ 0x80
           readMode = READMODE_POLLING
           val cycles = clk.getClockHz.toInt // 1 second (see datasheet)
@@ -109,6 +111,7 @@ class AMF29F040(address:Int,val rom:Array[Int]) {
         return
       case 6 =>
         //flash.flash(address & 0x1FFF,value,low)
+        println(s"Writing ${address.toHexString} = $value")
         rom(address) = value
         status = (value & 0x80) ^ 0x80
         readMode = READMODE_POLLING
@@ -134,7 +137,7 @@ class AMF29F040(address:Int,val rom:Array[Int]) {
         if (rom != null) rom(address) else 0xF1
     }
   }
-}
+}*/
 
 class VIC20FE3(val rom:Array[Int],
                override val signals:Signals) extends VIC20ExpansionPort(signals) {
@@ -145,7 +148,7 @@ class VIC20FE3(val rom:Array[Int],
   private val ram = Array.ofDim[Int](0x80000)
   private var lockbit = true
   private val regs = Array.ofDim[Int](2)
-  private val flash = new AMF29F040(0x2000,rom)
+  private val flash = new AMF29F040(AMF29F040.AMF29F040TypeB)
 
   final private val BASE_RAM123   = 4
   final private val BASE_BLK1     = 0
@@ -160,6 +163,8 @@ class VIC20FE3(val rom:Array[Int],
   final private val MODE_SUPER_RAM= 5
   final private val MODE_RAM_ROM  = 3
   final private val MODE_FLASH    = 1
+
+  flash.setROMBank(rom)
 
   @inline private def calcAddress(bank:Int,base:Int,offset:Int): Int = (bank & 0xF) << 15 | ((base & 0x3) ^ ((regs(1) >> 5) & 3)) << 13 | (offset & 0x1FFF)
   @inline private def mode(): Int = (regs(0) >> 5) & 7
@@ -378,13 +383,11 @@ class VIC20FE3(val rom:Array[Int],
   }
   // ==================================================================================
   protected def read_eeprom(address:Int): Int = {
-    //rom(address)
     flash.read(address)
   }
 
   protected def flash_eeprom(address:Int,value:Int): Unit = {
-    // TODO
-    println(s"Flashing at ${address.toHexString} = ${value.toHexString}")
+    flash.write(address,value)
   }
 
   override def read(address: Int): Option[Int] = {
@@ -442,7 +445,6 @@ class VIC20FE3(val rom:Array[Int],
         }
         else if (address >= 0x2000 && address < 0x4000) { // BLK1
           if (!isBLK1Enabled()) return false
-          flash.write(address, value)
           writeMode(address,value,BASE_BLK1)
         }
         else if (address >= 0x4000 && address < 0x6000) { // BLK2
