@@ -19,6 +19,9 @@ object AMF29F040 {
     val magicMask : Int
     val sectorSize : Int
     val sectorMask : Int
+    val sizeMask : Int
+    val eraseChipTimeInSeconds : Double
+    val eraseSectorTimeInSeconds : Double
   }
   case object AMF29F040TypeB extends AMF29F040Type {
     override val manufacturerID = 1
@@ -28,6 +31,9 @@ object AMF29F040 {
     override val magicMask = 0x7FF
     override val sectorSize = 0x10000
     override val sectorMask = 0x70000
+    override val sizeMask: Int = 0x80000 - 1
+    override val eraseChipTimeInSeconds = 8
+    override val eraseSectorTimeInSeconds = 1
   }
 
   case object AMF29F040Type064 extends AMF29F040Type {
@@ -38,11 +44,15 @@ object AMF29F040 {
     override val magicMask = 0xFFF
     override val sectorSize = 0x10000
     override val sectorMask = 0x7F0000
+    override val sizeMask: Int = 0x800000 - 1
+    override val eraseChipTimeInSeconds = 64
+    override val eraseSectorTimeInSeconds = 0.5
   }
 
 }
 
 class AMF29F040(flashType:AMF29F040.AMF29F040Type,low:Boolean = false,flash : FlashListener = null) {
+  private final val ERASE_PATTERN = 0xFF
   private final val READMODE_NORMAL = 0
   private final val READMODE_AUTO = 1
   private final val READMODE_POLLING = 2
@@ -69,6 +79,12 @@ class AMF29F040(flashType:AMF29F040.AMF29F040Type,low:Boolean = false,flash : Fl
       override def read(address: Int, chipID: ID): Int = bank(address)
       override def write(address: Int, value: Int, chipID: ID): Unit = bank(address) = value
     }
+  }
+
+  def reset(): Unit = {
+    step = 0
+    readMode = READMODE_NORMAL
+    status = 0
   }
 
   @inline private def isMagic(index:Int,address:Int): Boolean = (address & flashType.magicMask) == flashType.magics(index)
@@ -129,7 +145,11 @@ class AMF29F040(flashType:AMF29F040.AMF29F040Type,low:Boolean = false,flash : Fl
           romModified = true
           if (flash != null) flash.chipErase()
           else
-            for(address <- 0 until rom.length) rom.write(address,0xFF)
+            for(address <- 0 until rom.length) rom.write(address,ERASE_PATTERN)
+          readMode = READMODE_POLLING
+          val cycles = (flashType.eraseChipTimeInSeconds * clk.getClockHz).toInt
+          clk.schedule(new ClockEvent("AMF290F040_ERASECHIP", clk.currentCycles + cycles, _ => readMode = READMODE_NORMAL))
+          step = 0
           return
         }
         if (value == 0x30) {
@@ -139,11 +159,11 @@ class AMF29F040(flashType:AMF29F040.AMF29F040Type,low:Boolean = false,flash : Fl
           else {
             val eraseFrom = address & flashType.sectorMask
             val eraseTo = (eraseFrom + flashType.sectorSize - 1) % rom.length
-            for(address <- eraseFrom to eraseTo) rom.write(address,0xFF)
+            for(address <- eraseFrom to eraseTo) rom.write(address,ERASE_PATTERN)
           }
           status = (value & 0x80) ^ 0x80
           readMode = READMODE_POLLING
-          val cycles = clk.getClockHz.toInt // 1 second (see datasheet)
+          val cycles = (flashType.eraseSectorTimeInSeconds * clk.getClockHz).toInt
           clk.schedule(new ClockEvent("AMF290F040_ERASE",clk.currentCycles + cycles, _ => readMode = READMODE_NORMAL ))
           step = 0
           return
@@ -153,8 +173,9 @@ class AMF29F040(flashType:AMF29F040.AMF29F040Type,low:Boolean = false,flash : Fl
         return
       case 6 =>
         romModified = true
-        if (flash != null) flash.flash(address,value,low)
-        else rom.write(address,value)
+        //println(s"Writing ${address.toHexString} = $value")
+        if (flash != null) flash.flash(address & flashType.sizeMask,value,low)
+        else rom.write(address & flashType.sizeMask,value)
 
         status = (value & 0x80) ^ 0x80
         readMode = READMODE_POLLING
@@ -176,7 +197,7 @@ class AMF29F040(flashType:AMF29F040.AMF29F040Type,low:Boolean = false,flash : Fl
         status ^= 0x40
         status
       case _ =>
-        if (rom != null) rom.read(address) else 0xF1
+        if (rom != null) rom.read(address & flashType.sizeMask) else 0xF1
     }
   }
 }

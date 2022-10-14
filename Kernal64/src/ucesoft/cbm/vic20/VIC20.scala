@@ -57,7 +57,8 @@ class VIC20 extends CBMHomeComputer {
   protected val specialCartLoaderMap : Map[VIC20ExpansionPort.VICExpansionPortType.Value,VIC20ExpansionPort.VIC20ExpansionPortStateHandler] = Map(
     VIC20ExpansionPort.VICExpansionPortType.ULTIMEM -> VIC20Ultimem,
     VIC20ExpansionPort.VICExpansionPortType.GEORAM -> VIC20GeoRAM,
-    VIC20ExpansionPort.VICExpansionPortType.IEEE488 -> VIC201112IEEE488
+    VIC20ExpansionPort.VICExpansionPortType.IEEE488 -> VIC201112IEEE488,
+    VIC20ExpansionPort.VICExpansionPortType.FE3 -> VIC20FE3,
   )
 
   protected var signals : VIC20ExpansionPort.Signals = _
@@ -178,12 +179,6 @@ class VIC20 extends CBMHomeComputer {
     gifRecorder = GIFPanel.createGIFPanel(displayFrame, Array(display), Array("VIC"))
 
     signals = VIC20ExpansionPort.Signals(preferences,cpu.irqRequest _,cpu.nmiRequest _,() => reset(true),bus,ieee488Bus,mmu)
-
-    VIC20FE3.make("/Users/ealeame/Desktop/fe3firmware",signals) match {
-      case Right(cart) =>
-        mmu.attachSpecialCart(cart)
-      case Left(ex) => throw ex
-    }
   }
 
   override def afterInitHook : Unit = {
@@ -650,6 +645,34 @@ class VIC20 extends CBMHomeComputer {
     }
   }
 
+  protected def setFE3Settings(parent: JMenu): Unit = {
+    import Preferences._
+    val showFe3 = new JMenuItem("Final Expansion 3 configuration ...")
+    showFe3.addActionListener(_ => showFE3Config())
+    parent.add(showFe3)
+
+    preferences.add(PREF_VIC20_FE3, "enables final expansion 3 cartridge with the given rom", "") { filePath =>
+      if (!filePath.isEmpty) setFE3(filePath)
+    }
+  }
+
+  protected def showFE3Config(): Unit = {
+    VIC20FE3.showConfPanel(displayFrame, preferences, (enabled, romPath) => {
+      clock.pause()
+      if (enabled) setFE3(romPath) else mmu.detachSpecialCart()
+      reset(true)
+    })
+  }
+
+  protected def setFE3(romPath: String): Unit = {
+    VIC20FE3.make(romPath, signals) match {
+      case Right(fe3) =>
+        mmu.attachSpecialCart(fe3)
+      case Left(t) =>
+        showError("Final Expansion 3 cartridge", s"Rom loading error: $t")
+    }
+  }
+
   protected def showVIC1112IEEE488Config(): Unit = {
     VIC201112IEEE488.showConfPanel(displayFrame, preferences, (enabled, romPath) => {
       clock.pause()
@@ -802,6 +825,7 @@ class VIC20 extends CBMHomeComputer {
 
     setGEORamSettings(IOItem)
     setUltimemSettings(IOItem)
+    setFE3Settings(IOItem)
     setVIC1112IEEE488Settings(IOItem)
 
     // -----------------------------------

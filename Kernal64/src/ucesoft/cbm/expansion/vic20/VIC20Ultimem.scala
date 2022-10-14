@@ -1,10 +1,10 @@
 package ucesoft.cbm.expansion.vic20
 
 import ucesoft.cbm.expansion.vic20.VIC20ExpansionPort.{Signals, VIC20ExpansionPortStateHandler}
-import ucesoft.cbm.misc.Preferences
+import ucesoft.cbm.misc.{AMF29F040, Preferences}
 
 import java.awt.{BorderLayout, FlowLayout, GridLayout}
-import java.io.{File, FileOutputStream, ObjectInputStream, ObjectOutputStream}
+import java.io.{BufferedOutputStream, File, FileOutputStream, ObjectInputStream, ObjectOutputStream}
 import javax.swing._
 
 object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
@@ -13,6 +13,8 @@ object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
   private val _8M = _1M * 8
 
   private var switch0 = false
+  private var imageWriteBack = false
+  private var lastEnabledROMPath = ""
 
   def make(romPath:String,
            signals:Signals): Either[Throwable,VIC20Ultimem] = {
@@ -32,6 +34,7 @@ object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
                     signals:Signals): VIC20ExpansionPort = {
     import Preferences._
     val rom = in.readObject().asInstanceOf[Array[Int]]
+    imageWriteBack = in.readBoolean()
     val tmpFile = File.createTempFile("ultimem","")
     tmpFile.deleteOnExit()
     val romBytes = rom.map(_.toByte)
@@ -44,7 +47,24 @@ object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
 
   override def save(cart: VIC20ExpansionPort, out: ObjectOutputStream): Unit = {
     out.writeObject(cart.asInstanceOf[VIC20Ultimem].rom)
+    out.writeBoolean(imageWriteBack)
     cart.save(out)
+  }
+
+  private def saveRomBackOnImage(rom:Array[Int]): Unit = {
+    try {
+      val out = new BufferedOutputStream(new FileOutputStream(lastEnabledROMPath))
+      var i = 0
+      while (i < rom.length) {
+        out.write(rom(i))
+        i += 1
+      }
+      out.close()
+    }
+    catch {
+      case e:Exception =>
+        println(s"ULTIMEM: Cannot write back to image: $e")
+    }
   }
 
   def showConfPanel(parent: JFrame, pref: Preferences,enableHandler:(Boolean,String) => Unit): Unit = {
@@ -58,6 +78,7 @@ object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
 
     val enabledCheck = new JCheckBox("Enabled")
     val switch0Check = new JCheckBox("Switch 0")
+    val writeCheck = new JCheckBox("Image write back (when cart is detached)")
     val browseButton = new JButton("Browse")
     val applyButton = new JButton("Apply")
     val cancelButton = new JButton("Cancel")
@@ -88,10 +109,11 @@ object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
       enabledCheck.setSelected(!romFile.isEmpty)
       val wasEnabled = !romFile.isEmpty
       val wasText = romFile
-      val panel = new JPanel(new GridLayout(3, 1))
+      val panel = new JPanel(new GridLayout(4, 1))
       add("Center", panel)
       panel.add(enabledCheck)
       panel.add(switch0Check)
+      panel.add(writeCheck)
       var dummy = new JPanel(new FlowLayout(FlowLayout.LEFT))
       dummy.add(label)
       dummy.add(fileText)
@@ -103,6 +125,7 @@ object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
       add("South", dummy)
 
       switch0Check.setSelected(switch0)
+      writeCheck.setSelected(imageWriteBack)
       fileText.setEnabled(enabledCheck.isSelected)
       browseButton.setEnabled(enabledCheck.isSelected)
       label.setEnabled(enabledCheck.isSelected)
@@ -136,10 +159,12 @@ object VIC20Ultimem extends VIC20ExpansionPortStateHandler {
         if (checkFile()) {
           dialog.dispose()
           switch0 = switch0Check.isSelected
+          imageWriteBack = writeCheck.isSelected
           val enabled = enabledCheck.isSelected
           if (enabled) {
             pref.updateWithoutNotify(PREF_VIC20_ULTIMEM,fileText.getText)
             if (wasText != fileText.getText) enableHandler(true,fileText.getText)
+            lastEnabledROMPath = fileText.getText
           }
           else {
             pref.updateWithoutNotify(PREF_VIC20_ULTIMEM,"")
@@ -158,6 +183,7 @@ class VIC20Ultimem(val rom:Array[Int],
   override val portType = VIC20ExpansionPort.VICExpansionPortType.ULTIMEM
   override val componentID: String = "VIC20Ultimem"
   protected final val ram =  Array.ofDim[Int](if (rom.length == _512K) _512K else _1M)
+  protected val flash = new AMF29F040(if (rom.length == _512K) AMF29F040.AMF29F040TypeB else AMF29F040.AMF29F040Type064)
   protected final val ramSizeMask = ram.length - 1
   protected final val romSizeMask = rom.length - 1
   protected final val regs = Array.ofDim[Int](0x10)
@@ -192,9 +218,11 @@ class VIC20Ultimem(val rom:Array[Int],
   @inline private def set_blk5_config(v:Int): Unit = regs(2) = (regs(2) & 0x3F) | (v & 3) << 6
 
   reset()
+  flash.setROMBank(rom)
 
   override def eject(): Unit = {
     import ucesoft.cbm.misc.Preferences._
+    if (imageWriteBack && flash.hasBeenWritten()) saveRomBackOnImage(rom)
     signals.pref.update(PREF_VIC20_ULTIMEM, "")
   }
 
@@ -216,6 +244,7 @@ class VIC20Ultimem(val rom:Array[Int],
       regs(BANK_BLK5_REG) = 0
     }
     unhideSequence = 0
+    flash.reset()
   }
 
   override def init(): Unit = {
@@ -237,7 +266,7 @@ class VIC20Ultimem(val rom:Array[Int],
       case RAM_RW | RAM_RO =>
         Some(ram((bankAddress(bank_reg) | (address & 0x1FFF)) & ramSizeMask))
       case FLASH_ROM =>
-        Some(rom((bankAddress(bank_reg) | (address & 0x1FFF)) & romSizeMask))
+        Some(flash.read((bankAddress(bank_reg) | (address & 0x1FFF)) & romSizeMask))
     }
   }
 
@@ -299,7 +328,7 @@ class VIC20Ultimem(val rom:Array[Int],
         ram((bankAddress(bank_reg) | (address & 0x1FFF)) & ramSizeMask) = value
         true
       case FLASH_ROM =>
-        println(s"Writing ROM ${address.toHexString} = ${value.toHexString}. Writing flash rom not supported yet")
+        flash.write((bankAddress(bank_reg) | (address & 0x1FFF)) & romSizeMask,value)
         true
       case RAM_RO =>
         true

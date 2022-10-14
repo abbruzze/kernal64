@@ -1,19 +1,30 @@
 package ucesoft.cbm.expansion.vic20
 
 import ucesoft.cbm.expansion.vic20.VIC20ExpansionPort.{Signals, VIC20ExpansionPortStateHandler}
-import ucesoft.cbm.misc.AMF29F040
+import ucesoft.cbm.misc.{AMF29F040, Preferences}
 
-import java.io.{File, ObjectInputStream, ObjectOutputStream}
+import java.awt.{BorderLayout, FlowLayout, GridLayout}
+import java.io._
+import javax.swing._
 
 object VIC20FE3 extends VIC20ExpansionPortStateHandler {
+  private var imageWriteBack = false
+  private var lastEnabledROMPath = ""
+
   def make(romPath: String,
            signals: Signals): Either[Throwable, VIC20FE3] = {
     try {
       val f = new File(romPath)
       if (f.length() > 512 * 1024) throw new IllegalArgumentException("FE3 ROM length maximum size is 512K")
       val tmpRom = java.nio.file.Files.readAllBytes(f.toPath).map(_.toInt & 0xFF)
-      val rom = Array.ofDim[Int](0x80000)
-      System.arraycopy(tmpRom,0,rom,0x5000,tmpRom.length)
+      val rom = Array.fill[Int](0x80000)(0xFF) // important!, must be filled with 0xFF otherwise the catalog would be full
+      var offset = 0
+      if (f.length() < 0x8000) {
+        val tsize = (f.length().toInt + 0xFFF) & 0xFFFFF000
+        offset = 0x8000 - tsize
+      }
+      val ROMSIZE = 512 * 1024
+      System.arraycopy(tmpRom,0,rom,offset,if (f.length() > ROMSIZE) ROMSIZE else tmpRom.length)
       Right(new VIC20FE3(rom, signals))
     }
     catch {
@@ -21,126 +32,148 @@ object VIC20FE3 extends VIC20ExpansionPortStateHandler {
         Left(io)
     }
   }
-  override def load(in: ObjectInputStream, signals: Signals): VIC20ExpansionPort = ???
-  override def save(cart: VIC20ExpansionPort, out: ObjectOutputStream): Unit = ???
-}
-/*
-class AMF29F040(address:Int,val rom:Array[Int]) {
-  private final val READMODE_NORMAL = 0
-  private final val READMODE_AUTO = 1
-  private final val READMODE_POLLING = 2
-  private val magic = Array(Array(0x555,0xFFF),Array(0x2AA,0xFFF))
-  private var readMode = READMODE_NORMAL
-  private var step = 0
-  private val clk = Clock.systemClock
-  private var status = 0
 
-  @inline private def isMagic(index:Int,address:Int): Boolean = (address & magic(index)(1)) == magic(index)(0)
+  override def load(in: ObjectInputStream,
+                    signals: Signals): VIC20ExpansionPort = {
+    import Preferences._
+    val rom = in.readObject().asInstanceOf[Array[Int]]
+    imageWriteBack = in.readBoolean()
+    val tmpFile = File.createTempFile("fe3", "")
+    tmpFile.deleteOnExit()
+    val romBytes = rom.map(_.toByte)
+    val out = new FileOutputStream(tmpFile)
+    out.write(romBytes)
+    out.close()
+    signals.pref.updateWithoutNotify(PREF_VIC20_FE3, tmpFile.toString)
+    new VIC20FE3(rom, signals)
+  }
 
-  def write(address:Int, value:Int) : Unit = {
-    this.step match {
-      case 0 =>
-        if (value == 0xF0) {
-          println("RESET")
-          readMode = READMODE_NORMAL
-          return
-        }
-        if (isMagic(0,address) && (value == 0xAA)) {
-          step += 1
-          return
-        }
-        readMode = READMODE_NORMAL
-        return
-      case 1|4 =>
-        if (isMagic(1,address) & (value == 0x55)) {
-          step += 1
-          return
-        }
-        step = 0
-        readMode = READMODE_NORMAL
-        return
-      case 2 =>
-        if (!isMagic(0,address)) return
-        value match {
-          case 0xF0 =>
-            step = 0
-            readMode = READMODE_NORMAL
-            return
-          case 0x90 =>
-            readMode = READMODE_AUTO
-            step = 0
-            return
-          case 0xA0 =>
-            step = 6
-            return
-          case 0x80 =>
-            step += 1
-            return
+  override def save(cart: VIC20ExpansionPort, out: ObjectOutputStream): Unit = {
+    out.writeObject(cart.asInstanceOf[VIC20FE3].rom)
+    out.writeBoolean(imageWriteBack)
+    cart.save(out)
+  }
+
+  private def saveRomBackOnImage(rom: Array[Int]): Unit = {
+    try {
+      val out = new BufferedOutputStream(new FileOutputStream(lastEnabledROMPath))
+      var i = 0
+      while (i < rom.length) {
+        out.write(rom(i))
+        i += 1
+      }
+      out.close()
+    }
+    catch {
+      case e: Exception =>
+        println(s"FE3: Cannot write back to image: $e")
+    }
+  }
+
+  def showConfPanel(parent: JFrame, pref: Preferences, enableHandler: (Boolean, String) => Unit): Unit = {
+    val panel = new VIC20FE3Panel(parent, pref, enableHandler)
+    panel.dialog.setVisible(true)
+  }
+
+  private class VIC20FE3Panel(parent: JFrame, pref: Preferences, enableHandler: (Boolean, String) => Unit) extends JPanel {
+
+    import ucesoft.cbm.misc.Preferences._
+
+    val enabledCheck = new JCheckBox("Enabled")
+    val writeCheck = new JCheckBox("Image write back (when cart is detached)")
+    val browseButton = new JButton("Browse")
+    val applyButton = new JButton("Apply")
+    val cancelButton = new JButton("Cancel")
+    val fileText = new JTextField(40)
+    val label = new JLabel("ROM file path")
+
+    val dialog = new JDialog(parent, "Final Expansion 3 cartridge configuration", true)
+
+    init()
+
+    def checkFile(): Boolean = {
+      val f = new File(fileText.getText())
+      if (!f.exists()) {
+        JOptionPane.showMessageDialog(this, s"ROM file $f does not exists", "Final Expansion 3 configuration error", JOptionPane.ERROR_MESSAGE)
+        false
+      }
+      else true
+    }
+
+    def init(): Unit = {
+      setLayout(new BorderLayout())
+      val romFile = pref.get[String](PREF_VIC20_FE3).get.value
+      fileText.setText(romFile)
+      enabledCheck.setSelected(!romFile.isEmpty)
+      val wasEnabled = !romFile.isEmpty
+      val wasText = romFile
+      val panel = new JPanel(new GridLayout(3, 1))
+      add("Center", panel)
+      panel.add(enabledCheck)
+      panel.add(writeCheck)
+      var dummy = new JPanel(new FlowLayout(FlowLayout.LEFT))
+      dummy.add(label)
+      dummy.add(fileText)
+      dummy.add(browseButton)
+      panel.add(dummy)
+      dummy = new JPanel(new FlowLayout(FlowLayout.CENTER))
+      dummy.add(applyButton)
+      dummy.add(cancelButton)
+      add("South", dummy)
+
+      writeCheck.setSelected(imageWriteBack)
+      fileText.setEnabled(enabledCheck.isSelected)
+      browseButton.setEnabled(enabledCheck.isSelected)
+      label.setEnabled(enabledCheck.isSelected)
+
+      dialog.getContentPane.add("Center", this)
+      dialog.pack()
+      dialog.setResizable(false)
+      dialog.setLocationRelativeTo(parent)
+
+      browseButton.addActionListener(_ => {
+        val fc = new JFileChooser
+        fc.showOpenDialog(this) match {
+          case JFileChooser.APPROVE_OPTION =>
+            fileText.setText(fc.getSelectedFile.toString)
           case _ =>
-            step = 0
-            readMode = READMODE_NORMAL
-            return
         }
-      case 3 =>
-        if (isMagic(0,address) && (value == 0xAA)) {
-          step += 1
-          return
-        }
-        step = 0
-        readMode = READMODE_NORMAL
-        return
-      case 5 =>
-        if (isMagic(0,address) && (value == 0x10)) {
-          println(s"Erase chip: ${address.toHexString}")
-          // chip erase ignored
-          return
-        }
-        if (value == 0x30) {
-          //flash.eraseSector
-          println(s"Erase sector: ${address.toHexString} => sector erasing ${(address & 0x70000).toHexString} - ${((address & 0x70000) + 0xFFFF).toHexString}")
-          java.util.Arrays.fill(rom,address & 0x70000,(address & 0x70000) + 0xFFFF,0xFF)
-          status = (value & 0x80) ^ 0x80
-          readMode = READMODE_POLLING
-          val cycles = clk.getClockHz.toInt // 1 second (see datasheet)
-          clk.schedule(new ClockEvent("AMF290F040_ERASE",clk.currentCycles + cycles, _ => readMode = READMODE_NORMAL ))
-          step = 0
-          return
-        }
-        step = 0
-        readMode = READMODE_NORMAL
-        return
-      case 6 =>
-        //flash.flash(address & 0x1FFF,value,low)
-        println(s"Writing ${address.toHexString} = $value")
-        rom(address) = value
-        status = (value & 0x80) ^ 0x80
-        readMode = READMODE_POLLING
-        val cycles = 7 // 7 microseconds (ignore differences between PAL/NTSC) (see datasheet)
-        clk.schedule(new ClockEvent("AMF290F040_WRITE",clk.currentCycles + cycles, _ => readMode = READMODE_NORMAL ))
-    }
+      })
 
-    step = 0
-  }
+      cancelButton.addActionListener(_ => dialog.dispose())
 
-  def read(address:Int) : Int = {
-    readMode match {
-      case READMODE_AUTO =>
-        address & 3 match { // autoselect codes for AMF29F040
-          case 0 => 1
-          case 1 => 0xA4
-          case 2 => 0
+      enabledCheck.addActionListener(_ => {
+        fileText.setEnabled(enabledCheck.isSelected)
+        browseButton.setEnabled(enabledCheck.isSelected)
+        label.setEnabled(enabledCheck.isSelected)
+        if (!enabledCheck.isSelected) {
+          pref.updateWithoutNotify(PREF_VIC20_FE3, "")
         }
-      case READMODE_POLLING =>
-        status ^= 0x40
-        status
-      case _ =>
-        if (rom != null) rom(address) else 0xF1
+      })
+
+      applyButton.addActionListener(_ => {
+        if (checkFile()) {
+          dialog.dispose()
+          imageWriteBack = writeCheck.isSelected
+          val enabled = enabledCheck.isSelected
+          if (enabled) {
+            pref.updateWithoutNotify(PREF_VIC20_FE3, fileText.getText)
+            if (wasText != fileText.getText) enableHandler(true, fileText.getText)
+            lastEnabledROMPath = fileText.getText
+          }
+          else {
+            pref.updateWithoutNotify(PREF_VIC20_FE3, "")
+            if (wasEnabled) enableHandler(false, "")
+          }
+        }
+      })
     }
   }
-}*/
+}
 
 class VIC20FE3(val rom:Array[Int],
                override val signals:Signals) extends VIC20ExpansionPort(signals) {
+  import VIC20FE3._
 
   override val portType = VIC20ExpansionPort.VICExpansionPortType.FE3
   override val componentID: String = "VIC20FE3"
@@ -189,13 +222,16 @@ class VIC20FE3(val rom:Array[Int],
   @inline private def isRAM123WP(): Boolean = (regs(0) & 1) > 0
 
   override def eject(): Unit = {
-    // TODO
+    import ucesoft.cbm.misc.Preferences._
+    if (imageWriteBack && flash.hasBeenWritten()) saveRomBackOnImage(rom)
+    signals.pref.update(PREF_VIC20_FE3, "")
   }
 
   final override def reset: Unit = {
     lockbit = true
     regs(0) = 0
     regs(1) = 0
+    flash.reset()
   }
 
   protected def readMode(address:Int,block:Int): Option[Int] = {
@@ -462,6 +498,19 @@ class VIC20FE3(val rom:Array[Int],
         else
           false
     }
+  }
+
+  override def saveState(out: ObjectOutputStream): Unit = {
+    // rom is saved by handler
+    out.writeObject(ram)
+    out.writeObject(regs)
+    out.writeBoolean(lockbit)
+  }
+  override def loadState(in: ObjectInputStream): Unit = {
+    // rom is loaded by handler
+    loadMemory(ram,in)
+    loadMemory(regs,in)
+    lockbit = in.readBoolean()
   }
 
 }
