@@ -30,7 +30,6 @@ object Preferences {
   val PREF_DRIVE_X_ENABLED: Array[String] = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-enabled").toArray
   val PREF_DRIVE_X_FILE: Array[String] = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-file").toArray
   val PREF_DRIVE_X_TYPE: Array[String] = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-type").toArray
-  val PREF_DRIVE12LOCALPATH   = "drive12-local-path"
   val PREF_WRITEONDISK        = "write-on-disk"
   val PREF_CART               = "cart"
   val PREF_RAW_CART           = "raw-cart"

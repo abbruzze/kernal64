@@ -33,7 +33,7 @@ object CBMComputer {
         sys.exit(100)
       case t:Throwable =>
         cbm.errorHandler(t)
-        if (cbm.isHeadless) sys.exit(1)
+        sys.exit(1)
     }
   }
 }
@@ -474,7 +474,8 @@ abstract class CBMComputer extends CBMComponent {
   protected def setDriveType(drive:Int,dt:DriveType.Value,dontPlay:Boolean = false) : Unit = {
     clock.pause
     initDrive(drive,dt)
-    preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_TYPE(drive),dt.toString)
+    val driveType = if (dt == DriveType.LOCAL) s"$dt=${DrivesConfigPanel.getLocalPathFor(drive)}" else dt.toString
+    preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_TYPE(drive),driveType)
     if (!dontPlay) clock.play
   }
 

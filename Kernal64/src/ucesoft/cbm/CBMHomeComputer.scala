@@ -508,7 +508,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   override protected def initDrive(id:Int,driveType:DriveType.Value) : Unit = {
     val old = Option(drives(id))
     old match {
-      case Some(od) if od.driveType == driveType => return
+      case Some(od) if od.driveType == driveType && driveType != DriveType.LOCAL => return
       case _ =>
     }
     drives(id) = driveType match {
@@ -524,6 +524,13 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       case DriveType._8050 =>
         driveLedListeners(id).setPowerLedMode(false)
         new IEEE488Drive(s"IEEE488Drive_${id + 8}",id + 8,ieee488Bus,driveLedListeners(id))
+      case DriveType.LOCAL =>
+        val local = new LocalDrive(bus,id + 8)
+        import Preferences._
+        val dir  = DrivesConfigPanel.getLocalPathFor(id)
+        preferences.updateWithoutNotify(PREF_DRIVE_X_TYPE(id),s"local=${dir}")
+        local.setCurrentDir(new File(dir))
+        local
     }
 
     old match {
@@ -545,33 +552,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
     drives(id).runningListener = running => {
       drivesRunning(id) = running
-    }
-  }
-
-  protected def enableDrive12(enabled:Boolean, fn:Option[String]) : Unit = {
-    if (enabled) {
-      device12Drive = new LocalDrive(bus,12)
-      changeLocalDriveDir(fn)
-    }
-    device12DriveEnabled = enabled
-  }
-
-  protected def changeLocalDriveDir(fileName:Option[String] = None) : Unit = {
-    fileName match {
-      case None =>
-        val fc = new JFileChooser
-        fc.setCurrentDirectory(device12Drive.asInstanceOf[LocalDrive].getCurrentDir)
-        fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
-        fc.setDialogTitle("Choose the current device 12 local directory")
-        fc.showOpenDialog(displayFrame) match {
-          case JFileChooser.APPROVE_OPTION =>
-            device12Drive.asInstanceOf[LocalDrive].setCurrentDir(fc.getSelectedFile)
-            preferences.updateWithoutNotify(Preferences.PREF_DRIVE12LOCALPATH,fc.getSelectedFile.toString)
-          case _ =>
-        }
-      case Some(fn) =>
-        device12Drive.asInstanceOf[LocalDrive].setCurrentDir(new File(fn))
-        preferences.updateWithoutNotify(Preferences.PREF_DRIVE12LOCALPATH,fn)
     }
   }
 
@@ -1059,26 +1039,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
     // ====================================================================================================
 
-    // DRIVE12-LOCAL-PATH =================================================================================
-    val localDriveItem = new JMenu("Drive on device 12 ...")
-    fileMenu.add(localDriveItem)
-    val group0 = new ButtonGroup
-    val noLocalDriveItem = new JRadioButtonMenuItem("Disabled")
-    noLocalDriveItem.setSelected(true)
-    noLocalDriveItem.addActionListener(_ => enableDrive12(false,None) )
-    group0.add(noLocalDriveItem)
-    localDriveItem.add(noLocalDriveItem)
-    val localDriveEnabled = new JRadioButtonMenuItem("Local drive ...")
-    localDriveEnabled.addActionListener(_ => enableDrive12(true,None) )
-    group0.add(localDriveEnabled)
-    localDriveItem.add(localDriveEnabled)
-    preferences.add(PREF_DRIVE12LOCALPATH,"Enabled driver 12 to the given local path","") { path =>
-      val enabled = !path.isEmpty
-      enableDrive12(enabled,if (enabled) Some(path) else None)
-      localDriveEnabled.setSelected(enabled)
-    }
-    // ====================================================================================================
-
     // WRITE-ON-DISK ======================================================================================
     val writeOnDiskCheckItem = new JCheckBoxMenuItem("Write changes on disk")
     writeOnDiskCheckItem.setSelected(true)
@@ -1399,7 +1359,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     import Preferences._
     for(drive <- 0 until TOTAL_DRIVES) {
       // DRIVE-X-TYPE ========================================================================================
-      preferences.add(PREF_DRIVE_X_TYPE(drive),"Set the driver's type (1541,1571,1581,8050)","",Set("1541","1571","1581","8050")) { dt =>
+      preferences.add(PREF_DRIVE_X_TYPE(drive),"Set the driver's type (1541,1571,1581,8050,local=<directory path>)","") { dt =>
         dt match {
           case "1541" =>
             setDriveType(drive,DriveType._1541, true)
@@ -1410,12 +1370,20 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
           case "8050" =>
             setDriveType(drive, DriveType._8050, true)
           case _ =>
+            if (dt.toUpperCase().startsWith("LOCAL=")) {
+              val dir = new File(dt.substring(6))
+              if (!dir.exists() || !dir.isDirectory) throw new IllegalArgumentException(s"Bad ${PREF_DRIVE_X_TYPE(drive)} option value: invalid directory $dir")
+              DrivesConfigPanel.setLocalPathFor(drive,dir.toString)
+              setDriveType(drive, DriveType.LOCAL, true)
+            }
+            else
+              throw new IllegalArgumentException(s"Bad ${PREF_DRIVE_X_TYPE(drive)} option value: $dt")
         }
       }
       // =====================================================================================================
 
       // DRIVE-X-FILE ========================================================================================
-      preferences.add(PREF_DRIVE_X_FILE(drive),s"Attach a file to drive ${drive + 8}","") { df =>
+      preferences.add(PREF_DRIVE_X_FILE(drive),s"Attach a file to drive ${drive + 8}","",Set.empty,false) { df =>
         if (df != "") attachDiskFile(drive, new File(df), false, None)
       }
       // =====================================================================================================

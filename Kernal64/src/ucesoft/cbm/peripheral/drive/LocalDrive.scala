@@ -1,12 +1,14 @@
 package ucesoft.cbm.peripheral.drive
 
+import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.formats.Diskette
 import ucesoft.cbm.peripheral.bus.{BusDataIterator, IECBus}
+import ucesoft.cbm.trace.{BreakType, CpuStepInfo, TraceListener}
 
 import java.io._
 import scala.language.postfixOps
 
-class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device) {
+class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device) with TraceListener {
   val driveType: DriveType.Value = DriveType.LOCAL
   val componentID = "Local Drive"
   val formatExtList: List[String] = Nil
@@ -43,7 +45,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   }
     
   override protected def loadData(fileName: String) : Option[BusDataIterator] = {
-    println(s"Loading $fileName ...")
+    //println(s"Loading $fileName ...")
     if (fileName.startsWith("$")) return Some(loadDirectory(currentDir.toString,currentDir.getName))
     val dp = fileName.indexOf(":")
     val fn = (if (dp != -1) fileName.substring(dp + 1) else fileName) map { c => if (c < 128) c else (c - 128).toChar }
@@ -82,6 +84,10 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
       case _ =>
         setStatus(STATUS_CHANNEL_ERROR)
     }
+  }
+
+  override def byteJustRead(byte: Int, isLast: Boolean): Unit = {
+    super.byteJustRead(byte, isLast)
   }
   
   override def open_channel : Unit = {
@@ -133,12 +139,12 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   }
   
   private def executeCommand(cmd: String) : Unit = {
-    println(s"Executing CMD $cmd")
+    //println(s"Executing CMD $cmd")
     val command = if (cmd.charAt(cmd.length - 1) == 13) cmd.substring(0, cmd.length - 1) else cmd
     if (command.startsWith("CD")) {
       val cd = command.substring(2).trim
-      println(s"Change dir to $cd")
-      val newDir = new File(cd)
+      //println(s"Change dir to $cd")
+      val newDir = new File(currentDir,cd)
       if (newDir.isDirectory) currentDir = newDir
       else setStatus(STATUS_IO_ERROR)
     }
@@ -146,4 +152,14 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
     if (command.startsWith("I")) { setStatus(STATUS_OK)/* do nothing */ }
     else setStatus(STATUS_SYNTAX_ERROR)
   }
+
+  // fake trace listener implementation
+  override def setTraceOnFile(out: PrintWriter, enabled: Boolean): Unit = {}
+  override def setTrace(traceOn: Boolean): Unit = {}
+  override def step(updateRegisters: CpuStepInfo => Unit): Unit = {}
+  override def setBreakAt(breakType: BreakType, callback: CpuStepInfo => Unit): Unit = {}
+  override def jmpTo(pc: Int): Unit = {}
+  override def disassemble(mem: Memory, address: Int): (String, Int) = throw new UnsupportedOperationException("Disassembling is not supported on local drive")
+
+  override def setCycleMode(cycleMode: Boolean): Unit = ???
 }
