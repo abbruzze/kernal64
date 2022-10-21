@@ -9,7 +9,7 @@ import ucesoft.cbm.peripheral.keyboard
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.printer.{MPS803GFXDriver, MPS803ROM, Printer}
 import ucesoft.cbm.peripheral.vic.Display
-import ucesoft.cbm.trace.{InspectPanelDialog, TraceDialog, TraceListener}
+import ucesoft.cbm.trace.{InspectPanelDialog, TraceListener, Tracer, TracerGUI}
 
 import java.awt.event.{MouseAdapter, MouseEvent, WindowAdapter, WindowEvent}
 import java.awt.{BorderLayout, Color, FlowLayout}
@@ -142,10 +142,9 @@ abstract class CBMComputer extends CBMComponent {
   protected val tapeMenu = new JMenu("Tape control...")
 
   // -------------------- TRACE ----------------
-  protected var traceDialog : TraceDialog = _
-  protected var diskTraceDialog : TraceDialog = _
   protected var inspectDialog : InspectPanelDialog = _
   protected var traceItem,traceDiskItem : JCheckBoxMenuItem = _
+  protected var tracer : Tracer = new TracerGUI(traceOpened => traceItem.setSelected(traceOpened))
 
   // ------------------------------------ Drag and Drop ----------------------------
   protected val DNDHandler = new DNDHandler(handleDND(_,true,true))
@@ -184,8 +183,7 @@ abstract class CBMComputer extends CBMComponent {
   }
 
   protected def reset(play:Boolean,loadAndRunLastPrg:Boolean = false) : Unit = {
-    if (traceDialog != null) traceDialog.forceTracing(false)
-    if (diskTraceDialog != null) diskTraceDialog.forceTracing(false)
+    tracer.enableTracing(false)
     if (Thread.currentThread != Clock.systemClock) clock.pause
     resetComponent
     if (loadAndRunLastPrg) lastLoadedPrg.foreach( f =>
@@ -196,8 +194,7 @@ abstract class CBMComputer extends CBMComponent {
   }
 
   protected def hardReset(play:Boolean=true) : Unit = {
-    if (traceDialog != null) traceDialog.forceTracing(false)
-    if (diskTraceDialog != null) diskTraceDialog.forceTracing(false)
+    tracer.enableTracing(false)
     if (Thread.currentThread != Clock.systemClock) clock.pause
     hardResetComponent
 
@@ -214,7 +211,7 @@ abstract class CBMComputer extends CBMComponent {
           JOptionPane.YES_NO_CANCEL_OPTION,
           JOptionPane.ERROR_MESSAGE) match {
           case JOptionPane.YES_OPTION =>
-            if (traceDialog != null) traceDialog.forceTracing(true)
+            tracer.enableTracing(true)
             trace(true,true)
           case JOptionPane.CANCEL_OPTION => // continue
           case _ =>
@@ -238,19 +235,7 @@ abstract class CBMComputer extends CBMComponent {
   }
 
   protected def trace(cpu:Boolean,on:Boolean) : Unit = {
-    if (traceDialog == null) return
-
-    if (cpu) {
-      Log.setOutput(traceDialog.logPanel.writer)
-      traceDialog.setVisible(on)
-      traceItem.setSelected(on)
-    }
-    else {
-      if (on) Log.setOutput(diskTraceDialog.logPanel.writer)
-      else Log.setOutput(traceDialog.logPanel.writer)
-      diskTraceDialog.setVisible(on)
-      traceDiskItem.setSelected(on)
-    }
+    tracer.setVisible(on)
   }
 
   protected def setDisplayRendering(hints:java.lang.Object) : Unit = {
@@ -343,7 +328,7 @@ abstract class CBMComputer extends CBMComponent {
   protected def ejectDisk(driveID:Int) : Unit = {
     drives(driveID).getFloppy.close
     driveLeds(driveID).setToolTipText("")
-    if (traceDialog != null && !traceDialog.isTracing) clock.pause
+    if (!tracer.isTracing()) clock.pause
     if (drives(driveID).driveType == DriveType._1581) drives(driveID).setDriveReader(D1581.MFMEmptyFloppy,true)
     else drives(driveID).setDriveReader(EmptyFloppy,true)
     loadFileItems(driveID).setEnabled(false)

@@ -20,7 +20,7 @@ import ucesoft.cbm.peripheral.vic._
 import ucesoft.cbm.peripheral.vic.coprocessor.VASYL
 import ucesoft.cbm.peripheral.{controlport, keyboard, vic}
 import ucesoft.cbm.remote.RemoteC64
-import ucesoft.cbm.trace.{InspectPanel, TraceListener}
+import ucesoft.cbm.trace.{InspectPanel, TraceListener, Tracer}
 
 import java.awt.datatransfer.DataFlavor
 import java.awt.event._
@@ -200,7 +200,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       disk.canWriteOnDisk = canWriteOnDisk
       disk.flushListener = diskFlusher
       drives(driveID).getFloppy.close
-      if (traceDialog != null && !traceDialog.isTracing) clock.pause
+      if (!tracer.isTracing) clock.pause
       drives(driveID).setDriveReader(disk,emulateInserting)
       preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID),file.toString)
       clock.play
@@ -251,16 +251,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  // ------------------------------- TRACE LISTENER ------------------------------------------
-  def setTraceListener(tl:Option[TraceListener]) : Unit = {
-    tl match {
-      case None =>
-        if (traceDialog != null) traceDialog.traceListener = cpu
-      case Some(t) =>
-        if (traceDialog != null) traceDialog.traceListener = t
-    }
-  }
-  // ------------------------------------------------------------------------------------------
   override protected def handleDND(file:File,_reset:Boolean,autorun:Boolean) : Unit = {
     val name = file.getName.toUpperCase
     if (name.endsWith(".CRT")) loadCartridgeFile(file)
@@ -353,8 +343,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
     catch {
       case t:Throwable =>
-        if (traceDialog != null) t.printStackTrace(traceDialog.logPanel.writer)
-
+        Log.info(t.toString)
         showError("Cartridge loading error",t.toString)
     }
     finally {
@@ -544,11 +533,17 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
         drives(id).initComponent
         change(c,drives(id))
         inspectDialog.updateRoot
+
+        tracer.removeDevice(Tracer.TracedDevice(c.componentID,c.getMem,c))
+        /*
         if (id == 0) {
           diskTraceDialog.mem = drives(id).getMem
           diskTraceDialog.traceListener = drives(id)
         }
+         */
     }
+
+    tracer.addDevice(Tracer.TracedDevice(drives(id).componentID,drives(id).getMem,drives(id)))
 
     drives(id).runningListener = running => {
       drivesRunning(id) = running
@@ -717,7 +712,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     import Preferences._
     ExpansionPort.getExpansionPort.eject
     if (enabled) {
-      ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,dmaSwitcher.setLine(Switcher.CRT,_),setTraceListener _))
+      ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,dmaSwitcher.setLine(Switcher.CRT,_),tracer))
       detachCtrItem.setEnabled(true)
     }
     else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
@@ -882,11 +877,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
     preferences.add(PREF_TRACE,"Starts the emulator in trace mode",false,Set(),false) { trace =>
       traceOption = trace
-      if (trace && traceDialog != null) {
-        traceDialog.forceTracing(true)
-        traceDialog.setVisible(true)
-        traceItem.setSelected(true)
-      }
+      tracer.enableTracing(trace)
     }
     // WiC64
     preferences.add(PREF_WIC64_NETWORK,"Sets the network interface of WiC64","") { wic64Panel.setNetwork(_) }

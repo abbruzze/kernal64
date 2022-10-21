@@ -4,7 +4,8 @@ import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm._
 import ucesoft.cbm.cpu.{CPU65xx, Memory}
 import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
-import ucesoft.cbm.trace.{BreakType, CpuStepInfo, TraceListener}
+import ucesoft.cbm.trace.TraceListener
+import ucesoft.cbm.trace.TraceListener.{BreakType, CpuStepInfo, DisassembleInfo, StepType}
 
 import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
 import java.util.Properties
@@ -405,19 +406,19 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   }
 
   // ------------ TRACING -----------
-  def setCycleMode(cycleMode: Boolean): Unit = {
+  override def setCycleMode(cycleMode: Boolean): Unit = {
     cpu.setCycleMode(cycleMode)
   }
-  def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {/* ignored */}
-  def setTrace(traceOn: Boolean): Unit = {
+  override def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {/* ignored */}
+  override def setTrace(traceOn: Boolean): Unit = {
     tracing = traceOn
     if (tracing) awake
     cpu.setTrace(traceOn)
   }
-  def step(updateRegisters: CpuStepInfo => Unit): Unit = cpu.step(updateRegisters)
-  def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit): Unit = cpu.setBreakAt(breakType,callback)
-  def jmpTo(pc: Int): Unit = cpu.jmpTo(pc)
-  def disassemble(mem:Memory,address:Int): (String, Int) = cpu.disassemble(mem, address)
+  override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType): Unit = cpu.step(updateRegisters,stepType)
+  override def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit): Unit = cpu.setBreakAt(breakType,callback)
+  override def jmpTo(pc: Int): Unit = cpu.jmpTo(pc)
+  override def disassemble(address:Int): DisassembleInfo = cpu.disassemble(address)
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
     if (ledListener != null) out.writeBoolean(ledListener.isOn)

@@ -6,7 +6,9 @@ import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.cpu.asm.AsmEvaluator.Evaluator
 import ucesoft.cbm.cpu.asm.AsmParser.{Patch, Statement, Virtual}
 import ucesoft.cbm.misc.Preferences
-import ucesoft.cbm.trace.{BreakSet, NoBreak, TraceDialog, TracingListener}
+import ucesoft.cbm.trace.TraceListener.{BreakSet, NoBreak}
+import ucesoft.cbm.trace.Tracer
+import ucesoft.cbm.trace.Tracer.TracerListener
 
 import java.awt.datatransfer.{Clipboard, DataFlavor}
 import java.awt.event.{WindowAdapter, WindowEvent}
@@ -32,8 +34,8 @@ object Assembler {
 
   private[asm] case class CompilationResult(blocks:List[ByteCodeBlock],asmEncoding:AsmEncoding)
 
-  def getAssemblerDialog(parent:JFrame,mem:Memory,traceDialog:TraceDialog) : JDialog = {
-    val assembler = new AssemblerPanel(mem,traceDialog)
+  def getAssemblerDialog(parent:JFrame, mem:Memory, tracer:Tracer) : JDialog = {
+    val assembler = new AssemblerPanel(mem,tracer)
     val dialog = new JDialog(parent,"Assembler") {
       override def setVisible(b: Boolean): Unit = {
         super.setVisible(b)
@@ -286,7 +288,7 @@ private class SymbolPanel(map:collection.mutable.LinkedHashMap[String,String]) e
   }
 }
 
-private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel with TracingListener {
+private class AssemblerPanel(mem:Memory, tracer:Tracer) extends JPanel with TracerListener {
   import Assembler._
 
   private case class Break(address:Int,id:AnyRef)
@@ -321,7 +323,7 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
 
   init
 
-  def close() : Unit = traceDialog.removeListener(this)
+  def close() : Unit = tracer.removeListener(this)
 
   def getMenuBar : JMenuBar = {
     val menu = new JMenuBar
@@ -570,8 +572,8 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
           case Some(Break(_,id)) =>
             textArea.removeLineHighlight(id)
         }
-        if (breaksID.size > 0) traceDialog.setBrk(BreakSet(breaksID.values map { _.address } toSet))
-        else traceDialog.setBrk(NoBreak)
+        if (breaksID.size > 0) tracer.setBrk(BreakSet(breaksID.values map { _.address } toSet))
+        else tracer.setBrk(NoBreak)
     }
 
   }
@@ -589,12 +591,12 @@ private class AssemblerPanel(mem:Memory,traceDialog:TraceDialog) extends JPanel 
 
   private def attachToDebugger(attach:Boolean) : Unit = {
     if (attach) {
-      traceDialog.addListener(this)
+      tracer.addListener(this)
       textArea.setHighlightCurrentLine(false)
       parentDialog.setTitle(parentDialog.getTitle + " attached to debugger")
     }
     else {
-      traceDialog.removeListener(this)
+      tracer.removeListener(this)
       removeLastHighlight
       textArea.setHighlightCurrentLine(true)
       val title = parentDialog.getTitle

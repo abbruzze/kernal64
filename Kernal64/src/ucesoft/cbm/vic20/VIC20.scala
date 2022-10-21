@@ -16,7 +16,9 @@ import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.sid.DefaultAudioDriver
 import ucesoft.cbm.peripheral.vic.Palette.PaletteType
 import ucesoft.cbm.peripheral.vic.{Palette, VICType}
-import ucesoft.cbm.trace.TraceDialog
+import ucesoft.cbm.trace.Tracer
+import ucesoft.cbm.trace.Tracer.TracedDisplay
+//import ucesoft.cbm.trace.TraceDialog
 
 import java.awt._
 import java.awt.event.{ActionEvent, ActionListener}
@@ -95,8 +97,6 @@ class VIC20 extends CBMHomeComputer {
   }
 
   def init: Unit = {
-    val sw = new StringWriter
-    Log.setOutput(new PrintWriter(sw))
     Log.setInfo
 
     clock.setClockHz(vic.VIC_I_PAL.CPU_FREQ)
@@ -150,12 +150,7 @@ class VIC20 extends CBMHomeComputer {
     display.addMouseListener(lightPen)
     configureJoystick
     // tracing
-    if (!headless) {
-      traceDialog = TraceDialog.getTraceDialog("CPU Debugger", displayFrame, mmu, cpu, display, vicChip)
-      diskTraceDialog = TraceDialog.getTraceDialog("Drive 8 Debugger", displayFrame, drives(0).getMem, drives(0))
-      Log.setOutput(traceDialog.logPanel.writer)
-    }
-    else Log.setOutput(null)
+    if (headless) Log.setOutput(null)
 
     // TestCart
     TestCart.setCartLocation(0x910F)
@@ -173,12 +168,19 @@ class VIC20 extends CBMHomeComputer {
     infoPanel.add("West",memPanel)
     displayFrame.getContentPane.add("South", infoPanel)
     displayFrame.setTransferHandler(DNDHandler)
-    Log.info(sw.toString)
 
     // GIF Recorder
     gifRecorder = GIFPanel.createGIFPanel(displayFrame, Array(display), Array("VIC"))
 
     signals = VIC20ExpansionPort.Signals(preferences,cpu.irqRequest _,cpu.nmiRequest _,() => reset(true),bus,ieee488Bus,mmu)
+
+    // trace
+    tracer.addDevice(Tracer.TracedDevice("Main 6502 CPU",mmu,cpu,true))
+    tracer.setDisplay(new TracedDisplay {
+      override def getRasterLineAndCycle(): (Int, Int) = (vicChip.getRasterLine, vicChip.getRasterCycle)
+      override def setDisplayRasterLine(line: Int): Unit = display.setRasterLineAt(line)
+      override def enableDisplayRasterLine(enabled: Boolean): Unit = display.setDrawRasterLine(enabled)
+    })
   }
 
   override def afterInitHook : Unit = {
@@ -317,10 +319,8 @@ class VIC20 extends CBMHomeComputer {
     }
     catch {
       case t: Throwable =>
-        if (traceDialog != null) t.printStackTrace(traceDialog.logPanel.writer)
-
+        Log.info(t.toString)
         showError("Cartridge loading error", t.toString)
-
         None
     }
     finally {
@@ -348,8 +348,7 @@ class VIC20 extends CBMHomeComputer {
     }
     catch {
       case t: Throwable =>
-        if (traceDialog != null) t.printStackTrace(traceDialog.logPanel.writer)
-
+        Log.info(t.toString)
         showError("Cartridge loading error", t.toString)
         None
     }
@@ -913,11 +912,7 @@ class VIC20 extends CBMHomeComputer {
 
     preferences.add(PREF_TRACE, "Starts the emulator in trace mode", false, Set(), false) { trace =>
       traceOption = trace
-      if (trace && traceDialog != null) {
-        traceDialog.forceTracing(true)
-        traceDialog.setVisible(true)
-        traceItem.setSelected(true)
-      }
+      tracer.enableTracing(trace)
     }
   }
 

@@ -1,6 +1,7 @@
 package ucesoft.cbm.cpu.wd65816
 
 import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.trace.TraceListener.TraceRegister
 
 object CPU65816Disassembler {
   final val MNEMONICS : Array[String] = Array(
@@ -415,5 +416,43 @@ object CPU65816Disassembler {
     sb ++= (if ((P & 0x01) > 0) "C|" else "_|")
 
     sb.toString
+  }
+
+  def traceRegisters(A: Word16,
+                      X: Word16,
+                      Y: Word16,
+                      D: Word16,
+                      S: Word16,
+                      DB: Int,
+                      PC: ProgramCounter,
+                      P: Int,
+                      E: Boolean
+                     ): List[TraceRegister] = {
+    val a8 = E
+    val xy8 = E
+    val sb = new StringBuilder("|")
+    sb ++= (if ((P & 0x80) > 0) "N|" else "_|")
+    sb ++= (if ((P & 0x40) > 0) "V|" else "_|")
+    sb ++= (if (E) "1|" else if ((P & 0x20) > 0) "M|" else "_|")
+    sb ++= (if ((P & 0x10) > 0) {
+      if (E) "B|" else "X|"
+    } else "_|")
+    sb ++= (if ((P & 0x08) > 0) "D|" else "_|")
+    sb ++= (if ((P & 0x04) > 0) "I|" else "_|")
+    sb ++= (if ((P & 0x02) > 0) "Z|" else "_|")
+    sb ++= (if ((P & 0x01) > 0) "C|" else "_|")
+
+    TraceRegister.builder().
+      add("PC",fmt24(PC.A)).
+      add("E", if (E) "01" else "00").
+      add("A",s"${if (a8) fmt8(A.B.L) else fmt16(A.W)}").
+      add("X",s"${if (xy8) fmt8(X.B.L) else fmt16(X.W)}").
+      add("Y",s"${if (xy8) fmt8(Y.B.L) else fmt16(Y.W)}").
+      add("SP",s"${if (E) fmt8(S.B.L) else fmt16(S.W)}").
+      add("SP",s"${if (E) fmt8(S.B.L) else fmt16(S.W)}").
+      addIf(!E,"D",fmt16(D.W)).
+      addIf(!E,"DB",fmt8(DB)).
+      add("STATUS",sb.toString).
+      build()
   }
 }

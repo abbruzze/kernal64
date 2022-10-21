@@ -5,7 +5,8 @@ import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.{CPU65xx, Memory, RAMComponent}
 import ucesoft.cbm.peripheral.bus.IEEE488Bus
 import ucesoft.cbm.peripheral.mos653x.{MOS6532, MOS653X}
-import ucesoft.cbm.trace.{BreakType, CpuStepInfo, TraceDialog, TraceListener}
+import ucesoft.cbm.trace.TraceListener
+import ucesoft.cbm.trace.TraceListener.{BreakType, CpuStepInfo, StepType}
 
 import java.io.{File, ObjectInputStream, ObjectOutputStream, PrintWriter}
 
@@ -211,13 +212,13 @@ class D8050(val driveID:Int,
 
   override def setTrace(traceOn: Boolean): Unit = UN1_6502.setTrace(traceOn)
 
-  override def step(updateRegisters: CpuStepInfo => Unit): Unit = UN1_6502.step(updateRegisters)
+  override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType): Unit = UN1_6502.step(updateRegisters,stepType)
 
   override def setBreakAt(breakType: BreakType, callback: CpuStepInfo => Unit): Unit = UN1_6502.setBreakAt(breakType, callback)
 
   override def jmpTo(pc: Int): Unit = UN1_6502.jmpTo(pc)
 
-  override def disassemble(mem: Memory, address: Int): (String, Int) = UN1_6502.disassemble(mem, address)
+  override def disassemble(address: Int): TraceListener.DisassembleInfo = UN1_6502.disassemble(address)
 
   override def setCycleMode(cycleMode: Boolean): Unit = UN1_6502.setCycleMode(cycleMode)
 
@@ -246,17 +247,4 @@ class D8050(val driveID:Int,
   override protected def loadState(in: ObjectInputStream): Unit = ???
 
   override protected def allowsStateRestoring: Boolean = ???
-}
-
-object D8050 {
-  def main(args:Array[String]): Unit = {
-    val bus = new IEEE488Bus
-    val drive = new D8050(8,bus,null)
-    val traceDialog = TraceDialog.getTraceDialog("CPU Debugger", null, drive.UN1_6502_MEM, drive.UN1_6502)
-    traceDialog.forceTracing(true)
-    traceDialog.setVisible(true)
-    Log.setOutput(traceDialog.logPanel.writer)
-    drive.init()
-    while (true) drive.clock(0)
-  }
 }

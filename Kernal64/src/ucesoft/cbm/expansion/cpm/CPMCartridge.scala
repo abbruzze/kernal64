@@ -3,13 +3,14 @@ package ucesoft.cbm.expansion.cpm
 import ucesoft.cbm.{ChipID, Clock, ClockEvent, Log}
 import ucesoft.cbm.cpu.{Memory, Z80}
 import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortType}
-import ucesoft.cbm.trace.TraceListener
+import ucesoft.cbm.trace.{TraceListener, Tracer}
+import ucesoft.cbm.trace.Tracer.TracedDevice
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
 class CPMCartridge(mem:Memory,
-                   setDMA: (Boolean) => Unit,
-                   traceListener: (Option[TraceListener]) => Unit) extends ExpansionPort {
+                   setDMA: Boolean => Unit,
+                   tracer:Tracer) extends ExpansionPort {
   val TYPE : ExpansionPortType.Value = ExpansionPortType.CPM
   override val name = "CP/M Cartridge"
   override val componentID = "CP/M"
@@ -34,13 +35,14 @@ class CPMCartridge(mem:Memory,
   }
   
   private[this] val z80 = new Z80(z80Memory)
-  
+
   z80.init
+  tracer.addDevice(TracedDevice("CP/M Z80",z80Memory,z80,false))
   
   override def eject  : Unit = {
     Log.debug("Ejecting CP/M cartridge...")
     turnZ80(false)
-    //clk.setDefaultClockHz
+    tracer.removeDevice(TracedDevice("CP/M Z80",z80Memory,z80,false))
   }
   
   @inline private def turnZ80(on:Boolean) : Unit = {
@@ -48,21 +50,16 @@ class CPMCartridge(mem:Memory,
     if (on && !z80Active) {
       z80Active = true
       clk.schedule(new ClockEvent("Z80 clock",clk.nextCycles,z80ClockCallback))
-      traceListener(Some(z80))
-      //clk.setClockHzSpeedFactor(3)
     }
     else
     if (!on) {
       z80Active = false
-      traceListener(None)
-      //clk.setDefaultClockHz
     }
   }
   
   override def reset  : Unit = {
     z80.reset
     z80Active = false
-    //clk.setDefaultClockHz
   }
   
   override def setBaLow(baLow:Boolean) : Unit = {

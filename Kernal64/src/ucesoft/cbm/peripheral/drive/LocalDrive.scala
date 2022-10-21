@@ -3,7 +3,8 @@ package ucesoft.cbm.peripheral.drive
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.formats.Diskette
 import ucesoft.cbm.peripheral.bus.{BusDataIterator, IECBus}
-import ucesoft.cbm.trace.{BreakType, CpuStepInfo, TraceListener}
+import ucesoft.cbm.trace.TraceListener
+import ucesoft.cbm.trace.TraceListener.{BreakType, CpuStepInfo, StepType}
 
 import java.io._
 import scala.language.postfixOps
@@ -156,10 +157,9 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   // fake trace listener implementation
   override def setTraceOnFile(out: PrintWriter, enabled: Boolean): Unit = {}
   override def setTrace(traceOn: Boolean): Unit = {}
-  override def step(updateRegisters: CpuStepInfo => Unit): Unit = {}
+  override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType): Unit = {}
   override def setBreakAt(breakType: BreakType, callback: CpuStepInfo => Unit): Unit = {}
   override def jmpTo(pc: Int): Unit = {}
-  override def disassemble(mem: Memory, address: Int): (String, Int) = throw new UnsupportedOperationException("Disassembling is not supported on local drive")
-
-  override def setCycleMode(cycleMode: Boolean): Unit = ???
+  override def disassemble(address: Int): TraceListener.DisassembleInfo = throw new UnsupportedOperationException("Disassembling is not supported on local drive")
+  override def setCycleMode(cycleMode: Boolean): Unit = {}
 }

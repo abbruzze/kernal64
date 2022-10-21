@@ -18,7 +18,8 @@ import ucesoft.cbm.peripheral.mos6551.ACIA6551
 import ucesoft.cbm.peripheral.printer.{IEEE488MPS803, Printer}
 import ucesoft.cbm.peripheral.sid.SID
 import ucesoft.cbm.peripheral.vic.Display
-import ucesoft.cbm.trace.{InspectPanel, TraceDialog}
+import ucesoft.cbm.trace.Tracer.TracedDisplay
+import ucesoft.cbm.trace.{InspectPanel, Tracer}
 
 import java.awt.datatransfer.DataFlavor
 import java.awt.event.MouseAdapter
@@ -152,11 +153,7 @@ class CBMII extends CBMComputer {
     }
     preferences.add(PREF_TRACE, "Starts the emulator in trace mode", false, Set(), false) { trace =>
       traceOption = trace
-      if (trace && traceDialog != null) {
-        traceDialog.forceTracing(true)
-        traceDialog.setVisible(true)
-        traceItem.setSelected(true)
-      }
+      tracer.enableTracing(trace)
     }
     ROM.addReloadListener { res =>
       if (res == ROM.CBM2_KERNAL_ROM_PROP) mmu.setKernalROM(CBM2MMU.KERNAL_ROM.getROMBytes())
@@ -303,7 +300,7 @@ class CBMII extends CBMComputer {
       disk.canWriteOnDisk = canWriteOnDisk
       disk.flushListener = diskFlusher
       drives(driveID).getFloppy.close
-      if (traceDialog != null && !traceDialog.isTracing) clock.pause
+      if (!tracer.isTracing) clock.pause
       drives(driveID).setDriveReader(disk, emulateInserting)
       preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID), file.toString)
       clock.play
@@ -716,10 +713,12 @@ class CBMII extends CBMComputer {
         drives(id).initComponent
         change(c, drives(id))
         inspectDialog.updateRoot
+        /*
         if (id == 0) {
           diskTraceDialog.mem = drives(id).getMem
           diskTraceDialog.traceListener = drives(id)
         }
+         */
     }
 
     drives(id).runningListener = running => {
@@ -740,8 +739,6 @@ class CBMII extends CBMComputer {
   }
 
   override def init(): Unit = {
-    val sw = new StringWriter
-    Log.setOutput(new PrintWriter(sw))
     Log.setInfo
 
     Log.info("Building the system ...")
@@ -813,6 +810,8 @@ class CBMII extends CBMComputer {
 
     TestCart.setCartLocation(0xFDAFF)
 
+    if (headless) Log.setOutput(null)
+
     // ============== DISPLAY ===============================================
     display = new Display(CRTC6845.SCREEN_WIDTH, CRTC6845.SCREEN_HEIGHT, displayFrame.getTitle, displayFrame)
     display.setRenderingHints(java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
@@ -847,17 +846,20 @@ class CBMII extends CBMComputer {
     displayFrame.getContentPane.add("Center",display)
     displayFrame.getContentPane.add("South",makeInfoPanel(true))
     // tracing
-    if (!headless) {
-      traceDialog = TraceDialog.getTraceDialog("CPU Debugger", displayFrame, mmu, cpu)
-      Log.setOutput(traceDialog.logPanel.writer)
-    }
-    else Log.setOutput(null)
+    if (headless) Log.setOutput(null)
 
     displayFrame.setTransferHandler(DNDHandler)
-    Log.info(sw.toString)
 
     // GIF Recorder
     gifRecorder = GIFPanel.createGIFPanel(displayFrame, Array(display), Array("CRT"))
+
+    // trace
+    tracer.addDevice(Tracer.TracedDevice("Main 6509 CPU", mmu, cpu, true))
+    tracer.setDisplay(new TracedDisplay {
+      override def getRasterLineAndCycle(): (Int, Int) = (crt.getRasterLine, crt.getRasterCycle)
+      override def setDisplayRasterLine(line: Int): Unit = display.setRasterLineAt(line)
+      override def enableDisplayRasterLine(enabled: Boolean): Unit = display.setDrawRasterLine(enabled)
+    })
   }
 
   private def _50_60_Hz(cycles: Long): Unit = {

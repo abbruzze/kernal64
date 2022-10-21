@@ -13,7 +13,8 @@ import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.vdc.VDC
 import ucesoft.cbm.peripheral.vic.VICType
-import ucesoft.cbm.trace._
+import ucesoft.cbm.trace.Tracer
+import ucesoft.cbm.trace.Tracer.TracedDisplay
 
 import java.awt._
 import java.awt.event._
@@ -82,8 +83,6 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
   }
 
   def init  : Unit = {
-    val sw = new StringWriter
-    Log.setOutput(new PrintWriter(sw))
     Log.setInfo
     
     Log.info("Building the system ...")
@@ -241,12 +240,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     display.addMouseListener(lightPen)
     configureJoystick
     // tracing
-    if (!headless) {
-      traceDialog = TraceDialog.getTraceDialog("CPU Debugger",displayFrame,mmu,z80,display,vicChip)
-      diskTraceDialog = TraceDialog.getTraceDialog("Disk8 Debugger",displayFrame,drives(0).getMem,drives(0))
-      Log.setOutput(traceDialog.logPanel.writer)
-    }
-    else Log.setOutput(null)
+    if (headless) Log.setOutput(null)
     // tape
     datassette = new c2n.Datassette(cia1.setFlagLow _)
     mmu.setDatassette(datassette)
@@ -261,12 +255,20 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     statusPanel.add("West",mmuStatusPanel)
     displayFrame.getContentPane.add("South",statusPanel)
     displayFrame.setTransferHandler(DNDHandler)    
-    Log.info(sw.toString)
 
     // GIF Recorder
     gifRecorder = GIFPanel.createGIFPanel(displayFrame,Array(display,vdcDisplay),Array("VIC","VDC"))
     // clock freq change listener
     clock.addChangeFrequencyListener(f => z80ScaleFactor = 2000000 / f)
+
+    // trace
+    tracer.addDevice(Tracer.TracedDevice("Main 8502 CPU", mmu, cpu, true))
+    tracer.addDevice(Tracer.TracedDevice("Z80 CPU", mmu, z80, true))
+    tracer.setDisplay(new TracedDisplay {
+      override def getRasterLineAndCycle(): (Int, Int) = (vicChip.getRasterLine, vicChip.getRasterCycle)
+      override def setDisplayRasterLine(line: Int): Unit = display.setRasterLineAt(line)
+      override def enableDisplayRasterLine(enabled: Boolean): Unit = display.setDrawRasterLine(enabled)
+    })
   }
   
   override def afterInitHook  : Unit = {
@@ -335,18 +337,15 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
   }
   def cpuChanged(is8502:Boolean) : Unit = {
     if (is8502) {
-      if (traceDialog != null) traceDialog.traceListener = cpu
       z80Active = false
       cpu.setDMA(false)
       z80.requestBUS(true)
     }
     else {
-      if (traceDialog != null) traceDialog.traceListener = z80
       z80Active = true
       z80.requestBUS(false)
       cpu.setDMA(true)      
     }
-    if (traceDialog != null) traceDialog.forceTracing(traceDialog.isTracing)
     mmuStatusPanel.cpuChanged(is8502)
     Log.debug("Enabling CPU " + (if (z80Active) "Z80" else "8502"))
   }

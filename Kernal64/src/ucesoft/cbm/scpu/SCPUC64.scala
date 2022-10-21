@@ -13,7 +13,8 @@ import ucesoft.cbm.peripheral.bus.BusSnoop
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.vic.VICType
-import ucesoft.cbm.trace.TraceDialog
+import ucesoft.cbm.trace.Tracer
+import ucesoft.cbm.trace.Tracer.TracedDisplay
 
 import java.awt._
 import java.io._
@@ -56,8 +57,6 @@ class SCPUC64 extends CBMHomeComputer {
   }
 
   def init : Unit = {
-    val sw = new StringWriter
-    Log.setOutput(new PrintWriter(sw))
     Log.setInfo
 
     Log.info("Building the system ...")
@@ -135,11 +134,7 @@ class SCPUC64 extends CBMHomeComputer {
     display.addMouseListener(lightPen)
     configureJoystick
     // tracing
-    if (!headless) {
-      traceDialog = TraceDialog.getTraceDialog("CPU Debugger", displayFrame, mmu, cpu, display, vicChip)
-      diskTraceDialog = TraceDialog.getTraceDialog("Drive 8 Debugger", displayFrame, drives(0).getMem, drives(0))
-      Log.setOutput(traceDialog.logPanel.writer)
-    }
+    if (headless) Log.setOutput(null)
     else Log.setOutput(null)
     // tape
     // printer
@@ -154,10 +149,17 @@ class SCPUC64 extends CBMHomeComputer {
     mmuStatusPanel.setSys1MhzAction(mmu.setSystem1Mhz _)
     displayFrame.getContentPane.add("South", infoPanel)
     displayFrame.setTransferHandler(DNDHandler)
-    Log.info(sw.toString)
 
     // GIF Recorder
     gifRecorder = GIFPanel.createGIFPanel(displayFrame,Array(display),Array("VIC"))
+
+    // trace
+    tracer.addDevice(Tracer.TracedDevice("Main 65816 CPU", mmu, cpu, true))
+    tracer.setDisplay(new TracedDisplay {
+      override def getRasterLineAndCycle(): (Int, Int) = (vicChip.getRasterLine, vicChip.getRasterCycle)
+      override def setDisplayRasterLine(line: Int): Unit = display.setRasterLineAt(line)
+      override def enableDisplayRasterLine(enabled: Boolean): Unit = display.setDrawRasterLine(enabled)
+    })
   }
 
   protected def mainLoop(cycles: Long) : Unit = {

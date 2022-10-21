@@ -659,6 +659,10 @@ BEGIN_CPU_FUNC(opcode_0x60)
 	S_PULL(PC.B.L);					/* RTS s */
 	S_PULL(PC.B.H);
 	PC.W.PC_++;
+    if (stepType == StepOut) {
+      tracing = true
+      stepType = StepIn
+    }
 END_CPU_FUNC
 
 BEGIN_CPU_FUNC(opcode_0x61)
@@ -731,6 +735,10 @@ BEGIN_CPU_FUNC(opcode_0x6B)
 	S_PULL(PC.B.H);
 	S_PULL(PC.B.PB);
 	PC.W.PC_++;
+	if (stepType == StepOut) {
+      tracing = true
+      stepType = StepIn
+    }
 END_CPU_FUNC
 
 BEGIN_CPU_FUNC(opcode_0x6C)

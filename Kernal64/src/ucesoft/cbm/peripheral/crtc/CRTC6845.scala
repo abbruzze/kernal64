@@ -145,6 +145,9 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     Y_BOTTOM_CLIP_ROWS = bottom
   }
 
+  def getRasterLine(): Int = rasterLine
+  def getRasterCycle(): Int = 0
+
   // =====================================================
   def setAdaptScreenResolution(adapt:Boolean) : Unit = {
     adaptScreenResolution = adapt

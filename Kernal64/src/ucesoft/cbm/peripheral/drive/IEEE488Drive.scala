@@ -1,10 +1,12 @@
 package ucesoft.cbm.peripheral.drive
 
+import ucesoft.cbm.cpu.CPU65xx.DisassembledInfo
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.formats.Diskette.{FileMode, FileType, StandardFileName}
 import ucesoft.cbm.formats.{D80, Diskette}
 import ucesoft.cbm.peripheral.bus.{IEEE488Bus, IEEE488BusCommand}
-import ucesoft.cbm.trace.{BreakType, CpuStepInfo, TraceListener}
+import ucesoft.cbm.trace.TraceListener
+import ucesoft.cbm.trace.TraceListener.{BreakType, CpuStepInfo, StepType}
 import ucesoft.cbm.{CBMComponentType, ClockEvent}
 
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream, PrintWriter}
@@ -627,9 +629,9 @@ class IEEE488Drive(override val name:String,
   // Trace listener
   override def setTraceOnFile(out: PrintWriter, enabled: Boolean): Unit = {}
   override def setTrace(traceOn: Boolean): Unit = {}
-  override def step(updateRegisters: CpuStepInfo => Unit): Unit = {}
+  override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType): Unit = {}
   override def setBreakAt(breakType: BreakType, callback: CpuStepInfo => Unit): Unit = {}
   override def jmpTo(pc: Int): Unit = {}
-  override def disassemble(mem: Memory, address: Int): (String, Int) = ("",0)
+  override def disassemble(address: Int): TraceListener.DisassembleInfo = throw new UnsupportedOperationException("Disassembling is not supported on IEEE488 drive")
   override def setCycleMode(cycleMode: Boolean): Unit = {}
 }

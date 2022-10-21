@@ -1,7 +1,9 @@
 package ucesoft.cbm.cpu
 
 import ucesoft.cbm.ChipID.ID
-import ucesoft.cbm.trace.{BreakType, CpuStepInfo, NoBreak, TraceListener}
+import ucesoft.cbm.cpu.Z80.EmptyIOMemory
+import ucesoft.cbm.trace.TraceListener
+import ucesoft.cbm.trace.TraceListener.{BreakType, CpuStepInfo, DisassembleInfo, NoBreak, StepIn, StepOut, StepOver, StepType, TraceRegister}
 import ucesoft.cbm.{Chip, ChipID, Log}
 
 import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
@@ -24,7 +26,7 @@ object Z80 {
     def out(addressHI:Int,addressLO:Int,value:Int) : Unit = {}
   }
 
-  class Context(val mem:Memory,val io:IOMemory) {
+  class Context(val mem:Memory,val io:IOMemory,val traceUpdate: Boolean => Unit) {
     var A1,F1,H1,L1,D1,E1,B1,C1 = 0
     var halted = false
     var im = 0
@@ -50,6 +52,7 @@ object Z80 {
     private[this] var additionalClockCycles = 0
     var isIndexX = true
     var lastWrite = 0
+    var stepType : StepType = _
 
     final def copyQ() : Unit = {
       lastQ = Q
@@ -428,6 +431,22 @@ object Z80 {
     }
 
     override def toString = s"PC=${hex4(PC)} AF=${hex4(AF)} BC=${hex4(BC)} DE=${hex4(DE)} HL=${hex4(HL)} IX=${hex4(IX)} IY=${hex4(IY)} I=${hex2(I)} im=$im SP=${hex2(SP)} SZYHXPNC=$sr2String"
+
+    def buildCpuStepInfo(): List[TraceRegister] = {
+      TraceRegister.builder().
+        add("PC", hex4(PC)).
+        add("AF", hex4(AF)).
+        add("BC", hex4(BC)).
+        add("DE", hex4(DE)).
+        add("HL", hex4(HL)).
+        add("IX", hex4(IX)).
+        add("IY", hex4(IY)).
+        add("I", hex2(I)).
+        add("IM", hex2(im)).
+        add("SP", hex2(SP)).
+        add("SZYHXPNC", sr2String).
+        build()
+    }
     @inline private def sr2String = {
       val sb = new StringBuilder
       if (sign > 0) sb += 'S' else sb += '-'
@@ -436,6 +455,7 @@ object Z80 {
       if (half > 0) sb += 'H' else sb += '-'
       if (xf > 0) sb += 'X' else sb += '-'
       if (parity > 0) sb += 'P' else sb += '-'
+      if (negative > 0) sb += 'N' else sb += '-'
       if (carry > 0) sb += 'C' else sb += '-'
       sb.toString
     }
@@ -887,6 +907,10 @@ object Z80 {
       if (cond) {
         PC = pop
         setAdditionalClockCycles(6)
+        if (stepType == StepOut) {
+          traceUpdate(true)
+          stepType = StepIn
+        }
       }
       else PC = (PC + 1) & 0xFFFF
     }
@@ -2535,7 +2559,13 @@ object Z80 {
   private val DJNZ_e = Opcode(0x10,8,2,MNEMONIC_jr("DJNZ %s"),modifyPC = true) { ctx => ctx.djnz }
   // *** RET
   // **************
-  private val RET = Opcode(0xC9,10,1,"RET",modifyPC = true) { ctx => val addr = ctx.pop ; ctx.PC = addr ; ctx.memptr = addr }
+  private val RET = Opcode(0xC9,10,1,"RET",modifyPC = true) { ctx =>
+    val addr = ctx.pop ; ctx.PC = addr ; ctx.memptr = addr
+    if (ctx.stepType == StepOut) {
+      ctx.traceUpdate(true)
+      ctx.stepType = StepIn
+    }
+  }
   // *** RET cc
   // **************
   private val RET_C_nn = Opcode(0xD8,5,1,"RET C",modifyPC = true) { ctx => ctx.ret_cond(ctx.carry > 0) }
@@ -2759,13 +2789,14 @@ object Z80 {
  * @author ealeame
  */
 class Z80(mem:Memory,
-          io_memory:Z80.IOMemory = null,
+          io_memory:Z80.IOMemory = EmptyIOMemory,
           trapListener : Z80.Context => Unit = null,
           undocHandler : Z80.Context => Int = null) extends Chip with TraceListener {
   val id: ID = ChipID.CPU
   override lazy val componentID = "Z80"
   import Z80._
-  val ctx = new Context(mem,io_memory)
+  private[this] var tracing = false
+  val ctx = new Context(mem,io_memory,traceUpdate => tracing = traceUpdate)
   final val M1FETCH_PIN = 1
   final val REFRESH_PIN = 2
   final val DUMMY_READ_PIN = 4
@@ -2776,11 +2807,12 @@ class Z80(mem:Memory,
   private[this] var cpuWaitUntil = 0L
   private[this] var cpuRestCycles = 0.0
   private[this] var busREQ = false
-  private[this] var tracing = false
   private[this] var stepCallBack : CpuStepInfo => Unit = _
   private[this] val syncObject = new Object
   private[this] var breakCallBack : CpuStepInfo => Unit = _
   private[this] var breakType : BreakType = _
+  private[this] var stepType: StepType = _
+  private[this] var stepOverTargetAddress = 0
   private[this] var lastPC = 0
 
   override def getProperties: Properties = {
@@ -2791,18 +2823,20 @@ class Z80(mem:Memory,
   }
 
   // =================================== Tracing =============================================================
-  def setCycleMode(cycleMode: Boolean): Unit = {}
-  def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {
+  override def setCycleMode(cycleMode: Boolean): Unit = {}
+  override def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {
     // TODO
   }
-  def setTrace(traceOn:Boolean): Unit = tracing = traceOn
-  def step(updateRegisters: CpuStepInfo => Unit) : Unit = {
+  override def setTrace(traceOn:Boolean): Unit = tracing = traceOn
+  override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType) : Unit = {
     stepCallBack = updateRegisters
+    this.stepType = stepType
+    ctx.stepType = stepType
     syncObject.synchronized {
       syncObject.notify()
     }
   }
-  def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) : Unit = {
+  override def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) : Unit = {
     tracing = false
     breakCallBack = callback
     this.breakType = breakType match {
@@ -2810,15 +2844,15 @@ class Z80(mem:Memory,
       case _ => breakType
     }
   }
-  def jmpTo(pc:Int) : Unit = {
+  override def jmpTo(pc:Int) : Unit = {
     ctx.PC = pc & 0xFFFF
   }
-  def disassemble(mem:Memory,address:Int) : (String,Int) = {
+  override def disassemble(address:Int) : DisassembleInfo = {
     try {
       dummyRead = true
       val adr = Array(address)
       val opcode = fetch(adr)
-      (opcode.disassemble(mem, adr(0)), opcode.size)
+      DisassembleInfo(opcode.disassemble(mem, adr(0)), opcode.size)
     }
     finally {
       dummyRead = false
@@ -2950,7 +2984,7 @@ class Z80(mem:Memory,
   final def clock : Int = {
     if (breakType != null && breakType.isBreak(ctx.PC,false,false)) {
       tracing = true
-      breakCallBack(CpuStepInfo(ctx.PC,ctx.toString))
+      breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
     }
 
     if ((irqLow || nmiOnNegativeEdge) && !ctx.mustDelayInt) { // any interrupt pending ?
@@ -2958,7 +2992,7 @@ class Z80(mem:Memory,
       if (nmiOnNegativeEdge) { // NMI
         if (ctx.halted) {
           ctx.halted = false
-          ctx.incPC()//ctx.PC = (ctx.PC + 1) & 0xFFFF
+          ctx.incPC()
         }
         ctx.io.internalOperation(5)
         ctx.push(ctx.PC)
@@ -2966,7 +3000,7 @@ class Z80(mem:Memory,
         refreshCycle
         if (breakType != null && breakType.isBreak(ctx.PC,false,true)) {
           tracing = true
-          breakCallBack(CpuStepInfo(ctx.PC,ctx.toString))
+          breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
           Log.debug("NMI Break")
         }
         nmiOnNegativeEdge = false
@@ -2992,7 +3026,7 @@ class Z80(mem:Memory,
           ctx.incR(1)
           if (breakType != null && breakType.isBreak(ctx.PC,true,false)) {
             tracing = true
-            breakCallBack(CpuStepInfo(ctx.PC,ctx.toString))
+            breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
             Log.debug("IRQ Break")
           }
 
@@ -3028,13 +3062,28 @@ class Z80(mem:Memory,
     if (tracing) {
       try {
         dummyRead = true
-        Log.debug("[Z80] " + opcode.disassemble(mem, ctx.PC))
+        //Log.debug("[Z80] " + opcode.disassemble(mem, ctx.PC))
+        val disa = opcode.disassemble(mem, ctx.PC)
+        stepCallBack(CpuStepInfo(ctx.PC, ctx.buildCpuStepInfo,disa))
+        syncObject.synchronized {
+          syncObject.wait()
+        }
+        if (ctx.PC == stepOverTargetAddress) tracing = true
+        stepType match {
+          case StepOver =>
+            if (disa.indexOf("CALL") != -1) {
+              stepOverTargetAddress = ctx.PC + 3
+              tracing = false
+            }
+            else stepType = StepIn
+          case StepOut =>
+            tracing = false
+          case _ =>
+        }
       }
       finally {
         dummyRead = false
       }
-      stepCallBack(CpuStepInfo(ctx.PC,ctx.toString))
-      syncObject.synchronized { syncObject.wait() }
     }
     // execute
     lastPC = ctx.PC
