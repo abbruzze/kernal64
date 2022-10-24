@@ -4,8 +4,8 @@ import org.fife.ui.rsyntaxtextarea.{RSyntaxTextArea, SyntaxConstants}
 import org.fife.ui.rtextarea.RTextScrollPane
 import ucesoft.cbm.{Clock, Log}
 
-import java.awt.event.{WindowAdapter, WindowEvent}
-import java.awt.{BorderLayout, Color, Dimension, FlowLayout}
+import java.awt.event.{MouseAdapter, MouseEvent, WindowAdapter, WindowEvent}
+import java.awt.{BorderLayout, Color, Dimension, FlowLayout, GridLayout}
 import java.io.{BufferedOutputStream, FileOutputStream, PrintWriter, Writer}
 import javax.swing.JSpinner.DefaultEditor
 import javax.swing._
@@ -43,25 +43,25 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     }
   }
 
-  private case class AddressBreakType(read:Boolean,write:Boolean,execute:Boolean) {
+  protected case class AddressBreakType(read:Boolean,write:Boolean,execute:Boolean) {
     override def toString = {
       val r = if (read) "R" else ""
-      val w = if (read) "W" else ""
-      val x = if (read) "X" else ""
+      val w = if (write) "W" else ""
+      val x = if (execute) "X" else ""
       s"$r$w$x"
     }
   }
 
-  private sealed trait Break {
+  protected sealed trait Break {
     var enabled = true
   }
-  private case class AddressBreak(address:Int,breakType:AddressBreakType) extends Break
-  private case class EventBreak(eventName:String) extends Break
+  protected case class AddressBreak(address:Int,breakType:AddressBreakType) extends Break
+  protected case class EventBreak(eventName:String) extends Break
 
-  private final val BREAK_IRQ_EVENT = "IRQ"
-  private final val BREAK_NMI_EVENT = "NMI"
+  protected final val BREAK_IRQ_EVENT = "IRQ"
+  protected final val BREAK_NMI_EVENT = "NMI"
 
-  private class Breaks extends BreakType {
+  protected class Breaks extends BreakType {
     val addressMap = new mutable.HashMap[Int,AddressBreak]()
     val eventMap = new mutable.HashMap[String,EventBreak]()
 
@@ -116,6 +116,18 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       }
     }
 
+    def removeBreakAtRow(rows:Array[Int]): Unit = {
+      val orderedRows = rows.sortWith((r1,r2) => r1 > r2)
+      for(r <- orderedRows) breaks.remove(r)
+      fireTableDataChanged()
+    }
+    def getBreakAtRow(row:Int): Break = breaks(row)
+    def setBreakAtRow(row:Int,b:Break): Unit = {
+      breaks(row) = b
+      fireTableRowsUpdated(row,row)
+    }
+    def getBreaks(): List[Break] = breaks.toList
+
     override def getColumnClass(columnIndex: Int): Class[_] = columnIndex match {
       case 0 => classOf[java.lang.Boolean]
       case _ => classOf[String]
@@ -124,6 +136,11 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     def contentChanged(breaks:List[Break]): Unit = {
       this.breaks.clear()
       this.breaks.addAll(breaks)
+      fireTableDataChanged()
+    }
+    def contentUpdated(): Unit = fireTableDataChanged()
+    def addBreak(b:Break): Unit = {
+      breaks += b
       fireTableDataChanged()
     }
   }
@@ -246,7 +263,6 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     tscroll.setBorder(BorderFactory.createTitledBorder("Trace panel"))
     tscroll.setLineNumbersEnabled(false)
 
-    //val rscroll = new JScrollPane(registerPanel)
     registerPanel.setBorder(BorderFactory.createTitledBorder("Registers"))
 
     logPanel.setEditable(false)
@@ -254,18 +270,25 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     logPanel.getCaret.asInstanceOf[DefaultCaret].setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE)
     logPanel.setEditable(false)
     val lscroll = new RTextScrollPane(logPanel)
-    lscroll.setMinimumSize(new Dimension(0,150))
+    lscroll.setMinimumSize(new Dimension(0,70))
     lscroll.setBorder(BorderFactory.createTitledBorder("Log panel"))
+    val logButtonPanel = new JPanel(new BorderLayout())
+    logButtonPanel.add("Center",lscroll)
+    val logToolBar = new JToolBar()
+    logButtonPanel.add("South",logToolBar)
+    val clearLog = new JButton(new ImageIcon(getClass.getResource("/resources/trace/clear.png")))
+    logToolBar.add(clearLog)
+    clearLog.addActionListener(_ => logPanel.setText("") )
 
     val northPanel = new JPanel(new BorderLayout())
     northPanel.add("North",registerPanel)
     northPanel.add("Center",tscroll)
-    val splitPanel = new JSplitPane(JSplitPane.VERTICAL_SPLIT,northPanel,lscroll)
+    val splitPanel = new JSplitPane(JSplitPane.VERTICAL_SPLIT,northPanel,logButtonPanel)
     splitPanel.setOneTouchExpandable(true)
     frame.getContentPane.add("Center",splitPanel)
 
     // device combo
-    deviceCombo.addActionListener(e => {
+    deviceCombo.addActionListener(_ => {
       val sel = deviceCombo.getSelectedIndex
       if (sel != -1) selectDevice(deviceCombo.getSelectedItem.toString)
     })
@@ -282,9 +305,38 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     breakPanel.add("North",tablePanel)
     val breakButtonsPanel = new JToolBar()
     val addBreak = new JButton(new ImageIcon(getClass.getResource("/resources/trace/plus.png")))
+    addBreak.addActionListener(_ => {
+      editBreakGUI(None) match {
+        case Some(b) =>
+          b match {
+            case EventBreak(e) =>
+              if (!breaks.eventMap.contains(e)) breaksTableModel.addBreak(b)
+            case _ =>
+              breaksTableModel.addBreak(b)
+          }
+          updateBreaks()
+        case None =>
+      }
+    })
     val removeBreak = new JButton(new ImageIcon(getClass.getResource("/resources/trace/minus.png")))
+    removeBreak.addActionListener(_ => {
+      breaksTableModel.removeBreakAtRow(breaksTable.getSelectedRows)
+      updateBreaks()
+    })
     val enableBreak = new JButton(new ImageIcon(getClass.getResource("/resources/trace/enable.png")))
+    enableBreak.addActionListener(_ => {
+      for(br <- breaksTable.getSelectedRows) {
+        breaksTableModel.getBreakAtRow(br).enabled = true
+      }
+      breaksTableModel.contentUpdated()
+    })
     val disableBreak = new JButton(new ImageIcon(getClass.getResource("/resources/trace/disable.png")))
+    disableBreak.addActionListener(_ => {
+      for (br <- breaksTable.getSelectedRows) {
+        breaksTableModel.getBreakAtRow(br).enabled = false
+      }
+      breaksTableModel.contentUpdated()
+    })
     addBreak.setToolTipText("Adds a breakpoint")
     removeBreak.setToolTipText("Remove selected breakpoints")
     enableBreak.setToolTipText("Enable selected breakpoints")
@@ -306,7 +358,19 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
         }
       }
     )
-    breaksTableModel.contentChanged(List(AddressBreak(0xC000,AddressBreakType(true,true,false)),EventBreak("IRQ")))
+    breaksTable.addMouseListener(new MouseAdapter {
+      override def mouseClicked(e: MouseEvent): Unit = {
+        if (e.getClickCount == 2) {
+          val break = breaksTableModel.getBreakAtRow(breaksTable.getSelectedRow)
+          editBreakGUI(Some(break)) match {
+            case Some(b) =>
+              breaksTableModel.setBreakAtRow(breaksTable.getSelectedRow,b)
+              updateBreaks()
+            case None =>
+          }
+        }
+      }
+    })
 
     // Frame
     frame.addWindowListener(new WindowAdapter {
@@ -320,7 +384,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     frame.pack()
   }
 
-  protected def stepInfoCallBack(cpuStepInfo: CpuStepInfo): Unit = {
+  protected def stepInfoCallBack(breakCallBack:Boolean,cpuStepInfo: CpuStepInfo): Unit = {
     val same = cpuStepInfo.registers.length == registers.size && cpuStepInfo.registers.map(_.name).forall(registers.contains _)
     if (!same) {
       registerPanel.removeAll()
@@ -345,7 +409,8 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       displayRasterRegister.setValue(rasterLine.toString)
     }
 
-    if (traceEnabled) write(cpuStepInfo.disassembled)
+    if (breakCallBack && !traceEnabled) enableTracing(true)
+    if (traceEnabled && !breakCallBack) write(cpuStepInfo.disassembled)
     for(tl <- tracingListeners) tl.stepInto(cpuStepInfo.pc)
   }
 
@@ -355,12 +420,21 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     traceEnabled = enabled
     if (enabled) onOffButton.setToolTipText("Disable tracing")
     else onOffButton.setToolTipText("Enable tracing")
+    onOffButton.setSelected(enabled)
 
-    currentDevice.listener.step(stepInfoCallBack _,StepIn)
+    step(StepIn)
     currentDevice.listener.setTrace(enabled)
   }
 
-  override def setBrk(brk: TraceListener.BreakType): Unit = ???
+  override def setBrk(brk: TraceListener.BreakType): Unit = {
+    val brks = brk match {
+      case NoBreak =>
+        breaks
+      case _ =>
+        brk
+    }
+    currentDevice.listener.setBreakAt(brks,stepInfoCallBack(true,_))
+  }
 
   override def addListener(tl: Tracer.TracerListener): Unit = tracingListeners += tl
 
@@ -372,6 +446,8 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
   }
 
   override def addDevice(device: Tracer.TracedDevice): Unit = {
+    if (!device.listener.supportTracing) return
+
     val index = devices.map(_.id).indexOf(device.id)
     if (index == -1) devices += device
     else devices(index) = device
@@ -406,12 +482,13 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       case Some(dev) =>
         selectCurrentDevice(dev)
         setTitle(currentDevice.id)
+        step(StepIn)
         true
     }
   }
 
   override def step(stepType: StepType): Unit = {
-    currentDevice.listener.step(stepInfoCallBack _,stepType)
+    currentDevice.listener.step(stepInfoCallBack(false,_),stepType)
   }
 
   protected def openAssembler(): Unit = {
@@ -572,6 +649,130 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
 
   protected def enableCycleMode(enabled:Boolean): Unit = {
     currentDevice.listener.setCycleMode(enabled)
+  }
+
+  protected def editBreakGUI(break:Option[Break]): Option[Break] = {
+    def createDummyPanel(comp:JComponent*): JPanel = {
+      val d = new JPanel(new FlowLayout(FlowLayout.LEFT))
+      for(c <- comp) d.add(c)
+      d
+    }
+
+    val radioAddress = new JRadioButton("Address Break")
+    val radioEvent = new JRadioButton("Event Break")
+    val group = new ButtonGroup
+    group.add(radioAddress)
+    group.add(radioEvent)
+
+    val eventPanel = new JPanel(new GridLayout(2,1))
+    eventPanel.setBorder(BorderFactory.createTitledBorder("Event"))
+    eventPanel.add(createDummyPanel(radioEvent))
+    val radioIRQ = new JRadioButton("IRQ")
+    val radioNMI = new JRadioButton("NMI")
+    val groupE = new ButtonGroup
+    groupE.add(radioIRQ)
+    groupE.add(radioNMI)
+
+    eventPanel.add(createDummyPanel(radioIRQ,radioNMI))
+
+    val addressPanel = new JPanel(new GridLayout(3,1))
+    addressPanel.setBorder(BorderFactory.createTitledBorder("Address"))
+    addressPanel.add(createDummyPanel(radioAddress))
+    val address = new JTextField(5)
+    val readCheck = new JCheckBox("Read")
+    val writeCheck = new JCheckBox("Write")
+    val exeCheck = new JCheckBox("Execute")
+    addressPanel.add(createDummyPanel(new JLabel("Address:"),address,readCheck,writeCheck,exeCheck))
+    val condition = new JTextField(40)
+    addressPanel.add(createDummyPanel(new JLabel("Condition:"),condition))
+
+    radioAddress.addActionListener(_ => {
+      radioIRQ.setEnabled(false)
+      radioNMI.setEnabled(false)
+      readCheck.setEnabled(true)
+      writeCheck.setEnabled(true)
+      exeCheck.setEnabled(true)
+      address.setEnabled(true)
+      condition.setEditable(true)
+    })
+    radioEvent.addActionListener(_ => {
+      radioIRQ.setEnabled(true)
+      radioNMI.setEnabled(true)
+      readCheck.setEnabled(false)
+      writeCheck.setEnabled(false)
+      exeCheck.setEnabled(false)
+      address.setEnabled(false)
+      condition.setEditable(false)
+    })
+
+    break match {
+      case None =>
+        radioAddress.setSelected(true)
+        radioIRQ.setEnabled(false)
+        radioNMI.setEnabled(false)
+        exeCheck.setSelected(true)
+      case Some(b) =>
+        b match {
+          case AddressBreak(adr,bt) =>
+            radioAddress.setSelected(true)
+            address.setText(adr.toHexString.toUpperCase())
+            readCheck.setSelected(bt.read)
+            writeCheck.setSelected(bt.write)
+            exeCheck.setSelected(bt.execute)
+            // condition TODO
+          case EventBreak(event) =>
+            if (event == BREAK_IRQ_EVENT) radioIRQ.setSelected(true)
+            if (event == BREAK_NMI_EVENT) radioNMI.setSelected(true)
+            radioEvent.setSelected(true)
+        }
+    }
+
+    val dialogPanel = new JPanel(new BorderLayout())
+    dialogPanel.add("North",addressPanel)
+    dialogPanel.add("South",eventPanel)
+
+    while (true) {
+      JOptionPane.showConfirmDialog(frame, dialogPanel, if (break.isDefined) "Edit breakpoint" else "Add breakpoint", JOptionPane.OK_CANCEL_OPTION) match {
+        case JOptionPane.YES_OPTION =>
+          if (radioAddress.isSelected) {
+            try {
+              val adr = Integer.parseInt(address.getText, 16)
+              if (!readCheck.isSelected && !writeCheck.isSelected && !exeCheck.isSelected)
+                JOptionPane.showMessageDialog(frame, s"Select read/write/execute options", "Memory access type error", JOptionPane.ERROR_MESSAGE)
+              else
+                return Some(AddressBreak(adr, AddressBreakType(readCheck.isSelected, writeCheck.isSelected, exeCheck.isSelected)))
+            }
+            catch {
+              case _: NumberFormatException =>
+                JOptionPane.showMessageDialog(frame, s"Address not valid: ${address.getText}", "Address error", JOptionPane.ERROR_MESSAGE)
+                address.setText("")
+            }
+          }
+          else {
+            return Some(EventBreak(if (radioIRQ.isSelected) BREAK_IRQ_EVENT else BREAK_NMI_EVENT))
+          }
+        case _ =>
+          return None
+      }
+    }
+
+    None
+  }
+
+  protected def updateBreaks(): Unit = {
+    breaks.eventMap.clear()
+    breaks.addressMap.clear()
+    val brks = breaksTableModel.getBreaks()
+    for(b <- brks) {
+      b match {
+        case a@AddressBreak(adr,_) =>
+          breaks.addressMap += adr -> a
+        case e@EventBreak(eventName) =>
+          breaks.eventMap += eventName -> e
+      }
+    }
+    val brk = if (brks.size == 0) NoBreak else breaks
+    currentDevice.listener.setBreakAt(brk,stepInfoCallBack(true, _))
   }
 
   protected def write(s:String): Unit = {

@@ -121,6 +121,7 @@ object TraceListener {
 trait TraceListener {
   import TraceListener._
   val cycleModeSupported = false
+  val supportTracing = true
 
   def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit
   def setTrace(traceOn:Boolean) : Unit

@@ -1,7 +1,5 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.cpu.CPU65xx.DisassembledInfo
-import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.formats.Diskette.{FileMode, FileType, StandardFileName}
 import ucesoft.cbm.formats.{D80, Diskette}
 import ucesoft.cbm.peripheral.bus.{IEEE488Bus, IEEE488BusCommand}
@@ -16,6 +14,7 @@ class IEEE488Drive(override val name:String,
                    override val deviceID:Int,
                    bus: IEEE488Bus,
                    driveLedListener: DriveLedListener) extends IEEE488BusCommand(name,deviceID, bus) with Drive with TraceListener {
+  override val supportTracing = false
   override val componentType: CBMComponentType.Type = CBMComponentType.DISK
   override val driveType: DriveType.Value = DriveType._8050
   override val formatExtList: List[String] = List("D80")

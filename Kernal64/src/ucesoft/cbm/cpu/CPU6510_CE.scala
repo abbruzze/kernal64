@@ -8,7 +8,7 @@ import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
 import java.util.Properties
 
 class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
-  override lazy val componentID = "6510_CE"
+  override lazy val componentID = "6502"
   private[this] var baLow = false
   private[this] var dma = false
   private[this] var ready = true
