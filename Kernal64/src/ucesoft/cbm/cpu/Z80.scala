@@ -3,7 +3,7 @@ package ucesoft.cbm.cpu
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.Z80.EmptyIOMemory
 import ucesoft.cbm.trace.TraceListener
-import ucesoft.cbm.trace.TraceListener.{BreakType, CpuStepInfo, DisassembleInfo, NoBreak, StepIn, StepOut, StepOver, StepType, TraceRegister}
+import ucesoft.cbm.trace.TraceListener._
 import ucesoft.cbm.{Chip, ChipID, Log}
 
 import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
@@ -2895,6 +2895,11 @@ class Z80(mem:Memory,
     M1Fetch = false
     refresh = false
     dummyRead = false
+
+    if (breakType != null && breakType.isBreak(ResetBreakInfo())) {
+      tracing = true
+      breakCallBack(CpuStepInfo(ctx.PC, ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
+    }
   }
 
   @inline private[this] def fetch(addr:Array[Int] = null) : Opcode = {
@@ -2982,7 +2987,7 @@ class Z80(mem:Memory,
   }
 
   final def clock : Int = {
-    if (breakType != null && breakType.isBreak(ctx.PC,false,false)) {
+    if (breakType != null && breakType.isBreak(AddressBreakInfo(ctx.PC,ExecuteBreakAccess))) {
       tracing = true
       breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
     }
@@ -2998,7 +3003,7 @@ class Z80(mem:Memory,
         ctx.push(ctx.PC)
         ctx.incR(1)
         refreshCycle
-        if (breakType != null && breakType.isBreak(ctx.PC,false,true)) {
+        if (breakType != null && breakType.isBreak(NMIBreakInfo())) {
           tracing = true
           breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
           Log.debug("NMI Break")
@@ -3024,7 +3029,7 @@ class Z80(mem:Memory,
 
           ctx.push(ctx.PC)
           ctx.incR(1)
-          if (breakType != null && breakType.isBreak(ctx.PC,true,false)) {
+          if (breakType != null && breakType.isBreak(IRQBreakInfo())) {
             tracing = true
             breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
             Log.debug("IRQ Break")

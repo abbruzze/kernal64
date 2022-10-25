@@ -137,6 +137,11 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
     opcodes_table_emu(RESET_INDEX)()
     import ucesoft.cbm.cpu._
     Log.info(s"CPU 65816 reset! PC = ${hex4(PC.A)}")
+
+    if (breakType != null && breakType.isBreak(ResetBreakInfo())) {
+      tracing = true
+      breakCallBack(CpuStepInfo(PC.A,CPU65816Disassembler.traceRegisters(A,X,Y,D,S,DB,PC,P,E),formatDebug))
+    }
   }
 
   def setOverflowFlag : Unit = {}
@@ -248,7 +253,7 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
     }
 
         @inline private def fetchAndExecute : Unit = {
-          if (breakType != null && breakType.isBreak(PC.A, false, false)) {
+          if (breakType != null && breakType.isBreak(AddressBreakInfo(PC.A,ExecuteBreakAccess))) {
             tracing = true
             breakCallBack(CpuStepInfo(PC.A,CPU65816Disassembler.traceRegisters(A,X,Y,D,S,DB,PC,P,E),formatDebug))
           }
@@ -257,7 +262,7 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
                 cpu_cycle_count = 0
                 // check NMI first
                 if (nmiOnNegativeEdge) {
-                    if (breakType != null && breakType.isBreak(PC.A, false, true)) {
+                    if (breakType != null && breakType.isBreak(NMIBreakInfo())) {
                         tracing = true
                         breakCallBack(CpuStepInfo(PC.A,CPU65816Disassembler.traceRegisters(A,X,Y,D,S,DB,PC,P,E),formatDebug))
                         Log.debug("NMI Break")
@@ -266,7 +271,7 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
                     opcode_table_ptr(NMI_INDEX)()
                 }
                 else if (irqLow && !((P & 0x04) == 0x04)) {
-                    if (breakType != null && breakType.isBreak(PC.A, true, false)) {
+                    if (breakType != null && breakType.isBreak(IRQBreakInfo())) {
                         tracing = true
                         breakCallBack(CpuStepInfo(PC.A,CPU65816Disassembler.traceRegisters(A,X,Y,D,S,DB,PC,P,E),formatDebug))
                         Log.debug("IRQ Break")

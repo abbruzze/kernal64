@@ -4,88 +4,52 @@ import java.io.PrintWriter
 import scala.collection.mutable.ListBuffer
 
 object TraceListener {
-  trait BreakType {
-    def isBreak(address: Int, irq: Boolean, nmi: Boolean): Boolean
+  case class BreakAccessType(read: Boolean, write: Boolean, execute: Boolean) {
+    override def toString = {
+      val r = if (read) "R" else ""
+      val w = if (write) "W" else ""
+      val x = if (execute) "X" else ""
+      s"$r$w$x"
+    }
+
+    def hasAccess(other:BreakAccessType): Boolean = read && other.read || write && other.write || execute && other.execute
   }
+  val ReadBreakAccess = BreakAccessType(true,false,false)
+  val WriteBreakAccess = BreakAccessType(false,true,false)
+  val ExecuteBreakAccess = BreakAccessType(false,false,true)
 
-  case class BreakEqual(address: Int) extends BreakType {
-    def isBreak(address: Int, irq: Boolean, nmi: Boolean): Boolean = this.address == address
+  sealed trait BreakInfo {
+    private var _enabled = true
+    def enabled: Boolean = _enabled
+    def enabled_=(e:Boolean): Unit = _enabled = e
+  }
+  case class AddressBreakInfo(address:Int,access:BreakAccessType) extends BreakInfo
+  sealed trait EventBreakInfo extends BreakInfo
+  case class IRQBreakInfo() extends EventBreakInfo { override def toString = "IRQ" }
+  case class NMIBreakInfo() extends EventBreakInfo { override def toString = "NMI" }
+  case class ResetBreakInfo() extends EventBreakInfo { override def toString = "RESET" }
 
-    override def toString: String = f"breaks at $address%04X"
+  trait BreakType {
+    def isBreak(info:BreakInfo): Boolean
   }
 
   case class BreakSet(addressSet: Set[Int]) extends BreakType {
-    def isBreak(address: Int, irq: Boolean, nmi: Boolean): Boolean = addressSet.contains(address)
+    def isBreak(info:BreakInfo): Boolean = {
+      info match {
+        case AddressBreakInfo(address, access) if access.execute =>
+          addressSet.contains(address)
+        case _ =>
+          false
+      }
+    }
 
     override def toString: String = f"breaks in ${addressSet.map(a => f"$a%04X").mkString("{ ", ",", " }")}"
   }
 
-  case class BreakIn(fromAddress: Int, toAddress: Int) extends BreakType {
-    def isBreak(address: Int, irq: Boolean, nmi: Boolean): Boolean = address >= fromAddress && address <= toAddress
-
-    override def toString: String = f"breaks between $fromAddress%04X and $toAddress%04X"
-  }
-
-  case class BreakOut(fromAddress: Int, toAddress: Int) extends BreakType {
-    def isBreak(address: Int, irq: Boolean, nmi: Boolean): Boolean = address < fromAddress || address > toAddress
-
-    override def toString: String = f"breaks out of $fromAddress%04X and $toAddress%04X"
-  }
-
   object NoBreak extends BreakType {
-    def isBreak(address: Int, irq: Boolean, nmi: Boolean) = false
+    def isBreak(info:BreakInfo) = false
 
     override def toString: String = "no breaks set"
-  }
-
-  object IRQBreak extends BreakType {
-    def isBreak(address: Int, irq: Boolean, nmi: Boolean): Boolean = irq
-
-    override def toString: String = "breaks if IRQ"
-  }
-
-  object NMIBreak extends BreakType {
-    def isBreak(address: Int, irq: Boolean, nmi: Boolean): Boolean = nmi
-
-    override def toString: String = "breaks if NMI"
-  }
-
-  object BreakType {
-
-    private def s2a(address: String) = address(0) match {
-      case '$' => Integer.parseInt(address.substring(1), 16)
-      case '%' => Integer.parseInt(address.substring(1), 2)
-      case _ => address.toInt
-    }
-
-    def makeBreak(cmd: String): BreakType = {
-      if (cmd.startsWith("in")) { // BreakIn
-        val range = cmd.substring(2).trim.split(",")
-        if (range.length != 2) throw new IllegalArgumentException("Bad range in the inclusive break type")
-        return BreakIn(s2a(range(0)), s2a(range(1)))
-      }
-      if (cmd.startsWith("out")) { // BreakOut
-        val range = cmd.substring(3).trim.split(",")
-        if (range.length != 2) throw new IllegalArgumentException("Bad range in the out of range break type")
-        return BreakOut(s2a(range(0)), s2a(range(1)))
-      }
-      if (cmd.startsWith("irq")) return IRQBreak
-      if (cmd.startsWith("nmi")) return NMIBreak
-
-      try {
-        val addresses = cmd.split(",")
-        if (addresses.length == 1) BreakEqual(s2a(cmd))
-        else {
-          val set = addresses map s2a toSet
-
-          BreakSet(set)
-        }
-      }
-      catch {
-        case _: Exception =>
-          throw new IllegalArgumentException("Bad break type")
-      }
-    }
   }
 
   trait TraceRegisterBuilder {

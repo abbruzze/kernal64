@@ -1,8 +1,8 @@
 package ucesoft.cbm.cpu
 
-import ucesoft.cbm.{ChipID, Clock, Log}
 import ucesoft.cbm.cpu.CPU65xx.CPUPostponeReadException
-import ucesoft.cbm.trace.TraceListener.{BreakType, CpuStepInfo, DisassembleInfo, NoBreak, StepIn, StepOut, StepOver, StepType, TraceRegister}
+import ucesoft.cbm.trace.TraceListener._
+import ucesoft.cbm.{ChipID, Clock, Log}
 
 import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
 import java.util.Properties
@@ -2124,6 +2124,11 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     SP = 0
     sei
     Log.info(s"CPU reset! PC = ${hex4(PC)}")
+
+    if (breakType != null && breakType.isBreak(ResetBreakInfo())) {
+      tracing = true
+      breakCallBack(CpuStepInfo(PC, buildCpuStepInfo, formatDebug))
+    }
   }
 
   override def disassemble(address: Int): DisassembleInfo = {
@@ -2142,7 +2147,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   @inline private def fetchAndExecute()  : Unit = {
     readyCycles = readyCycles << 1 | (if (ready) 1 else 0)
 
-    if (breakType != null && state == 0 && breakType.isBreak(PC, false, false)) {
+    if (breakType != null && state == 0 && breakType.isBreak(AddressBreakInfo(PC,ExecuteBreakAccess))) {
       tracing = true
       breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug))
     }
@@ -2151,7 +2156,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     if (nmiOnNegativeEdge && state == 0 && clk.currentCycles - nmiFirstCycle >= 2) {
       nmiOnNegativeEdge = false
       state = NMI_STATE
-      if (breakType != null && breakType.isBreak(PC, false, true)) {
+      if (breakType != null && breakType.isBreak(NMIBreakInfo())) {
         tracing = true
         breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug))
         Log.debug("NMI Break")
@@ -2162,7 +2167,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
         forceIRQNow = false
         state = IRQ_STATE
       }
-      if (breakType != null && breakType.isBreak(PC, true, false)) {
+      if (breakType != null && breakType.isBreak(IRQBreakInfo())) {
         tracing = true
         breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug))
         Log.debug("IRQ Break")

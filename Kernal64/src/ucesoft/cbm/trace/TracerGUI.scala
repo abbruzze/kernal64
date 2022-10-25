@@ -43,52 +43,32 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     }
   }
 
-  protected case class AddressBreakType(read:Boolean,write:Boolean,execute:Boolean) {
-    override def toString = {
-      val r = if (read) "R" else ""
-      val w = if (write) "W" else ""
-      val x = if (execute) "X" else ""
-      s"$r$w$x"
-    }
-  }
-
-  protected sealed trait Break {
-    var enabled = true
-  }
-  protected case class AddressBreak(address:Int,breakType:AddressBreakType) extends Break
-  protected case class EventBreak(eventName:String) extends Break
-
-  protected final val BREAK_IRQ_EVENT = "IRQ"
-  protected final val BREAK_NMI_EVENT = "NMI"
-
   protected class Breaks extends BreakType {
-    val addressMap = new mutable.HashMap[Int,AddressBreak]()
-    val eventMap = new mutable.HashMap[String,EventBreak]()
+    val addressMap = new mutable.HashMap[Int,AddressBreakInfo]()
+    val eventMap = new mutable.HashMap[String,EventBreakInfo]()
 
-    override def isBreak(address: Int, irq: Boolean, nmi: Boolean): Boolean = {
-      if (irq) {
-        eventMap.get(BREAK_IRQ_EVENT) match {
-          case Some(e) => return e.enabled
-          case _ =>
-        }
-      }
-      if (nmi) {
-        eventMap.get(BREAK_NMI_EVENT) match {
-          case Some(e) => return e.enabled
-          case _ =>
-        }
-      }
-      addressMap.get(address) match {
-        case Some(e) =>
-          e.enabled
-        case _ =>
-          false
+    override def isBreak(info:BreakInfo): Boolean = {
+      info match {
+        case AddressBreakInfo(address,access) =>
+          addressMap.get(address) match {
+            case Some(e) if e.enabled =>
+              e.access.hasAccess(access)
+            case _ =>
+              false
+          }
+        case event =>
+          eventMap.get(event.toString) match {
+            case Some(e) if e.enabled =>
+              true
+            case None =>
+              false
+          }
       }
     }
   }
 
   private class BreaksTableModel extends AbstractTableModel {
-    private val breaks = new ArrayBuffer[Break]
+    private val breaks = new ArrayBuffer[BreakInfo]
     override def getColumnName(column: Int): String = column match {
       case 0 => "Enabled"
       case 1 => "Address"
@@ -103,15 +83,15 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       if (columnIndex == 0) return java.lang.Boolean.valueOf(breaks(rowIndex).enabled)
 
       breaks(rowIndex) match {
-        case AddressBreak(address,breakType) =>
+        case AddressBreakInfo(address,accessType) =>
           columnIndex match {
             case 1 => address.toHexString.toUpperCase()
-            case 2 => breakType.toString
+            case 2 => accessType.toString
           }
-        case EventBreak(eventName) =>
+        case event =>
           columnIndex match {
             case 1 => ""
-            case 2 => eventName
+            case 2 => event.toString
           }
       }
     }
@@ -121,33 +101,37 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       for(r <- orderedRows) breaks.remove(r)
       fireTableDataChanged()
     }
-    def getBreakAtRow(row:Int): Break = breaks(row)
-    def setBreakAtRow(row:Int,b:Break): Unit = {
+    def getBreakAtRow(row:Int): BreakInfo = breaks(row)
+    def setBreakAtRow(row:Int,b:BreakInfo): Unit = {
       breaks(row) = b
       fireTableRowsUpdated(row,row)
     }
-    def getBreaks(): List[Break] = breaks.toList
+    def getBreaks(): List[BreakInfo] = breaks.toList
 
     override def getColumnClass(columnIndex: Int): Class[_] = columnIndex match {
       case 0 => classOf[java.lang.Boolean]
       case _ => classOf[String]
     }
 
-    def contentChanged(breaks:List[Break]): Unit = {
+    def contentChanged(breaks:List[BreakInfo]): Unit = {
       this.breaks.clear()
       this.breaks.addAll(breaks)
       fireTableDataChanged()
     }
     def contentUpdated(): Unit = fireTableDataChanged()
-    def addBreak(b:Break): Unit = {
+    def addBreak(b:BreakInfo): Unit = {
       breaks += b
+      fireTableDataChanged()
+    }
+    def clear(): Unit = {
+      breaks.clear()
       fireTableDataChanged()
     }
   }
 
   private val breaksTableModel = new BreaksTableModel
   private val breaksTable = new JTable(breaksTableModel)
-  private val breaks = new Breaks
+  private val breaks = new mutable.HashMap[String,Breaks]
   private var traceEnabled = false
   private val devices = new ArrayBuffer[TracedDevice]
   private var currentDevice : TracedDevice = _
@@ -309,10 +293,10 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       editBreakGUI(None) match {
         case Some(b) =>
           b match {
-            case EventBreak(e) =>
-              if (!breaks.eventMap.contains(e)) breaksTableModel.addBreak(b)
-            case _ =>
+            case AddressBreakInfo(_,_) =>
               breaksTableModel.addBreak(b)
+            case event =>
+              if (!breaks(currentDevice.id).eventMap.contains(event.toString)) breaksTableModel.addBreak(b)
           }
           updateBreaks()
         case None =>
@@ -424,12 +408,13 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
 
     step(StepIn)
     currentDevice.listener.setTrace(enabled)
+    if (!enabled) step(StepIn)
   }
 
   override def setBrk(brk: TraceListener.BreakType): Unit = {
     val brks = brk match {
       case NoBreak =>
-        breaks
+        breaks(currentDevice.id)
       case _ =>
         brk
     }
@@ -452,6 +437,8 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     if (index == -1) devices += device
     else devices(index) = device
 
+    breaks += device.id -> new Breaks
+
     deviceComboModel.removeAllElements()
     val sorted = devices.sortWith((a,b) => a.default && !b.default)
     import scala.jdk.CollectionConverters._
@@ -471,7 +458,16 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
   }
 
   protected def selectCurrentDevice(device:TracedDevice): Unit = {
+    if (currentDevice != null) {
+      currentDevice.listener.setTrace(false)
+      currentDevice.listener.setBreakAt(NoBreak,stepInfoCallBack(true, _))
+      step(StepIn)
+    }
     currentDevice = device
+    breaksTableModel.clear()
+    for(b <- breaks(currentDevice.id).addressMap.values) breaksTableModel.addBreak(b)
+    for(b <- breaks(currentDevice.id).eventMap.values) breaksTableModel.addBreak(b)
+    updateBreaks()
     cycleMode.setEnabled(device.listener.cycleModeSupported)
   }
 
@@ -651,7 +647,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     currentDevice.listener.setCycleMode(enabled)
   }
 
-  protected def editBreakGUI(break:Option[Break]): Option[Break] = {
+  protected def editBreakGUI(break:Option[BreakInfo]): Option[BreakInfo] = {
     def createDummyPanel(comp:JComponent*): JPanel = {
       val d = new JPanel(new FlowLayout(FlowLayout.LEFT))
       for(c <- comp) d.add(c)
@@ -669,11 +665,13 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     eventPanel.add(createDummyPanel(radioEvent))
     val radioIRQ = new JRadioButton("IRQ")
     val radioNMI = new JRadioButton("NMI")
+    val radioRESET = new JRadioButton("RESET")
     val groupE = new ButtonGroup
     groupE.add(radioIRQ)
     groupE.add(radioNMI)
+    groupE.add(radioRESET)
 
-    eventPanel.add(createDummyPanel(radioIRQ,radioNMI))
+    eventPanel.add(createDummyPanel(radioIRQ,radioNMI,radioRESET))
 
     val addressPanel = new JPanel(new GridLayout(3,1))
     addressPanel.setBorder(BorderFactory.createTitledBorder("Address"))
@@ -689,6 +687,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     radioAddress.addActionListener(_ => {
       radioIRQ.setEnabled(false)
       radioNMI.setEnabled(false)
+      radioRESET.setEnabled(false)
       readCheck.setEnabled(true)
       writeCheck.setEnabled(true)
       exeCheck.setEnabled(true)
@@ -698,6 +697,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     radioEvent.addActionListener(_ => {
       radioIRQ.setEnabled(true)
       radioNMI.setEnabled(true)
+      radioRESET.setEnabled(true)
       readCheck.setEnabled(false)
       writeCheck.setEnabled(false)
       exeCheck.setEnabled(false)
@@ -710,19 +710,25 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
         radioAddress.setSelected(true)
         radioIRQ.setEnabled(false)
         radioNMI.setEnabled(false)
+        radioRESET.setEnabled(false)
         exeCheck.setSelected(true)
       case Some(b) =>
         b match {
-          case AddressBreak(adr,bt) =>
+          case AddressBreakInfo(adr,bt) =>
             radioAddress.setSelected(true)
             address.setText(adr.toHexString.toUpperCase())
             readCheck.setSelected(bt.read)
             writeCheck.setSelected(bt.write)
             exeCheck.setSelected(bt.execute)
             // condition TODO
-          case EventBreak(event) =>
-            if (event == BREAK_IRQ_EVENT) radioIRQ.setSelected(true)
-            if (event == BREAK_NMI_EVENT) radioNMI.setSelected(true)
+          case IRQBreakInfo() =>
+            radioIRQ.setSelected(true)
+            radioEvent.setSelected(true)
+          case NMIBreakInfo() =>
+            radioNMI.setSelected(true)
+            radioEvent.setSelected(true)
+          case ResetBreakInfo() =>
+            radioRESET.setSelected(true)
             radioEvent.setSelected(true)
         }
     }
@@ -740,7 +746,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
               if (!readCheck.isSelected && !writeCheck.isSelected && !exeCheck.isSelected)
                 JOptionPane.showMessageDialog(frame, s"Select read/write/execute options", "Memory access type error", JOptionPane.ERROR_MESSAGE)
               else
-                return Some(AddressBreak(adr, AddressBreakType(readCheck.isSelected, writeCheck.isSelected, exeCheck.isSelected)))
+                return Some(AddressBreakInfo(adr, BreakAccessType(readCheck.isSelected, writeCheck.isSelected, exeCheck.isSelected)))
             }
             catch {
               case _: NumberFormatException =>
@@ -749,7 +755,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
             }
           }
           else {
-            return Some(EventBreak(if (radioIRQ.isSelected) BREAK_IRQ_EVENT else BREAK_NMI_EVENT))
+            return Some(if (radioIRQ.isSelected) IRQBreakInfo() else if (radioNMI.isSelected) NMIBreakInfo() else ResetBreakInfo())
           }
         case _ =>
           return None
@@ -760,18 +766,18 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
   }
 
   protected def updateBreaks(): Unit = {
-    breaks.eventMap.clear()
-    breaks.addressMap.clear()
+    breaks(currentDevice.id).eventMap.clear()
+    breaks(currentDevice.id).addressMap.clear()
     val brks = breaksTableModel.getBreaks()
     for(b <- brks) {
       b match {
-        case a@AddressBreak(adr,_) =>
-          breaks.addressMap += adr -> a
-        case e@EventBreak(eventName) =>
-          breaks.eventMap += eventName -> e
+        case a@AddressBreakInfo(adr,_) =>
+          breaks(currentDevice.id).addressMap += adr -> a
+        case e:EventBreakInfo =>
+          breaks(currentDevice.id).eventMap += e.toString -> e
       }
     }
-    val brk = if (brks.size == 0) NoBreak else breaks
+    val brk = if (brks.size == 0) NoBreak else breaks(currentDevice.id)
     currentDevice.listener.setBreakAt(brk,stepInfoCallBack(true, _))
   }
 
