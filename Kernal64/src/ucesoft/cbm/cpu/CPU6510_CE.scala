@@ -1,5 +1,6 @@
 package ucesoft.cbm.cpu
 
+import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.CPU65xx.CPUPostponeReadException
 import ucesoft.cbm.trace.TraceListener._
 import ucesoft.cbm.{ChipID, Clock, Log}
@@ -7,7 +8,7 @@ import ucesoft.cbm.{ChipID, Clock, Log}
 import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
 import java.util.Properties
 
-class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
+class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
   override lazy val componentID = "6502"
   private[this] var baLow = false
   private[this] var dma = false
@@ -57,6 +58,37 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   private[this] var prevIClearedFlag = false
   private[this] var pageCrossed = false
   private[this] var readyCycles = 0
+  private[this] var mem : Memory = _mem
+
+  private val memRWProxy = new Memory {
+    override val isRom = false
+    override val length = 0
+    override val startAddress = 0
+    override val name = ""
+
+    override def init(): Unit = {}
+    override def isActive = true
+
+    override def read(address: Int, chipID: ID): Int = {
+      if (breakType != null && breakType.isBreak(AddressBreakInfo(address,ReadBreakAccess))) stepAndWait()
+      _mem.read(address,chipID)
+    }
+
+    private def stepAndWait(): Unit = {
+      tracing = true
+      breakCallBack(CpuStepInfo(CURRENT_OP_PC, buildCpuStepInfo, formatDebug(CURRENT_OP_PC)))
+      syncObject.synchronized {
+        syncObject.wait()
+      }
+    }
+
+    override def write(address: Int, value: Int, chipID: ID): Unit = {
+      _mem.write(address,value,chipID)
+      if (breakType != null && breakType.isBreak(AddressBreakInfo(address,WriteBreakAccess(value)))) stepAndWait()
+    }
+  }
+
+
 
   // -----------------------------------------
   final override def setBaLow(baLow: Boolean) : Unit = {
@@ -234,8 +266,12 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
     tracing = false
     breakCallBack = callback
     this.breakType = breakType match {
-      case NoBreak => null
-      case _ => breakType
+      case NoBreak =>
+        mem = _mem
+        null
+      case _ =>
+        mem = memRWProxy
+        breakType
     }
   }
 
@@ -2127,7 +2163,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
     if (breakType != null && breakType.isBreak(ResetBreakInfo())) {
       tracing = true
-      breakCallBack(CpuStepInfo(PC, buildCpuStepInfo, formatDebug))
+      breakCallBack(CpuStepInfo(PC, buildCpuStepInfo, formatDebug()))
     }
   }
 
@@ -2149,7 +2185,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
     if (breakType != null && state == 0 && breakType.isBreak(AddressBreakInfo(PC,ExecuteBreakAccess))) {
       tracing = true
-      breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug))
+      breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug()))
     }
 
     // check interrupts
@@ -2158,7 +2194,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
       state = NMI_STATE
       if (breakType != null && breakType.isBreak(NMIBreakInfo())) {
         tracing = true
-        breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug))
+        breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug()))
         Log.debug("NMI Break")
       }
     }
@@ -2169,7 +2205,7 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
       }
       if (breakType != null && breakType.isBreak(IRQBreakInfo())) {
         tracing = true
-        breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug))
+        breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug()))
         Log.debug("IRQ Break")
       }
     }
@@ -2183,11 +2219,10 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
       if (!baLow) instructionCycle += 1
 
       val tracingNow = (tracing || (stepType == StepOver && PC == stepOverTargetAddress)) && (state == 0 || state == O_JAM || tracingCycleMode)
-      //if (tracingNow) Log.debug(formatDebug)
-      if (tracingOnFile && (state == 0 || state == O_JAM)) tracingFile.println(formatDebug)
+      if (tracingOnFile && (state == 0 || state == O_JAM)) tracingFile.println(formatDebug())
 
       if (tracingNow) {
-        val disa = formatDebug
+        val disa = formatDebug()
         stepCallBack(CpuStepInfo(PC,buildCpuStepInfo,disa))
         syncObject.synchronized {
           syncObject.wait()
@@ -2219,15 +2254,15 @@ class CPU6510_CE(private var mem: Memory, val id: ChipID.ID) extends CPU65xx {
   }
 
   override def getMemory: Memory = mem
-  override def setMemory(m: Memory): Unit = this.mem = m
+  override def setMemory(m: Memory): Unit = _mem = m
   override def getCurrentOpCode: Int = op
 
   def isFetchingInstruction: Boolean = state == 0
 
-  protected def formatDebug: String = {
+  protected def formatDebug(pc:Int = PC): String = {
     disassembling = true
     try
-      s"${CPU65xx.disassemble(mem, if (tracingCycleMode) tracingCyclePC else PC).toString} ${if (tracingCycleMode) s"\t-- C$instructionCycle/${state.toHexString.toUpperCase}" else ""} ${if (state >= IRQ_STATE && state <= NMI_STATE_7) s"IRQ" else ""} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
+      s"${CPU65xx.disassemble(mem, if (tracingCycleMode) tracingCyclePC else pc).toString} ${if (tracingCycleMode) s"\t-- C$instructionCycle/${state.toHexString.toUpperCase}" else ""} ${if (state >= IRQ_STATE && state <= NMI_STATE_7) s"IRQ" else ""} ${if (baLow) "[BA]" else ""}${if (dma) " [DMA]" else ""}"
     finally
       disassembling = false
   }

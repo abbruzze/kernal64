@@ -394,7 +394,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     }
 
     if (breakCallBack && !traceEnabled) enableTracing(true)
-    if (traceEnabled && !breakCallBack) write(cpuStepInfo.disassembled)
+    if (traceEnabled) write(cpuStepInfo.disassembled)
     for(tl <- tracingListeners) tl.stepInto(cpuStepInfo.pc)
   }
 

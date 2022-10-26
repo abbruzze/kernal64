@@ -4,7 +4,7 @@ import java.io.PrintWriter
 import scala.collection.mutable.ListBuffer
 
 object TraceListener {
-  case class BreakAccessType(read: Boolean, write: Boolean, execute: Boolean) {
+  case class BreakAccessType(read: Boolean, write: Boolean, execute: Boolean,writeValue:Option[Int] = None) {
     override def toString = {
       val r = if (read) "R" else ""
       val w = if (write) "W" else ""
@@ -15,7 +15,7 @@ object TraceListener {
     def hasAccess(other:BreakAccessType): Boolean = read && other.read || write && other.write || execute && other.execute
   }
   val ReadBreakAccess = BreakAccessType(true,false,false)
-  val WriteBreakAccess = BreakAccessType(false,true,false)
+  val WriteBreakAccess = (writeValue:Int) => BreakAccessType(false,true,false,Some(writeValue))
   val ExecuteBreakAccess = BreakAccessType(false,false,true)
 
   sealed trait BreakInfo {
