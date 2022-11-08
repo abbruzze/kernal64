@@ -184,7 +184,11 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
   
   private def gamePadConfig() : Unit = {
     try {
-      val controllers = ControllerEnvironment.getDefaultEnvironment.getControllers map { _.asInstanceOf[Object] }
+      val controllers = GamePadControlPort.getControllers() map { _.asInstanceOf[Object] }
+      if (controllers.length == 0) {
+        JOptionPane.showMessageDialog(this,"No joysticks available","Joysticks detection error",JOptionPane.ERROR_MESSAGE)
+        return
+      }
       val controller = JOptionPane.showInputDialog(this,"Select Joystick","GamePad configuration",JOptionPane.QUESTION_MESSAGE,null,controllers,controllers(0)).asInstanceOf[Controller]      
       if (controller != null) {
         val buttons = controller.getComponents filter { _.getIdentifier.isInstanceOf[Component.Identifier.Button] }
