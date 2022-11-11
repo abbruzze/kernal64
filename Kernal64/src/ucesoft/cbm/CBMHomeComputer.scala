@@ -20,7 +20,7 @@ import ucesoft.cbm.peripheral.vic._
 import ucesoft.cbm.peripheral.vic.coprocessor.VASYL
 import ucesoft.cbm.peripheral.{controlport, keyboard, vic}
 import ucesoft.cbm.remote.RemoteC64
-import ucesoft.cbm.trace.{InspectPanel, TraceListener, Tracer}
+import ucesoft.cbm.trace.{InspectPanel, Tracer}
 
 import java.awt.datatransfer.DataFlavor
 import java.awt.event._

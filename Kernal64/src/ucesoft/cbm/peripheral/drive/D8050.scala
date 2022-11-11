@@ -208,6 +208,7 @@ class D8050(val driveID:Int,
    * Tracing
    *
    ***********************************************************************************************************/
+  override def getRegisters(): List[TraceListener.TraceRegister] = UN1_6502.getRegisters()
   override def setTraceOnFile(out: PrintWriter, enabled: Boolean): Unit = UN1_6502.setTraceOnFile(out,enabled)
 
   override def setTrace(traceOn: Boolean): Unit = UN1_6502.setTrace(traceOn)

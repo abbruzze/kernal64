@@ -443,16 +443,15 @@ object CPU65816Disassembler {
     sb ++= (if ((P & 0x01) > 0) "C|" else "_|")
 
     TraceRegister.builder().
-      add("PC",fmt24(PC.A)).
-      add("E", if (E) "01" else "00").
-      add("A",s"${if (a8) fmt8(A.B.L) else fmt16(A.W)}").
-      add("X",s"${if (xy8) fmt8(X.B.L) else fmt16(X.W)}").
-      add("Y",s"${if (xy8) fmt8(Y.B.L) else fmt16(Y.W)}").
-      add("SP",s"${if (E) fmt8(S.B.L) else fmt16(S.W)}").
-      add("SP",s"${if (E) fmt8(S.B.L) else fmt16(S.W)}").
-      addIf(!E,"D",fmt16(D.W)).
-      addIf(!E,"DB",fmt8(DB)).
-      add("STATUS",sb.toString).
+      add("PC",fmt24(PC.A),PC.A).
+      add("E", if (E) "01" else "00",if (E) 1 else 0).
+      add("A",s"${if (a8) fmt8(A.B.L) else fmt16(A.W)}",if (a8) A.B.L else A.W).
+      add("X",s"${if (xy8) fmt8(X.B.L) else fmt16(X.W)}",if (xy8) X.B.L else X.W).
+      add("Y",s"${if (xy8) fmt8(Y.B.L) else fmt16(Y.W)}",if (xy8) Y.B.L else Y.W).
+      add("SP",s"${if (E) fmt8(S.B.L) else fmt16(S.W)}", if (E) S.B.L else S.W).
+      addIf(!E,"D",fmt16(D.W),D.W).
+      addIf(!E,"DB",fmt8(DB),DB).
+      add("STATUS",sb.toString,P,"STATUS").
       build()
   }
 }

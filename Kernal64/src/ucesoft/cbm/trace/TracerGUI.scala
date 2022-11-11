@@ -9,20 +9,11 @@ import java.awt.{BorderLayout, Color, Dimension, FlowLayout, GridLayout}
 import java.io.{BufferedOutputStream, FileOutputStream, PrintWriter, Writer}
 import javax.swing.JSpinner.DefaultEditor
 import javax.swing._
+import javax.swing.event.{DocumentEvent, DocumentListener}
 import javax.swing.table.AbstractTableModel
 import javax.swing.text.DefaultCaret
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
-
-object TracerGUI {
-  def main(args:Array[String]): Unit = {
-    val t = new TracerGUI(null)
-    t.addDevice(Tracer.TracedDevice("Main 6502",null,null))
-    t.setVisible(true)
-    Log.setInfo()
-    Log.info("Hello, world!")
-  }
-}
 
 class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
   import TraceListener._
@@ -49,10 +40,21 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
 
     override def isBreak(info:BreakInfo): Boolean = {
       info match {
-        case AddressBreakInfo(address,access) =>
+        case AddressBreakInfo(address,access,_) =>
           addressMap.get(address) match {
             case Some(e) if e.enabled =>
-              e.access.hasAccess(access)
+              if (!e.access.hasAccess(access)) return false
+              e.condition match {
+                case None =>
+                  true
+                case Some(cond) =>
+                  TracerConditionEvaluator.eval(cond.expr,currentDevice.listener.getRegisters(),Map.empty) match { // TODO labels
+                    case Right(value) =>
+                      value
+                    case Left(_) =>
+                      false
+                  }
+              }
             case _ =>
               false
           }
@@ -83,10 +85,10 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       if (columnIndex == 0) return java.lang.Boolean.valueOf(breaks(rowIndex).enabled)
 
       breaks(rowIndex) match {
-        case AddressBreakInfo(address,accessType) =>
+        case AddressBreakInfo(address,accessType,condition) =>
           columnIndex match {
             case 1 => address.toHexString.toUpperCase()
-            case 2 => accessType.toString
+            case 2 => s"${accessType.toString} ${if (condition.isDefined) "C" else ""}"
           }
         case event =>
           columnIndex match {
@@ -293,7 +295,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       editBreakGUI(None) match {
         case Some(b) =>
           b match {
-            case AddressBreakInfo(_,_) =>
+            case AddressBreakInfo(_,_,_) =>
               breaksTableModel.addBreak(b)
             case event =>
               if (!breaks(currentDevice.id).eventMap.contains(event.toString)) breaksTableModel.addBreak(b)
@@ -648,10 +650,31 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
   }
 
   protected def editBreakGUI(break:Option[BreakInfo]): Option[BreakInfo] = {
+    val conditionField = new JTextField(40)
+    val conditionErrorLabel = new JLabel()
+    conditionErrorLabel.setForeground(Color.RED)
+
     def createDummyPanel(comp:JComponent*): JPanel = {
       val d = new JPanel(new FlowLayout(FlowLayout.LEFT))
       for(c <- comp) d.add(c)
       d
+    }
+
+    def checkCondition(): Unit = {
+      if (conditionField.getText.nonEmpty) {
+        TracerConditionParser.parseCondition(conditionField.getText()) match {
+          case Right(_) =>
+            conditionErrorLabel.setVisible(false)
+            conditionField.setForeground(Color.BLACK)
+          case Left(err) =>
+            conditionErrorLabel.setVisible(true)
+            conditionErrorLabel.setText(err)
+        }
+      }
+      else {
+        conditionField.setForeground(Color.BLACK)
+        conditionErrorLabel.setVisible(false)
+      }
     }
 
     val radioAddress = new JRadioButton("Address Break")
@@ -673,7 +696,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
 
     eventPanel.add(createDummyPanel(radioIRQ,radioNMI,radioRESET))
 
-    val addressPanel = new JPanel(new GridLayout(3,1))
+    val addressPanel = new JPanel(new GridLayout(4,1))
     addressPanel.setBorder(BorderFactory.createTitledBorder("Address"))
     addressPanel.add(createDummyPanel(radioAddress))
     val address = new JTextField(5)
@@ -681,8 +704,15 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     val writeCheck = new JCheckBox("Write")
     val exeCheck = new JCheckBox("Execute")
     addressPanel.add(createDummyPanel(new JLabel("Address:"),address,readCheck,writeCheck,exeCheck))
-    val condition = new JTextField(40)
-    addressPanel.add(createDummyPanel(new JLabel("Condition:"),condition))
+    addressPanel.add(createDummyPanel(new JLabel("Condition:"),conditionField))
+    addressPanel.add(createDummyPanel(conditionErrorLabel))
+    conditionErrorLabel.setVisible(false)
+
+    conditionField.getDocument.addDocumentListener(new DocumentListener {
+      override def insertUpdate(e: DocumentEvent): Unit = checkCondition()
+      override def removeUpdate(e: DocumentEvent): Unit = checkCondition()
+      override def changedUpdate(e: DocumentEvent): Unit = checkCondition()
+    })
 
     radioAddress.addActionListener(_ => {
       radioIRQ.setEnabled(false)
@@ -692,7 +722,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       writeCheck.setEnabled(true)
       exeCheck.setEnabled(true)
       address.setEnabled(true)
-      condition.setEditable(true)
+      conditionField.setEditable(true)
     })
     radioEvent.addActionListener(_ => {
       radioIRQ.setEnabled(true)
@@ -702,7 +732,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       writeCheck.setEnabled(false)
       exeCheck.setEnabled(false)
       address.setEnabled(false)
-      condition.setEditable(false)
+      conditionField.setEditable(false)
     })
 
     break match {
@@ -714,13 +744,19 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
         exeCheck.setSelected(true)
       case Some(b) =>
         b match {
-          case AddressBreakInfo(adr,bt) =>
+          case AddressBreakInfo(adr,bt,condition) =>
             radioAddress.setSelected(true)
             address.setText(adr.toHexString.toUpperCase())
             readCheck.setSelected(bt.read)
             writeCheck.setSelected(bt.write)
             exeCheck.setSelected(bt.execute)
-            // condition TODO
+            condition match {
+              case Some(BreakCondition(cond,_)) =>
+                conditionField.setText(cond)
+                checkCondition()
+              case None =>
+                conditionField.setText("")
+            }
           case IRQBreakInfo() =>
             radioIRQ.setSelected(true)
             radioEvent.setSelected(true)
@@ -745,8 +781,18 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
               val adr = Integer.parseInt(address.getText, 16)
               if (!readCheck.isSelected && !writeCheck.isSelected && !exeCheck.isSelected)
                 JOptionPane.showMessageDialog(frame, s"Select read/write/execute options", "Memory access type error", JOptionPane.ERROR_MESSAGE)
-              else
-                return Some(AddressBreakInfo(adr, BreakAccessType(readCheck.isSelected, writeCheck.isSelected, exeCheck.isSelected)))
+              else {
+                if (conditionField.getText().nonEmpty) {
+                  TracerConditionParser.parseCondition(conditionField.getText()) match {
+                    case Right(expr) =>
+                      return Some(AddressBreakInfo(adr, BreakAccessType(readCheck.isSelected, writeCheck.isSelected, exeCheck.isSelected),Some(BreakCondition(conditionField.getText(),expr))))
+                    case Left(err) =>
+                      JOptionPane.showMessageDialog(frame, err,s"Condition error", JOptionPane.ERROR_MESSAGE)
+                  }
+                }
+                else
+                  return Some(AddressBreakInfo(adr, BreakAccessType(readCheck.isSelected, writeCheck.isSelected, exeCheck.isSelected),None))
+              }
             }
             catch {
               case _: NumberFormatException =>
@@ -771,7 +817,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     val brks = breaksTableModel.getBreaks()
     for(b <- brks) {
       b match {
-        case a@AddressBreakInfo(adr,_) =>
+        case a@AddressBreakInfo(adr,_,_) =>
           breaks(currentDevice.id).addressMap += adr -> a
         case e:EventBreakInfo =>
           breaks(currentDevice.id).eventMap += e.toString -> e

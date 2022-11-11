@@ -625,7 +625,9 @@ class IEEE488Drive(override val name:String,
   override protected def loadState(in: ObjectInputStream): Unit = {
     status.st = in.readInt()
   }
+
   // Trace listener
+  override def getRegisters(): List[TraceListener.TraceRegister] = Nil
   override def setTraceOnFile(out: PrintWriter, enabled: Boolean): Unit = {}
   override def setTrace(traceOn: Boolean): Unit = {}
   override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType): Unit = {}

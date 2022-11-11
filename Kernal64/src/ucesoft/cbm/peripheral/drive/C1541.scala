@@ -406,6 +406,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
   }
 
   // ------------ TRACING -----------
+  override def getRegisters(): List[TraceListener.TraceRegister] = cpu.getRegisters()
   override def setCycleMode(cycleMode: Boolean): Unit = {
     cpu.setCycleMode(cycleMode)
   }

@@ -143,7 +143,7 @@ abstract class CBMComputer extends CBMComponent {
 
   // -------------------- TRACE ----------------
   protected var inspectDialog : InspectPanelDialog = _
-  protected var traceItem,traceDiskItem : JCheckBoxMenuItem = _
+  protected var traceItem : JCheckBoxMenuItem = _
   protected var tracer : Tracer = new TracerGUI(traceOpened => traceItem.setSelected(traceOpened))
 
   // ------------------------------------ Drag and Drop ----------------------------
@@ -610,16 +610,11 @@ abstract class CBMComputer extends CBMComponent {
   }
 
   protected def setTraceMenu(traceMenu: JMenu): Unit = {
-    traceItem = new JCheckBoxMenuItem("Trace CPU")
+    traceItem = new JCheckBoxMenuItem("Trace devices ...")
     traceItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_T, java.awt.event.InputEvent.ALT_DOWN_MASK))
     traceItem.setSelected(false)
-    traceItem.addActionListener(e => trace(true, e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected))
+    traceItem.addActionListener(e => trace(true, traceItem.isSelected))
     traceMenu.add(traceItem)
-
-    traceDiskItem = new JCheckBoxMenuItem("Trace Disk CPU")
-    traceDiskItem.setSelected(false)
-    traceDiskItem.addActionListener(e => trace(false, e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected))
-    traceMenu.add(traceDiskItem)
 
     val inspectItem = new JCheckBoxMenuItem("Inspect components ...")
     inspectItem.setSelected(false)

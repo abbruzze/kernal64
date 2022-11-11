@@ -200,6 +200,7 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
   protected def allowsStateRestoring : Boolean = true
 
     // ================== Tracing ==================================
+    override def getRegisters(): List[TraceRegister] = CPU65816Disassembler.traceRegisters(A,X,Y,D,S,DB,PC,P,E)
     override def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {}
     override def setTrace(traceOn:Boolean) : Unit = tracing = traceOn
     override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType) : Unit = {

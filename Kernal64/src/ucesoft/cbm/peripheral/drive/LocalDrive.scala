@@ -155,6 +155,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   }
 
   // fake trace listener implementation
+  override def getRegisters(): List[TraceListener.TraceRegister] = Nil
   override def setTraceOnFile(out: PrintWriter, enabled: Boolean): Unit = {}
   override def setTrace(traceOn: Boolean): Unit = {}
   override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType): Unit = {}

@@ -347,6 +347,7 @@ class D1581(val driveID: Int,
   }
     
   // ================== Tracing ====================================
+  override def getRegisters(): List[TraceListener.TraceRegister] = cpu.getRegisters()
   override def setCycleMode(cycleMode: Boolean): Unit = {
     cpu.setCycleMode(cycleMode)
   }

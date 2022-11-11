@@ -23,7 +23,8 @@ object TraceListener {
     def enabled: Boolean = _enabled
     def enabled_=(e:Boolean): Unit = _enabled = e
   }
-  case class AddressBreakInfo(address:Int,access:BreakAccessType) extends BreakInfo
+  case class BreakCondition(condition:String,expr:TracerConditionParser.Expr)
+  case class AddressBreakInfo(address:Int,access:BreakAccessType,condition:Option[BreakCondition] = None) extends BreakInfo
   sealed trait EventBreakInfo extends BreakInfo
   case class IRQBreakInfo() extends EventBreakInfo { override def toString = "IRQ" }
   case class NMIBreakInfo() extends EventBreakInfo { override def toString = "NMI" }
@@ -36,7 +37,7 @@ object TraceListener {
   case class BreakSet(addressSet: Set[Int]) extends BreakType {
     def isBreak(info:BreakInfo): Boolean = {
       info match {
-        case AddressBreakInfo(address, access) if access.execute =>
+        case AddressBreakInfo(address, access,_) if access.execute =>
           addressSet.contains(address)
         case _ =>
           false
@@ -53,24 +54,24 @@ object TraceListener {
   }
 
   trait TraceRegisterBuilder {
-    def add(name:String,value:String): TraceRegisterBuilder
-    def addIf(cond:Boolean,name:String,value:String): TraceRegisterBuilder
+    def add(name:String,value:String,intValue:Int,conditionName:String = null): TraceRegisterBuilder
+    def addIf(cond:Boolean,name:String,value:String,intValue:Int,conditionName:String = null): TraceRegisterBuilder
     def build(): List[TraceRegister]
   }
   object TraceRegister {
     def builder(): TraceRegisterBuilder = new TraceRegisterBuilder {
       val regs = new ListBuffer[TraceRegister]
-      override def add(name: String, value: String): TraceRegisterBuilder = {
-        regs += TraceRegister(name,value)
+      override def add(name: String, value: String,intValue:Int,conditionName:String = null): TraceRegisterBuilder = {
+        regs += TraceRegister(name,value,intValue,Option(conditionName))
         this
       }
-      override def addIf(cond:Boolean,name:String,value:String): TraceRegisterBuilder = {
-        if (cond) add(name,value) else this
+      override def addIf(cond:Boolean,name:String,value:String,intValue:Int,conditionName:String = null): TraceRegisterBuilder = {
+        if (cond) add(name,value,intValue,conditionName) else this
       }
       override def build(): List[TraceRegister] = regs.toList
     }
   }
-  case class TraceRegister(name:String,value:String)
+  case class TraceRegister(name:String,value:String,intValue:Int,conditionName:Option[String] = None)
   case class CpuStepInfo(pc: Int, registers: List[TraceRegister],disassembled:String)
 
   sealed trait StepType
@@ -94,4 +95,6 @@ trait TraceListener {
   def jmpTo(pc:Int) : Unit
   def disassemble(address:Int) : DisassembleInfo
   def setCycleMode(cycleMode:Boolean) : Unit
+
+  def getRegisters(): List[TraceRegister]
 }

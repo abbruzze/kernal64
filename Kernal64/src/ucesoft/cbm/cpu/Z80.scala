@@ -434,17 +434,17 @@ object Z80 {
 
     def buildCpuStepInfo(): List[TraceRegister] = {
       TraceRegister.builder().
-        add("PC", hex4(PC)).
-        add("AF", hex4(AF)).
-        add("BC", hex4(BC)).
-        add("DE", hex4(DE)).
-        add("HL", hex4(HL)).
-        add("IX", hex4(IX)).
-        add("IY", hex4(IY)).
-        add("I", hex2(I)).
-        add("IM", hex2(im)).
-        add("SP", hex2(SP)).
-        add("SZYHXPNC", sr2String).
+        add("PC", hex4(PC),PC).
+        add("AF", hex4(AF),AF).
+        add("BC", hex4(BC),BC).
+        add("DE", hex4(DE),DE).
+        add("HL", hex4(HL),HL).
+        add("IX", hex4(IX),IX).
+        add("IY", hex4(IY),IY).
+        add("I", hex2(I),I).
+        add("IM", hex2(im),im).
+        add("SP", hex2(SP),SP).
+        add("SZYHXPNC", sr2String,F,"STATUS").
         build()
     }
     @inline private def sr2String = {
@@ -2823,6 +2823,7 @@ class Z80(mem:Memory,
   }
 
   // =================================== Tracing =============================================================
+  override def getRegisters(): List[TraceRegister] = ctx.buildCpuStepInfo()
   override def setCycleMode(cycleMode: Boolean): Unit = {}
   override def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {
     // TODO

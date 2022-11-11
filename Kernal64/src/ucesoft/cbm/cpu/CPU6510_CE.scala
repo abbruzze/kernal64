@@ -225,12 +225,12 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   private def buildCpuStepInfo(): List[TraceRegister] = {
     TraceRegister.builder().
-      add("PC",hex4(PC)).
-      add("A",hex2(A)).
-      add("X",hex2(X)).
-      add("Y",hex2(Y)).
-      add("SP",hex2(SP)).
-      add("NV#BDIZC",sr2String).
+      add("PC",hex4(PC),PC).
+      add("A",hex2(A),A).
+      add("X",hex2(X),X).
+      add("Y",hex2(Y),Y).
+      add("SP",hex2(SP),SP).
+      add("NV#BDIZC",sr2String,SREG,"STATUS").
       build()
   }
 
@@ -243,6 +243,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
   }).mkString
 
   // TRACING ---------------------------------------------
+  override def getRegisters(): List[TraceRegister] = buildCpuStepInfo()
   override def setCycleMode(cycleMode:Boolean) : Unit = {
     tracingCycleMode = cycleMode
   }
