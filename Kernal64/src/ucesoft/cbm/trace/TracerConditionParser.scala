@@ -29,9 +29,9 @@ object TracerConditionParser extends JavaTokenParsers {
 
   case class FunOp(fun: String, args: List[Expr]) extends Expr
 
-  private def decNumber: Parser[Int] = "[0-9]{1,5}".r ^^ { i => i.toInt }
-  private def hexWord: Parser[Int] = "0x[0-9A-Fa-f]{1,4}".r ^^ { i => Integer.parseInt(i.substring(2), 16) }
-  private def binWord: Parser[Int] = "[01]{1,16}[bB]".r ^^ { i => Integer.parseInt(i.dropRight(1), 2) }
+  private def decNumber: Parser[Int] = "[0-9]+".r ^^ { i => i.toInt }
+  private def hexWord: Parser[Int] = "0x[0-9A-Fa-f]+".r ^^ { i => Integer.parseInt(i.substring(2), 16) }
+  private def binWord: Parser[Int] = "[01]+[bB]".r ^^ { i => Integer.parseInt(i.dropRight(1), 2) }
   private def number: Parser[Int] = binWord | hexWord | decNumber
 
   private def label: Parser[String] = ident

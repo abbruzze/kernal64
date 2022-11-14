@@ -19,6 +19,8 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
   import TraceListener._
   import Tracer._
 
+  protected case class TraceLabel(address:Int,label:String)
+
   private class Register(val name:String) extends JPanel {
     private val value = new JLabel("")
     private val stdForegroundColor = value.getForeground
@@ -37,6 +39,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
   protected class Breaks extends BreakType {
     val addressMap = new mutable.HashMap[Int,AddressBreakInfo]()
     val eventMap = new mutable.HashMap[String,EventBreakInfo]()
+    var labels : Map[String,Int] = Map.empty
 
     override def isBreak(info:BreakInfo): Boolean = {
       info match {
@@ -48,7 +51,13 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
                 case None =>
                   true
                 case Some(cond) =>
-                  TracerConditionEvaluator.eval(cond.expr,currentDevice.listener.getRegisters(),Map.empty) match { // TODO labels
+                  var regs = TraceRegister("CLOCK","",Clock.systemClock.currentCycles.toInt & 0x7FFFFFFF) :: currentDevice.listener.getRegisters()
+                  if (display != null) {
+                    val (rasterLine, cycle) = display.getRasterLineAndCycle()
+                    regs ::= TraceRegister("RASTER_LINE","",rasterLine)
+                    regs ::= TraceRegister("RASTER_CYCLE","",cycle)
+                  }
+                  TracerConditionEvaluator.eval(cond.expr,regs,labels) match {
                     case Right(value) =>
                       value
                     case Left(_) =>
@@ -131,6 +140,51 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     }
   }
 
+  private class LabelsTableModel extends AbstractTableModel {
+    private var labels = new ArrayBuffer[TraceLabel]()
+
+    override def getColumnName(column: Int): String = column match {
+      case 0 => "Address"
+      case 1 => "Label"
+    }
+    override def isCellEditable(row: Int, col: Int): Boolean = false
+    override def getRowCount: Int = labels.size
+    override def getColumnCount: Int = 2
+    override def getValueAt(rowIndex: Int, columnIndex: Int): AnyRef = {
+      columnIndex match {
+        case 0 => labels(rowIndex).address.toHexString.toUpperCase()
+        case 1 => labels(rowIndex).label
+      }
+    }
+    def removeLabelAtRow(rows: Array[Int]): Unit = {
+      val orderedRows = rows.sortWith((r1, r2) => r1 > r2)
+      for (r <- orderedRows) labels.remove(r)
+      fireTableDataChanged()
+    }
+
+    def getLabelAtRow(row: Int): TraceLabel = labels(row)
+
+    def setLabelAtRow(row: Int, label: TraceLabel): Unit = {
+      labels(row) = label
+      fireTableRowsUpdated(row, row)
+    }
+
+    def getLabelMap(): Map[String,Int] = labels.map(l => l.label -> l.address).toMap
+    def contentUpdated(): Unit = fireTableDataChanged()
+    def addLabel(l: TraceLabel): Unit = {
+      labels += l
+      labels = labels.sortBy(_.address)
+      fireTableDataChanged()
+    }
+
+    def clear(): Unit = {
+      labels.clear()
+      fireTableDataChanged()
+    }
+  }
+
+  private val labelsTableModel = new LabelsTableModel
+  private val labelsTable = new JTable(labelsTableModel)
   private val breaksTableModel = new BreaksTableModel
   private val breaksTable = new JTable(breaksTableModel)
   private val breaks = new mutable.HashMap[String,Breaks]
@@ -270,6 +324,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     northPanel.add("North",registerPanel)
     northPanel.add("Center",tscroll)
     val splitPanel = new JSplitPane(JSplitPane.VERTICAL_SPLIT,northPanel,logButtonPanel)
+    splitPanel.setDividerLocation(600)
     splitPanel.setOneTouchExpandable(true)
     frame.getContentPane.add("Center",splitPanel)
 
@@ -282,13 +337,13 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     // breaks
     breaksTable.setAutoCreateRowSorter(true)
     breaksTable.setFillsViewportHeight(true)
-    val breakPanel = new JPanel(new BorderLayout())
-    breakPanel.setBorder(BorderFactory.createTitledBorder("Breakpoints"))
+    val breakLabelPanel = new JPanel(new BorderLayout())
     val tableScroll = new JScrollPane(breaksTable)
     tableScroll.setPreferredSize(new Dimension(200,300))
     val tablePanel = new JPanel(new BorderLayout())
+    tablePanel.setBorder(BorderFactory.createTitledBorder("Breakpoints"))
     tablePanel.add("Center",tableScroll)
-    breakPanel.add("North",tablePanel)
+    breakLabelPanel.add("North",tablePanel)
     val breakButtonsPanel = new JToolBar()
     val addBreak = new JButton(new ImageIcon(getClass.getResource("/resources/trace/plus.png")))
     addBreak.addActionListener(_ => {
@@ -358,6 +413,58 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       }
     })
 
+    // labels
+    labelsTable.setAutoCreateRowSorter(true)
+    labelsTable.setFillsViewportHeight(true)
+    val labelTableScroll = new JScrollPane(labelsTable)
+    labelTableScroll.setPreferredSize(new Dimension(200, 300))
+    val labelTablePanel = new JPanel(new BorderLayout())
+    labelTablePanel.setBorder(BorderFactory.createTitledBorder("Labels"))
+    labelTablePanel.add("Center", labelTableScroll)
+    breakLabelPanel.add("Center", labelTablePanel)
+
+    val labelsButtonsPanel = new JToolBar()
+    val addLabel = new JButton(new ImageIcon(getClass.getResource("/resources/trace/plus.png")))
+    addLabel.addActionListener(_ => {
+      editLabelGUI(None) match {
+        case Some(l) =>
+          labelsTableModel.addLabel(l)
+          updateLabels()
+        case None =>
+      }
+    })
+    val removeLabel = new JButton(new ImageIcon(getClass.getResource("/resources/trace/minus.png")))
+    removeLabel.addActionListener(_ => {
+      labelsTableModel.removeLabelAtRow(labelsTable.getSelectedRows)
+      updateLabels()
+    })
+    removeLabel.setEnabled(false)
+    addLabel.setToolTipText("Adds a Label")
+    removeLabel.setToolTipText("Remove selected labels")
+    labelsButtonsPanel.add(addLabel)
+    labelsButtonsPanel.add(removeLabel)
+    labelTablePanel.add("South",labelsButtonsPanel)
+    labelsTable.getSelectionModel.addListSelectionListener(e => {
+      if (!e.getValueIsAdjusting) {
+        val selected = labelsTable.getSelectedRowCount > 0
+        removeLabel.setEnabled(selected)
+      }
+    }
+    )
+    labelsTable.addMouseListener(new MouseAdapter {
+      override def mouseClicked(e: MouseEvent): Unit = {
+        if (e.getClickCount == 2) {
+          val label = labelsTableModel.getLabelAtRow(labelsTable.getSelectedRow)
+          editLabelGUI(Some(label)) match {
+            case Some(l) =>
+              labelsTableModel.setLabelAtRow(labelsTable.getSelectedRow, l)
+              updateLabels()
+            case None =>
+          }
+        }
+      }
+    })
+
     // Frame
     frame.addWindowListener(new WindowAdapter {
       override def windowClosing(e: WindowEvent): Unit = {
@@ -366,7 +473,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       }
     })
     frame.getContentPane.add("North",toolBar)
-    frame.getContentPane.add("East",breakPanel)
+    frame.getContentPane.add("East",breakLabelPanel)
     frame.pack()
   }
 
@@ -466,10 +573,15 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       step(StepIn)
     }
     currentDevice = device
+    // breaks
     breaksTableModel.clear()
     for(b <- breaks(currentDevice.id).addressMap.values) breaksTableModel.addBreak(b)
     for(b <- breaks(currentDevice.id).eventMap.values) breaksTableModel.addBreak(b)
     updateBreaks()
+    // labels
+    labelsTableModel.clear()
+    for(l <- breaks(currentDevice.id).labels) labelsTableModel.addLabel(TraceLabel(l._2,l._1))
+    updateLabels()
     cycleMode.setEnabled(device.listener.cycleModeSupported)
   }
 
@@ -690,6 +802,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     val radioNMI = new JRadioButton("NMI")
     val radioRESET = new JRadioButton("RESET")
     val groupE = new ButtonGroup
+    radioIRQ.setSelected(true)
     groupE.add(radioIRQ)
     groupE.add(radioNMI)
     groupE.add(radioRESET)
@@ -703,6 +816,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     val readCheck = new JCheckBox("Read")
     val writeCheck = new JCheckBox("Write")
     val exeCheck = new JCheckBox("Execute")
+    exeCheck.setSelected(true)
     addressPanel.add(createDummyPanel(new JLabel("Address:"),address,readCheck,writeCheck,exeCheck))
     addressPanel.add(createDummyPanel(new JLabel("Condition:"),conditionField))
     addressPanel.add(createDummyPanel(conditionErrorLabel))
@@ -757,15 +871,26 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
               case None =>
                 conditionField.setText("")
             }
-          case IRQBreakInfo() =>
-            radioIRQ.setSelected(true)
-            radioEvent.setSelected(true)
-          case NMIBreakInfo() =>
-            radioNMI.setSelected(true)
-            radioEvent.setSelected(true)
-          case ResetBreakInfo() =>
-            radioRESET.setSelected(true)
-            radioEvent.setSelected(true)
+            radioIRQ.setEnabled(false)
+            radioNMI.setEnabled(false)
+            radioRESET.setEnabled(false)
+          case e =>
+            readCheck.setEnabled(false)
+            writeCheck.setEnabled(false)
+            exeCheck.setEnabled(false)
+            address.setEnabled(false)
+            conditionField.setEditable(false)
+            e match {
+              case IRQBreakInfo() =>
+                radioIRQ.setSelected(true)
+                radioEvent.setSelected(true)
+              case NMIBreakInfo() =>
+                radioNMI.setSelected(true)
+                radioEvent.setSelected(true)
+              case ResetBreakInfo() =>
+                radioRESET.setSelected(true)
+                radioEvent.setSelected(true)
+            }
         }
     }
 
@@ -809,6 +934,52 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     }
 
     None
+  }
+
+  protected def editLabelGUI(label:Option[TraceLabel]): Option[TraceLabel] = {
+    val labelPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
+    val addressText = new JTextField(5)
+    val labelText = new JTextField(20)
+
+    labelPanel.add(new JLabel("Address:"))
+    labelPanel.add(addressText)
+    labelPanel.add(new JLabel("Label:"))
+    labelPanel.add(labelText)
+
+    label match {
+      case Some(l) =>
+        addressText.setText(l.address.toHexString.toUpperCase())
+        labelText.setText(l.label)
+      case None =>
+    }
+
+    while (true) {
+      JOptionPane.showConfirmDialog(frame, labelPanel, if (label.isDefined) "Edit label" else "Add label", JOptionPane.OK_CANCEL_OPTION) match {
+        case JOptionPane.YES_OPTION =>
+          try {
+            val adr = Integer.parseInt(addressText.getText, 16)
+            if (breaks(currentDevice.id).labels.values.exists(_ == adr) && label.map(_.address).getOrElse(-1) != adr) throw new IllegalArgumentException(s"Label for address ${addressText.getText} already exists")
+            if (breaks(currentDevice.id).labels.contains(labelText.getText) && label.map(_.label).getOrElse("") != labelText.getText) throw new IllegalArgumentException(s"Label ${labelText.getText} already exists for address ${breaks(currentDevice.id).labels(labelText.getText).toHexString.toUpperCase()}")
+            if (labelText.getText.isEmpty) throw new IllegalArgumentException("Label cannot be empty")
+            return Some(TraceLabel(adr,labelText.getText))
+          }
+          catch {
+            case _: NumberFormatException =>
+              JOptionPane.showMessageDialog(frame, s"Address not valid: ${addressText.getText}", "Address error", JOptionPane.ERROR_MESSAGE)
+              addressText.setText("")
+            case i: IllegalArgumentException =>
+              JOptionPane.showMessageDialog(frame, i.getMessage, "Label error", JOptionPane.ERROR_MESSAGE)
+          }
+        case _ =>
+          return None
+      }
+    }
+
+    None
+  }
+
+  protected def updateLabels(): Unit = {
+    breaks(currentDevice.id).labels = labelsTableModel.getLabelMap()
   }
 
   protected def updateBreaks(): Unit = {
