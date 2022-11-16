@@ -157,8 +157,9 @@ class CBM2MMU extends RAMComponent {
     }
     else {
       val ram = banks(bank)
-      if (bank == 0)
-        println(s"READING FROM BANK 0 ${address.toHexString}")
+      if (bank == 0) {
+        //println(s"READING FROM BANK 0 ${address.toHexString}")
+      }
       if (ram != null) {
         //println(s"READING FROM BANK $bank")
         if (address == 0) codeBank
@@ -182,8 +183,9 @@ class CBM2MMU extends RAMComponent {
     }
     else {
       val ram = banks(bank)
-      if (bank == 0)
-        println(s"WRITING TO BANK 0 ${address.toHexString} $value")
+      if (bank == 0) {
+        //Adde(s"WRITING TO BANK 0 ${address.toHexString} $value")
+      }
       if (ram != null) {
         if (address == 0) codeBank = value & 0xF
         else if (address == 1) dataBank = value & 0xF

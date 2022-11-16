@@ -1,3 +1,4 @@
+KERNAL64C64OPTS+=" --shell"
 KERNAL64C64OPTS+=" --testcart"
 KERNAL64C64OPTS+=" --headless"
 KERNAL64C64OPTS+=" --warp"
