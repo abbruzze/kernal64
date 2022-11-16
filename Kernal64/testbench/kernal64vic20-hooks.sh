@@ -58,8 +58,12 @@ function kernal64vic20_get_options
                 exitoptions="--32k"
                 memory_expansion_enabled="32K"
             ;;
+          "geo256k")
+                exitoptions="--geo-ram 256"
+                georam_enabled=1
+            ;;
           "geo512k")
-                exitoptions="-geo-ram 512"
+                exitoptions="--geo-ram 512"
                 georam_enabled=1
             ;;
         *)

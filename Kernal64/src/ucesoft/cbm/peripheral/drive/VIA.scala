@@ -309,8 +309,10 @@ abstract class VIA(val name:String,
         if (lastCA2 && !state)
           irq_set(IRQ_CA2)
       case 2 | 3 =>
-        if (!lastCA2 && state)
+        if (!lastCA2 && state) {
           irq_set(IRQ_CA2)
+        }
+      case _ =>
     }
     lastCA2 = state
   }
@@ -321,6 +323,7 @@ abstract class VIA(val name:String,
         if (lastCB2 && !state) irq_set(IRQ_CB2)
       case 2 | 3 =>
         if (!lastCB2 && state) irq_set(IRQ_CB2)
+      case _ =>
     }
     lastCB2 = state
   }

@@ -219,15 +219,16 @@ abstract class CBMComputer extends CBMComponent {
         }
       case _:CPUJammedException => // continue
       case _ =>
+        if (headless) {
+          println(s"Fatal error occurred on cycle ${clock.currentCycles}: $cpu\n${CPU65xx.disassemble(mmu, cpu.getCurrentInstructionPC)}")
+          t.printStackTrace()
+          sys.exit(1)
+        } // exit if headless
+
         Log.info("Fatal error occurred: " + cpu + "-" + t)
         try Log.info(CPU65xx.disassemble(mmu,cpu.getCurrentInstructionPC).toString) catch { case _:Throwable => }
         t.printStackTrace(Log.getOut)
         t.printStackTrace()
-        if (headless) {
-          println(s"Fatal error occurred on cycle ${clock.currentCycles}: $cpu\n${CPU65xx.disassemble(mmu,cpu.getCurrentInstructionPC)}")
-          t.printStackTrace()
-          sys.exit(1)
-        } // exit if headless
         JOptionPane.showMessageDialog(displayFrame,t.toString + " [PC=" + Integer.toHexString(cpu.getCurrentInstructionPC) + "]", "Fatal error",JOptionPane.ERROR_MESSAGE)
         //trace(true,true)
         reset(true)
@@ -693,18 +694,21 @@ abstract class CBMComputer extends CBMComponent {
         // run the given file name
         preferences[String](Preferences.PREF_RUNFILE) match {
           case Some(fn) if fn != null && fn != "" =>
+            if (!new File(fn).exists()) throw new FileNotFoundException(fn)
             delayedAutorun(fn)
           case _ =>
         }
       case Some(f) =>
         preferences[String](Preferences.PREF_DRIVE_X_FILE(0)) match {
           case None =>
+            if (!new File(f).exists()) throw new FileNotFoundException(f)
             handleDND(new File(f), false, true)
           case Some(_) =>
             // here we have both drive8 and PRG set: we load the given PRG file from disk 8
             val fn = new File(f).getName
             val dot = fn.indexOf('.')
             val cbmFile = if (dot > 0) fn.substring(0, dot) else f
+            if (!new File(cbmFile).exists()) throw new FileNotFoundException(cbmFile)
             delayedAutorun(cbmFile)
         }
     }
