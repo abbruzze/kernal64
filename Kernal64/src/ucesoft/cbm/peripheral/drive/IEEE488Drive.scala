@@ -193,7 +193,7 @@ class IEEE488Drive(override val name:String,
     // special secondary address
     if (secondaryAddress == 1) {
       Diskette.parseFileName(name.toUpperCase()) match {
-        case Some(fn@StandardFileName(name, ftype, _, _)) =>
+        case Some(fn@StandardFileName(name, Some(ftype), _, _)) =>
           if (ftype == FileType.PRG) {
             println(s"Saving $name")
             return saveChannel(fn)

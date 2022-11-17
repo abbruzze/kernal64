@@ -9,7 +9,7 @@ import java.util.Properties
 
 abstract class VIA(val name:String,
 				   val startAddress:Int,
-				   irqAction:(Boolean) => Unit) extends Chip with RAMComponent {
+				   irqAction:Boolean => Unit) extends Chip with RAMComponent {
   val isRom = false
   val length = 0x400
   val isActive = true
@@ -58,7 +58,7 @@ abstract class VIA(val name:String,
   
   protected var active = true
 
-  def init : Unit = {
+  def init() : Unit = {
     active = true
     initCA1()
     initCA2()
@@ -66,7 +66,7 @@ abstract class VIA(val name:String,
     initCB2()
   }
 
-  def reset : Unit = {
+  def reset() : Unit = {
     java.util.Arrays.fill(regs,0)
     active = true
     paLatch = 0
@@ -93,19 +93,19 @@ abstract class VIA(val name:String,
     
   def setActive(active:Boolean) : Unit = {
     if (!this.active && active) {
-      init
+      init()
     }
     this.active = active
   }
   
   final def irq_set(irq:Int) : Unit = {
     regs(IFR) |= irq //| 0x80	// enable irq bit + 7th bit
-    checkIRQ
+    checkIRQ()
   }
   final def irq_clr(irq:Int) : Unit = {
     regs(IFR) &= ~irq & 0x7F
     //if ((regs(IFR) & 0x7F) == 0) regs(IFR) = 0 // if no more irq are set clear 7th bit
-    checkIRQ
+    checkIRQ()
   }
   @inline private def checkIRQ() : Unit ={
     val irq = (regs(IFR) & regs(IER)) > 0
@@ -120,15 +120,15 @@ abstract class VIA(val name:String,
   /*
    * Ignores DDRA & DDRB. Subclasses are in charge for this check
    */
-  def read(address: Int, chipID: ChipID.ID): Int = (address & 0x0F) match {
+  def read(address: Int, chipID: ChipID.ID): Int = address & 0x0F match {
     case PA =>
       irq_clr(IRQ_CA1)
       val PCR_CA2_CTRL = (regs(PCR) >> 1) & 7
       if (PCR_CA2_CTRL != 1 && PCR_CA2_CTRL != 3) irq_clr(IRQ_CA2) // check for independent interrupt mode
       Log.debug(s"Cleared IRQ_CA1: IFR=${Integer.toBinaryString(regs(IFR))} IER=${Integer.toBinaryString(regs(IER))}")
-      (if (is_set(ACR,PA_LATCH_ENABLED)) paLatch else regs(PA)) // & ~regs(DDRA)
+      if (is_set(ACR,PA_LATCH_ENABLED)) paLatch else regs(PA) // & ~regs(DDRA)
     case PA2 =>
-      (if (is_set(ACR,PA_LATCH_ENABLED)) paLatch else regs(PA)) // & ~regs(DDRA)
+      if (is_set(ACR,PA_LATCH_ENABLED)) paLatch else regs(PA) // & ~regs(DDRA)
     case PB =>
       irq_clr(IRQ_CB1)
       val PCR_CB2_CTRL = (regs(PCR) >> 5) & 7
@@ -154,7 +154,7 @@ abstract class VIA(val name:String,
   /*
    * Ignores DDRA & DDRB. Subclasses are in charge for this check
    */
-  def write(address: Int, value: Int, chipID: ChipID.ID): Unit = (address & 0x0F) match {
+  def write(address: Int, value: Int, chipID: ChipID.ID): Unit = address & 0x0F match {
     case DDRA =>
       regs(DDRA) = value
       write(startAddress + PA,(regs(PA) | ~value) & 0xFF,chipID)
@@ -208,11 +208,11 @@ abstract class VIA(val name:String,
     case IFR =>
       regs(IFR) &= ~value
       Log.debug(s"$name writing IFR => IFR=${Integer.toBinaryString(regs(IFR))}")
-      checkIRQ            
+      checkIRQ()
     case IER =>
       if ((value & 0x80) > 0) regs(IER) |= value & 0x7F else regs(IER) &= ~value
       Log.debug(s"$name writing IER => IER=${Integer.toBinaryString(regs(IER))}")
-      checkIRQ
+      checkIRQ()
     case ACR =>
       acrNew = true
       regs(ACR) = value
@@ -331,8 +331,8 @@ abstract class VIA(val name:String,
   
   def clock(cycles:Long) : Unit = {
     if (active) {
-      updateT1
-      updateT2
+      updateT1()
+      updateT2()
 
       if (acrNew) {
         acrNew = false
@@ -345,7 +345,7 @@ abstract class VIA(val name:String,
             if (srStartDelay == 0) shiftSR(in = true)
             else {
               srStartDelay -= 1
-              if (srStarted == 0) {
+              if (srStartDelay == 0) {
                 CA2In(true)
                 CA2In(false)
               }
