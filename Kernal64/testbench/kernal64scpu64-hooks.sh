@@ -1,4 +1,5 @@
 KERNAL64SCPU64OPTS+=" --shell"
+KERNAL64SCPU64OPTS+=" --ignore-config-file"
 KERNAL64SCPU64OPTS+=" --testcart"
 KERNAL64SCPU64OPTS+=" --headless"
 KERNAL64SCPU64OPTS+=" --warp"
@@ -6,17 +7,23 @@ KERNAL64SCPU64OPTS+=" --vic-palette pepto"
 KERNAL64SCPU64OPTS+=" --screen-dim 1"
 KERNAL64SCPU64OPTS+=" --cpujam-continue true"
 KERNAL64SCPU64OPTS+=" --sid-cycle-exact"
-KERNAL64SCPU64OPTS+=" --ignore-config-file"
 
 function kernal64scpu64_check_environment
 {
     KERNAL64SCPU64=$EMUDIR/kscpu64.sh
-    
+
+    if ! [ -f "$KERNAL64SCPU64" ]; then
+        echo "Error: "$KERNAL64SCPU64" not found." >&2
+        exit 1
+    fi
+
     if ! [ -x "$(command -v $JAVA_HOME/bin/java)" ]; then
         echo 'Error: java not installed.' >&2
         exit 1
     fi
     
+# The current VIC implementations are: 6569 & 6567R8 for C64.
+    emu_default_videosubtype="6569"
 }
 
 # $1  option
@@ -35,7 +42,7 @@ function kernal64scpu64_get_options
         "vicii-ntsc")
             exitoptions="--ntsc true --screen-dim 1"
             testprogvideotype="NTSC"
-        ;;
+            ;;
         "sid-old")
                 new_sid_enabled=0
             ;;
@@ -43,12 +50,44 @@ function kernal64scpu64_get_options
                 exitoptions="--sid-8580 true"
                 new_sid_enabled=1
             ;;
+        "reu128k")
+                exitoptions="--reu-type 128"
+                reu_enabled=1
+            ;;
+        "reu256k")
+                exitoptions="--reu-type 256"
+                reu_enabled=1
+            ;;
         "reu512k")
                 exitoptions="--reu-type 512"
                 reu_enabled=1
             ;;
+        "reu1m")
+                exitoptions="--reu-type 1024"
+                reu_enabled=1
+            ;;
+        "reu2m")
+                exitoptions="--reu-type 2048"
+                reu_enabled=1
+            ;;
+        "reu4m")
+                exitoptions="--reu-type 4096"
+                reu_enabled=1
+            ;;
+        "reu8m")
+                exitoptions="--reu-type 8192"
+                reu_enabled=1
+            ;;
+        "reu16m")
+                exitoptions="--reu-type 16384"
+                reu_enabled=1
+            ;;
         "geo256k")
                 exitoptions="--geo-ram 256"
+                georam_enabled=1
+            ;;
+        "geo512k")
+                exitoptions="--geo-ram 512"
                 georam_enabled=1
             ;;
         "cia-old")
@@ -137,7 +176,6 @@ function kernal64scpu64_run_screenshot
     then
         if [ -f "$refscreenshotname" ]
         then
-        
             # defaults for PAL
             KERNAL64SCPU64REFSXO=32
             KERNAL64SCPU64REFSYO=35
@@ -159,7 +197,7 @@ function kernal64scpu64_run_screenshot
                 KERNAL64SCPU64SXO=32
                 KERNAL64SCPU64SYO=23
             fi
-        
+
             if [ $verbose == "1" ]; then
                 echo ./cmpscreens "$refscreenshotname" "$KERNAL64SCPU64REFSXO" "$KERNAL64SCPU64REFSYO" "$1"/.testbench/"$screenshottest"-kernal64c64.png "$KERNAL64SCPU64SXO" "$KERNAL64SCPU64SYO"
             fi
