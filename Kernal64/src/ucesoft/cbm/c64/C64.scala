@@ -459,11 +459,11 @@ class C64 extends CBMHomeComputer {
     }
     // --headless handling to disable logging & debugging
     if (args.exists(_ == "--headless")) headless = true
+    // --ignore-config-file handling
+    if (args.exists(_ == "--ignore-config-file")) configuration.clear()
     swing { initComponent }
     // VIC
     swing { displayFrame.pack() }
-    // --ignore-config-file handling
-    if (args.exists(_ == "--ignore-config-file")) configuration.clear()
     // screen's dimension and size restoration
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map { _.toInt }

@@ -858,10 +858,10 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     }
     // --headless handling to disable logging & debugging
     if (args.exists(_ == "--headless")) headless = true
-    swing{ initComponent }
-    checkFunctionROMS
     // --ignore-config-file handling
     if (args.exists(_ == "--ignore-config-file")) configuration.clear()
+    swing{ initComponent }
+    checkFunctionROMS
     // screen's dimension and size restoration
     // VDC
     swing { vdcDisplayFrame.pack() }
