@@ -135,7 +135,6 @@ class SCPUC64 extends CBMHomeComputer {
     configureJoystick
     // tracing
     if (headless) Log.setOutput(null)
-    else Log.setOutput(null)
     // tape
     // printer
     add(printer)
