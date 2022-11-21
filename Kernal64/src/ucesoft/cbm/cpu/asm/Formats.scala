@@ -1,6 +1,6 @@
 package ucesoft.cbm.cpu.asm
 
-import ucesoft.cbm.cpu.asm.AsmEvaluator.{EvaluationError, ListVal, NumberVal, RuntimeValue, StringVal, StructVal}
+import ucesoft.cbm.cpu.asm.AsmEvaluator._
 
 import scala.collection.mutable
 

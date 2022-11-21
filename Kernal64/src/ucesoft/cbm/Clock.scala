@@ -1,40 +1,42 @@
 package ucesoft.cbm
 
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.misc.TestCart
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 class ClockEvent (val id : String,val when : Long,val execute: (Long) => Unit,val subid : Int = 0) {
   var canceled = false
-  override def toString = s"${id}(${when} canceled=$canceled)"
+  override def toString = s"$id($when canceled=$canceled)"
 }
 
 object Clock {
   private var clock : Clock = null
-  def systemClock = clock
-  def isAvailable = clock != null
+  def systemClock: Clock = clock
+  def isAvailable: Boolean = clock != null
 
-  def setSystemClock(errorHandler:Option[(Throwable) => Unit] = None)(mainLoop: (Long) => Unit) = {
+  def setSystemClock(errorHandler:Option[(Throwable) => Unit] = None)(mainLoop: (Long) => Unit): Clock = {
     if (clock == null) {
       clock = new Clock(errorHandler)(mainLoop)
-      clock.start
+      clock.start()
     }
     clock
   }
 
-  def makeClock(clockName:String,errorHandler:Option[(Throwable) => Unit] = None)(mainLoop: (Long) => Unit) = {
+  def makeClock(clockName:String,errorHandler:Option[(Throwable) => Unit] = None)(mainLoop: (Long) => Unit): Clock = {
     val clock = new Clock(errorHandler,clockName)(mainLoop)
-    clock.start
+    clock.start()
     clock
   }
 }
 
 class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clock")(mainLoop: (Long) => Unit) extends Thread(name) with CBMComponent with Tickable {
   val componentID = "System Clock"
-  val componentType = CBMComponentType.CHIP
+  val componentType: Type = CBMComponentType.CHIP
 
   private class EventList(val e:ClockEvent,var next:EventList = null) {
-    override def toString = {
+    override def toString: String = {
       val sb = new StringBuilder
       var ptr = this
       while (ptr != null) {
@@ -42,11 +44,11 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
         ptr = ptr.next
         if (ptr != null) sb.append(",")
       }
-      s"EventList[${sb}]"
+      s"EventList[$sb]"
     }
   }
 
-  Log.info(s"${name} clock started")
+  Log.info(s"$name clock started")
 
   private[this] var events : EventList = null
   @volatile private[this] var running = false
@@ -77,7 +79,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
 
   def limitCyclesTo(cycles:Long) : Unit = limitCycles = cycles
 
-  def setDefaultClockHz : Unit = setClockHz(DEFAULT_CLOCK_HZ)
+  def setDefaultClockHz() : Unit = setClockHz(DEFAULT_CLOCK_HZ)
 
   def setClockHzSpeedFactor(f:Double) : Unit = setClockHz(DEFAULT_CLOCK_HZ * f)
 
@@ -98,10 +100,10 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
 
   private[this] var cycles = 0L
 
-  override final def currentCycles = cycles
-  final def nextCycles = cycles + 1
+  override final def currentCycles: Long = cycles
+  final def nextCycles: Long = cycles + 1
 
-  def maximumSpeed = _maximumSpeed
+  def maximumSpeed: Boolean = _maximumSpeed
   def maximumSpeed_=(maximumSpeed:Boolean) : Unit = {
     if (!maximumSpeed) {
       skipThrottle = true
@@ -110,7 +112,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     _maximumSpeed = maximumSpeed
   }
 
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("cycles","%10d".format(cycles))
     properties
   }
@@ -123,14 +125,19 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     lastCorrectionCycles = cycles
   }
 
-  final override def run  : Unit = {
+  override def hardReset(): Unit = {
+    cycles = 0
+    reset
+  }
+
+  final override def run()  : Unit = {
     running = true
     while (running) {
       try {
         if (suspended) {
           while (suspended) suspendedLock.synchronized {
             suspendedConfim = true
-            suspendedLock.wait
+            suspendedLock.wait()
           }
         }
 
@@ -148,21 +155,21 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       }
       catch {
         case t:Throwable => errorHandler match {
-          case None => t.printStackTrace
+          case None => t.printStackTrace()
           case Some(h) => h(t)
         }
       }
     }
   }
 
-  @inline private def setupNextMeasurement  : Unit = {
+  @inline private def setupNextMeasurement()  : Unit = {
     lastCorrectionTime = System.currentTimeMillis
     lastCorrectionCycles = cycles
     throttleStartedAt = cycles
     nextPerformanceMeasurementTime = System.currentTimeMillis + PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS
   }
 
-  @inline private def throttle  : Unit = {
+  @inline private def throttle()  : Unit = {
     if (!_maximumSpeed && !skipThrottle) {
       val timeDiff = System.currentTimeMillis - lastCorrectionTime
       val cyclesDiff = cycles - lastCorrectionCycles
@@ -180,7 +187,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     }
   }
 
-  def getLastPerformancePerc = lastPerformance
+  def getLastPerformancePerc: Int = lastPerformance
 
   final def cancel(id:String) : Unit = {
     if (events != null) {
@@ -213,22 +220,22 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     }
   }
 
-  def isPaused = suspendedConfim
+  def isPaused: Boolean = suspendedConfim
 
-  def pause  : Unit = {
+  def pause()  : Unit = {
     if (Thread.currentThread == this) return
 
     suspendedLock.synchronized { suspended = true }
     while (!suspendedConfim) { Thread.sleep(10) }
   }
 
-  def play = suspendedLock.synchronized {
+  def play(): Unit = suspendedLock.synchronized {
     suspended = false
     suspendedConfim = false
-    suspendedLock.notify
+    suspendedLock.notify()
   }
-  def halt = running = false
-  def printEvents  : Unit = { println(if (events != null) events else "No events") }
+  def halt(): Unit = running = false
+  def printEvents()  : Unit = { println(if (events != null) events else "No events") }
 
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {

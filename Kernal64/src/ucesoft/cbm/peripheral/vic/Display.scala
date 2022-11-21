@@ -1,17 +1,18 @@
 package ucesoft.cbm.peripheral.vic
 
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponent, CBMComponentType, Clock, Log}
+
 import java.awt._
 import java.awt.event.{MouseEvent, MouseListener, MouseMotionListener}
 import java.awt.image.{BufferedImage, MemoryImageSource}
 import java.io.{File, ObjectInputStream, ObjectOutputStream}
-
 import javax.imageio.ImageIO
 import javax.swing._
-import ucesoft.cbm.{CBMComponent, CBMComponentType, Clock, Log}
 
 class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = Clock.systemClock) extends JComponent with MouseMotionListener with MouseListener with CBMComponent {
   val componentID = "Display"
-  val componentType = CBMComponentType.OUTPUT_DEVICE  
+  val componentType: Type = CBMComponentType.OUTPUT_DEVICE
   private[this] val dimension = new Dimension(0, 0)
   private[this] var dashIndex = 0
   private[this] val mouseZoomStartPoint,mouseZoomEndPoint = new Point
@@ -68,8 +69,8 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     if (!singleFrameMode) advanceOneFrame
   }
 
-  def advanceOneFrame : Unit = singleFrameModeMonitor.synchronized {
-    singleFrameModeMonitor.notifyAll
+  def advanceOneFrame() : Unit = singleFrameModeMonitor.synchronized {
+    singleFrameModeMonitor.notifyAll()
   }
 
   def setRotationAngle(angleInDeg:Double) : Unit = {
@@ -169,12 +170,12 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     }
   }
   
-  def getLightPenX = lpX
-  def getLightPenY = lpY
+  def getLightPenX: Int = lpX
+  def getLightPenY: Int = lpY
   
-  def getFrameCounter = totalFrameCounter
+  def getFrameCounter: Long = totalFrameCounter
   
-  def getClipArea = clipArea
+  def getClipArea: (Point, Point) = clipArea
   def setRemote(remote:Option[ucesoft.cbm.remote.RemoteC64]) : Unit = {
     remote match {
       case Some(r) => this.remote = r
@@ -195,7 +196,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     this.rasterLine = rasterLine
     repaint()
   }
-  def getRasterLine = rasterLine
+  def getRasterLine: Int = rasterLine
 
   override final def paint(g: Graphics) : Unit = {
     if (dimension.width != getWidth || dimension.height != getHeight) {
@@ -274,7 +275,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       singleFrameCounter += 1
       frame.setTitle(s"$title - single frame mode ($singleFrameCounter)")
       singleFrameModeMonitor.synchronized {
-        singleFrameModeMonitor.wait
+        singleFrameModeMonitor.wait()
       }
     }
     else {
@@ -294,11 +295,11 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     }
   }
 
-  def setPaused : Unit = {
+  def setPaused() : Unit = {
     frame.setTitle(s"$title - paused")
   }
 
-  def lastFramePerSecondCounter = framePerSecond
+  def lastFramePerSecondCounter: Int = framePerSecond
 
   def saveSnapshot(file: File) : Unit = {
     val snap = createImage(getSize().width, getSize().height).asInstanceOf[BufferedImage]

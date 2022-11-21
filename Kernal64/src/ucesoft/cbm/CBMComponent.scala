@@ -1,29 +1,25 @@
 package ucesoft.cbm
 
 import java.awt.Frame
-
-import scala.collection.mutable.ListBuffer
+import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
 import java.util.Properties
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-
-import javax.swing.{JFrame, JOptionPane}
-import java.io.IOException
+import javax.swing.JOptionPane
+import scala.collection.mutable.ListBuffer
 
 object CBMComponentType extends Enumeration {
   type Type = Value
-  val CPU = Value
-  val MEMORY = Value
-  val CHIP = Value
-  val INPUT_DEVICE = Value
-  val OUTPUT_DEVICE = Value
-  val DISK = Value
-  val INTERNAL = Value
-  val TAPE = Value
-  val PRINTER = Value
-  val USER_PORT = Value
-  val FLOPPY = Value
-  val CABLE = Value
+  val CPU: CBMComponentType.Value = Value
+  val MEMORY: CBMComponentType.Value = Value
+  val CHIP: CBMComponentType.Value = Value
+  val INPUT_DEVICE: CBMComponentType.Value = Value
+  val OUTPUT_DEVICE: CBMComponentType.Value = Value
+  val DISK: CBMComponentType.Value = Value
+  val INTERNAL: CBMComponentType.Value = Value
+  val TAPE: CBMComponentType.Value = Value
+  val PRINTER: CBMComponentType.Value = Value
+  val USER_PORT: CBMComponentType.Value = Value
+  val FLOPPY: CBMComponentType.Value = Value
+  val CABLE: CBMComponentType.Value = Value
 }
 
 trait CBMComponent {
@@ -32,17 +28,17 @@ trait CBMComponent {
   protected val properties = new Properties  
   private[this] val _components = new ListBuffer[CBMComponent]
   
-  def getProperties = properties
+  def getProperties: Properties = properties
   
   final def add(c:CBMComponent) : Unit = {
     val alreadyAdded = _components exists { _.componentID == c.componentID }
     if (!alreadyAdded) _components += c
   }
   
-  def reset : Unit
-  def init : Unit
-  def shutdown  : Unit = {}
-  def hardReset : Unit = reset
+  def reset() : Unit
+  def init() : Unit
+  def shutdown()  : Unit = {}
+  def hardReset() : Unit = reset
   
   final def change(oldComponent:CBMComponent,newComponent:CBMComponent) : Unit = {
     _components indexOf (oldComponent) match {
@@ -55,39 +51,39 @@ trait CBMComponent {
     _components -= c
   }
   
-  def afterInitHook  : Unit = {}
+  def afterInitHook()  : Unit = {}
   
-  final def shutdownComponent  : Unit = {
+  final def shutdownComponent()  : Unit = {
     _components foreach { c =>      
       c.shutdownComponent 
     }
     shutdown
   }
   
-  final def resetComponent : Unit = {
-    Log.info(s"Resetting ${componentID}")
+  final def resetComponent() : Unit = {
+    Log.info(s"Resetting $componentID")
     _components foreach { c =>      
       c.resetComponent 
     }
     reset
   }
-  final def hardResetComponent : Unit = {
-    Log.info(s"Hard Resetting ${componentID}")
+  final def hardResetComponent() : Unit = {
+    Log.info(s"Hard Resetting $componentID")
     _components foreach { c =>
       c.hardResetComponent
     }
     hardReset
   }
-  def initComponent : Unit = {
-    Log.info(s"Initializing ${componentID}")
+  def initComponent() : Unit = {
+    Log.info(s"Initializing $componentID")
     init
     _components foreach { c =>      
       c.initComponent 
     }
     afterInitHook
   }
-  final def components = _components.toList
-  final def printComponentsTree  : Unit = {
+  final def components: List[CBMComponent] = _components.toList
+  final def printComponentsTree()  : Unit = {
     def print(c:CBMComponent,ind:Int) : Unit = {
       println(("\t" * ind) + c.componentID + " - " + c.componentType)
       c.components foreach { c => print(c,ind + 1) }
@@ -99,13 +95,13 @@ trait CBMComponent {
   protected def loadState(in:ObjectInputStream) : Unit
   protected def allowsStateRestoring : Boolean
   
-  final def save(out:ObjectOutputStream) : Unit = {
+  def save(out:ObjectOutputStream) : Unit = {
     Log.info(s"Saving $componentID/$componentType's state ...")
     out.writeObject(componentID)
     saveState(out)
     for(c <- _components) c.save(out)    
   }
-  final def load(in:ObjectInputStream) : Unit = {
+  def load(in:ObjectInputStream) : Unit = {
     Log.info(s"Loading $componentID/$componentType's state ...")
     val id = in.readObject.asInstanceOf[String]
     if (id != componentID) componentIDMismatchHandling(id)

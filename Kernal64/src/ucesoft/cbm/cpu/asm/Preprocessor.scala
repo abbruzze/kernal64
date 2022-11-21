@@ -47,11 +47,11 @@ class Preprocessor {
     def isClosed : Boolean = state == 1 || state == 2
     def isElseState : Boolean = state == 1
 
-    override def toString = s"If($stmt,then=${thenClauses},else=${elseClauses})"
+    override def toString = s"If($stmt,then=$thenClauses,else=$elseClauses)"
   }
   private case class Else(stmt : Match) extends PrepStat
   private case class Endif(stmt : Match) extends PrepStat
-  private case class Text(text:String) extends PrepStat { val stmt = null }
+  private case class Text(text:String) extends PrepStat { val stmt: Match = null }
 
   private case class PrepError(msg:String,stmt:PrepStat)
 

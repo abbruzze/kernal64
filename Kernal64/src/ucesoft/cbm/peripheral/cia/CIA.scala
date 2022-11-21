@@ -1,17 +1,13 @@
 package ucesoft.cbm.peripheral.cia
 
-import ucesoft.cbm.ChipID
-import ucesoft.cbm.Chip
-import ucesoft.cbm.Clock
-import ucesoft.cbm.ClockEvent
-import ucesoft.cbm.Log
-import ucesoft.cbm.peripheral.Connector
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.ChipID.ID
+import ucesoft.cbm._
 import ucesoft.cbm.cpu.RAMComponent
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
+import ucesoft.cbm.peripheral.Connector
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 object CIA {
   final val PRA = 0
@@ -53,11 +49,11 @@ class CIA(val name:String,
 		  manualClockTODUpdate:Boolean = false) extends Chip with RAMComponent {
   import CIA._
   
-  override lazy val componentID = name
+  override lazy val componentID: String = name
   val isRom = false
   val length = 0x100
   val isActive = true
-  val id = ChipID.CIA
+  val id: ID = ChipID.CIA
 
   private[this] val timerABRunning = Array(true,true)
   private[this] val timerB = new Timer_B(name,IRQ_SRC_TB,irqHandling _, idle => timerIdleCallBack(1,idle))
@@ -90,8 +86,8 @@ class CIA(val name:String,
   // ========================== TOD ================================================
   
   private class TOD extends CBMComponent {
-    val componentID = name + " TOD"
-    val componentType = CBMComponentType.CHIP 
+    val componentID: String = name + " TOD"
+    val componentType: Type = CBMComponentType.CHIP
     final private[this] val TICK_SUBID = 1
     final private val PAL_TICK = 98990
     final private val NTSC_TICK = 102273
@@ -117,7 +113,7 @@ class CIA(val name:String,
         am = t.am
       }
       
-      def tick  : Unit = {
+      def tick()  : Unit = {
         var sl = s & 0x0F
         var sh = (s & 0xF0) >> 4
         var ml = m & 0x0F
@@ -194,7 +190,7 @@ class CIA(val name:String,
     private val alarmTime = Time(0,0,0,0,true)
     private var resetSync = false
     
-    override def getProperties = {
+    override def getProperties: Properties = {
       properties.setProperty("Time",actualTime.toString)
       properties.setProperty("Latch",latchTime.toString)
       properties.setProperty("Alarm",alarmTime.toString)
@@ -206,8 +202,10 @@ class CIA(val name:String,
         f match {
           case clk.PAL_CLOCK_HZ =>
             TICK_CYCLES = PAL_TICK
-          case _ =>
+          case clk.NTSC_CLOCK_HZ =>
             TICK_CYCLES = NTSC_TICK
+          case f =>
+            TICK_CYCLES = (f / 10).toInt
         }
       })
       reset
@@ -231,14 +229,14 @@ class CIA(val name:String,
     
     private[this] val tickCallback = tick _
 
-    @inline private def reschedule = {
+    @inline private def reschedule(): Unit = {
       if (!manualClockTODUpdate) {
         clk.cancel(componentID)
         clk.schedule(new ClockEvent(componentID,clk.currentCycles + TICK_CYCLES,tickCallback,TICK_SUBID))
       }
     }
     
-    def readHour = {
+    def readHour: Int = {
       val time = if (!latchTime.freezed) {
         latchTime.freezed = true
         latchTime.setFrom(actualTime)
@@ -246,9 +244,9 @@ class CIA(val name:String,
       } else latchTime
       time.h | (if (time.am) 0 else 0x80)
     }
-    def readMin = if (latchTime.freezed) latchTime.m else actualTime.m
-    def readSec = if (latchTime.freezed) latchTime.s else actualTime.s
-    def readTenthSec = {
+    def readMin: Int = if (latchTime.freezed) latchTime.m else actualTime.m
+    def readSec: Int = if (latchTime.freezed) latchTime.s else actualTime.s
+    def readTenthSec: Int = {
       if (!latchTime.freezed) actualTime.ts
       else {
         latchTime.freezed = false
@@ -385,7 +383,7 @@ class CIA(val name:String,
     ackCycle = false
   }
   
-  def setFlagLow = {
+  def setFlagLow(): Unit = {
     irqHandling(IRQ_FLAG)
     idleAction(false)
   }
@@ -396,12 +394,12 @@ class CIA(val name:String,
     if (bit == IRQ_SRC_ALARM || bit == IRQ_SERIAL) setIRQ(bit) else setIRQOnNextClock(bit)
   }
 
-  @inline private def setIRQ(src:Int) = {
+  @inline private def setIRQ(src:Int): Unit = {
     val deltaClock = if (ciaModel == CIA_MODEL_8521) 0 else 1
     val currentIcrMask = if (clk.currentCycles == lastIcrMaskClock + deltaClock) lastIcrMask else icrMask
     if ((currentIcrMask & icr) > 0) {
       icr |= 0x80
-      Log.debug(s"${name} is generating IRQ(${src}) icr=${icr}")
+      Log.debug(s"$name is generating IRQ($src) icr=$icr")
       irqAction(true)
     }
   }
@@ -414,7 +412,7 @@ class CIA(val name:String,
     }
   }
   
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Interrupt control register",Integer.toHexString(icr))
     properties.setProperty("Interrupt mask register",Integer.toHexString(icrMask))
     properties.setProperty("Shift register",Integer.toHexString(shiftRegister))
@@ -465,19 +463,19 @@ class CIA(val name:String,
     case CRA => timerA.readCR & 0xEE | timerA.getState & 0x01
     case CRB => timerB.readCR & 0xEE | timerB.getState & 0x01
   }
-  final def write(address: Int, value: Int, chipID: ChipID.ID) = decodeAddress(address) match {
+  final def write(address: Int, value: Int, chipID: ChipID.ID): Unit = decodeAddress(address) match {
     case PRA => 
       portAConnector.write(value)
-      Log.debug(s"${name} set PRA to ${Integer.toBinaryString(value)}")
+      Log.debug(s"$name set PRA to ${Integer.toBinaryString(value)}")
     case PRB => 
       portBConnector.write(value)
-      Log.debug(s"${name} set PRB to ${Integer.toBinaryString(value)}")
+      Log.debug(s"$name set PRB to ${Integer.toBinaryString(value)}")
     case DDRA => 
       portAConnector.ddr = value
-      Log.debug(s"${name} set DDRA to ${Integer.toBinaryString(value)}")
+      Log.debug(s"$name set DDRA to ${Integer.toBinaryString(value)}")
     case DDRB => 
       portBConnector.ddr = value
-      Log.debug(s"${name} set DDRB to ${Integer.toBinaryString(value)}")
+      Log.debug(s"$name set DDRB to ${Integer.toBinaryString(value)}")
     // timer A
     case TALO => timerA.writeLo(value)
     case TAHI => timerA.writeHi(value)
@@ -509,7 +507,7 @@ class CIA(val name:String,
         val delay = if (ciaModel == CIA_MODEL_8521) 1 else 2
         clk.schedule(new ClockEvent(componentID + "_IRQ", clk.currentCycles + delay, _ => setIRQ(-1)))
       }
-      Log.debug(s"${name} ICR's value is ${Integer.toBinaryString(value)} => ICR = ${Integer.toBinaryString(icrMask)}")
+      Log.debug(s"$name ICR's value is ${Integer.toBinaryString(value)} => ICR = ${Integer.toBinaryString(icrMask)}")
     case CRA =>
       val oldSerialOut = timerA.readCR & 0x40
       timerA.writeCR(value)
@@ -522,14 +520,14 @@ class CIA(val name:String,
     case CRB => timerB.writeCR(value)
   }
   
-  @inline private def loadShiftRegister  : Unit = {
+  @inline private def loadShiftRegister()  : Unit = {
     shiftRegister = sdr // load the shift register
     sdrLoaded = false
     sdrOut = true
     //println("Shift register loaded with " + sdr + " latch=" + sdrlatch)
   }
   
-  private def sendSerial  : Unit = {
+  private def sendSerial()  : Unit = {
     if ((timerA.readCR & 0x40) == 0x40) { // serial out
       if (sdrIndex == 0 && sdrLoaded) loadShiftRegister
       if (sdrOut) {

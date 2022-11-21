@@ -1,15 +1,11 @@
 package ucesoft.cbm.remote
 
-import javax.swing._
+import java.awt.{Color, Dimension, Graphics, Image}
+import java.awt.event.{KeyEvent, KeyListener}
 import java.awt.image.MemoryImageSource
-import java.awt.Image
-import java.awt.Graphics
-import java.net.Socket
 import java.io._
-import java.awt.Dimension
-import java.awt.event.KeyListener
-import java.awt.event.KeyEvent
-import java.awt.Color
+import java.net.Socket
+import javax.swing._
 
 object RemoteC64Client extends App {
   if (args.length != 2) {
@@ -26,7 +22,7 @@ object RemoteC64Client extends App {
   }
   catch {
     case t:Throwable =>
-      t.printStackTrace
+      t.printStackTrace()
       sys.exit(1)
   }
 }
@@ -44,7 +40,7 @@ class RemoteC64Client(host:String,port:Int,video:RemoteC64Frame) extends KeyList
     out.writeInt(e.getKeyCode)
     out.writeChar(e.getKeyChar)
     out.writeInt(e.getKeyLocation)
-    out.flush
+    out.flush()
   }
   
   def keyPressed(e:KeyEvent) : Unit = {
@@ -55,7 +51,7 @@ class RemoteC64Client(host:String,port:Int,video:RemoteC64Frame) extends KeyList
   }
   def keyTyped(e:KeyEvent) : Unit = {}
   
-  def listen : Unit = {
+  def listen() : Unit = {
     println("Connection established ...")
     try {
       val in = new DataInputStream(new BufferedInputStream(socket.getInputStream))
@@ -120,7 +116,7 @@ class RemoteC64Frame(title:String) extends JFrame(title) {
       imageSource.setFullBufferUpdates(true)
       screen = createImage(imageSource)      
       panel.setPreferredSize(new Dimension(w,h))      
-      pack
+      pack()
     }
   }
   

@@ -1,24 +1,15 @@
 package ucesoft.cbm.game
 
-import java.io.File
-import scala.util.Properties
-import java.io.IOException
 import ucesoft.cbm.Log
-import java.util.zip.GZIPOutputStream
-import java.io.FileOutputStream
-import java.io.PrintWriter
-import java.util.zip.GZIPInputStream
-import java.io.FileInputStream
-import java.net.URL
-import javax.swing.ImageIcon
-import java.nio.file.Files
-import javax.imageio.ImageIO
 import ucesoft.cbm.formats.ZIP
-import scala.util.Success
-import scala.util.Failure
-import java.net.HttpURLConnection
-import java.io.InputStream
-import java.net.URLConnection
+
+import java.io._
+import java.net.{HttpURLConnection, URL, URLConnection}
+import java.nio.file.Files
+import java.util.zip.{GZIPInputStream, GZIPOutputStream}
+import javax.imageio.ImageIO
+import javax.swing.ImageIcon
+import scala.util.{Failure, Properties, Success}
 
 class Repository(provider:GameProvider) {
   import ZIP._
@@ -36,7 +27,7 @@ class Repository(provider:GameProvider) {
   
   init
   
-  private def init  : Unit = {
+  private def init()  : Unit = {
     if (!home.exists) {
       if (!home.mkdirs) throw new IOException(s"Cannot create repository directory $home")
     }
@@ -47,13 +38,13 @@ class Repository(provider:GameProvider) {
         Log.info(s"Downloading icon for ${provider.name} [$iconURL] ...")
         val in = iconURL.openStream
         Files.copy(in,icon.toPath)
-        in.close
+        in.close()
       }
       iconImage = Some(new ImageIcon(ImageIO.read(icon)))
     }
     catch {
       case t:Throwable =>
-        t.printStackTrace
+        t.printStackTrace()
     }
     if (!version.exists) writeVersion 
     else versionID = {
@@ -64,14 +55,14 @@ class Repository(provider:GameProvider) {
     }
   }
   
-  private def writeVersion  : Unit = {
+  private def writeVersion()  : Unit = {
     val v = new PrintWriter(new FileOutputStream(version))
     v.print(provider.version)
     versionID = provider.version
-    v.close
+    v.close()
   }
   
-  final def currentVersion = versionID
+  final def currentVersion: String = versionID
   
   final def getIcon : Option[ImageIcon] = iconImage
   final def getIconFor(game:Game) : Option[ImageIcon] = {
@@ -125,11 +116,11 @@ class Repository(provider:GameProvider) {
       }      
     }
     finally {
-      out.close
+      out.close()
     }
   }
   
-  def clearCache  : Unit = {
+  def clearCache()  : Unit = {
     for(file <- home.listFiles) {
       if (file.getName != repository.getName) file.delete
     }
@@ -187,7 +178,7 @@ class Repository(provider:GameProvider) {
   				    status == HttpURLConnection.HTTP_SEE_OTHER) {
             val newUrl = new URL(hc.getHeaderField("Location"))
             game.downloadPageURL = Some(newUrl)
-            connection.getInputStream.close
+            connection.getInputStream.close()
             connection = newUrl.openConnection
             fileName = extractFileName(connection)   
             keepRedirecting = true
@@ -201,7 +192,7 @@ class Repository(provider:GameProvider) {
     if (game.downloadPageURL.isDefined) {    
       val (in,fileName) = openDownloadURL(game)
       val copied = Files.copy(in,gameid(game).toPath)
-      in.close
+      in.close()
       Files.write(fileNameid(game).toPath,java.util.Arrays.asList(fileName))
       writeVersion
     }
@@ -213,7 +204,7 @@ class Repository(provider:GameProvider) {
         case None =>
           val in = game.imageURL.get.openStream
           Files.copy(in,iconid(game).toPath)
-          in.close
+          in.close()
         case _ =>
       }      
     }

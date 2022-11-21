@@ -1,20 +1,22 @@
 package ucesoft.cbm.peripheral.rs232
 
 import ucesoft.cbm.peripheral.cia.CIA
-import RS232._
+import ucesoft.cbm.peripheral.rs232.RS232._
 import ucesoft.cbm.{Clock, ClockEvent, Log}
 
+import java.util.Properties
+
 abstract class AbstractRS232 extends RS232 with ModemCommandListener {
-  protected var cia1,cia2 : CIA = _
+  protected var bitReceivedListener : () => Unit = _
   private[this] var txd,others = 0
   private[this] var stop,parity,bits,length = 0
-  protected var dsr = DSR
+  protected var dsr: Int = DSR
   protected var cts,dcd,ri = 0
   protected var rts,dtr = false
   private[this] var rxd = RXD
   private[this] var outbuffer = 0
   private[this] var bitreceived,bitsent,tmpParity = 0
-  protected var byteToSend = -1
+  protected var byteToSend: Int = -1
   private[this] var totalByteSent,totalByteReceived = 0
   private[this] var configurationString = ""
   private[this] var enabled = false
@@ -26,8 +28,8 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
   protected val modem = new Modem(this)
 
   def hangUp : Unit = {}
-  def commandMode(on:Boolean) = {}
-  def connectTo(address:String) = {
+  def commandMode(on:Boolean): Unit = {}
+  def connectTo(address:String): Unit = {
     Log.info(s"RS232 - Connecting to $address")
     setConfiguration(address + "," + configurationString)
     setEnabled(true)
@@ -38,8 +40,8 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     println("Ringing..")
   }
   
-  def isEnabled = enabled
-  def setEnabled(enabled:Boolean) = {
+  def isEnabled: Boolean = enabled
+  def setEnabled(enabled:Boolean): Unit = {
     this.enabled = enabled
     if (enabled) {
       clk.schedule(new ClockEvent("RS232-readCycle",clk.currentCycles + baudCycles,_ => readCycle))
@@ -52,7 +54,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     }
 
   }
-  def setRS232Listener(l:RS232StatusListener) = statusListener = l
+  def setRS232Listener(l:RS232StatusListener): Unit = statusListener = l
   
   def init : Unit = {}
   
@@ -66,16 +68,13 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     modem.reset
   }
   
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Total bytes received",totalByteReceived.toString)
     properties.setProperty("Total bytes sent",totalByteSent.toString)
     properties
   }
-  
-  def setCIA12(cia1:CIA,cia2:CIA) : Unit = {
-    this.cia2 = cia2
-    this.cia1 = cia1
-  }
+
+  def setBitReceivedListener(listener: () => Unit) : Unit = bitReceivedListener = listener
   
   def setTXD(high:Int) : Unit = {
     txd = high
@@ -112,20 +111,20 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
       if (modem.outputStream != null) {
         modem.outputStream.write(byte)
         //print(byte.toChar)
-        modem.outputStream.flush
+        modem.outputStream.flush()
       }
     }
     catch {
       case t:Throwable =>
         Log.info(s"I/O error while writing from rs-232 ($componentID): " + t)
-        t.printStackTrace
+        t.printStackTrace()
         disconnect
     }
   }
   
   def getTXD : Int = txd
   
-  protected def checkCTS : Unit = {
+  protected def checkCTS() : Unit = {
     // auto set cs
     cts = if (!flowControlEnabled || rts) CTS else 0
   }
@@ -148,7 +147,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     rxd | others & RTS | others & DTR | ri | dcd | cts | dsr
   }
 
-  def getConfiguration = configurationString
+  def getConfiguration: String = configurationString
 
   /**
    * Syntax: <baud>,<bits>,<parity>,<stops>
@@ -190,7 +189,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     }
   }
 
-  protected def disconnect : Unit = {
+  protected def disconnect() : Unit = {
     if (statusListener != null) {
       statusListener.setRS232Enabled(false)
       statusListener.disconnected
@@ -200,10 +199,10 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
 
   protected def isByteAvailable : Boolean = modem.inputStream.available() > 0
   protected def getByte : Int = modem.inputStream.read()
-  protected def canSend = !flowControlEnabled || (rts && dtr)
+  protected def canSend: Boolean = !flowControlEnabled || (rts && dtr)
   protected def sendRXD(rxdHigh:Boolean) : Unit = {}
 
-  protected def readCycle: Unit = {
+  protected def readCycle(): Unit = {
     try {
       if (isByteAvailable && canSend) {
         sendInByte(getByte)
@@ -225,7 +224,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     sendState = 0
     // send start bit
     rxd = 0
-    cia2.setFlagLow
+    bitReceivedListener()
     //sendRXD(false)
     bitsent = 1
     tmpParity = 0
@@ -234,9 +233,9 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     if (statusListener != null) statusListener.update(RXD,1)
   }
 
-  protected def stopin = stop
+  protected def stopin: Int = stop
 
-  protected def sendBit: Unit = {
+  protected def sendBit(): Unit = {
     val scheduleNextBit = sendState match {
       case 0 => // DATA BITS
         if ((byteToSend & 1) > 0) rxd = RXD else rxd = 0
@@ -251,7 +250,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
             else sendState += 1
           } // skip parity
         }
-        if (rxd == 0) cia2.setFlagLow
+        if (rxd == 0) bitReceivedListener()
         sendRXD(rxd > 0)
         true
       case 1 => // PARITY
@@ -263,7 +262,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
         }
         if (stopin == 0) sendState = 4
         else sendState += 1
-        if (rxd == 0) cia2.setFlagLow
+        if (rxd == 0) bitReceivedListener()
         sendRXD(rxd > 0)
         true
       case 2 => // STOP #1
@@ -287,5 +286,5 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     else clk.schedule(new ClockEvent("RS232-readCycle",clk.currentCycles + baudCycles,_ => readCycle))
   }
 
-  def connectionInfo = getConfiguration
+  def connectionInfo: String = getConfiguration
 }

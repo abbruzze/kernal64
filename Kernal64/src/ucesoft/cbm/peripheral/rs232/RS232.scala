@@ -1,12 +1,9 @@
 package ucesoft.cbm.peripheral.rs232
 
-import ucesoft.cbm.peripheral.cia.CIA
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
-import javax.swing.JOptionPane
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponent, CBMComponentType}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 object RS232 {
   final val RXD = 1 << 0
@@ -26,11 +23,11 @@ object RS232 {
 }
 
 trait RS232 extends CBMComponent {
-  val componentType = CBMComponentType.USER_PORT
+  val componentType: Type = CBMComponentType.USER_PORT
   private[this] var flowControl = false
 
-  def flowControlEnabled = flowControl
-  def setFlowControlEnabled(enabled:Boolean) = flowControl = enabled
+  def flowControlEnabled: Boolean = flowControl
+  def setFlowControlEnabled(enabled:Boolean): Unit = flowControl = enabled
   
   def setTXD(high:Int) : Unit
   def getTXD : Int
@@ -60,7 +57,7 @@ trait RS232 extends CBMComponent {
   def isEnabled : Boolean
   def setEnabled(enabled:Boolean) : Unit
   
-  def setCIA12(cia1:CIA,cia2:CIA) : Unit
+  def setBitReceivedListener(listener: () => Unit) : Unit
   
   def getDescription : String
   

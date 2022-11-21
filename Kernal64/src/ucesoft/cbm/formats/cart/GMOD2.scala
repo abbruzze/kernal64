@@ -1,10 +1,10 @@
 package ucesoft.cbm.formats.cart
 
-import ucesoft.cbm.{ChipID, Log}
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.formats.Cartridge
 import ucesoft.cbm.formats.ExpansionPortFactory.CartridgeExpansionPort
 import ucesoft.cbm.misc.M93C86
+import ucesoft.cbm.{ChipID, Log}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 import java.util.Properties
@@ -14,7 +14,7 @@ class GMOD2(crt: Cartridge,ram:Memory,config:Properties) extends CartridgeExpans
   private[this] var reg = 0
   private[this] val m93c86 = new M93C86(x16 = true)
 
-  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     if (address == 0xDE00) m93c86.output << 7 else 0
   }
   override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
@@ -37,8 +37,8 @@ class GMOD2(crt: Cartridge,ram:Memory,config:Properties) extends CartridgeExpans
     romlBankIndex = 0
     romhBankIndex = 0
   }
-  override def eject = saveEeprom
-  override def shutdown = saveEeprom
+  override def eject: Unit = saveEeprom
+  override def shutdown: Unit = saveEeprom
   override def init  : Unit = {
     Option(config.getProperty(CONFIGURATION_GMOD2_FILE)) match {
       case None =>
@@ -50,7 +50,7 @@ class GMOD2(crt: Cartridge,ram:Memory,config:Properties) extends CartridgeExpans
         }
     }
   }
-  private def saveEeprom  : Unit = {
+  private def saveEeprom()  : Unit = {
     Option(config.getProperty(CONFIGURATION_GMOD2_FILE)) match {
       case None =>
       case Some(eeprom) =>

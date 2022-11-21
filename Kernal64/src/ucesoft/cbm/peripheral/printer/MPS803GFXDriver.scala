@@ -1,15 +1,14 @@
 package ucesoft.cbm.peripheral.printer
 
-import javax.swing._
 import ucesoft.cbm.cpu.Memory
-import scala.collection.mutable.ListBuffer
-import java.awt.Dimension
-import java.awt.Graphics
 import ucesoft.cbm.peripheral.vic.Palette
-import java.io.File
+
 import java.awt.image.BufferedImage
+import java.awt.{Color, Dimension, Graphics}
+import java.io.File
 import javax.imageio.ImageIO
-import java.awt.Color
+import javax.swing._
+import scala.collection.mutable.ListBuffer
 
 object MPS803GFXDriver extends App {
   val f = new JFrame
@@ -28,7 +27,7 @@ object MPS803GFXDriver extends App {
   canvas.print(13)
   canvas.checkSize
   f.getContentPane.add("Center", canvas)
-  f.pack
+  f.pack()
   f.setVisible(true)
 }
 
@@ -87,7 +86,7 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
   private[this] var posL,posH,rep = 0
   private[this] var bitmapActive = false
   
-  def clearPages : Unit = {
+  def clearPages() : Unit = {
     operations.clear
     quote = 0
     state = WAITING_CHAR
@@ -166,7 +165,7 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
     repaint()      
   }
 
-  def checkSize : Unit = {
+  def checkSize() : Unit = {
     val lines = 1 + (operations count { op => op == CarrigeReturn || op == LineFeed })
     val width = COLUMNS * CHRWIDTH
     setPreferredSize(new Dimension(width, lines * CHRHEIGHT))
@@ -193,47 +192,46 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
     while (opIterator.hasNext) {
       opIterator.next match {
         case Print(ch) =>
-          bitmapMode match {
-            case false =>
-              var char = ch
-              if (!graphicMode) char += 0x100
-              for (line <- 0 to CHRHEIGHT - 1) { // char line
-                var byte = readChar(char, line)
-                if (rvsOn) byte = ~byte
-                var bit = 0x80
-                var dx = 0
-                while (bit > 1) {
-                  var width = if (doubleWidth) 2 else 1
-                  while (width > 0) {
-                    if ((byte & bit) > 0) g.drawRect(x + dx, y + line, 0, 0)
-                    width -= 1
-                    dx += 1
-                  }
-                  bit >>= 1
+          if (bitmapMode) {
+            val byte = ch & 0x7F // clear 8th bit
+            for (dy <- 1 to 7) {
+              if ((byte & (1 << dy)) > 0) g.drawRect(x, y + dy - 1, 0, 0)
+            }
+            x += 1
+          } else {
+            var char = ch
+            if (!graphicMode) char += 0x100
+            for (line <- 0 to CHRHEIGHT - 1) { // char line
+              var byte = readChar(char, line)
+              if (rvsOn) byte = ~byte
+              var bit = 0x80
+              var dx = 0
+              while (bit > 1) {
+                var width = if (doubleWidth) 2 else 1
+                while (width > 0) {
+                  if ((byte & bit) > 0) g.drawRect(x + dx, y + line, 0, 0)
+                  width -= 1
+                  dx += 1
                 }
+                bit >>= 1
               }
-              x += CHRWIDTH * (if (doubleWidth) 2 else 1)
-              if (x >= LINE_DOTS) {
-                x = 0
-                y += CHRHEIGHT + interLinePixels
-                if (y > getPreferredSize.height) {
-                  setPreferredSize(new Dimension(getPreferredSize.width, y + 2 * (CHRHEIGHT + interLinePixels)))
-                  invalidate
-                }
+            }
+            x += CHRWIDTH * (if (doubleWidth) 2 else 1)
+            if (x >= LINE_DOTS) {
+              x = 0
+              y += CHRHEIGHT + interLinePixels
+              if (y > getPreferredSize.height) {
+                setPreferredSize(new Dimension(getPreferredSize.width, y + 2 * (CHRHEIGHT + interLinePixels)))
+                invalidate()
               }
-            case true => // bitmap mode
-              val byte = ch & 0x7F // clear 8th bit
-              for(dy <- 1 to 7) {
-                if ((byte & (1 << dy)) > 0) g.drawRect(x, y + dy - 1, 0, 0)
-              }
-              x += 1
+            }
           }
         case CarrigeReturn =>
           x = 0
           y += CHRHEIGHT + interLinePixels
           if (y > getPreferredSize.height) {
             setPreferredSize(new Dimension(getPreferredSize.width, y + 2 * (CHRHEIGHT + interLinePixels)))
-            invalidate
+            invalidate()
           }
           rvsOn = false
         case LineFeed =>
@@ -241,7 +239,7 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
           y += CHRHEIGHT + interLinePixels
           if (y > getPreferredSize.height) {
             setPreferredSize(new Dimension(getPreferredSize.width, y + 2 * (CHRHEIGHT + interLinePixels)))
-            invalidate
+            invalidate()
           }
         case GraphicMode =>
           graphicMode = true

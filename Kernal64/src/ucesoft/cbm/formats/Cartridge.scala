@@ -4,20 +4,34 @@ import java.io._
 import scala.language.postfixOps
 
 object Cartridge {
-  def createCRTFileFromState(in:ObjectInputStream) : File = {
-    val tmpFile = File.createTempFile("CRT",null)
+  def createCRTFileFromState(in: ObjectInputStream): (File,Boolean) = {
+    val tmpFile = File.createTempFile("CRT", null)
     tmpFile.deleteOnExit()
     val tmpOut = new FileOutputStream(tmpFile)
+    val raw = in.readBoolean()
     val len = in.readInt
     val buffer = Array.ofDim[Byte](len)
     in.readFully(buffer)
     tmpOut.write(buffer)
-    tmpOut.close
-    tmpFile
+    tmpOut.close()
+    (tmpFile,raw)
+  }
+
+  def main(args:Array[String]): Unit = {
+    println(new Cartridge(args(0),true))
+  }
+
+  object CBMType extends Enumeration {
+    val C64   = Value("C64 CARTRIDGE   ")
+    val C128  = Value("C128 CARTRIDGE  ")
+    val VIC20 = Value("VIC20 CARTRIDGE ")
+    val CBMII = Value("CBM2 CARTRIDGE  ")
   }
 }
 
-class Cartridge(val file:String) {
+class Cartridge(val file:String,raw:Boolean = false) {
+  import Cartridge._
+
   class Chip {
     var bankNumber = 0
     var startingLoadAddress = 0
@@ -38,28 +52,56 @@ class Cartridge(val file:String) {
       for(i <- 0 until romSize) romData(i) = buffer(i).toInt & 0xFF
     }
     
-    override def toString = s"CHIP bank=${bankNumber} loadAddress=${Integer.toHexString(startingLoadAddress)} romSize=${romSize}"
+    override def toString = s"CHIP bank=$bankNumber loadAddress=${Integer.toHexString(startingLoadAddress)} romSize=$romSize"
   }
-  private val CRT_SIGN = "C64 CARTRIDGE   "
   var name = ""
-  var ctrType = 0 
+  var ctrType = 0
+  var cbmType : CBMType.Value = _
   var EXROM,GAME = false
   var chips : Array[Chip] = null
-  lazy val kbSize = (chips map { _.romSize } sum) / 1024
+  lazy val kbSize: Int = (chips map { _.romSize } sum) / 1024
   
-  load
+  if (raw) loadRaw() else load()
+
+  private def addChip(romAddress:Int,romSize:Int,rom:Array[Int],bank:Int = 0): Unit = {
+    val chip = new Chip
+    chip.bankNumber = bank
+    chip.startingLoadAddress = romAddress
+    chip.romSize = romSize
+    chip.romData = rom
+    if (chips == null) chips = Array(chip)
+    else chips = chips ++ Array(chip)
+  }
 
   def saveState(out:ObjectOutputStream) : Unit = {
     val f = new File(file)
+    out.writeBoolean(raw)
     out.writeInt(f.length.toInt)
     java.nio.file.Files.copy(f.toPath,out)
   }
+
+  private def loadRaw()  : Unit = {
+    val f = new File(file)
+    val buffer = java.nio.file.Files.readAllBytes(f.toPath)
+    val address = (buffer(1) << 8 | buffer(0)) & 0xFFFF
+    val rom = buffer.drop(2).map(_.toInt & 0xFF)
+    addChip(address,buffer.length - 2,rom)
+    name = f.getName
+  }
   
-  def load  : Unit = {
-    println("Opening file " + file)
+  private def load()  : Unit = {
     val in = new RandomAccessFile(file,"r")
     try {
-      for(i <- 0 to 15) if (in.readByte != CRT_SIGN(i)) throw new IOException("Signature not found on index " + i)
+      val nameBuffer = Array.ofDim[Byte](16)
+      in.readFully(nameBuffer)
+      val signature = new String(nameBuffer)
+      try {
+        cbmType = CBMType.withName(signature)
+      }
+      catch {
+        case _:Exception =>
+          throw new IOException(s"Cart signature not supported: $signature")
+      }
       in.seek(0x16)
       ctrType = in.readByte * 256 + in.readByte
       EXROM = in.readByte == 1
@@ -84,11 +126,11 @@ class Cartridge(val file:String) {
       chips = tmp.reverse.toArray
     }
     finally {
-      in.close
+      in.close()
     }
   }
   
-  override def toString = s"Cartridge ${name} type=${ctrType} EXROM=${EXROM} GAME=${GAME} CHIPS=${chips.map{_.toString} mkString("[",",","]")}"
+  override def toString = s"Cartridge[$cbmType] $name type=$ctrType EXROM=$EXROM GAME=$GAME CHIPS=${chips.map{_.toString} mkString("[",",","]")}"
 }
 
 class CartridgeBuilder(crt:String,name:String,crtType:Int,exrom:Boolean,game:Boolean) {
@@ -135,5 +177,5 @@ class CartridgeBuilder(crt:String,name:String,crtType:Int,exrom:Boolean,game:Boo
     out.write(bdata)
   }
 
-  def finish : Unit = out.close
+  def finish() : Unit = out.close()
 }

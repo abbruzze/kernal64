@@ -14,5 +14,5 @@ class Ocean(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
     }
   }
 
-  override def ROMH = ROML
+  override def ROMH: Memory = ROML
 }

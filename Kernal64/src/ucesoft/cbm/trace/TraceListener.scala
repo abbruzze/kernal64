@@ -1,86 +1,100 @@
 package ucesoft.cbm.trace
 
 import java.io.PrintWriter
-import ucesoft.cbm.cpu.Memory
+import scala.collection.mutable.ListBuffer
 
-sealed trait BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) : Boolean
-}
-case class BreakEqual(address:Int) extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = this.address == address
-  override def toString: String = f"breaks at $address%04X"
-}
-case class BreakSet(addressSet:Set[Int]) extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = addressSet.contains(address)
-  override def toString: String = f"breaks in ${addressSet.map(a => f"$a%04X").mkString("{ ",","," }")}"
-}
-case class BreakIn(fromAddress:Int,toAddress:Int) extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = address >= fromAddress && address <= toAddress
-  override def toString: String = f"breaks between $fromAddress%04X and $toAddress%04X"
-}
-case class BreakOut(fromAddress:Int,toAddress:Int) extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = address < fromAddress || address > toAddress
-  override def toString: String = f"breaks out of $fromAddress%04X and $toAddress%04X"
-}
-object NoBreak extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = false
-  override def toString: String = "no breaks set"
-}
-object IRQBreak extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = irq
-  override def toString: String = "breaks if IRQ"
-}
-object NMIBreak extends BreakType {
-  def isBreak(address:Int,irq:Boolean,nmi:Boolean) = nmi
-  override def toString: String = "breaks if NMI"
-}
+object TraceListener {
+  case class BreakAccessType(read: Boolean, write: Boolean, execute: Boolean,writeValue:Option[Int] = None) {
+    override def toString = {
+      val r = if (read) "R" else ""
+      val w = if (write) "W" else ""
+      val x = if (execute) "X" else ""
+      s"$r$w$x"
+    }
 
-object BreakType {
-  
-  private def s2a(address: String) = address(0) match {
-    case '$' => Integer.parseInt(address.substring(1), 16)
-    case '%' => Integer.parseInt(address.substring(1), 2)
-    case _ => address.toInt
+    def hasAccess(other:BreakAccessType): Boolean = read && other.read || write && other.write || execute && other.execute
   }
-  
-  def makeBreak(cmd:String) : BreakType = {
-    if (cmd.startsWith("in")) { // BreakIn
-      val range = cmd.substring(2).trim.split(",")
-      if (range.length != 2) throw new IllegalArgumentException("Bad range in the inclusive break type")
-      return BreakIn(s2a(range(0)),s2a(range(1)))
-    }
-    if (cmd.startsWith("out")) { // BreakOut
-      val range = cmd.substring(3).trim.split(",")
-      if (range.length != 2) throw new IllegalArgumentException("Bad range in the out of range break type")
-      return BreakOut(s2a(range(0)),s2a(range(1)))
-    }
-    if (cmd.startsWith("irq")) return IRQBreak
-    if (cmd.startsWith("nmi")) return NMIBreak
+  val ReadBreakAccess = BreakAccessType(true,false,false)
+  val WriteBreakAccess = (writeValue:Int) => BreakAccessType(false,true,false,Some(writeValue))
+  val ExecuteBreakAccess = BreakAccessType(false,false,true)
 
-    try {
-      val addresses = cmd.split(",")
-      if (addresses.length == 1) BreakEqual(s2a(cmd))
-      else {
-        val set = addresses map s2a toSet
+  sealed trait BreakInfo {
+    private var _enabled = true
+    def enabled: Boolean = _enabled
+    def enabled_=(e:Boolean): Unit = _enabled = e
+  }
+  case class BreakCondition(condition:String,expr:TracerConditionParser.Expr)
+  case class AddressBreakInfo(address:Int,access:BreakAccessType,condition:Option[BreakCondition] = None) extends BreakInfo
+  sealed trait EventBreakInfo extends BreakInfo
+  case class IRQBreakInfo() extends EventBreakInfo { override def toString = "IRQ" }
+  case class NMIBreakInfo() extends EventBreakInfo { override def toString = "NMI" }
+  case class ResetBreakInfo() extends EventBreakInfo { override def toString = "RESET" }
 
-        BreakSet(set)
+  trait BreakType {
+    def isBreak(info:BreakInfo): Boolean
+  }
+
+  case class BreakSet(addressSet: Set[Int]) extends BreakType {
+    def isBreak(info:BreakInfo): Boolean = {
+      info match {
+        case AddressBreakInfo(address, access,_) if access.execute =>
+          addressSet.contains(address)
+        case _ =>
+          false
       }
     }
-    catch {
-      case _:Exception =>
-        throw new IllegalArgumentException("Bad break type")
+
+    override def toString: String = f"breaks in ${addressSet.map(a => f"$a%04X").mkString("{ ", ",", " }")}"
+  }
+
+  object NoBreak extends BreakType {
+    def isBreak(info:BreakInfo) = false
+
+    override def toString: String = "no breaks set"
+  }
+
+  trait TraceRegisterBuilder {
+    def add(name:String,value:String,intValue:Int,conditionName:String = null): TraceRegisterBuilder
+    def addIf(cond:Boolean,name:String,value:String,intValue:Int,conditionName:String = null): TraceRegisterBuilder
+    def build(): List[TraceRegister]
+  }
+  object TraceRegister {
+    def builder(): TraceRegisterBuilder = new TraceRegisterBuilder {
+      val regs = new ListBuffer[TraceRegister]
+      override def add(name: String, value: String,intValue:Int,conditionName:String = null): TraceRegisterBuilder = {
+        regs += TraceRegister(name,value,intValue,Option(conditionName))
+        this
+      }
+      override def addIf(cond:Boolean,name:String,value:String,intValue:Int,conditionName:String = null): TraceRegisterBuilder = {
+        if (cond) add(name,value,intValue,conditionName) else this
+      }
+      override def build(): List[TraceRegister] = regs.toList
     }
   }
+  case class TraceRegister(name:String,value:String,intValue:Int,conditionName:Option[String] = None)
+  case class CpuStepInfo(pc: Int, registers: List[TraceRegister],disassembled:String)
+
+  sealed trait StepType
+  case object StepIn extends StepType
+  case object StepOut extends StepType
+  case object StepOver extends StepType
+
+  case class DisassembleInfo(dis:String,bytes:Int)
+
 }
 
-case class CpuStepInfo(pc:Int,registers:String)
-
 trait TraceListener {
+  import TraceListener._
+  val cycleModeSupported = false
+  val supportTracing = true
+
   def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit
   def setTrace(traceOn:Boolean) : Unit
-  def step(updateRegisters: CpuStepInfo => Unit) : Unit
+  def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType) : Unit
   def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) : Unit
   def jmpTo(pc:Int) : Unit
-  def disassemble(mem:Memory,address:Int) : (String,Int)
+  def disassemble(address:Int) : DisassembleInfo
   def setCycleMode(cycleMode:Boolean) : Unit
+
+  def getRegisters(): List[TraceRegister]
 }

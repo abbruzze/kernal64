@@ -1,38 +1,28 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.peripheral.bus.IECBus
-import ucesoft.cbm.peripheral.bus.BusDataIterator
-import java.io.File
-import java.net.InetAddress
-import scala.collection.mutable.ListBuffer
-import java.io.InputStream
-import java.io.OutputStream
-import java.net.HttpURLConnection
-import java.io.IOException
-import java.net.Socket
 import ucesoft.cbm.Log
-import java.net.ServerSocket
-import java.net.URL
-import java.io.FileOutputStream
-import java.io.BufferedOutputStream
-import java.net.URLEncoder
 import ucesoft.cbm.formats.Diskette
+import ucesoft.cbm.peripheral.bus.{BusDataIterator, IECBus}
+
+import java.io._
+import java.net._
+import scala.collection.mutable.ListBuffer
 
 class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bus, 7) {
-  val driveType = DriveType.OTHER
+  val driveType: DriveType.Value = DriveType.OTHER
   val componentID = "FlyerIEC"
   override val busid = "FlyerIEC"
-  val formatExtList = Nil
+  val formatExtList: List[String] = Nil
   
   private class ConnectionDataIterator extends BusDataIterator {
     private val queue = new collection.mutable.Queue[Int]
     def enqueue(e:Int) : Unit = { queue.enqueue(e) }
-    def isLast = queue.size == 1
+    def isLast: Boolean = queue.size == 1
     def getPerc = 0
     def goto(pos:Int) : Unit = { throw new IllegalArgumentException }
-    def hasNext = queue.size > 0
-    def next = queue.dequeue
-    def queueSize = queue.size
+    def hasNext: Boolean = queue.size > 0
+    def next: Int = queue.dequeue
+    def queueSize: Int = queue.size
   }
   
   private class ClientConnection(val channel:Int) {
@@ -45,7 +35,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     private[this] var httpFirstPost = true
     
     private class ThreadListener extends Thread(s"Flyer-Thread-$channel") {
-      override def run : Unit = {
+      override def run() : Unit = {
         try {
           var closed = false
           while (!isInterrupted && !closed) {
@@ -83,16 +73,16 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
       try {
         val ss = new ServerSocket(port)
         listener = Some(new Thread {
-          override def run : Unit = {
+          override def run() : Unit = {
             try {
               val socket = ss.accept
-              ss.close
+              ss.close()
               in = Some(socket.getInputStream)
               out = Some(socket.getOutputStream)
               Log.info(s"Flyer: connection accepted from ${ss.getInetAddress.getHostName}")
               remoteIPAndPort = Some((socket.getInetAddress.getHostAddress,socket.getPort))
               listener = Some(new ThreadListener)
-              listener.get.start
+              listener.get.start()
             }
             catch {
               case _:InterruptedException =>
@@ -102,7 +92,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
             }
           }
         })
-        listener.get.start
+        listener.get.start()
       }
       catch {
         case io:IOException =>
@@ -127,12 +117,12 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
           if (name.length == 2) {
             val file = new BufferedOutputStream(new FileOutputStream(new File(floppyRepository,name(1))))
             for(i <- 0 until loadBuffer.length) file.write(loadBuffer(i))
-            file.close
+            file.close()
             channels(0).dataToSend = Some(loadLocalDiskDirectory)
           }
           else sendStatus(STATUS_SYNTAX_ERROR)
       }      
-      in.get.close
+      in.get.close()
       in = None
     }
     
@@ -144,7 +134,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
         val conn = url.openConnection.asInstanceOf[HttpURLConnection]
         //conn.connect        
         if (channel == 0) {
-          conn.connect
+          conn.connect()
           in = Some(conn.getInputStream)
           httpLoad(if (urlAndDisk.length == 2) Some(urlAndDisk(1)) else None)
         }
@@ -162,7 +152,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     def connect(url:String) : Unit = {
       if (isConnected) close
       
-      Log.info(s"Flyer: connecting to ${url} ...")
+      Log.info(s"Flyer: connecting to $url ...")
       val protocol = url.split(":")
       
       protocol(0).toUpperCase match {
@@ -182,7 +172,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
             out = Some(socket.getOutputStream)
             sendStatus(STATUS_OK)
             listener = Some(new ThreadListener)
-            listener.get.start
+            listener.get.start()
           }
           catch {
             case io:Throwable =>
@@ -210,8 +200,8 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
         }
     }
     
-    def isConnected = in.isDefined
-    def close : Unit = {
+    def isConnected: Boolean = in.isDefined
+    def close() : Unit = {
       in foreach { _.close }
       out foreach { _.close }
       listener foreach { _.interrupt }
@@ -222,7 +212,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
       remoteIPAndPort = None
       httpGenericDataWritten = false
     }
-    def write : Unit = {
+    def write() : Unit = {
       httpConnection match {
         case None =>
           out match {
@@ -237,7 +227,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
             case None =>
               hc.setDoOutput(true)
               try {
-                hc.connect
+                hc.connect()
                 out = Some(hc.getOutputStream)
               }
               catch {
@@ -257,7 +247,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
           channels(channel).buffer.clear
       }      
     }
-    def netstat : Unit = {
+    def netstat() : Unit = {
       setStatus(STATUS_OK)
       in match {
         case Some(_) =>          
@@ -270,14 +260,14 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
       //println(s"netstat on channel $channel => conn = $status_s avail = $status_t")
       //sendStatus
     }
-    def netavail : Unit = {
+    def netavail() : Unit = {
       setStatus(STATUS_OK)
       status_t = available
       status_s = 0
       //println(s"netavail on channel $channel = $status_t")
       //sendStatus
     }
-    def connectioninfo : Unit = {
+    def connectioninfo() : Unit = {
       setStatus(STATUS_OK)
       remoteIPAndPort match {
         case Some((ip,port)) =>
@@ -290,22 +280,22 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
           status_s = 0
       }
     }
-    def httptransact : Unit = {
+    def httptransact() : Unit = {
       httpConnection match {
         case Some(hc) =>
           in match {
             case None =>
               out match {
                 case Some(out) =>
-                  out.flush
-                  out.close
+                  out.flush()
+                  out.close()
                 case None =>                                  
               }
               try {
-                hc.connect
+                hc.connect()
                 in = Some(hc.getInputStream)
                 listener = Some(new ThreadListener)
-                listener.get.start
+                listener.get.start()
               }
               catch {
                 case io:IOException =>
@@ -326,7 +316,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
             case None =>
               try {
                 hc.setDoOutput(true)
-                hc.connect
+                hc.connect()
                 out = Some(hc.getOutputStream)
                 httpFirstPost = true
               }
@@ -358,7 +348,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
   final private[this] val STATUS_PROTOCOL_ERROR = 1
   final private[this] val STATUS_CONNECTION_ERROR = 2
 
-  protected val ERROR_CODES = Map(
+  protected val ERROR_CODES: Map[Int, String] = Map(
     STATUS_OK -> "OK",
     STATUS_SYNTAX_ERROR -> "SYNTAX ERROR",
     STATUS_FILE_NOT_FOUND -> "FILE NOT FOUND",
@@ -380,8 +370,8 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
   bus.registerListener(this)
   //sendStatus(STATUS_OK)
   
-  def setFloppyRepository(repository:File) = floppyRepository = repository
-  def getFloppyRepository = floppyRepository
+  def setFloppyRepository(repository:File): Unit = floppyRepository = repository
+  def getFloppyRepository: File = floppyRepository
   
   def reset : Unit = {
     status_t = 0
@@ -674,7 +664,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     }
   }
   
-  private def diskWipe : Unit = {
+  private def diskWipe() : Unit = {
     floppyRepository.listFiles map { _.delete }
     setStatus(STATUS_OK)
   }
@@ -765,12 +755,12 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     status_t = 0 // d64
   }
   
-  private def diskCountCommand : Unit = {
+  private def diskCountCommand() : Unit = {
     setStatus(STATUS_OK)
     status_t = listDisks.length
   }  
   
-  private def openChannel : Unit = {
+  private def openChannel() : Unit = {
     //println(s"OPEN CHANNEL $channel with ${channels(channel).fileName}")
     channel match {
       //case 0 => load(channels(channel).fileName.toString)
@@ -779,7 +769,7 @@ class FlyerIEC(bus: IECBus,attachDrive: (File) => Unit) extends AbstractDrive(bu
     }
   }
   
-  private def writeOnChannel : Unit = {
+  private def writeOnChannel() : Unit = {
     //println(s"WRITING IN CHANNEL $channel ${channels(channel).bufferToString}")
     connections(channel).write
   }

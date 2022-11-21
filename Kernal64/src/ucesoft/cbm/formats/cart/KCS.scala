@@ -8,7 +8,7 @@ import ucesoft.cbm.formats.ExpansionPortFactory.CartridgeExpansionPort
 class KCS(crt: Cartridge,ram:Memory,nmiAction: (Boolean) => Unit) extends CartridgeExpansionPort(crt,ram) {
   private[this] val ram128 = Array.ofDim[Int](128)
 
-  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     if (address < 0xDF00) { // IO1
       exrom = (address & 0x02) == 2
       game = true

@@ -8,7 +8,7 @@ class SettingsPanel(settings:Preferences) extends JPanel {
 
   init
 
-  private def init : Unit = {
+  private def init() : Unit = {
     setLayout(new BorderLayout)
     val data : Array[Array[Object]] = settings.preferences.sortBy(_.cmdLine) map { s => Array[Object](s"--${s.cmdLine}",s.description) } toArray
     val cols : Array[Object] = Array("Setting","Description")

@@ -1,20 +1,20 @@
 package ucesoft.cbm.formats
 
-import java.io.RandomAccessFile
-import java.io.IOException
 import ucesoft.cbm.cpu.Memory
 
+import java.io.{IOException, RandomAccessFile}
+
 case class T64Entry(fileName: String, startAddress: Int, offset: Int, length: Int, blocks: Int) {
-  override def toString = fileName
+  override def toString: String = fileName
 }
 
 class T64(file: String) {
   private[this] val t64 = new RandomAccessFile(file, "r")
   private[this] var _tapeName = ""
-  val entries = loadEntries
+  val entries: Array[T64Entry] = loadEntries
 
-  def close = t64.close
-  def tapeName = _tapeName
+  def close: Unit = t64.close()
+  def tapeName: String = _tapeName
 
   def loadInMemory(mem: Memory, entry: T64Entry,c64Mode:Boolean=true) : Unit = {
     t64.seek(entry.offset)

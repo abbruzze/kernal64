@@ -1,17 +1,12 @@
 package ucesoft.cbm.expansion
 
-import ucesoft.cbm.Clock
-import ucesoft.cbm.ChipID
-import java.io._
-
-import ucesoft.cbm.Log
-import ucesoft.cbm.ClockEvent
 import org.apache.commons.net.telnet.TelnetClient
-import ucesoft.cbm.peripheral.rs232._
+import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.cia.CIA
-import ucesoft.cbm.CBMComponentType
-import javax.swing.JFrame
-import javax.swing.JOptionPane
+import ucesoft.cbm.peripheral.rs232._
+import ucesoft.cbm._
+
+import java.io._
 
 object SwiftLink {
   def getSL(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort]) : ExpansionPort with RS232 = {
@@ -23,7 +18,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   val TYPE : ExpansionPortType.Value = ExpansionPortType.SWIFTLINK
   override val name = "SwiftLink"
   override val componentID = "SwiftLink"
-  override val componentType = CBMComponentType.MEMORY
+  override val componentType: CBMComponentType.Value = CBMComponentType.MEMORY
   final private[this] val RX_EVENT = "SL_RX_EVENT"
   final private[this] val TX_EVENT = "SL_TX_EVENT"
   
@@ -70,8 +65,8 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   
   val EXROM = true
   val GAME = true
-  val ROML = null
-  val ROMH = null
+  val ROML: Memory = null
+  val ROMH: Memory = null
 
   // Modem interface
   def hangUp : Unit = {
@@ -80,8 +75,8 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     disconnect
     nmi
   }
-  def commandMode(on:Boolean) = {}
-  def connectTo(address:String) = {
+  def commandMode(on:Boolean): Unit = {}
+  def connectTo(address:String): Unit = {
     Log.info(s"SwiftLink - Connecting to $address")
     setConfiguration(address)
     setEnabled(true)
@@ -104,11 +99,11 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     else host = ""
   }
   
-  def connectionInfo = hostAndConf
+  def connectionInfo: String = hostAndConf
   
-  def getConfiguration = host + ":" + port
+  def getConfiguration: String = host + ":" + port
   
-  def isEnabled = connected == 0
+  def isEnabled: Boolean = connected == 0
   
   def setEnabled(enabled:Boolean) : Unit = {
     eject
@@ -123,7 +118,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     }
   }
   
-  private def connect  : Unit = {
+  private def connect()  : Unit = {
     try {
       telnetClient.connect(host, port)
       modem.setStreams(telnetClient.getInputStream,telnetClient.getOutputStream)
@@ -138,10 +133,10 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     }
   }
   
-  private def disconnect  : Unit = {
+  private def disconnect()  : Unit = {
     try {
       connected = DATA_SET_READY
-      if (telnetClient != null) telnetClient.disconnect
+      if (telnetClient != null) telnetClient.disconnect()
       modem.setStreams(null,null)
       Log.info(s"SwiftLink disconnected from $host:$port")
       modem.commandModeMessage(HayesResultCode.NO_CARRIER)
@@ -155,13 +150,13 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     }
   }
   
-  def setCIA12(cia1:CIA,cia2:CIA) : Unit = {}
+  def setBitReceivedListener(l: () => Unit) : Unit = {}
   
   def getDescription = "<html>SwiftLink TCP/IP cartridge.<br>Connection string: <i>host:port</i> or leave empty to connect later via <i>atdt host:port</i> modem command</html>"
   
-  def setRS232Listener(l:RS232StatusListener) = statusListener = l
+  def setRS232Listener(l:RS232StatusListener): Unit = statusListener = l
   
-  override def toString = componentID + (if (isEnabled) "(enabled)" else "") + (if (reu.isDefined) " $DE00 + REU" else " $DF00")
+  override def toString: String = componentID + (if (isEnabled) "(enabled)" else "") + (if (reu.isDefined) " $DE00 + REU" else " $DF00")
   // ----------------
   
   override def reset  : Unit = {
@@ -188,7 +183,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   @inline private def isDataTerminalReady = ((cmd & DATA_TERMINAL_READY) > 0)
   @inline private def isReceiverInterruptEnabled = (cmd & RECEIVER_INTERRUPT_ENABLED) == 0
   @inline private def isTransmitterInterruptEnabled = (cmd & TRANSMITTER_INTERRUPT_CONTROL) == 0x04
-  @inline private def nmi  : Unit = {
+  @inline private def nmi()  : Unit = {
     nmiHandler(true)
     nmiHandler(false)
     irq = IRQ
@@ -215,11 +210,11 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   
   private def socketError(t:Throwable) : Unit = {
     Log.info("Error while reading/writing byte from/to SwiftLink: " + t)
-    t.printStackTrace
+    t.printStackTrace()
     hangUp
   }
   
-  override def read(_address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  override def read(_address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     val address = (_address & 0xFF00) | (_address & 3) 
     address match {  
       case STATUS => 
@@ -242,7 +237,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
         }      
     }    
   }
-  override def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  override def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {
     val address = (_address & 0xFF00) | (_address & 3) 
     
     address match {  
@@ -268,7 +263,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
             try {
               if (modem.outputStream != null) {
                 modem.outputStream.write(value)
-                modem.outputStream.flush
+                modem.outputStream.flush()
               }
             }
             catch {
@@ -290,7 +285,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     }
   }
   
-  private def updateClockTicks  : Unit = {
+  private def updateClockTicks()  : Unit = {
     val stopBits = 1 + ((ctrl & 0x80) >> 7)
     val wordLength = 8 - ((ctrl & 0x60) >> 5)
     val parityBit = (cmd & 0x20) >> 5

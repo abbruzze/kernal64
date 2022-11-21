@@ -1,9 +1,9 @@
 package ucesoft.cbm.misc
 
-import java.awt.{Color, Component, Dimension, FlowLayout}
-
-import javax.swing._
 import ucesoft.cbm.peripheral.rs232.{BridgeRS232, RS232}
+
+import java.awt.{Color, Component, FlowLayout}
+import javax.swing._
 
 object RS232ConfigPanel {
   private var AVAILABLE_RS232 : Array[RS232] = _

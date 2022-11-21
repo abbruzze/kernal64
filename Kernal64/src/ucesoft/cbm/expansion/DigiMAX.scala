@@ -1,18 +1,17 @@
 package ucesoft.cbm.expansion
 
-import javax.sound.sampled.AudioFormat
-import javax.sound.sampled.DataLine
-import javax.sound.sampled.SourceDataLine
-import javax.sound.sampled.AudioSystem
 import ucesoft.cbm.ChipID
+import ucesoft.cbm.cpu.Memory
+
+import javax.sound.sampled.{AudioFormat, AudioSystem, DataLine, SourceDataLine}
 
 class DigiMaxCart(digiAddress:Int) extends ExpansionPort {
   val TYPE : ExpansionPortType.Value = ExpansionPortType.DIGIMAX
   val name = "DigiMAX"
   val EXROM = true
   val GAME = true
-  val ROML = null
-  val ROMH = null
+  val ROML: Memory = null
+  val ROMH: Memory = null
   
   DigiMAX.enabled(true,false)
   
@@ -20,7 +19,7 @@ class DigiMaxCart(digiAddress:Int) extends ExpansionPort {
   
   @inline private def checkAddress(address:Int) : Boolean = (address & 0xFFFC) == digiAddress
     
-  final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     if (checkAddress(address)) soundData(address & 3) else 0
   }
   final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
@@ -67,17 +66,17 @@ object DigiMAX {
   def setSampleRate(fHz:Int) : Unit = {
     sampleRate = fHz
     if (lines != null) {
-      for(l <- lines) if (l != null) l.close
+      for(l <- lines) if (l != null) l.close()
     }
     lines = createLines(fHz)
-    if (_enabled) for(l <- lines) if (l != null) l.start
+    if (_enabled) for(l <- lines) if (l != null) l.start()
   }
   
   def selectChannel(channel:Int) : Unit = {
     this.channel = channel
   }
-  def enabled = _enabled
-  def isEnabledOnUserPort = _enabled && enabledOnUserPort
+  def enabled: Boolean = _enabled
+  def isEnabledOnUserPort: Boolean = _enabled && enabledOnUserPort
   
   def enabled(on:Boolean,enabledOnUserPort:Boolean = false) : Unit = {
     _enabled = on
@@ -85,11 +84,10 @@ object DigiMAX {
     this.enabledOnUserPort = enabledOnUserPort
     if (lines != null) {
       for (dl <- lines) {
-        if (dl != null) on match {
-          case true =>
-            dl.start
-          case false =>
-            dl.stop
+        if (dl != null) if (on) {
+          dl.start()
+        } else {
+          dl.stop()
         }
       }
     }

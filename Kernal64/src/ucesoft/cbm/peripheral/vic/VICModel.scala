@@ -1,21 +1,52 @@
 package ucesoft.cbm.peripheral.vic
 
 object VICType extends Enumeration {
-  val PAL = Value
-  val NTSC = Value
+  val PAL: VICType.Value = Value
+  val NTSC: VICType.Value = Value
 }
 
 sealed trait VICModel {
-  val VIC_TYPE : VICType.Value
-  val CPU_FREQ : Double
-  val RASTER_LINES : Int
-  val RASTER_CYCLES : Int
-  val BLANK_TOP_LINE : Int
-  val BLANK_BOTTOM_LINE : Int
-  val BLANK_LEFT_CYCLE : Int
-  val BLANK_RIGHT_CYCLE : Int
+  val VIC_TYPE: VICType.Value
+  val CPU_FREQ: Double
+  val RASTER_LINES: Int
+  val RASTER_CYCLES: Int
+  val BLANK_TOP_LINE: Int
+  val BLANK_BOTTOM_LINE: Int
+  val BLANK_LEFT_CYCLE: Int
+  val BLANK_RIGHT_CYCLE: Int
   val RASTER_OFFSET = 0
+  val MAX_COLUMNS = 0
+  val MAX_ROWS = 0
+}
 
+object VIC_I_PAL extends VICModel {
+  override final val VIC_TYPE = VICType.PAL
+  override final val CPU_FREQ = 1_108_405.0d
+  override final val RASTER_LINES = 312
+  override final val RASTER_CYCLES = 71
+  override final val BLANK_TOP_LINE = 28
+  override final val BLANK_BOTTOM_LINE = 312
+  override final val BLANK_LEFT_CYCLE = 6
+  override final val BLANK_RIGHT_CYCLE = 62//64
+  override final val MAX_COLUMNS = 32
+  override final val MAX_ROWS = 37
+}
+
+object VIC_I_NTSC extends VICModel { // TODO to check if these values are correct
+  override final val VIC_TYPE = VICType.NTSC
+  override final val CPU_FREQ = 1_022_727.0d
+  override final val RASTER_LINES = 261
+  override final val RASTER_CYCLES = 65
+  override final val BLANK_TOP_LINE = 14
+  override final val BLANK_BOTTOM_LINE = RASTER_LINES
+  override final val BLANK_LEFT_CYCLE = 1
+  override final val BLANK_RIGHT_CYCLE = 51
+  override final val MAX_COLUMNS = 32
+  override final val MAX_ROWS = 31
+  override final val RASTER_OFFSET = 0
+}
+
+sealed trait VIC_II_Model extends VICModel {
   val XCOORD : Array[Int]
 
   /* ================================= SPRITE INFO =====================================
@@ -34,7 +65,7 @@ sealed trait VICModel {
   val SPRITE_BA_INFO : Array[Int]
 }
 
-object VIC_NTSC extends VICModel {
+object VIC_II_NTSC extends VIC_II_Model {
   override final val VIC_TYPE           = VICType.NTSC
   override final val CPU_FREQ           = 1022727.0d
   override final val RASTER_LINES       = 263
@@ -60,49 +91,49 @@ object VIC_NTSC extends VICModel {
     (0 << 16) | 8 << 8 | 0x80,      // 9
     (0 << 16) | 0 << 8 | 0x00,      // 10
     (0 << 16) | 0 << 8 | 0x00,      // 11
-    (1 << 17),                      // 12
-    (1 << 17),                      // 13
-    (1 << 17),                      // 14
-    (1 << 17),                      // 15
-    (1 << 17),                      // 16
-    (1 << 17),                      // 17
-    (1 << 17),                      // 18
-    (1 << 17),                      // 19
-    (1 << 17),                      // 20
-    (1 << 17),                      // 21
-    (1 << 17),                      // 22
-    (1 << 17),                      // 23
-    (1 << 17),                      // 24
-    (1 << 17),                      // 25
-    (1 << 17),                      // 26
-    (1 << 17),                      // 27
-    (1 << 17),                      // 28
-    (1 << 17),                      // 29
-    (1 << 17),                      // 30
-    (1 << 17),                      // 31
-    (1 << 17),                      // 32
-    (1 << 17),                      // 33
-    (1 << 17),                      // 34
-    (1 << 17),                      // 35
-    (1 << 17),                      // 36
-    (1 << 17),                      // 37
-    (1 << 17),                      // 38
-    (1 << 17),                      // 39
-    (1 << 17),                      // 40
-    (1 << 17),                      // 41
-    (1 << 17),                      // 42
-    (1 << 17),                      // 43
-    (1 << 17),                      // 44
-    (1 << 17),                      // 45
-    (1 << 17),                      // 46
-    (1 << 17),                      // 47
-    (1 << 17),                      // 48
-    (1 << 17),                      // 49
-    (1 << 17),                      // 50
-    (1 << 17),                      // 51
-    (1 << 17),                      // 52
-    (1 << 17),                      // 53
-    (1 << 17),                      // 54
+    1 << 17,                      // 12
+    1 << 17,                      // 13
+    1 << 17,                      // 14
+    1 << 17,                      // 15
+    1 << 17,                      // 16
+    1 << 17,                      // 17
+    1 << 17,                      // 18
+    1 << 17,                      // 19
+    1 << 17,                      // 20
+    1 << 17,                      // 21
+    1 << 17,                      // 22
+    1 << 17,                      // 23
+    1 << 17,                      // 24
+    1 << 17,                      // 25
+    1 << 17,                      // 26
+    1 << 17,                      // 27
+    1 << 17,                      // 28
+    1 << 17,                      // 29
+    1 << 17,                      // 30
+    1 << 17,                      // 31
+    1 << 17,                      // 32
+    1 << 17,                      // 33
+    1 << 17,                      // 34
+    1 << 17,                      // 35
+    1 << 17,                      // 36
+    1 << 17,                      // 37
+    1 << 17,                      // 38
+    1 << 17,                      // 39
+    1 << 17,                      // 40
+    1 << 17,                      // 41
+    1 << 17,                      // 42
+    1 << 17,                      // 43
+    1 << 17,                      // 44
+    1 << 17,                      // 45
+    1 << 17,                      // 46
+    1 << 17,                      // 47
+    1 << 17,                      // 48
+    1 << 17,                      // 49
+    1 << 17,                      // 50
+    1 << 17,                      // 51
+    1 << 17,                      // 52
+    1 << 17,                      // 53
+    1 << 17,                      // 54
     (0 << 16) | 0 << 8 | 0x00,      // 55
     (0 << 16) | 0 << 8 | 0x01,      // 56
     (0 << 16) | 0 << 8 | 0x01,      // 57
@@ -117,7 +148,7 @@ object VIC_NTSC extends VICModel {
   )
 }
 
-object VIC_PAL extends VICModel {
+object VIC_II_PAL extends VIC_II_Model {
   override final val VIC_TYPE           = VICType.PAL
   override final val CPU_FREQ           = 985248.0d
   override final val RASTER_LINES       = 312
@@ -142,49 +173,49 @@ object VIC_PAL extends VICModel {
     (1 << 16) | 8 << 8 | 0x80,      // 9
     (0 << 16) | 8 << 8 | 0x80,      // 10
     (0 << 16) | 0 << 8 | 0x00,      // 11
-    (1 << 17),                      // 12
-    (1 << 17),                      // 13
-    (1 << 17),                      // 14
-    (1 << 17),                      // 15
-    (1 << 17),                      // 16
-    (1 << 17),                      // 17
-    (1 << 17),                      // 18
-    (1 << 17),                      // 19
-    (1 << 17),                      // 20
-    (1 << 17),                      // 21
-    (1 << 17),                      // 22
-    (1 << 17),                      // 23
-    (1 << 17),                      // 24
-    (1 << 17),                      // 25
-    (1 << 17),                      // 26
-    (1 << 17),                      // 27
-    (1 << 17),                      // 28
-    (1 << 17),                      // 29
-    (1 << 17),                      // 30
-    (1 << 17),                      // 31
-    (1 << 17),                      // 32
-    (1 << 17),                      // 33
-    (1 << 17),                      // 34
-    (1 << 17),                      // 35
-    (1 << 17),                      // 36
-    (1 << 17),                      // 37
-    (1 << 17),                      // 38
-    (1 << 17),                      // 39
-    (1 << 17),                      // 40
-    (1 << 17),                      // 41
-    (1 << 17),                      // 42
-    (1 << 17),                      // 43
-    (1 << 17),                      // 44
-    (1 << 17),                      // 45
-    (1 << 17),                      // 46
-    (1 << 17),                      // 47
-    (1 << 17),                      // 48
-    (1 << 17),                      // 49
-    (1 << 17),                      // 50
-    (1 << 17),                      // 51
-    (1 << 17),                      // 52
-    (1 << 17),                      // 53
-    (1 << 17),                      // 54
+    1 << 17,                      // 12
+    1 << 17,                      // 13
+    1 << 17,                      // 14
+    1 << 17,                      // 15
+    1 << 17,                      // 16
+    1 << 17,                      // 17
+    1 << 17,                      // 18
+    1 << 17,                      // 19
+    1 << 17,                      // 20
+    1 << 17,                      // 21
+    1 << 17,                      // 22
+    1 << 17,                      // 23
+    1 << 17,                      // 24
+    1 << 17,                      // 25
+    1 << 17,                      // 26
+    1 << 17,                      // 27
+    1 << 17,                      // 28
+    1 << 17,                      // 29
+    1 << 17,                      // 30
+    1 << 17,                      // 31
+    1 << 17,                      // 32
+    1 << 17,                      // 33
+    1 << 17,                      // 34
+    1 << 17,                      // 35
+    1 << 17,                      // 36
+    1 << 17,                      // 37
+    1 << 17,                      // 38
+    1 << 17,                      // 39
+    1 << 17,                      // 40
+    1 << 17,                      // 41
+    1 << 17,                      // 42
+    1 << 17,                      // 43
+    1 << 17,                      // 44
+    1 << 17,                      // 45
+    1 << 17,                      // 46
+    1 << 17,                      // 47
+    1 << 17,                      // 48
+    1 << 17,                      // 49
+    1 << 17,                      // 50
+    1 << 17,                      // 51
+    1 << 17,                      // 52
+    1 << 17,                      // 53
+    1 << 17,                      // 54
     (0 << 16) | 0 << 8 | 0x01,      // 55
     (0 << 16) | 0 << 8 | 0x01,      // 56
     (0 << 16) | 0 << 8 | 0x03,      // 57

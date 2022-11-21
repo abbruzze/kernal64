@@ -1,10 +1,28 @@
 package ucesoft.cbm.peripheral.controlport
 
+import net.java.games.input.{Component, Controller, ControllerEnvironment}
+import ucesoft.cbm.Log
+import ucesoft.cbm.peripheral.controlport.Joysticks._
+
 import java.util.Properties
-import net.java.games.input.Controller
-import net.java.games.input.ControllerEnvironment
-import net.java.games.input.Component
-import Joysticks._
+
+object GamePadControlPort {
+  private var controllers : Array[Controller] = Array()
+
+  private def discoverControllers(): Unit = {
+    val thread = new Thread {
+      override def run(): Unit = {
+        System.setProperty("jinput.loglevel","SEVERE")
+        controllers = ControllerEnvironment.getDefaultEnvironment.getControllers
+        Log.info(s"JInput controllers discovery terminated [${controllers.length}]")
+      }
+    }
+    thread.start()
+    thread.join(1000)
+  }
+
+  def getControllers(): Array[Controller] = controllers
+}
 
 class GamePadControlPort(configuration:Properties) extends ControlPort {
   private[this] var controller : Option[Controller] = None
@@ -14,14 +32,14 @@ class GamePadControlPort(configuration:Properties) extends ControlPort {
   private[this] var yAxisComponent : Option[Component] = None
   private[this] var fireComponent : Option[Component] = None
   private[this] val dirThreshold = 0.5f
-  
+
+  GamePadControlPort.discoverControllers()
   findController
   
-  def findController : Unit = {
-    System.setProperty("jinput.loglevel","SEVERE")
+  def findController() : Unit = {
     controllerName = configuration.getProperty(CONFIG_CONTROLLER_NAME)
     controllerFireName = configuration.getProperty(CONFIG_CONTROLLER_FIRE_BUTTON,"1")
-    val controllers = ControllerEnvironment.getDefaultEnvironment.getControllers
+    val controllers = GamePadControlPort.getControllers()
     controller = controllers find { c => c.getName == controllerName  && (c.getType == Controller.Type.GAMEPAD || c.getType == Controller.Type.STICK)}
     controller match {
       case None =>

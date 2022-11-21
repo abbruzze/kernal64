@@ -1,16 +1,18 @@
 package ucesoft.cbm.scpu
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
-import java.util
-
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.c64._
 import ucesoft.cbm.cpu._
 import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortConfigurationListener, LastByteReadMemory}
 import ucesoft.cbm.misc.TestCart
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.sid.SID
-import ucesoft.cbm.peripheral.vic.VIC
+import ucesoft.cbm.peripheral.vic.VIC_II
 import ucesoft.cbm.{CBMComponentType, ChipID, Log}
-import ucesoft.cbm.c64._
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util
+import java.util.Properties
 
 object SCPUC64MMU {
   import ROM._
@@ -28,7 +30,7 @@ object SCPUC64MMU {
   // ------------------ C64 1Mhz RAM --------------------------------------
   class RAM extends RAMComponent {
     val componentID = "RAM"
-    val componentType = CBMComponentType.MEMORY
+    val componentType: Type = CBMComponentType.MEMORY
     
     val isRom = false
     val name = "RAM"
@@ -99,11 +101,11 @@ object SCPUC64MMU {
    */
   class COLOR_RAM(mem:Array[Int]) extends RAMComponent {
     val componentID = "COLOR RAM"
-    val componentType = CBMComponentType.MEMORY
+    val componentType: Type = CBMComponentType.MEMORY
 
     val isRom = false
     val name = "COLOR_RAM"
-    val startAddress = COLOR_RAM
+    val startAddress: Int = COLOR_RAM
     val length = 1024
 
     final val isActive = true
@@ -116,7 +118,7 @@ object SCPUC64MMU {
     }
 
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(0x010000 | address)
-    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem(0x010000 | address) = value & 0x0f
+    final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = mem(0x010000 | address) = value & 0x0f
     // state
     protected def saveState(out:ObjectOutputStream) : Unit = {}
     protected def loadState(in:ObjectInputStream) : Unit = {}
@@ -125,14 +127,14 @@ object SCPUC64MMU {
 
   class SCPU_MMU(cpuFastModeListener : Boolean => Unit = null,simmUsageListener: Float => Unit = null) extends RAMComponent with ExpansionPortConfigurationListener {
     val componentID = "Main RAM"
-    val componentType = CBMComponentType.MEMORY
+    val componentType: Type = CBMComponentType.MEMORY
     
     private[this] val ram = new RAM
 
     val name = "MAIN-RAM"
     val isRom = false
-    val startAddress = ram.startAddress
-    val length = ram.length
+    val startAddress: Int = ram.startAddress
+    val length: Int = ram.length
     val CHAR_ROM = new CHARACTERS_ROM(ram)
     val SCPU_ROM = new SCPU_ROM(ram)
     val isActive = true
@@ -153,7 +155,7 @@ object SCPUC64MMU {
 
     private[this] var cia1,cia2 : CIA = _
     private[this] var sid : SID = _
-    private[this] var vic : VIC = _
+    private[this] var vic : VIC_II = _
 
     private[this] var clockStretchingRequest : () => Unit = _
     private[this] var cacheWriteWaitListener : Boolean => Unit = _
@@ -233,7 +235,7 @@ object SCPUC64MMU {
       if (!baLow) cacheWriteWaitListener(false)
     }
 
-    def setIO(cia1:CIA,cia2:CIA,sid:SID,vic:VIC): Unit = {
+    def setIO(cia1:CIA,cia2:CIA,sid:SID,vic:VIC_II): Unit = {
       this.cia1 = cia1
       this.cia2 = cia2
       this.sid = sid
@@ -242,13 +244,13 @@ object SCPUC64MMU {
     
     def getRAM : Memory = this
 
-    def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory) = {
+    def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory): Unit = {
       this.lastByteReadMemory = lastByteReadMemory
       ram.lastByteReadMemory = lastByteReadMemory
       COLOR_RAM.setLastByteReadMemory(lastByteReadMemory)
     }
     
-    override def getProperties = {
+    override def getProperties: Properties = {
       super.getProperties
       properties.setProperty("Mem config",MEM_CONFIG(memConfig).toString)
       properties.setProperty("$0",Integer.toHexString(ddr))
@@ -267,7 +269,7 @@ object SCPUC64MMU {
       properties
     }
 
-    @inline private def check0001 : Unit = {
+    @inline private def check0001() : Unit = {
       val EXROM = expansionPort.EXROM
       val GAME = expansionPort.GAME
       expansionPortConfigurationChanged(GAME,EXROM)
@@ -811,7 +813,7 @@ object SCPUC64MMU {
       Log.debug(s"Set ${mb}M of memory. mem_simm_ram_mask=${mem_simm_ram_mask.toHexString} mem_simm_page_size=$mem_simm_page_size")
     }
 
-    private def updateSIMMConfig : Unit = {
+    private def updateSIMMConfig() : Unit = {
       reg_simm_config match {
         case 0 =>
           mem_conf_page_size = 9 + 2
@@ -832,7 +834,7 @@ object SCPUC64MMU {
       Log.debug(s"Updating SIMM configuration: $reg_simm_config mem_conf_page_size=$mem_conf_page_size mem_conf_size=${mem_conf_size.toHexString}")
     }
 
-    private def updateMirroringMode : Unit = {
+    private def updateMirroringMode() : Unit = {
       mirroringMode = (reg_opt_mode & 0xC0) >> 5 | (reg_opt_mode & 0x04) >> 2
       zeroPageAndStackMirroring = (reg_opt_mode & 1) > 0
       mirroringArea = MIRROR_AREAS(mirroringMode)

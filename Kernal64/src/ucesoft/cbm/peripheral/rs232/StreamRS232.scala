@@ -1,10 +1,6 @@
 package ucesoft.cbm.peripheral.rs232
 
-import java.io.OutputStream
-import java.io.InputStream
-import ucesoft.cbm.Log
-import ucesoft.cbm.Clock
-import ucesoft.cbm.ClockEvent
+import java.io.{InputStream, OutputStream}
 
 abstract class StreamRS232 extends AbstractRS232 {
 
@@ -29,5 +25,5 @@ abstract class StreamRS232 extends AbstractRS232 {
     }
   }
   
-  def getStreams = (modem.inputStream,modem.outputStream)
+  def getStreams: (InputStream, OutputStream) = (modem.inputStream,modem.outputStream)
 }

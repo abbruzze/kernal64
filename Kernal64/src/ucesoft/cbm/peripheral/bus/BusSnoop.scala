@@ -8,7 +8,7 @@ class BusSnoop(bus:IECBus) extends IECBusDevice(bus,0xFF) {
   bus.registerListener(this)
    
   protected def isDeviceReady = true
-  protected def loadData(fileName:String) = None
+  protected def loadData(fileName:String): Option[BusDataIterator] = None
   
   override protected def onCommand(cmd:IECBusDevice.Command.Value,secondaryAddress:Int) : Unit = {
     Log.info("Bus Snoop: %10s %d".format(cmd.toString,secondaryAddress))

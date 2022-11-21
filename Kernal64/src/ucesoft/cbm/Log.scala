@@ -1,14 +1,12 @@
 package ucesoft.cbm
 
-import java.io.PrintWriter
-
-import javax.swing.{JPanel, JScrollPane, JTextArea, SwingUtilities}
-import java.io.Writer
-import java.awt.{BorderLayout, Color, Font}
-
-import javax.swing.text.DefaultCaret
 import org.fife.ui.rsyntaxtextarea.{RSyntaxTextArea, SyntaxConstants}
 import org.fife.ui.rtextarea.RTextScrollPane
+
+import java.awt.BorderLayout
+import java.io.{PrintWriter, Writer}
+import javax.swing.JPanel
+import javax.swing.text.DefaultCaret
 
 object Log {
   private val FINE = 1
@@ -17,9 +15,9 @@ object Log {
   private var severity = 0
   private var out : PrintWriter = new PrintWriter(System.out,true)
   
-  def setInfo: Unit = severity = INFO
-  def setDebug: Unit = severity = DEBUG | INFO
-  def setFine : Unit= severity = FINE | DEBUG | INFO
+  def setInfo(): Unit = severity = INFO
+  def setDebug(): Unit = severity = DEBUG | INFO
+  def setFine() : Unit= severity = FINE | DEBUG | INFO
   def setOutput(out:PrintWriter) : Unit = { this.out = out }
   def getOut : PrintWriter = out
   
@@ -46,10 +44,10 @@ object Log {
 
     val writer = new PrintWriter(new Writer {
       def write(chars:Array[Char],off:Int,len:Int) : Unit = logPanel.append(new String(chars, off, len))
-      def flush  : Unit = {}
-      def close  : Unit = {}
+      def flush()  : Unit = {}
+      def close()  : Unit = {}
     },true)
     
-    def clear = logPanel.setText("")
+    def clear(): Unit = logPanel.setText("")
   }
 }

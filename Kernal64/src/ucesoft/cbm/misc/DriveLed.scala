@@ -1,16 +1,16 @@
 package ucesoft.cbm.misc
 
-import javax.swing.{JComponent, JFrame, JLabel}
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
+import ucesoft.cbm.{CBMComponent, CBMComponentType}
+import ucesoft.cbm.CBMComponentType.Type
 
-import java.awt.{Color, Dimension, FlowLayout, Graphics, Graphics2D}
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
+import java.awt._
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
+import javax.swing.{JComponent, JLabel}
 
 class DriveLed(id:Int) extends JComponent with CBMComponent {
   val componentID = "Drive led"
-  val componentType = CBMComponentType.INTERNAL
+  val componentType: Type = CBMComponentType.INTERNAL
   var powerOn,driveLedOn,driveWriteMode = false
 
   private[this] final val LED_OFF = Color.DARK_GRAY
@@ -26,7 +26,7 @@ class DriveLed(id:Int) extends JComponent with CBMComponent {
   add(new Led)
   add(label)
 
-  def setPowerLedMode(on:Boolean) = {
+  def setPowerLedMode(on:Boolean): Unit = {
     powerLedMode = on
     repaint()
   }
@@ -70,7 +70,7 @@ class DriveLed(id:Int) extends JComponent with CBMComponent {
     }
   }
 
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Led on",driveLedOn.toString)
     properties
   }

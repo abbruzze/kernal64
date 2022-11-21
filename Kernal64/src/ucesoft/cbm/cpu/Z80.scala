@@ -1,14 +1,14 @@
 package ucesoft.cbm.cpu
 
 import ucesoft.cbm.ChipID.ID
-import ucesoft.cbm.trace.{BreakType, CpuStepInfo, NoBreak, TraceListener}
+import ucesoft.cbm.cpu.Z80.EmptyIOMemory
+import ucesoft.cbm.trace.TraceListener
+import ucesoft.cbm.trace.TraceListener._
 import ucesoft.cbm.{Chip, ChipID, Log}
 
-import scala.language.implicitConversions
-import java.io.PrintWriter
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
+import java.io.{ObjectInputStream, ObjectOutputStream, PrintWriter}
 import java.util.Properties
+import scala.language.implicitConversions
 
 object Z80 {
   @inline private def hex2(data: Int) = "%02X".format(data & 0xffff)
@@ -26,7 +26,7 @@ object Z80 {
     def out(addressHI:Int,addressLO:Int,value:Int) : Unit = {}
   }
 
-  class Context(val mem:Memory,val io:IOMemory) {
+  class Context(val mem:Memory,val io:IOMemory,val traceUpdate: Boolean => Unit) {
     var A1,F1,H1,L1,D1,E1,B1,C1 = 0
     var halted = false
     var im = 0
@@ -52,8 +52,9 @@ object Z80 {
     private[this] var additionalClockCycles = 0
     var isIndexX = true
     var lastWrite = 0
+    var stepType : StepType = _
 
-    final def copyQ : Unit = {
+    final def copyQ() : Unit = {
       lastQ = Q
       Q = false
     }
@@ -296,7 +297,7 @@ object Z80 {
     final def INDEX : Int = if (isIndexX) IX else IY
     final def INDEX_=(value:Int) : Unit = if (isIndexX) IX = value else IY = value
 
-    final def EX_SP_IX : Unit = {
+    final def EX_SP_IX() : Unit = {
       val tmp = readW(SP)
       io.internalOperation(1,(SP + 1) & 0xFFFF)
       writeW(SP,INDEX)
@@ -305,7 +306,7 @@ object Z80 {
       memptr = tmp
     }
 
-    final def EX_SP_HL : Unit = {
+    final def EX_SP_HL() : Unit = {
       val tmp = readW(SP)
       io.internalOperation(1,(SP + 1) & 0xFFFF)
       writeW(SP,HL)
@@ -314,7 +315,7 @@ object Z80 {
       memptr = tmp
     }
 
-    final def EX_AF  : Unit = {
+    final def EX_AF()  : Unit = {
       var tmp = A
       A = A1
       A1 = tmp
@@ -323,7 +324,7 @@ object Z80 {
       F1 = tmp
     }
 
-    final def EX_DE_HL  : Unit = {
+    final def EX_DE_HL()  : Unit = {
       var tmp = D
       D = H
       H = tmp
@@ -332,7 +333,7 @@ object Z80 {
       L = tmp
     }
 
-    final def EXX  : Unit = {
+    final def EXX()  : Unit = {
       // BC <=> BC'
       var tmp = B
       B = B1
@@ -405,7 +406,7 @@ object Z80 {
       mem.write((address + 1) & 0xFFFF,(value >> 8) & 0xFF,ChipID.CPU)
     }
 
-    final def reset  : Unit = {
+    final def reset()  : Unit = {
       AF = 0xFFFF
       SP = 0xFFFF
       PC = 0
@@ -429,7 +430,23 @@ object Z80 {
       memptr = 0xFFFF
     }
 
-    override def toString = s"PC=${hex4(PC)} AF=${hex4(AF)} BC=${hex4(BC)} DE=${hex4(DE)} HL=${hex4(HL)} IX=${hex4(IX)} IY=${hex4(IY)} I=${hex2(I)} im=$im SP=${hex2(SP)} SZYHXPNC=${sr2String}"
+    override def toString = s"PC=${hex4(PC)} AF=${hex4(AF)} BC=${hex4(BC)} DE=${hex4(DE)} HL=${hex4(HL)} IX=${hex4(IX)} IY=${hex4(IY)} I=${hex2(I)} im=$im SP=${hex2(SP)} SZYHXPNC=$sr2String"
+
+    def buildCpuStepInfo(): List[TraceRegister] = {
+      TraceRegister.builder().
+        add("PC", hex4(PC),PC).
+        add("AF", hex4(AF),AF).
+        add("BC", hex4(BC),BC).
+        add("DE", hex4(DE),DE).
+        add("HL", hex4(HL),HL).
+        add("IX", hex4(IX),IX).
+        add("IY", hex4(IY),IY).
+        add("I", hex2(I),I).
+        add("IM", hex2(im),im).
+        add("SP", hex2(SP),SP).
+        add("SZYHXPNC", sr2String,F,"STATUS").
+        build()
+    }
     @inline private def sr2String = {
       val sb = new StringBuilder
       if (sign > 0) sb += 'S' else sb += '-'
@@ -438,6 +455,7 @@ object Z80 {
       if (half > 0) sb += 'H' else sb += '-'
       if (xf > 0) sb += 'X' else sb += '-'
       if (parity > 0) sb += 'P' else sb += '-'
+      if (negative > 0) sb += 'N' else sb += '-'
       if (carry > 0) sb += 'C' else sb += '-'
       sb.toString
     }
@@ -506,7 +524,7 @@ object Z80 {
       setXY(A)
     }
 
-    final def cpl : Unit = {
+    final def cpl() : Unit = {
       A = ~A & 0xFF
       setHalf(true)
       setNegative(true)
@@ -514,19 +532,19 @@ object Z80 {
       Q = true
     }
 
-    final def ccf : Unit = {
+    final def ccf() : Unit = {
       val q = if (lastQ) F else 0
       F = F & 0xC4 | (if ((F & 1) != 0) 0x10 else 1) | ((q ^ F) | A) & 0x28
       Q = true
     }
 
-    final def scf : Unit = {
+    final def scf() : Unit = {
       val q = if (lastQ) F else 0
       F = F & 0xC4 | ((q ^ F) | A) & 0x28 | 1
       Q = true
     }
 
-    final def daa : Unit = {
+    final def daa() : Unit = {
       var c,d = 0
       if (A > 0x99 || carry > 0) {
         c = 1
@@ -550,7 +568,7 @@ object Z80 {
       setXY(value)
     }
 
-    final def addHLBC : Unit = {
+    final def addHLBC() : Unit = {
       memptr = (HL + 1) & 0xFFFF
       io.internalOperation(7,IR)
       val tmp = HL + BC
@@ -562,7 +580,7 @@ object Z80 {
       Q = true
     }
 
-    final def addHLDE : Unit = {
+    final def addHLDE() : Unit = {
       memptr = (HL + 1) & 0xFFFF
       io.internalOperation(7,IR)
       val tmp = HL + DE
@@ -574,7 +592,7 @@ object Z80 {
       Q = true
     }
 
-    final def addHLHL : Unit = {
+    final def addHLHL() : Unit = {
       memptr = (HL + 1) & 0xFFFF
       io.internalOperation(7,IR)
       val tmp = HL + HL
@@ -586,7 +604,7 @@ object Z80 {
       Q = true
     }
 
-    final def addHLSP : Unit = {
+    final def addHLSP() : Unit = {
       memptr = (HL + 1) & 0xFFFF
       io.internalOperation(7,IR)
       val tmp = HL + SP
@@ -598,7 +616,7 @@ object Z80 {
       Q = true
     }
 
-    final def addIXBC : Unit = {
+    final def addIXBC() : Unit = {
       memptr = (INDEX + 1) & 0xFFFF
       io.internalOperation(7,IR)
       val tmp = INDEX + BC
@@ -610,7 +628,7 @@ object Z80 {
       Q = true
     }
 
-    final def addIXDE : Unit = {
+    final def addIXDE() : Unit = {
       memptr = (INDEX + 1) & 0xFFFF
       io.internalOperation(7,IR)
       val tmp = INDEX + DE
@@ -622,7 +640,7 @@ object Z80 {
       Q = true
     }
 
-    final def addIXSP : Unit = {
+    final def addIXSP() : Unit = {
       memptr = (INDEX + 1) & 0xFFFF
       io.internalOperation(7,IR)
       val tmp = INDEX + SP
@@ -634,7 +652,7 @@ object Z80 {
       Q = true
     }
 
-    final def addIXIX : Unit = {
+    final def addIXIX() : Unit = {
       memptr = (INDEX + 1) & 0xFFFF
       io.internalOperation(7,IR)
       val tmp = INDEX + INDEX
@@ -678,7 +696,7 @@ object Z80 {
       Q = true
     }
 
-    final def rotLC(value: Int) = {
+    final def rotLC(value: Int): Int = {
       val h = (value & 0x80) >> 7
       val rot = (value << 1 | h) & 0xFF
       F = SZP(rot) ; Q = true
@@ -687,7 +705,7 @@ object Z80 {
       rot
     }
 
-    final def rotRC(value: Int) = {
+    final def rotRC(value: Int): Int = {
       val oldCarry = value & 0x01
       val rot = (value >> 1 | oldCarry << 7) & 0xFF
       F = SZP(rot) ; Q = true
@@ -696,7 +714,7 @@ object Z80 {
       rot
     }
 
-    final def rotL(value: Int) = {
+    final def rotL(value: Int): Int = {
       val oldCarry = carry
       val h = (value & 0x80) >> 7
       val rot = (value << 1 | oldCarry) & 0xFF
@@ -706,7 +724,7 @@ object Z80 {
       rot
     }
 
-    final def rotR(value: Int) = {
+    final def rotR(value: Int): Int = {
       val oldCarry = carry
       val l = (value & 0x01)
       val rot = (value >> 1 | oldCarry << 7) & 0xFF
@@ -716,7 +734,7 @@ object Z80 {
       rot
     }
 
-    final def sla(value: Int, bit0: Int = 0) = {
+    final def sla(value: Int, bit0: Int = 0): Int = {
       val h = (value & 0x80)
       val shift = bit0 | (value << 1) & 0xFF
       F = SZP(shift) ; Q = true
@@ -725,7 +743,7 @@ object Z80 {
       shift
     }
 
-    final def sra(value: Int) = {
+    final def sra(value: Int): Int = {
       val l = (value & 0x01)
       val h = (value & 0x80)
       val shift = (value >> 1 | h) & 0xFF
@@ -735,7 +753,7 @@ object Z80 {
       shift
     }
 
-    final def srl(value: Int) = {
+    final def srl(value: Int): Int = {
       val l = value & 0x01
       val shift = (value >> 1) & 0xFF
       F = SZP(shift) ; Q = true
@@ -794,7 +812,7 @@ object Z80 {
       Q = true
     }
 
-    final def rld : Unit = {
+    final def rld() : Unit = {
       memptr = (HL + 1) & 0xFFFF
       val memHL = read(HL)
       io.internalOperation(4,HL)
@@ -806,7 +824,7 @@ object Z80 {
       setXY(A)
     }
 
-    final def rrd : Unit = {
+    final def rrd() : Unit = {
       memptr = (HL + 1) & 0xFFFF
       val memHL = read(HL)
       io.internalOperation(4,HL)
@@ -837,10 +855,10 @@ object Z80 {
       }
     }
 
-    final def res(b:Int,value:Int) = value & ~(1 << b)
-    final def set(b:Int,value:Int) = value | (1 << b)
+    final def res(b:Int,value:Int): Int = value & ~(1 << b)
+    final def set(b:Int,value:Int): Int = value | (1 << b)
 
-    final def jre_e : Unit = {
+    final def jre_e() : Unit = {
       io.internalOperation(5,PC)
       val addr = (PC + 2 + byte(1).asInstanceOf[Byte]) & 0xFFFF
       PC = addr
@@ -889,6 +907,10 @@ object Z80 {
       if (cond) {
         PC = pop
         setAdditionalClockCycles(6)
+        if (stepType == StepOut) {
+          traceUpdate(true)
+          stepType = StepIn
+        }
       }
       else PC = (PC + 1) & 0xFFFF
     }
@@ -906,13 +928,13 @@ object Z80 {
       memptr = PC
     }
 
-    final def in_a_n : Unit = {
+    final def in_a_n() : Unit = {
       val port = byte(1)
       memptr = ((A << 8) + port + 1) & 0xFFFF
       A = io.in(A,port)
     }
 
-    final def in_r_c() = {
+    final def in_r_c(): Int = {
       val v = io.in(B,C)
       F = SZP(v) | carry ; Q = true
       setHalf(false)
@@ -967,7 +989,7 @@ object Z80 {
       setXY(B)
     }
 
-    final def neg : Unit = {
+    final def neg() : Unit = {
       val tmp = (0 - A) & 0xFF
       F = SZP(tmp) ; Q = true
       setNegative(true)
@@ -978,9 +1000,9 @@ object Z80 {
       setXY(tmp)
     }
 
-    final def incR(deltaR:Int) = R = (R & 0x80) | (R + deltaR) & 0x7F
+    final def incR(deltaR:Int): Unit = R = (R & 0x80) | (R + deltaR) & 0x7F
 
-    final def ldi : Unit = {
+    final def ldi() : Unit = {
       val tmp = read(HL)
       val tmp2 = A + tmp
       val de = DE
@@ -992,7 +1014,7 @@ object Z80 {
       F = F & 0xD7 | tmp2 & 0x8 | (tmp2 & 0x2) << 4
     }
 
-    final def ldir : Unit = {
+    final def ldir() : Unit = {
       val tmp = read(HL)
       val tmp2 = A + tmp
       val de = DE
@@ -1013,7 +1035,7 @@ object Z80 {
       F = F & 0xD7 | tmp2 & 0x8 | (tmp2 & 0x2) << 4
     }
 
-    final def ldd : Unit = {
+    final def ldd() : Unit = {
       val tmp = read(HL)
       val tmp2 = A + tmp
       val de = DE
@@ -1025,7 +1047,7 @@ object Z80 {
       F = F & 0xD7 | tmp2 & 0x8 | (tmp2 & 0x2) << 4
     }
 
-    final def lddr : Unit = {
+    final def lddr() : Unit = {
       val tmp = read(HL)
       val tmp2 = A + tmp
       val de = DE
@@ -1045,7 +1067,7 @@ object Z80 {
       F = F & 0xD7 | tmp2 & 0x8 | (tmp2 & 0x2) << 4
     }
 
-    final def cpi : Unit = {
+    final def cpi() : Unit = {
       val value = read(HL)
       io.internalOperation(5,HL)
       var cmp = (A - value) & 0xFF
@@ -1059,7 +1081,7 @@ object Z80 {
       memptr = (memptr + 1) & 0xFFFF
     }
 
-    final def cpir : Unit = {
+    final def cpir() : Unit = {
       val value = read(HL)
       io.internalOperation(5,HL)
       var cmp = (A - value) & 0xFF
@@ -1082,7 +1104,7 @@ object Z80 {
       F = F & 0xD7 | cmp & 0x8 | (cmp & 0x2) << 4
     }
 
-    final def cpdr : Unit = {
+    final def cpdr() : Unit = {
       val value = read(HL)
       io.internalOperation(5,HL)
       var cmp = (A - value) & 0xFF
@@ -1105,7 +1127,7 @@ object Z80 {
       F = F & 0xD7 | cmp & 0x8 | (cmp & 0x2) << 4
     }
 
-    final def cpd : Unit = {
+    final def cpd() : Unit = {
       val value = read(HL)
       io.internalOperation(5,HL)
       var cmp = (A - value) & 0xFF
@@ -1119,7 +1141,7 @@ object Z80 {
       memptr = (memptr - 1) & 0xFFFF
     }
 
-    final def djnz : Unit = {
+    final def djnz() : Unit = {
       io.internalOperation(1,IR)
       val ofs = byte(1).asInstanceOf[Byte]
       B = (B - 1) & 0xFF
@@ -2537,7 +2559,13 @@ object Z80 {
   private val DJNZ_e = Opcode(0x10,8,2,MNEMONIC_jr("DJNZ %s"),modifyPC = true) { ctx => ctx.djnz }
   // *** RET
   // **************
-  private val RET = Opcode(0xC9,10,1,"RET",modifyPC = true) { ctx => val addr = ctx.pop ; ctx.PC = addr ; ctx.memptr = addr }
+  private val RET = Opcode(0xC9,10,1,"RET",modifyPC = true) { ctx =>
+    val addr = ctx.pop ; ctx.PC = addr ; ctx.memptr = addr
+    if (ctx.stepType == StepOut) {
+      ctx.traceUpdate(true)
+      ctx.stepType = StepIn
+    }
+  }
   // *** RET cc
   // **************
   private val RET_C_nn = Opcode(0xD8,5,1,"RET C",modifyPC = true) { ctx => ctx.ret_cond(ctx.carry > 0) }
@@ -2663,7 +2691,7 @@ object Z80 {
   private val OUT$C$0 = Opcode((0xED,0x71),12,2,"OUT (C),0") { ctx => ctx.out_c_r(0) }
   // =========================================================================================================
   // ====================================== Reflection =======================================================
-  def initOpcodes  : Unit = {
+  def initOpcodes()  : Unit = {
     if (opcodes_1(0) != null) return
 
     val fields = getClass.getDeclaredFields
@@ -2761,13 +2789,14 @@ object Z80 {
  * @author ealeame
  */
 class Z80(mem:Memory,
-          io_memory:Z80.IOMemory = null,
+          io_memory:Z80.IOMemory = EmptyIOMemory,
           trapListener : Z80.Context => Unit = null,
           undocHandler : Z80.Context => Int = null) extends Chip with TraceListener {
   val id: ID = ChipID.CPU
   override lazy val componentID = "Z80"
   import Z80._
-  val ctx = new Context(mem,io_memory)
+  private[this] var tracing = false
+  val ctx = new Context(mem,io_memory,traceUpdate => tracing = traceUpdate)
   final val M1FETCH_PIN = 1
   final val REFRESH_PIN = 2
   final val DUMMY_READ_PIN = 4
@@ -2778,11 +2807,12 @@ class Z80(mem:Memory,
   private[this] var cpuWaitUntil = 0L
   private[this] var cpuRestCycles = 0.0
   private[this] var busREQ = false
-  private[this] var tracing = false
   private[this] var stepCallBack : CpuStepInfo => Unit = _
   private[this] val syncObject = new Object
   private[this] var breakCallBack : CpuStepInfo => Unit = _
   private[this] var breakType : BreakType = _
+  private[this] var stepType: StepType = _
+  private[this] var stepOverTargetAddress = 0
   private[this] var lastPC = 0
 
   override def getProperties: Properties = {
@@ -2793,18 +2823,21 @@ class Z80(mem:Memory,
   }
 
   // =================================== Tracing =============================================================
-  def setCycleMode(cycleMode: Boolean): Unit = {}
-  def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {
+  override def getRegisters(): List[TraceRegister] = ctx.buildCpuStepInfo()
+  override def setCycleMode(cycleMode: Boolean): Unit = {}
+  override def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {
     // TODO
   }
-  def setTrace(traceOn:Boolean): Unit = tracing = traceOn
-  def step(updateRegisters: CpuStepInfo => Unit) : Unit = {
+  override def setTrace(traceOn:Boolean): Unit = tracing = traceOn
+  override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType) : Unit = {
     stepCallBack = updateRegisters
+    this.stepType = stepType
+    ctx.stepType = stepType
     syncObject.synchronized {
-      syncObject.notify
+      syncObject.notify()
     }
   }
-  def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) : Unit = {
+  override def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) : Unit = {
     tracing = false
     breakCallBack = callback
     this.breakType = breakType match {
@@ -2812,15 +2845,15 @@ class Z80(mem:Memory,
       case _ => breakType
     }
   }
-  def jmpTo(pc:Int) : Unit = {
+  override def jmpTo(pc:Int) : Unit = {
     ctx.PC = pc & 0xFFFF
   }
-  def disassemble(mem:Memory,address:Int) : (String,Int) = {
+  override def disassemble(address:Int) : DisassembleInfo = {
     try {
       dummyRead = true
       val adr = Array(address)
       val opcode = fetch(adr)
-      (opcode.disassemble(mem, adr(0)), opcode.size)
+      DisassembleInfo(opcode.disassemble(mem, adr(0)), opcode.size)
     }
     finally {
       dummyRead = false
@@ -2842,7 +2875,7 @@ class Z80(mem:Memory,
   }
 
   // ======================================== Bus Request (threee state) =====================================
-  def requestBUS(request:Boolean) = busREQ = request
+  def requestBUS(request:Boolean): Unit = busREQ = request
   // ======================================== Fetch & Execute ================================================
 
   def isM1Fetch : Boolean = M1Fetch
@@ -2863,6 +2896,11 @@ class Z80(mem:Memory,
     M1Fetch = false
     refresh = false
     dummyRead = false
+
+    if (breakType != null && breakType.isBreak(ResetBreakInfo())) {
+      tracing = true
+      breakCallBack(CpuStepInfo(ctx.PC, ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
+    }
   }
 
   @inline private[this] def fetch(addr:Array[Int] = null) : Opcode = {
@@ -2932,27 +2970,27 @@ class Z80(mem:Memory,
     }
   }
 
-  @inline private def refreshCycle : Unit = {
+  @inline private def refreshCycle() : Unit = {
     refresh = true
     val refreshAddress = ctx.I << 8 | ctx.R & 0x7F
     mem.read(refreshAddress)
     refresh = false
   }
 
-  @inline private def interruptMode0Handling  : Unit = {
+  @inline private def interruptMode0Handling()  : Unit = {
     // RST 38
     ctx.PC = 0x38
   }
 
-  @inline private def interruptMode2Handling  : Unit = {
+  @inline private def interruptMode2Handling()  : Unit = {
     val addr = ctx.I << 8 | im2LowByte
     ctx.PC = (mem.read(addr + 1) << 8) | mem.read(addr)
   }
 
   final def clock : Int = {
-    if (breakType != null && breakType.isBreak(ctx.PC,false,false)) {
+    if (breakType != null && breakType.isBreak(AddressBreakInfo(ctx.PC,ExecuteBreakAccess))) {
       tracing = true
-      breakCallBack(CpuStepInfo(ctx.PC,ctx.toString))
+      breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
     }
 
     if ((irqLow || nmiOnNegativeEdge) && !ctx.mustDelayInt) { // any interrupt pending ?
@@ -2960,15 +2998,15 @@ class Z80(mem:Memory,
       if (nmiOnNegativeEdge) { // NMI
         if (ctx.halted) {
           ctx.halted = false
-          ctx.incPC()//ctx.PC = (ctx.PC + 1) & 0xFFFF
+          ctx.incPC()
         }
         ctx.io.internalOperation(5)
         ctx.push(ctx.PC)
         ctx.incR(1)
         refreshCycle
-        if (breakType != null && breakType.isBreak(ctx.PC,false,true)) {
+        if (breakType != null && breakType.isBreak(NMIBreakInfo())) {
           tracing = true
-          breakCallBack(CpuStepInfo(ctx.PC,ctx.toString))
+          breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
           Log.debug("NMI Break")
         }
         nmiOnNegativeEdge = false
@@ -2992,9 +3030,9 @@ class Z80(mem:Memory,
 
           ctx.push(ctx.PC)
           ctx.incR(1)
-          if (breakType != null && breakType.isBreak(ctx.PC,true,false)) {
+          if (breakType != null && breakType.isBreak(IRQBreakInfo())) {
             tracing = true
-            breakCallBack(CpuStepInfo(ctx.PC,ctx.toString))
+            breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
             Log.debug("IRQ Break")
           }
 
@@ -3030,13 +3068,28 @@ class Z80(mem:Memory,
     if (tracing) {
       try {
         dummyRead = true
-        Log.debug("[Z80] " + opcode.disassemble(mem, ctx.PC))
+        //Log.debug("[Z80] " + opcode.disassemble(mem, ctx.PC))
+        val disa = opcode.disassemble(mem, ctx.PC)
+        stepCallBack(CpuStepInfo(ctx.PC, ctx.buildCpuStepInfo,disa))
+        syncObject.synchronized {
+          syncObject.wait()
+        }
+        if (ctx.PC == stepOverTargetAddress) tracing = true
+        stepType match {
+          case StepOver =>
+            if (disa.indexOf("CALL") != -1) {
+              stepOverTargetAddress = ctx.PC + 3
+              tracing = false
+            }
+            else stepType = StepIn
+          case StepOut =>
+            tracing = false
+          case _ =>
+        }
       }
       finally {
         dummyRead = false
       }
-      stepCallBack(CpuStepInfo(ctx.PC,ctx.toString))
-      syncObject.synchronized { syncObject.wait }
     }
     // execute
     lastPC = ctx.PC

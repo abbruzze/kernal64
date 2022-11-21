@@ -1,33 +1,15 @@
 package ucesoft.cbm.game
 
-import javax.swing._
-import javax.swing.table.AbstractTableModel
-import javax.swing.event.ListSelectionListener
-import java.awt.Dimension
-import java.awt.event.MouseEvent
-import javax.swing.event.DocumentListener
-import javax.swing.event.DocumentEvent
-import java.awt.FlowLayout
-import java.awt.event.ActionListener
-import java.awt.event.ActionEvent
-import java.awt.BorderLayout
-import java.awt.Image
-import java.awt.Graphics
-import java.awt.event.WindowAdapter
-import java.awt.event.WindowEvent
-import javax.swing.event.ListSelectionEvent
-import java.awt.GridLayout
-import scala.util.Success
-import scala.util.Failure
-import java.awt.Cursor
-import scala.concurrent.Future
-import java.awt.Insets
-import javax.swing.table.DefaultTableCellRenderer
-import java.awt.Component
-import java.awt.Color
-import java.util.concurrent.atomic.AtomicInteger
 import ucesoft.cbm.formats.ZIP
-import java.awt.event.MouseAdapter
+
+import java.awt._
+import java.awt.event._
+import java.util.concurrent.atomic.AtomicInteger
+import javax.swing._
+import javax.swing.event.{DocumentEvent, DocumentListener, ListSelectionEvent, ListSelectionListener}
+import javax.swing.table.{AbstractTableModel, DefaultTableCellRenderer}
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 object GameUI {
   private val providerCache = new collection.mutable.HashMap[String,JDialog]
@@ -55,21 +37,21 @@ object GameUI {
   
   private class GameTableModel(var games:Array[Game]) extends AbstractTableModel {
     private val COL_NAMES = Array("Name","Genre","Date","Author")    
-    def getRowCount = games.length
+    def getRowCount: Int = games.length
     def getColumnCount = 4
-    def getValueAt(r:Int,c:Int) = c match {
+    def getValueAt(r:Int,c:Int): AnyRef = c match {
       case 0 => games(r).name
       case 1 => games(r).genre
       case 2 => games(r).date
       case 3 => games(r).softwareHouse
     }
-    def getGame(r:Int) = games(r)
-    override def getColumnName(c:Int) = COL_NAMES(c)
+    def getGame(r:Int): Game = games(r)
+    override def getColumnName(c:Int): String = COL_NAMES(c)
     override def isCellEditable(r:Int,c:Int) = false
     
     def fillWith(newGames:Array[Game]) : Unit = {
       games = newGames
-      fireTableDataChanged
+      fireTableDataChanged()
     }
   }
   
@@ -134,20 +116,20 @@ object GameUI {
   }
   
   private def createFilterPanel(table:JTable) : JPanel with DocumentListener = new JPanel with Function1[Int,String] with DocumentListener {
-    val filterTextFields = Array.fill(4)(new JTextField(10))
-    val fields = Array("Name: ","Genre: ","Year: ","Software House: ")
+    val filterTextFields: Array[JTextField] = Array.fill(4)(new JTextField(10))
+    val fields: Array[String] = Array("Name: ","Genre: ","Year: ","Software House: ")
     
     for(tf <- filterTextFields) tf.getDocument.addDocumentListener(this)
     
-    def changedUpdate(e:DocumentEvent) = updateFilter
-    def insertUpdate(e:DocumentEvent) = updateFilter
-    def removeUpdate(e:DocumentEvent) = updateFilter
+    def changedUpdate(e:DocumentEvent): Unit = updateFilter
+    def insertUpdate(e:DocumentEvent): Unit = updateFilter
+    def removeUpdate(e:DocumentEvent): Unit = updateFilter
     
-    private def updateFilter  : Unit = {
+    private def updateFilter()  : Unit = {
       table.getRowSorter.asInstanceOf[DefaultRowSorter[GameTableModel,Int]].setRowFilter(createTableFilter(this))
     }
     
-    def apply(col:Int) = filterTextFields(col).getText
+    def apply(col:Int): String = filterTextFields(col).getText
     
     setLayout(new FlowLayout)
     for(i <- 0 to 3) {
@@ -157,7 +139,7 @@ object GameUI {
     val resetButton = new JButton("Clear filters")
     add(resetButton)
     resetButton.addActionListener(new ActionListener {
-      def actionPerformed(e:ActionEvent) = filterTextFields foreach { _.setText("") }
+      def actionPerformed(e:ActionEvent): Unit = filterTextFields foreach { _.setText("") }
     })
     setBorder(BorderFactory.createTitledBorder(BorderFactory.createRaisedSoftBevelBorder,"Filters"))
   }
@@ -206,7 +188,7 @@ object GameUI {
     
     init
     
-    private def init  : Unit = {
+    private def init()  : Unit = {
       setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
       addWindowListener(new WindowAdapter {
         override def windowClosed(e:WindowEvent) : Unit = {
@@ -298,11 +280,11 @@ object GameUI {
       val b = if (toggle) new JToggleButton(label) else new JButton(label)
       b.setToolTipText(toolTip)
       b.setEnabled(enabled)
-      b.addActionListener(new ActionListener { def actionPerformed(e:ActionEvent) = ac(b) })
+      b.addActionListener(new ActionListener { def actionPerformed(e:ActionEvent): Unit = ac(b) })
       b
     }
     
-    private def updateGamesCount  : Unit = {
+    private def updateGamesCount()  : Unit = {
       scrollPane.setBorder(BorderFactory.createTitledBorder(BorderFactory.createRaisedSoftBevelBorder,s"Games [${tableModel.getRowCount}]"))
     }
     
@@ -327,20 +309,20 @@ object GameUI {
         case None =>
           gameIcon.setIcon(null)
       }
-      gameListModel.clear
+      gameListModel.clear()
       if (existsInCache(game)) {
         for(e <- getArchiveItemsFor(game)) gameListModel.addElement(e)
       }
     }
     
-    private def swing(action : => Unit) = SwingUtilities.invokeLater(new Runnable { def run = action })    
+    private def swing(action : => Unit): Unit = SwingUtilities.invokeLater(new Runnable { def run(): Unit = action })
     
     // =================================================
     private class SyncDialog extends JDialog(GamesDialog.this,"Synchronizing ...",true) with GameLoadingProgressListener {
       private val progress = new JProgressBar
       
       progress.setStringPainted(true)
-      val panel = new JPanel(new GridLayout(3,1)) {
+      val panel: JPanel = new JPanel(new GridLayout(3,1)) {
         override def getInsets = new Insets(5,10,5,10)
       }
       
@@ -352,10 +334,10 @@ object GameUI {
       panel.add(msg)
       val buttonPanel = new JPanel(new FlowLayout)
       getContentPane.add("South",buttonPanel)
-      val cancelButton = button("Cancel","Cancel synchronization") { cancelSync }
+      val cancelButton: AbstractButton = button("Cancel","Cancel synchronization") { cancelSync }
       cancelButton.setCursor(new Cursor(Cursor.DEFAULT_CURSOR))
       buttonPanel.add(cancelButton)
-      pack
+      pack()
       setResizable(false)
       setLocationRelativeTo(GamesDialog.this)     
       setCursor(new Cursor(Cursor.WAIT_CURSOR))
@@ -366,7 +348,7 @@ object GameUI {
         provider.interrupt
       }
       
-      def update(perc:Int) = swing {
+      def update(perc:Int): Unit = swing {
         progress.setValue(perc)
       }
     }
@@ -375,7 +357,7 @@ object GameUI {
       JOptionPane.showConfirmDialog(this,s"Are you sure you want to clear the cache ?","Cache",JOptionPane.YES_NO_OPTION,JOptionPane.QUESTION_MESSAGE) match {
         case JOptionPane.YES_OPTION =>
           provider.repository.clearCache
-          tableModel.fireTableDataChanged
+          tableModel.fireTableDataChanged()
         case _ =>
       }
     }
@@ -404,7 +386,7 @@ object GameUI {
           games.onComplete { 
             case Success(games) =>
               endDownload
-              syncDialog.dispose
+              syncDialog.dispose()
               provider.repository.save(games)
               tableModel.fillWith(games.toArray)
               setCursor(new Cursor(Cursor.DEFAULT_CURSOR))
@@ -413,8 +395,8 @@ object GameUI {
               updateGamesCount
             case Failure(t) =>
               endDownload
-              syncDialog.dispose
-              t.printStackTrace
+              syncDialog.dispose()
+              t.printStackTrace()
               JOptionPane.showMessageDialog(this,t.toString,s"Error while synchronizing with ${provider.name}'s server",JOptionPane.ERROR_MESSAGE)
               setCursor(new Cursor(Cursor.DEFAULT_CURSOR))
               syncButton.setEnabled(true)            
@@ -425,11 +407,11 @@ object GameUI {
       }
     }
     
-    private def beginDownload  : Unit = {
+    private def beginDownload()  : Unit = {
       downloadCount.incrementAndGet
       downloadProgress.setIndeterminate(true)
     }
-    private def endDownload  : Unit = {
+    private def endDownload()  : Unit = {
       if (downloadCount.decrementAndGet == 0) downloadProgress.setIndeterminate(false)
     }
     
@@ -483,7 +465,7 @@ object GameUI {
       case None =>
         val dialog = new GamesDialog(Some(cb),parent,provider,player)
         providerCache += provider.name -> dialog
-        dialog.pack
+        dialog.pack()
         dialog.setLocationByPlatform(true)
         dialog
     }

@@ -1,16 +1,18 @@
 package ucesoft.cbm.peripheral.cia
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
-
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.{CBMComponent, CBMComponentType, Log}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 abstract class Timer(ciaName: String,
             id: Int,
             irqAction: (Int) => Unit,
             idleAction : (Boolean) => Unit) extends CBMComponent {
 
-  val componentID = ciaName + "_TB"
-  val componentType = CBMComponentType.CHIP
+  val componentID: String = ciaName + "_TB"
+  val componentType: Type = CBMComponentType.CHIP
 
   protected final val CIAT_CR_START = 0x01
   private[this] final val CIAT_STEP = 0x04
@@ -36,7 +38,7 @@ abstract class Timer(ciaName: String,
   private[this] var serialActionCallback : () => Unit = null
   private[this] var stopped = false
 
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Control register", lastControlValue.toString)
     properties.setProperty("State", state.toHexString)
     properties.setProperty("Timer", timer.toString)
@@ -58,29 +60,29 @@ abstract class Timer(ciaName: String,
     stopped = false
   }
 
-  def setSerialCallBack(serialActionCallback : Option[() => Unit]) = this.serialActionCallback = serialActionCallback.getOrElse(null)
+  def setSerialCallBack(serialActionCallback : Option[() => Unit]): Unit = this.serialActionCallback = serialActionCallback.getOrElse(null)
 
   final def writeLo(low: Int): Unit = {
     latch = latch & 0xff00 | low & 0xff
     if ((state & CIAT_LOAD) != 0) timer = timer & 0xff00 | low & 0xff
-    Log.debug(s"${componentID} set counter lo to ${low} latch=${latch}")
+    Log.debug(s"$componentID set counter lo to $low latch=$latch")
   }
   final def writeHi(high: Int): Unit = {
     latch = latch & 0xff | (high & 0xff) << 8
     if ((state & CIAT_LOAD) != 0 || (state & CIAT_CR_START) == 0) timer = latch
-    Log.debug(s"${componentID} set counter hi to ${high} latch=${latch} started=${(lastControlValue & 1) != 0}")
+    Log.debug(s"$componentID set counter hi to $high latch=$latch started=${(lastControlValue & 1) != 0}")
   }
   final def readLo: Int = timer & 0xFF
   final def readHi: Int = timer >> 8
   final def getPbToggle : Boolean = pbToggle
   final def readCR : Int = lastControlValue
-  final def setStep : Unit = state |= CIAT_STEP
+  final def setStep() : Unit = state |= CIAT_STEP
 
   def writeCR(cr: Int): Unit = {
     state &= ~(CIAT_CR_MASK)
     state |= cr & CIAT_CR_MASK ^ CIAT_PHI2IN
     if ((cr & 1) != 0 && (lastControlValue & 1) == 0) pbToggle = true
-    Log.debug(s"${componentID} started=${(cr & 1) != 0}")
+    Log.debug(s"$componentID started=${(cr & 1) != 0}")
     lastControlValue = cr
     stopped = false
     idleAction(false)
@@ -89,7 +91,7 @@ abstract class Timer(ciaName: String,
   final def getState : Int = state
   final def isStateOut : Boolean = (state & CIAT_OUT) != 0
 
-  final def clock : Unit = {
+  final def clock() : Unit = {
     if ((timer != 0) && ((state & CIAT_COUNT3) != 0)) timer -= 1
 
     var adj = state & (CIAT_CR_START | CIAT_CR_ONESHOT | CIAT_PHI2IN)
@@ -123,7 +125,7 @@ abstract class Timer(ciaName: String,
     checkIdle
   }
 
-  @inline private def checkIdle : Unit = {
+  @inline private def checkIdle() : Unit = {
     val unwanted = CIAT_OUT | CIAT_CR_FLOAD | CIAT_LOAD1 | CIAT_LOAD | CIAT_COUNT3
     if ((state & unwanted) != 0) return
 
@@ -136,7 +138,7 @@ abstract class Timer(ciaName: String,
     idleAction((state & CIAT_CR_START) == 0)
   }
 
-  protected def underflow : Unit
+  protected def underflow() : Unit
 
   protected def allowsStateRestoring : Boolean = true
   protected def loadState(in:ObjectInputStream): Unit = {

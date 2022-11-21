@@ -2,8 +2,8 @@ package ucesoft.cbm.formats.cart
 
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.formats.{Cartridge, CartridgeBuilder }
 import ucesoft.cbm.formats.ExpansionPortFactory.CartridgeExpansionPort
+import ucesoft.cbm.formats.{Cartridge, CartridgeBuilder}
 import ucesoft.cbm.misc.{AMF29F040, FlashListener}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
@@ -18,26 +18,26 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
 
   private class FlashROM(low:Boolean) extends ROMMemory with FlashListener {
     val name = "FLASH"
-    val startAddress = if (low) 0x8000 else 0xE000
+    val startAddress: Int = if (low) 0x8000 else 0xE000
     val length = 8192
     val isRom = true
     def isActive = true
     def init  : Unit = {}
 
-    private val amf29f040 = new AMF29F040(startAddress,low,this)
-    val bankErasedMap = Array.ofDim[Boolean](64)
+    private val amf29f040 = new AMF29F040(AMF29F040.AMF29F040TypeB,low,this)
+    val bankErasedMap: Array[Boolean] = Array.ofDim[Boolean](64)
 
     updateROMBank
     checkErasedBanks
 
-    private def checkErasedBanks : Unit = {
+    private def checkErasedBanks() : Unit = {
       val map = if (low) romlBanks else romhBanks
       for(b <- 0 to 63) {
         bankErasedMap(b) = !map.contains(b)
       }
     }
 
-    override def eraseSector: Unit = {
+    override def eraseSector(address:Int): Unit = {
       val bank = (if (low) romlBankIndex else romhBankIndex) & 0xF8
       for(b <- bank until bank + 8) {
         val rom = getOrCreateBank(Some(b)).asInstanceOf[ROM]
@@ -66,20 +66,20 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
 
     override def flash(address: Int, value: Int, low: Boolean): Unit = {
       val rom = getOrCreateBank(None)
-      rom.asInstanceOf[ROM].data(address) = value // flash value
+      rom.asInstanceOf[ROM].data(address & 0x1FFF) = value // flash value
       val bank = if (low) romlBankIndex else romhBankIndex
       bankErasedMap(bank) = false
       //println("FLASHING[%5b] bank %2d address %4X value %2X bank present=%5b".format(low,if (low) romlBankIndex else romhBankIndex,address,value,if (low) romlBanks.contains(romlBankIndex) else romhBanks.contains(romhBankIndex)))
     }
 
-    def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = amf29f040.read(address)
+    def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = amf29f040.read(address)
 
     override def writeROM(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       //println("Flash write to %4X = %2X".format(address,value))
       amf29f040.write(address,value)
     }
 
-    def updateROMBank : Unit = amf29f040.setROMBank(if (low) EasyFlash.super.ROML else EasyFlash.super.ROMH)
+    def updateROMBank() : Unit = amf29f040.setROMBank(if (low) EasyFlash.super.ROML else EasyFlash.super.ROMH)
   }
 
   private val flashL = new FlashROM(true)
@@ -88,7 +88,7 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
   override def ROML : Memory = flashL
   override def ROMH : Memory = flashH
 
-  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     if (address >= 0xDF00) io2mem(address & 0xFF) else 0
   }
 
@@ -131,7 +131,7 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
     loadMemory[Int](io2mem,in)
   }
 
-  def createCRT : Unit = {
+  def createCRT() : Unit = {
     val builder = new CartridgeBuilder(crt.file,"KERNAL64 EASYFLASH",32,true,false)
     for(hl <- 0 to 1) {
       val banks = if (hl == 0) romlBanks else romhBanks

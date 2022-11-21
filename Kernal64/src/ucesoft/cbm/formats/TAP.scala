@@ -1,10 +1,9 @@
 package ucesoft.cbm.formats
 
-import java.io._
-import java.nio.file.Files
-
 import ucesoft.cbm.Clock
 
+import java.io._
+import java.nio.file.Files
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 
@@ -19,7 +18,7 @@ class TAP(file:String) extends Iterator[Int] {
   
   private def read = tape.read & 0xFF
   
-  private def loadHeader  : Unit = {
+  private def loadHeader()  : Unit = {
     for(i <- MAGIC) {
       if (read.toChar != i) throw new IllegalArgumentException("Bad TAP file")
     }
@@ -28,15 +27,15 @@ class TAP(file:String) extends Iterator[Int] {
     rewind
   }
   
-  def getFilename = file
-  def close = tape.close
-  def version = _version
-  def tapeLength = tape.length
-  def getOffset = tape.getFilePointer
-  def rewind = tape.seek(0x14)
+  def getFilename: String = file
+  def close(): Unit = tape.close()
+  def version: Int = _version
+  def tapeLength: Long = tape.length
+  def getOffset: Long = tape.getFilePointer
+  def rewind(): Unit = tape.seek(0x14)
   def goTo(pos:Long) : Boolean = if (pos > tape.length()) false else { tape.seek(pos) ; true }
   
-  def hasNext = tape.getFilePointer < tape.length
+  def hasNext: Boolean = tape.getFilePointer < tape.length
   def next: Int = {
     val gap = read
     if (gap == 0) {
@@ -85,7 +84,7 @@ object TAP {
 
   class TapCounterMap(val map:Map[Int,Int]) {
     private val list = map.toArray.sortWith((a,b) => a._1 < b._1)
-    val maxCounter = list.last._1
+    val maxCounter: Int = list.last._1
 
     def findCounter(pos:Int) : Int = {
       val found = find(pos,0,list.length - 1)

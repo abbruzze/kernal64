@@ -1,9 +1,10 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import java.io.{BufferedReader, FileInputStream, FileNotFoundException, IOException, InputStreamReader, PrintWriter}
-import java.awt.event.KeyEvent
+import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, Log, VIC20Model}
+import ucesoft.cbm.peripheral.keyboard.CKey.Key
 
-import ucesoft.cbm.Log
+import java.awt.event.KeyEvent
+import java.io._
 
 trait KeyboardMapper {
 	val map : Map[Int,CKey.Key]
@@ -39,24 +40,25 @@ object KeyboardMapperStore {
     }
   }
   
-  def loadFromResource(name:String) : Option[KeyboardMapper] = {
+  def loadFromResource(name:String,model:CBMComputerModel) : Option[KeyboardMapper] = {
     val in = getClass.getResourceAsStream(name)
     if (in == null) None
     else {
       try {
-        val map = Some(load(new BufferedReader(new InputStreamReader(in))))
-        in.close
+        val map = Some(load(new BufferedReader(new InputStreamReader(in)),model))
+        in.close()
         map
       }
       catch {
         case t:Throwable =>
+          t.printStackTrace()
           Log.info(s"Can't load keyboard mapping '$name': " + t)
           None
       }
     }
   }
   
-  def load(in:BufferedReader) : KeyboardMapper = {
+  def load(in:BufferedReader,model:CBMComputerModel) : KeyboardMapper = {
     val e_map = new collection.mutable.HashMap[Int,CKey.Key]
     val e_keypad_map = new collection.mutable.HashMap[Int,CKey.Key]
     
@@ -85,12 +87,19 @@ object KeyboardMapperStore {
     
     if (section == 0) throw new IllegalArgumentException
 
-    // add l-shift button
-    e_map += KeyEvent.VK_SHIFT -> CKey.L_SHIFT
+    model match {
+      case C64Model | C128Model =>
+        // add l-shift button
+        e_map += KeyEvent.VK_SHIFT -> CKey.L_SHIFT
+      case VIC20Model =>
+        // add l-shift button
+        e_map += KeyEvent.VK_SHIFT -> CKey.VIC20_L_SHIFT
+      case _ =>
+    }
     
     new KeyboardMapper {
-      val map = e_map.toMap
-      val keypad_map = e_keypad_map.toMap
+      val map: Map[Int, Key] = e_map.toMap
+      val keypad_map: Map[Int, Key] = e_keypad_map.toMap
     }
   }
   
@@ -110,14 +119,14 @@ object KeyboardMapperStore {
     }
   }
   
-  def loadMapper(externalFile:Option[String],_internalResource:String) : KeyboardMapper = {
+  def loadMapper(externalFile:Option[String],_internalResource:String,model:CBMComputerModel) : KeyboardMapper = {
     externalFile match {
       case None =>
         val internalResource = findDefaultKeyboardLayoutForLocale(_internalResource)
-        loadFromResource(internalResource) match {
+        loadFromResource(internalResource,model) match {
           case None =>
             // layout not found, switching to IT
-            loadFromResource(s"${_internalResource}_IT") match {
+            loadFromResource(s"${_internalResource}_IT",model) match {
               case None =>
                 throw new FileNotFoundException(s"Can't find default keyboard file: ${_internalResource}")
               case Some(m) =>
@@ -131,8 +140,8 @@ object KeyboardMapperStore {
       case Some(file) =>
         try {
           val in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))
-          val m = load(in)
-          in.close
+          val m = load(in,model)
+          in.close()
           Log.info(s"Loaded keyboard configuration file from $file")
           m
         }
@@ -140,7 +149,7 @@ object KeyboardMapperStore {
           case t:Throwable =>
             Log.info(s"Cannot load keyboard file $file: " + t)
             println(s"Cannot load keyboard file $file: " + t)
-            loadMapper(None,_internalResource)
+            loadMapper(None,_internalResource,model)
         }
     }
   }

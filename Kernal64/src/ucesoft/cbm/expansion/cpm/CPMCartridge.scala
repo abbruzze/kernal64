@@ -1,26 +1,23 @@
 package ucesoft.cbm.expansion.cpm
 
+import ucesoft.cbm.{ChipID, Clock, ClockEvent, Log}
+import ucesoft.cbm.cpu.{Memory, Z80}
+import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortType}
+import ucesoft.cbm.trace.{TraceListener, Tracer}
+import ucesoft.cbm.trace.Tracer.TracedDevice
+
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
-import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortType}
-import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.ChipID
-import ucesoft.cbm.Log
-import ucesoft.cbm.Clock
-import ucesoft.cbm.ClockEvent
-import ucesoft.cbm.trace.TraceListener
-import ucesoft.cbm.cpu.Z80
-
 class CPMCartridge(mem:Memory,
-                   setDMA: (Boolean) => Unit,
-                   traceListener: (Option[TraceListener]) => Unit) extends ExpansionPort {
+                   setDMA: Boolean => Unit,
+                   tracer:Tracer) extends ExpansionPort {
   val TYPE : ExpansionPortType.Value = ExpansionPortType.CPM
   override val name = "CP/M Cartridge"
   override val componentID = "CP/M"
   val EXROM = true
   val GAME = true
-  val ROML = null
-  val ROMH = null
+  val ROML: Memory = null
+  val ROMH: Memory = null
   
   private[this] var z80Active = false
   private[this] val clk = Clock.systemClock
@@ -33,18 +30,19 @@ class CPMCartridge(mem:Memory,
     def init  : Unit = {}
     val isActive = true
     @inline private def z80Address(address:Int) = (address + 0x1000) & 0xFFFF
-    def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = mem.read(z80Address(address),chipID)
-    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = mem.write(z80Address(address),value,chipID)
+    def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem.read(z80Address(address),chipID)
+    def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = mem.write(z80Address(address),value,chipID)
   }
   
   private[this] val z80 = new Z80(z80Memory)
-  
+
   z80.init
+  tracer.addDevice(TracedDevice("CP/M Z80",z80Memory,z80,false))
   
   override def eject  : Unit = {
     Log.debug("Ejecting CP/M cartridge...")
     turnZ80(false)
-    //clk.setDefaultClockHz
+    tracer.removeDevice(TracedDevice("CP/M Z80",z80Memory,z80,false))
   }
   
   @inline private def turnZ80(on:Boolean) : Unit = {
@@ -52,21 +50,16 @@ class CPMCartridge(mem:Memory,
     if (on && !z80Active) {
       z80Active = true
       clk.schedule(new ClockEvent("Z80 clock",clk.nextCycles,z80ClockCallback))
-      traceListener(Some(z80))
-      //clk.setClockHzSpeedFactor(3)
     }
     else
     if (!on) {
       z80Active = false
-      traceListener(None)
-      //clk.setDefaultClockHz
     }
   }
   
   override def reset  : Unit = {
     z80.reset
     z80Active = false
-    //clk.setDefaultClockHz
   }
   
   override def setBaLow(baLow:Boolean) : Unit = {

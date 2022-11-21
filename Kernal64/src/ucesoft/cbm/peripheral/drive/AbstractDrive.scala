@@ -1,11 +1,9 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.peripheral.bus.IECBus
-import ucesoft.cbm.peripheral.bus.IECBusDevice
-import ucesoft.cbm.peripheral.bus.BusDataIterator
+import ucesoft.cbm.peripheral.bus.{BusDataIterator, IECBus, IECBusDevice}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
 import scala.collection.mutable.ListBuffer
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
 
 abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(bus, device) with Drive {
   protected var status = 0
@@ -19,10 +17,10 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
   def isDeviceReady = true
   def init : Unit = {}
   def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) : Unit = {}
-  def getFloppy = EmptyFloppy
+  def getFloppy: Floppy = EmptyFloppy
   
-  protected def setStatus(code: Int) = status = code
-  protected def sendStatus : Unit = {
+  protected def setStatus(code: Int): Unit = status = code
+  protected def sendStatus() : Unit = {
     import BusDataIterator._
     channels(15).dataToSend = Some(new StringDataIterator("%02d,%s,00,00".format(status, ERROR_CODES(status)) + 13.toChar))
   }
@@ -33,7 +31,7 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
   
   protected def getDirectoryEntries(path:String) : List[DirEntry]
   
-  protected def handleChannel15 : Unit
+  protected def handleChannel15() : Unit
   
   protected def loadDirectory(path:String,pathName:String) : BusDataIterator = {
     val out = new ListBuffer[Int]
@@ -65,7 +63,7 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
     for(file <- getDirectoryEntries(path)) {
       val fileName = file.name.take(16).toUpperCase
       val sectors = file.byteSize / 256
-      val sizeInSector = math.min(if (sectors == 0) 1 else sectors,9999).toInt
+      val sizeInSector = math.min(if (sectors == 0) 1 else sectors,9999)
       val blanks = if (sizeInSector < 10) 3 
         else
         if (sizeInSector < 100) 2

@@ -1,13 +1,11 @@
 package ucesoft.cbm.formats
 
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import java.io.RandomAccessFile
+import java.io.{ObjectInputStream, ObjectOutputStream, RandomAccessFile}
 
 private[formats] class D81(val file: String) extends Diskette {
   import Diskette._
   val canBeEmulated = false
-  val isReadOnly = !new java.io.File(file).canWrite
+  val isReadOnly: Boolean = !new java.io.File(file).canWrite
   val totalTracks = 80
   override lazy val singleSide = true
   override protected final val DIR_TRACK = 40
@@ -23,7 +21,7 @@ private[formats] class D81(val file: String) extends Diskette {
   private[this] final val D81_DISK_SIZE_80_TRACKS = 819200
   private[this] final val D81_DISK_SIZE_80_TRACKS_WITH_ERRORS = 822400
   
-  override protected def absoluteSector(t: Int, s: Int) = (t - 1) * 40 + s
+  override protected def absoluteSector(t: Int, s: Int): Int = (t - 1) * 40 + s
   
   def bam : BamInfo = {
     disk.seek(absoluteSector(DIR_TRACK,HEADER_SECTOR) * BYTES_PER_SECTOR + 4)
@@ -151,16 +149,16 @@ private[formats] class D81(val file: String) extends Diskette {
     
   }
     
-  private def init  : Unit = {
+  private def init()  : Unit = {
     for(side <- 0 to 1;
         track <- 0 to 79) {
       MFM.buildPhysicalTrack(1 - side,2,track,physicalTracks(1 - side)(track),readLogical _)
     }
   }
   
-  override def isOnIndexHole = trackOffset < 5
+  override def isOnIndexHole: Boolean = trackOffset < 5
   
-  final override def side = _side
+  final override def side: Int = _side
   final override def side_=(newSide:Int) : Unit = {
     _side = newSide
   }
@@ -201,8 +199,8 @@ private[formats] class D81(val file: String) extends Diskette {
   final def nextBit : Int = 0
   final def writeNextBit(bit:Boolean) : Unit = {}
   
-  final def currentTrack = track
-  final def currentSector = sector
+  final def currentTrack: Int = track
+  final def currentSector: Option[Int] = sector
   /**
    * trackSteps > 0 inc track
    * trackSteps < 0 dec track
@@ -218,15 +216,15 @@ private[formats] class D81(val file: String) extends Diskette {
     //println(s"New track is $track")
     notifyTrackSectorChangeListener
   }
-  final def setTrackChangeListener(l:TrackListener) = trackChangeListener = l
-  final def notifyTrackSectorChangeListener = if (trackChangeListener != null) trackChangeListener(track,false,sector)
+  final def setTrackChangeListener(l:TrackListener): Unit = trackChangeListener = l
+  final def notifyTrackSectorChangeListener: Unit = if (trackChangeListener != null) trackChangeListener(track,false,sector)
   
   override def defaultZoneFor(track:Int) = 4 // 250.0000 bit/sec
   
   override def flush  : Unit = {
     if (trackModified && canWriteOnDisk) {
       trackModified = false
-      flushListener.flushing(file.toString,{
+      flushListener.flushing(file,{
         var s,t,p = 0
         while (s < 2) {
           t = 0
@@ -247,7 +245,7 @@ private[formats] class D81(val file: String) extends Diskette {
   
   final def close  : Unit = {
     flush
-    disk.close
+    disk.close()
   }
   final def reset  : Unit = {
     _side = 0

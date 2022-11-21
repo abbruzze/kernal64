@@ -1,12 +1,11 @@
 package ucesoft.cbm.remote
 
-import java.io._
-import java.net.Socket
-import java.awt.event.KeyEvent
-import java.awt.event.KeyListener
-import javax.swing.SwingUtilities
-import java.net.ServerSocket
 import ucesoft.cbm.Log
+
+import java.awt.event.{KeyEvent, KeyListener}
+import java.io._
+import java.net.{ServerSocket, Socket}
+import javax.swing.SwingUtilities
 
 class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[Int],w:Int,h:Int,c1x:Int,c1y:Int,c2x:Int,c2y:Int,FR:Int = 1) extends Thread("C64Remote") with RemoteC64 {
   @volatile private[this] var sending = false
@@ -23,7 +22,7 @@ class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[
   private[this] val ss = new ServerSocket(port)
   
   private class KBThread extends Thread {
-    override def run : Unit = {
+    override def run() : Unit = {
       while (!isInterrupted) {
         while (in == null) Thread.sleep(1000)
         
@@ -32,7 +31,7 @@ class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[
             case 'K' =>
               val event = new KeyEvent(dummyComponent,in.readInt,System.currentTimeMillis,in.readInt,in.readInt,in.readChar,in.readInt)
               SwingUtilities.invokeLater(new Runnable {
-                def run : Unit = {
+                def run() : Unit = {
                   event.getID match {
                     case KeyEvent.KEY_PRESSED =>
                       for(kl <- keyListeners) kl.keyPressed(event)
@@ -70,21 +69,21 @@ class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[
         this.y2 = y2 + 1
       }
       fc = (fc + 1) % FR
-      lock.synchronized { lock.notify } 
+      lock.synchronized { lock.notify() }
     }
   }  
   
   def stopRemoting : Unit = {
     running = false
-    interrupt
+    interrupt()
   }
   
   def isConnected : Boolean = connected
   
-  override def run : Unit = {
+  override def run() : Unit = {
     running = true
     val keyb = new KBThread
-    keyb.start
+    keyb.start()
     
     while (running) {      
       var out : DataOutputStream = null      
@@ -110,7 +109,7 @@ class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[
       while (running && connected) {
         try {
           if (!sending) lock.synchronized {
-            while (!sending) lock.wait
+            while (!sending) lock.wait()
           } 
           
           // video          
@@ -141,7 +140,7 @@ class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[
             }
           }
           sending = false
-          out.flush
+          out.flush()
         }
         catch {
           case t:Throwable =>
@@ -151,9 +150,9 @@ class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[
       }
     }
     try {
-      if (socket != null) socket.close
-      ss.close
-      keyb.interrupt
+      if (socket != null) socket.close()
+      ss.close()
+      keyb.interrupt()
     }
     catch {
       case t:Throwable =>

@@ -3,14 +3,14 @@ package ucesoft.cbm.misc
 import ucesoft.cbm.peripheral.drive.DriveLedListener
 
 abstract class AbstractDriveLedListener(led:DriveLed) extends DriveLedListener {
-  override def writeMode(enabled:Boolean) = {
+  override def writeMode(enabled:Boolean): Unit = {
     led.driveWriteMode = enabled
     led.repaint()
   }
 
-  override def isOn = led.driveLedOn
+  override def isOn: Boolean = led.driveLedOn
 
-  def setPowerLedMode(on:Boolean) = led.setPowerLedMode(on)
+  def setPowerLedMode(on:Boolean): Unit = led.setPowerLedMode(on)
 
   def turnPower(on:Boolean) : Unit = {
     if (on != led.powerOn) {

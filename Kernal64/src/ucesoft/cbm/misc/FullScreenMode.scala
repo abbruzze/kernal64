@@ -1,16 +1,8 @@
 package ucesoft.cbm.misc
 
-import javax.swing.JFrame
-import javax.swing.JComponent
-import java.awt.GraphicsEnvironment
-import javax.swing.JOptionPane
-import java.awt.Color
-import java.awt.Dimension
-import java.awt.event.KeyListener
-import java.awt.event.KeyAdapter
-import java.awt.event.KeyEvent
-import javax.swing.ImageIcon
-import java.awt.event.MouseListener
+import java.awt.{Color, Dimension, GraphicsEnvironment}
+import java.awt.event.{KeyAdapter, KeyEvent, KeyListener, MouseListener}
+import javax.swing.{ImageIcon, JComponent, JFrame, JOptionPane}
 
 object FullScreenMode {
   def goFullScreen(frame:JFrame,component:JComponent,width:Int,height:Int,mouseListener:MouseListener,keyListeners:KeyListener*) : Unit = {
@@ -36,8 +28,8 @@ object FullScreenMode {
       val vicSize = component.getSize()
       val winSize = window.getSize()
       component.setLocation((winSize.width - vicSize.width) / 2,(winSize.height - vicSize.height) / 2)
-      component.invalidate
-      window.validate
+      component.invalidate()
+      window.validate()
       window.setVisible(true)
       window.toFront()
       window.addMouseListener(mouseListener)
@@ -46,11 +38,11 @@ object FullScreenMode {
         override def keyPressed(e:KeyEvent) : Unit = {
           e.getKeyCode match {
             case java.awt.event.KeyEvent.VK_ENTER if e.isAltDown =>
-              window.dispose
+              window.dispose()
               frame.setVisible(true)
               component.setSize(originalSize)
               frame.getContentPane.add("Center",component)
-              frame.pack
+              frame.pack()
             case _ =>
           }
         }

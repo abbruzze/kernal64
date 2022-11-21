@@ -1,11 +1,11 @@
 package ucesoft.cbm.misc
 
+import ucesoft.cbm.cpu.Memory
+
 import java.io.IOException
 import java.util.Properties
 
-import ucesoft.cbm.cpu.Memory
-
-class AboutCanvas(charRom:Memory,version:String) extends CBMCanvas(charRom) {
+class AboutCanvas(charRom:Memory,version:String,romCharBytes:Int = 8,romCharHeight:Int = 8) extends CBMCanvas(charRom,romCharBytes,romCharHeight) {
   private val WIDTH = 50
   private val scalaVersion = {
     val p = new Properties
@@ -14,7 +14,7 @@ class AboutCanvas(charRom:Memory,version:String) extends CBMCanvas(charRom) {
       case Some(in) =>
         try {
           p.load(in)
-          in.close
+          in.close()
           p.getProperty("version.number")
         }
         catch {
@@ -33,9 +33,9 @@ class AboutCanvas(charRom:Memory,version:String) extends CBMCanvas(charRom) {
   add(center("SCALA VERSION " + scalaVersion,WIDTH)).newLine
   newLine
   white
-  add(center("A COMMODORE 64/128 EMULATOR WRITTEN IN SCALA",WIDTH)).newLine
+  add(center(" A COMMODORE 64/128/CBMII/VIC20 EMULATOR ",WIDTH)).newLine
   newLine
-  add(center("BY ALESSANDRO ABBRUZZETTI",WIDTH)).newLine
+  add(center("WRITTEN IN SCALA BY ALESSANDRO ABBRUZZETTI",WIDTH)).newLine
   newLine
   add(center("2013-2022",WIDTH)).newLine
   newLine

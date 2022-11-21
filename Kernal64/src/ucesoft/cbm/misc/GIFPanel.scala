@@ -1,12 +1,12 @@
 package ucesoft.cbm.misc
 
-import java.awt.event.{WindowAdapter, WindowEvent}
-import java.awt.{Font, GridBagConstraints, GridBagLayout, Insets}
-import java.io.{File, FileOutputStream}
-
-import javax.swing.filechooser.FileFilter
-import javax.swing._
 import ucesoft.cbm.peripheral.vic.Display
+
+import java.awt.event.{WindowAdapter, WindowEvent}
+import java.awt.{GridBagConstraints, GridBagLayout, Insets}
+import java.io.{File, FileOutputStream}
+import javax.swing._
+import javax.swing.filechooser.FileFilter
 
 class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel with Runnable {
   private var delayInMillis = 0
@@ -19,7 +19,7 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
   private val frameCheckbox = new JCheckBox("Include frame border")
   private val frameRecordedLabel = new JLabel("0")
 
-  private def init : Unit = {
+  private def init() : Unit = {
     setLayout(new GridBagLayout)
     val displaySelector = new JComboBox(displayName)
     displaySelector.addActionListener(_ => selectedDisplayIndex = displaySelector.getSelectedIndex )
@@ -56,7 +56,7 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
     add(comp,c)
   }
 
-  private def checkDelay : Unit = {
+  private def checkDelay() : Unit = {
     try {
       delayInMillis = delayTextField.getText.toInt
       if (delayInMillis < 20) {
@@ -70,7 +70,7 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
     }
   }
 
-  private def startStop : Unit = {
+  private def startStop() : Unit = {
     try {
       if (!recording) {
         val fileName = if (fileTextField.getText.toUpperCase.endsWith("GIF")) fileTextField.getText else fileTextField.getText + ".gif"
@@ -79,7 +79,7 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
         recording = true
         checkDelay
         startStopButton.setText("Stop recording")
-        thread.start
+        thread.start()
       }
       else stopRecording
     }
@@ -92,7 +92,7 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
     val fc = new JFileChooser
     fc.setDialogTitle("Choose a file where to save GIF")
     fc.setFileFilter(new FileFilter {
-      def accept(f: File) = f.isDirectory || f.getName.toUpperCase.endsWith(".GIF")
+      def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".GIF")
       def getDescription = "GIF files"
     })
     fc.showSaveDialog(this) match {
@@ -103,7 +103,7 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
     }
   }
 
-  def run : Unit = {
+  def run() : Unit = {
     val includeFrame = frameCheckbox.isSelected
     val region = if (includeFrame) {
       val frame = SwingUtilities.getRoot(display(selectedDisplayIndex)).asInstanceOf[JFrame]
@@ -142,11 +142,11 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
       if (elapsed < delayInMillis) Thread.sleep(delayInMillis - elapsed)
     }
     writer.finishWrite(out)
-    out.close
+    out.close()
     stopRecording
   }
 
-  def stopRecording : Unit = {
+  def stopRecording() : Unit = {
     recording = false
     startStopButton.setText("Start")
   }
@@ -163,7 +163,7 @@ object GIFPanel {
 
     gifPanel.init
     f.getContentPane.add("Center",gifPanel)
-    f.pack
+    f.pack()
     f
   }
 }

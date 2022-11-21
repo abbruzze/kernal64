@@ -1,20 +1,29 @@
+KERNAL64C128C128OPTS+=" --shell"
+KERNAL64C128C128OPTS+=" --ignore-config-file"
 KERNAL64C128C128OPTS+=" --testcart"
 KERNAL64C128C128OPTS+=" --headless"
 KERNAL64C128C128OPTS+=" --warp"
 KERNAL64C128C128OPTS+=" --vic-palette pepto"
 KERNAL64C128C128OPTS+=" --screen-dim 1"
 KERNAL64C128C128OPTS+=" --cpujam-continue true"
-KERNAL64C128C128OPTS+=" --ignore-config-file"
+KERNAL64C128C128OPTS+=" --sid-cycle-exact"
 
 function kernal64c128c128_check_environment
 {
     KERNAL64C128C128=$EMUDIR/k128.sh
-    
+
+    if ! [ -f "$KERNAL64C128C128" ]; then
+        echo "Error: "$KERNAL64C128C128" not found." >&2
+        exit 1
+    fi
+
     if ! [ -x "$(command -v $JAVA_HOME/bin/java)" ]; then
         echo 'Error: java not installed.' >&2
         exit 1
     fi
     
+# The current VIC implementations are: 6569 & 6567R8 for C64.
+    emu_default_videosubtype="6569"
 }
 
 # $1  option
@@ -26,6 +35,9 @@ function kernal64c128c128_get_options
         "default")
                 exitoptions=""
             ;;
+        "vicii-screenshot")
+                viciiscreenshot=1
+            ;;
         "vicii-pal")
                 exitoptions=""
                 testprogvideotype="PAL"
@@ -33,7 +45,7 @@ function kernal64c128c128_get_options
         "vicii-ntsc")
               exitoptions="--ntsc true --screen-dim 1"
               testprogvideotype="NTSC"
-          ;;
+            ;;
         "sid-old")
                 new_sid_enabled=0
             ;;
@@ -41,12 +53,44 @@ function kernal64c128c128_get_options
                 exitoptions="--sid-8580 true"
                 new_sid_enabled=1
             ;;
+        "reu128k")
+                exitoptions="--reu-type 128"
+                reu_enabled=1
+            ;;
+        "reu256k")
+                exitoptions="--reu-type 256"
+                reu_enabled=1
+            ;;
         "reu512k")
                 exitoptions="--reu-type 512"
                 reu_enabled=1
             ;;
+        "reu1m")
+                exitoptions="--reu-type 1024"
+                reu_enabled=1
+            ;;
+        "reu2m")
+                exitoptions="--reu-type 2048"
+                reu_enabled=1
+            ;;
+        "reu4m")
+                exitoptions="--reu-type 4096"
+                reu_enabled=1
+            ;;
+        "reu8m")
+                exitoptions="--reu-type 8192"
+                reu_enabled=1
+            ;;
+        "reu16m")
+                exitoptions="--reu-type 16384"
+                reu_enabled=1
+            ;;
         "geo256k")
                 exitoptions="--geo-ram 256"
+                georam_enabled=1
+            ;;
+        "geo512k")
+                exitoptions="--geo-ram 512"
                 georam_enabled=1
             ;;
         "cia-old")
@@ -64,7 +108,17 @@ function kernal64c128c128_get_options
                     mounted_d64="${1:9}"
                     echo -ne "(disk:${1:9}) "
                 fi
+                if [ "${1:0:9}" == "mountd71:" ]; then
+                    exitoptions="--drive8-file $2/${1:9}"
+                    mounted_d64="${1:9}"
+                    echo -ne "(disk:${1:9}) "
+                fi
                 if [ "${1:0:9}" == "mountg64:" ]; then
+                    exitoptions="--drive8-file $2/${1:9}"
+                    mounted_g64="${1:9}"
+                    echo -ne "(disk:${1:9}) "
+                fi
+                if [ "${1:0:9}" == "mountg71:" ]; then
                     exitoptions="--drive8-file $2/${1:9}"
                     mounted_g64="${1:9}"
                     echo -ne "(disk:${1:9}) "
@@ -135,7 +189,7 @@ function kernal64c128c128_run_screenshot
             if [ $exitcode -ne 255 ]
             then
                 echo -ne "\nerror: call to $KERNAL64C128C128 failed.\n"
-                exit -1
+#                exit -1
             fi
         fi
     fi
@@ -165,8 +219,10 @@ function kernal64c128c128_run_screenshot
                 KERNAL64C128C128SXO=32
                 KERNAL64C128C128SYO=23
             fi
-        
-            echo ./cmpscreens "$refscreenshotname" "$KERNAL64C128C128REFSXO" "$KERNAL64C128C128REFSYO" "$1"/.testbench/"$screenshottest"-kernal64C128C128.png "$KERNAL64C128C128SXO" "$KERNAL64C128C128SYO"
+
+            if [ $verbose == "1" ]; then
+                echo ./cmpscreens "$refscreenshotname" "$KERNAL64C128C128REFSXO" "$KERNAL64C128C128REFSYO" "$1"/.testbench/"$screenshottest"-kernal64C128C128.png "$KERNAL64C128C128SXO" "$KERNAL64C128C128SYO"
+            fi
             ./cmpscreens "$refscreenshotname" "$KERNAL64C128C128REFSXO" "$KERNAL64C128C128REFSYO" "$1"/.testbench/"$screenshottest"-kernal64C128C128.png "$KERNAL64C128C128SXO" "$KERNAL64C128C128SYO"
             exitcode=$?
         else
@@ -174,7 +230,9 @@ function kernal64c128c128_run_screenshot
             exitcode=255
         fi
     fi
-    echo "cmpscreen exited with: " $exitcode
+    if [ $verbose == "1" ]; then
+        echo "cmpscreen exited with: " $exitcode
+    fi
 }
 
 ################################################################################
@@ -196,4 +254,15 @@ function kernal64c128c128_run_exitcode
     $KERNAL64C128C128 $KERNAL64C128C128OPTS $KERNAL64C128C128OPTSEXITCODE ${@:5} "--limitcycles" "$3" "$4" 1> /dev/null 2> /dev/null
     exitcode=$?
     #echo EXIT CODE for $2 is $exitcode
+    if [ $exitcode -ne 0 ]
+    then
+        if [ $exitcode -ne 1 ]
+        then
+            if [ $exitcode -ne 255 ]
+            then
+                echo -ne "\nerror: call to $KERNAL64C128C128 failed.\n"
+#                exit -1
+            fi
+        fi
+    fi
 }

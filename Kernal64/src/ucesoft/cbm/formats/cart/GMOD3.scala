@@ -3,8 +3,8 @@ package ucesoft.cbm.formats.cart
 import ucesoft.cbm.ChipID
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.formats.{Cartridge, CartridgeBuilder}
 import ucesoft.cbm.formats.ExpansionPortFactory.CartridgeExpansionPort
+import ucesoft.cbm.formats.{Cartridge, CartridgeBuilder}
 import ucesoft.cbm.misc.EN25QH128A
 
 class GMOD3(crt: Cartridge,ram:Memory,forwardRam:Memory) extends CartridgeExpansionPort(crt,ram) {
@@ -112,7 +112,7 @@ class GMOD3(crt: Cartridge,ram:Memory,forwardRam:Memory) extends CartridgeExpans
     forwardRam.setForwardReadTo(Some(IRQHackVectorRAM))
   }
 
-  def createCRT : Unit = {
+  def createCRT() : Unit = {
     val builder = new CartridgeBuilder(crt.file,"KERNAL64 GMOD3",62,false,true)
     for((b,rom:ROM) <- romlBanks) builder.addChip(0x8000,2,b,rom.data)
 

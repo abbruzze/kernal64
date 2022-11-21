@@ -35,7 +35,7 @@ object D64LocalDirectory {
       }
     }
     d64.setFileMap(fileMap.toMap)
-    d64.rename(s"/${dir.getName.toUpperCase}")
+    d64.rename(s"/${dir.getName.toUpperCase}","  ")
     d64.reloadGCR
     d64
   }
@@ -64,10 +64,10 @@ class D64LocalDirectory(override val file:String,val dir:File) extends D64_D71(f
   override def close: Unit = {
     flush
     if (diskModified) syncWithLocalDir
-    disk.close
+    disk.close()
   }
 
-  private def syncWithLocalDir : Unit = {
+  private def syncWithLocalDir() : Unit = {
     val dirEntries = directories
     val toDelete = initialDirEntries filter { e => !dirEntries.contains(e) }
     val toModify = dirEntries
@@ -96,7 +96,7 @@ class D64LocalDirectory(override val file:String,val dir:File) extends D64_D71(f
     val out = new FileOutputStream(f)
     try {
       do {
-        val sector = readSectorBuffer(t, s)
+        val sector = readBlock(t, s)
         t = sector(0)
         s = sector(1).toInt & 0xFF
         if (t == 0) out.write(sector, 2, s)
@@ -104,6 +104,6 @@ class D64LocalDirectory(override val file:String,val dir:File) extends D64_D71(f
       }
       while (t != 0)
     }
-    finally out.close
+    finally out.close()
   }
 }

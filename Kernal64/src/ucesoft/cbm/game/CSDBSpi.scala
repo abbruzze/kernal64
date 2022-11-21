@@ -1,10 +1,11 @@
 package ucesoft.cbm.game
 
-import java.awt.Dimension
-import java.util.concurrent.atomic.AtomicInteger
-import java.net.URL
 import org.jsoup.Jsoup
-import concurrent.ExecutionContext.Implicits.global
+
+import java.awt.Dimension
+import java.net.URL
+import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class CSDBSpi extends GameProvider {
@@ -19,8 +20,8 @@ class CSDBSpi extends GameProvider {
   }
 
   val name = "CSDB"
-  val url = Some(new URL("https://csdb.dk/"))
-  val iconURL = Some(new URL("https://csdb.dk/gfx/csdb-frontlogo.gif"))
+  val url: Option[URL] = Some(new URL("https://csdb.dk/"))
+  val iconURL: Option[URL] = Some(new URL("https://csdb.dk/gfx/csdb-frontlogo.gif"))
   val gameIconPreferredSize = new Dimension(384,272)
   val version = "N/A"
   lazy val repository = new Repository(this)
@@ -33,7 +34,7 @@ class CSDBSpi extends GameProvider {
   private val currentDownloaded = new AtomicInteger(0)
   @volatile private var interrupted = false
 
-  def setProgressListener(l:GameLoadingProgressListener) = progressListener = Some(l)
+  def setProgressListener(l:GameLoadingProgressListener): Unit = progressListener = Some(l)
 
   def games(constraint:Option[SyncConstraint]) : Future[List[Game]] = {
     currentLoading match {

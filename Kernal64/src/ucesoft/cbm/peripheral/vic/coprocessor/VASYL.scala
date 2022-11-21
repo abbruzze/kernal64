@@ -315,13 +315,13 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
         }
       }
       else
-        if (compareV(v_arg,true) || (compareV(v_arg) && compareH(h_arg,true))) {
-          clearMaskv
-          clearMaskh
-          executeNextNow = true
-          return
-        }
-        else fetchOp = false
+      if (compareV(v_arg,true) || (compareV(v_arg) && compareH(h_arg,true))) {
+        clearMaskv
+        clearMaskh
+        executeNextNow = true
+        return
+      }
+      else fetchOp = false
     }
 
     if (compareV(v_arg) && compareH(h_arg)) {
@@ -392,127 +392,127 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     val reg = _reg & 0xFF
     //if (debug && reg == 0x2E || (reg > 0x30) && (reg < 0x3F)) println(s"regs(${reg.toHexString}) = ${value.toHexString}")
     if (reg == 0x31) {
-      beamRacerActiveState match {
-        case 0 =>
-          if (value == 0x42) beamRacerActiveState += 1
-        case 1 =>
-          if (value == 0x52) {
-            beamRacerActiveState += 1
-            if (debug) println("VASYL activated")
-          }
-          else beamRacerActiveState = 0
-        case 2 =>
-          regs(0x31) = value
-
-          dlistOnPendingOnNextFrame = (value & 8) > 0
-
-          portBank = value & 7
-          portMem = banks(portBank)
-
-          if (!dlistOnPendingOnNextFrame) {
-            displayListFetchBank = portBank
-            prgMem = banks(displayListFetchBank)
-          }
-
-          portsBind = (value & 0x40) > 0
-
-          if (!dlistOnPendingOnNextFrame) dlistExecutionActive = false
-
-          // TODO: grey dot kill
-
-          if (debug) println(s"Control register: portBank = $portBank, dlistOnPendingOnNextFrame = $dlistOnPendingOnNextFrame, dlistExecutionActive = $dlistExecutionActive portsBind = $portsBind")
-      }
-    }
-    else
-      if (beamRacerActiveState == 2) { // beamracer active
-        if ((reg > 0x30 && reg < 0x40) || (reg >= 0x40 && reg < 0x4D && isVasylWriting)) regs(reg) = value
-
-        reg match {
-          case 0x2E =>
-            if ((value & 0x40) > 0) { // un-knock
-              deactivate
+        beamRacerActiveState match {
+          case 0 =>
+            if (value == 0x42) beamRacerActiveState += 1
+          case 1 =>
+            if (value == 0x52) {
+              beamRacerActiveState += 1
+              if (debug) println("VASYL activated")
             }
-          case 0x32 =>
-            if (debug) println(s"DLISTL = ${value.toHexString}, execution address = ${(value | regs(0x33) << 8).toHexString}")
-          case 0x33 =>
-            if (debug) println(s"DLISTH = ${value.toHexString}, execution address = ${(value << 8| regs(0x32)).toHexString}")
-          case 0x34 =>
-            addressPort(0) = addressPort(0) & 0xFF00 | value & 0xFF
-            if (debug) println(s"ADR0L = ${value.toHexString}, address port 0 = ${addressPort(0).toHexString}")
-          case 0x35 =>
-            addressPort(0) = addressPort(0) & 0xFF | (value & 0xFF) << 8
-            if (debug) println(s"ADR0H = ${value.toHexString}, address port 0 = ${addressPort(0).toHexString}")
-          case 0x36 =>
-            if (debug) println(s"STEP0 = ${value.toHexString}")
-          case 0x37 =>
-            writePort(0,value)
-          case 0x38 =>
-            addressPort(1) = addressPort(1) & 0xFF00 | value & 0xFF
-            if (debug) println(s"ADR1L = ${value.toHexString}, address port 1 = ${addressPort(1).toHexString}")
-          case 0x39 =>
-            addressPort(1) = addressPort(1) & 0xFF | (value & 0xFF) << 8
-            if (debug) println(s"ADR1H = ${value.toHexString}, address port 1 = ${addressPort(1).toHexString}")
-          case 0x3A =>
-            if (debug) println(s"STEP1 = ${value.toHexString}")
-          case 0x3B =>
-            writePort(1,value)
-          case 0x3C =>
-            if (debug) println(s"REP0 = ${value.toHexString}")
-            portWriteRepsEnabled(0) = true
-            portWriteReps(0) = value
-          case 0x3D =>
-            if (debug) println(s"REP1 = ${value.toHexString} ${if (portsBind) s" portsBind enabled from ${addressPort(0).toHexString} to ${addressPort(1).toHexString}" else ""}")
-            portWriteRepsEnabled(1) = true
-            portWriteReps(1) = value
-          case 0x3E =>
-            dlistOnPendingOnNextCycle = true
-          // ========================= VASYL WRITE-ONLY REGISTERS ==========================
-          case 0x40 if isVasylWriting => // PBS_CONTROL
-            seq_bank = value & 7
-            seq_active = (value & 8) > 0
-            seq_update_mode = (value >> 4) & 3
-            seq_swizzle_mode = (value >> 6) & 3
-            if (debug) println(s"PBS CONTROL REGISTER: seq_bank=$seq_bank seq_active=$seq_active seq_update=$seq_update_mode seq_swizzle=$seq_swizzle_mode")
-          case 0x41 if isVasylWriting =>
-            if (debug) println(s"DLIST2L = ${value.toHexString}, execution address = ${(value | regs(0x42) << 8).toHexString}")
-          case 0x42 if isVasylWriting =>
-            if (debug) println(s"DLIST2H = ${value.toHexString}, execution address = ${(value << 8| regs(0x41)).toHexString}")
-          case 0x43 if isVasylWriting =>
-            dlistOnPendingOnNextCycle = true
-            updatePCWithDLIST2LH = true
-            if ((value & 0x8) > 0) {
-              displayListFetchBank = value & 7
+            else beamRacerActiveState = 0
+          case 2 =>
+            regs(0x31) = value
+
+            dlistOnPendingOnNextFrame = (value & 8) > 0
+
+            portBank = value & 7
+            portMem = banks(portBank)
+
+            if (!dlistOnPendingOnNextFrame) {
+              displayListFetchBank = portBank
               prgMem = banks(displayListFetchBank)
             }
-          case 0x44 if isVasylWriting =>
-            if (debug) println(s"S_BASEL = ${value.toHexString}, bitmap pointer = ${(value | regs(0x45) << 8).toHexString}")
-          case 0x45 if isVasylWriting =>
-            seq_bitmap_pointer = value << 8| regs(0x44)
-            if (debug) println(s"S_BASEH = ${value.toHexString}, bitmap pointer = ${seq_bitmap_pointer.toHexString}")
-          case 0x46 if isVasylWriting =>
-            seq_cycle_start = value
-            if (debug) println(s"S_CYC_START = $seq_cycle_start")
-          case 0x47 if isVasylWriting =>
-            seq_cycle_stop = value
-            if (debug) println(s"S_CYC_STOP = $seq_cycle_stop")
-          case 0x48 if isVasylWriting =>
-            seq_step = ((seq_step & 0xFF00) | value).toShort
-            if (debug) println(s"S_STEP_L = $value, seq_step = $seq_step")
-          case 0x49 if isVasylWriting =>
-            seq_step = ((seq_step & 0x00FF) | (value << 8)).toShort
-            if (debug) println(s"S_STEP_H = $value, seq_step = $seq_step")
-          case 0x4A if isVasylWriting =>
-            seq_padding = ((seq_padding & 0xFF00) | value).toShort
-            if (debug) println(s"S_PADDING_L = $value, seq_step = $seq_padding")
-          case 0x4B if isVasylWriting =>
-            seq_padding = ((seq_padding & 0x00FF) | (value << 8)).toShort
-            if (debug) println(s"S_PADDING_H = $value, seq_step = $seq_padding")
-          case 0x4C if isVasylWriting =>
-            if (debug) println(s"S_XORBYTE= $value")
-            seq_xor_value = value
-          case _ =>
+
+            portsBind = (value & 0x40) > 0
+
+            if (!dlistOnPendingOnNextFrame) dlistExecutionActive = false
+
+            // TODO: grey dot kill
+
+            if (debug) println(s"Control register: portBank = $portBank, dlistOnPendingOnNextFrame = $dlistOnPendingOnNextFrame, dlistExecutionActive = $dlistExecutionActive portsBind = $portsBind")
         }
+    }
+    else
+    if (beamRacerActiveState == 2) { // beamracer active
+      if ((reg > 0x30 && reg < 0x40) || (reg >= 0x40 && reg < 0x4D && isVasylWriting)) regs(reg) = value
+
+      reg match {
+        case 0x2E =>
+          if ((value & 0x40) > 0) { // un-knock
+            deactivate
+          }
+        case 0x32 =>
+          if (debug) println(s"DLISTL = ${value.toHexString}, execution address = ${(value | regs(0x33) << 8).toHexString}")
+        case 0x33 =>
+          if (debug) println(s"DLISTH = ${value.toHexString}, execution address = ${(value << 8| regs(0x32)).toHexString}")
+        case 0x34 =>
+          addressPort(0) = addressPort(0) & 0xFF00 | value & 0xFF
+          if (debug) println(s"ADR0L = ${value.toHexString}, address port 0 = ${addressPort(0).toHexString}")
+        case 0x35 =>
+          addressPort(0) = addressPort(0) & 0xFF | (value & 0xFF) << 8
+          if (debug) println(s"ADR0H = ${value.toHexString}, address port 0 = ${addressPort(0).toHexString}")
+        case 0x36 =>
+          if (debug) println(s"STEP0 = ${value.toHexString}")
+        case 0x37 =>
+          writePort(0,value)
+        case 0x38 =>
+          addressPort(1) = addressPort(1) & 0xFF00 | value & 0xFF
+          if (debug) println(s"ADR1L = ${value.toHexString}, address port 1 = ${addressPort(1).toHexString}")
+        case 0x39 =>
+          addressPort(1) = addressPort(1) & 0xFF | (value & 0xFF) << 8
+          if (debug) println(s"ADR1H = ${value.toHexString}, address port 1 = ${addressPort(1).toHexString}")
+        case 0x3A =>
+          if (debug) println(s"STEP1 = ${value.toHexString}")
+        case 0x3B =>
+          writePort(1,value)
+        case 0x3C =>
+          if (debug) println(s"REP0 = ${value.toHexString}")
+          portWriteRepsEnabled(0) = true
+          portWriteReps(0) = value
+        case 0x3D =>
+          if (debug) println(s"REP1 = ${value.toHexString} ${if (portsBind) s" portsBind enabled from ${addressPort(0).toHexString} to ${addressPort(1).toHexString}" else ""}")
+          portWriteRepsEnabled(1) = true
+          portWriteReps(1) = value
+        case 0x3E =>
+          dlistOnPendingOnNextCycle = true
+        // ========================= VASYL WRITE-ONLY REGISTERS ==========================
+        case 0x40 if isVasylWriting => // PBS_CONTROL
+          seq_bank = value & 7
+          seq_active = (value & 8) > 0
+          seq_update_mode = (value >> 4) & 3
+          seq_swizzle_mode = (value >> 6) & 3
+          if (debug) println(s"PBS CONTROL REGISTER: seq_bank=$seq_bank seq_active=$seq_active seq_update=$seq_update_mode seq_swizzle=$seq_swizzle_mode")
+        case 0x41 if isVasylWriting =>
+          if (debug) println(s"DLIST2L = ${value.toHexString}, execution address = ${(value | regs(0x42) << 8).toHexString}")
+        case 0x42 if isVasylWriting =>
+          if (debug) println(s"DLIST2H = ${value.toHexString}, execution address = ${(value << 8| regs(0x41)).toHexString}")
+        case 0x43 if isVasylWriting =>
+          dlistOnPendingOnNextCycle = true
+          updatePCWithDLIST2LH = true
+          if ((value & 0x8) > 0) {
+            displayListFetchBank = value & 7
+            prgMem = banks(displayListFetchBank)
+          }
+        case 0x44 if isVasylWriting =>
+          if (debug) println(s"S_BASEL = ${value.toHexString}, bitmap pointer = ${(value | regs(0x45) << 8).toHexString}")
+        case 0x45 if isVasylWriting =>
+          seq_bitmap_pointer = value << 8| regs(0x44)
+          if (debug) println(s"S_BASEH = ${value.toHexString}, bitmap pointer = ${seq_bitmap_pointer.toHexString}")
+        case 0x46 if isVasylWriting =>
+          seq_cycle_start = value
+          if (debug) println(s"S_CYC_START = $seq_cycle_start")
+        case 0x47 if isVasylWriting =>
+          seq_cycle_stop = value
+          if (debug) println(s"S_CYC_STOP = $seq_cycle_stop")
+        case 0x48 if isVasylWriting =>
+          seq_step = ((seq_step & 0xFF00) | value).toShort
+          if (debug) println(s"S_STEP_L = $value, seq_step = $seq_step")
+        case 0x49 if isVasylWriting =>
+          seq_step = ((seq_step & 0x00FF) | (value << 8)).toShort
+          if (debug) println(s"S_STEP_H = $value, seq_step = $seq_step")
+        case 0x4A if isVasylWriting =>
+          seq_padding = ((seq_padding & 0xFF00) | value).toShort
+          if (debug) println(s"S_PADDING_L = $value, seq_step = $seq_padding")
+        case 0x4B if isVasylWriting =>
+          seq_padding = ((seq_padding & 0x00FF) | (value << 8)).toShort
+          if (debug) println(s"S_PADDING_H = $value, seq_step = $seq_padding")
+        case 0x4C if isVasylWriting =>
+          if (debug) println(s"S_XORBYTE= $value")
+          seq_xor_value = value
+        case _ =>
       }
+    }
   }
 
   private def writePort(port:Int,value:Int) : Unit = {
@@ -659,10 +659,10 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
       if (dlistExecutionActive) reloadPcFromRegs
       else
-        if (dlistOnPendingOnNextFrame) {
-          dlistOnPendingOnNextFrame = false
-          activateListExecution
-        }
+      if (dlistOnPendingOnNextFrame) {
+        dlistOnPendingOnNextFrame = false
+        activateListExecution
+      }
     }
     //=========================================================
     if (dlistOnPendingOnNextCycle) {
@@ -704,10 +704,10 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
       dmaHandler(false)
     }
     else // check for postponed read
-      if (cpuPostponedRead && !lastOpAccessingVIC) {
-        cpuPostponedRead = false
-        dmaHandler(false)
-      }
+    if (cpuPostponedRead && !lastOpAccessingVIC) {
+      cpuPostponedRead = false
+      dmaHandler(false)
+    }
     //=========================================================
   }
   final def g_access(rasterCycle:Int) : Int = {

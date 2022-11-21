@@ -1,17 +1,11 @@
 package ucesoft.cbm.peripheral.printer
 
-import ucesoft.cbm.peripheral.bus.IECBusDevice
-import ucesoft.cbm.peripheral.bus.IECBus
 import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
+import ucesoft.cbm.peripheral.bus.{BusDataIterator, IECBus, IECBusDevice}
 
-class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevice(bus,device) with CBMComponent {
-  val componentID = "Commodore MPS803"
-  val componentType = CBMComponentType.PRINTER 
-  
+import java.io.{ObjectInputStream, ObjectOutputStream}
+
+class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevice(bus,device) with CBMComponent with Printer {
   val busid = "MPS803"
     
   private[this] var active = false
@@ -19,9 +13,9 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
   // register itself to bus
   bus.registerListener(this)
   
-  def setActive(active:Boolean) = this.active = active
-  protected def isDeviceReady = active
-  protected def loadData(fileName:String) = None
+  override def setActive(active:Boolean): Unit = this.active = active
+  protected def isDeviceReady: Boolean = active
+  protected def loadData(fileName:String): Option[BusDataIterator] = None
   
   def init : Unit = {}
   
@@ -39,12 +33,8 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
     channels(channel).clear
     driver.print(byte)
   }
-  // state
-  protected def saveState(out:ObjectOutputStream) : Unit = {
-    out.writeBoolean(active)
-  }
-  protected def loadState(in:ObjectInputStream) : Unit = {
-    active = in.readBoolean
-  }
-  protected def allowsStateRestoring : Boolean = true
+
+  override protected def saveState(out: ObjectOutputStream): Unit = {}
+  override protected def loadState(in: ObjectInputStream): Unit = {}
+  override protected def allowsStateRestoring: Boolean = true
 }

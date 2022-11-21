@@ -1,9 +1,9 @@
 package ucesoft.cbm.formats.cart
 
-import ucesoft.cbm.{ChipID, Clock, ClockEvent}
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.formats.Cartridge
 import ucesoft.cbm.formats.ExpansionPortFactory.CartridgeExpansionPort
+import ucesoft.cbm.{ChipID, Clock, ClockEvent}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
@@ -15,7 +15,7 @@ class ActionReplay(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) exte
 
   for(i <- 0 to 3) {
     romh(i) = new ROM("ROMH-" + i,0xE000,0x2000,romlBanks(i).asInstanceOf[ROM].data) {
-      override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+      override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
         if (!game && exrom) super.read(address,chipID)
         else data(address - 0xA000)
       }
@@ -29,14 +29,14 @@ class ActionReplay(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) exte
     val isActive = true
     val isRom = false
     def init  : Unit = {}
-    def reset  : Unit = {}
-    def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = crtRAM(address & 0x1FFF)
-    override def writeROM(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
+    def reset()  : Unit = {}
+    def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = crtRAM(address & 0x1FFF)
+    override def writeROM(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {
       crtRAM(address & 0x1FFF) = value
     }
   }
 
-  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = if (address < 0xDF00) 0 else readIO2(address)
+  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = if (address < 0xDF00) 0 else readIO2(address)
 
   @inline private def readIO2(address:Int) : Int = {
     if (!isActive) 0
@@ -45,7 +45,7 @@ class ActionReplay(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) exte
       else romlBanks(romlBankIndex).asInstanceOf[ROM].data(address & 0x1FFF)//romlBanks(romlBankIndex).read(address - 0xDF00 + 0x8000)
   }
 
-  override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = if (address < 0xDF00) writeIO1(address,value) else writeIO2(address,value)
+  override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = if (address < 0xDF00) writeIO1(address,value) else writeIO2(address,value)
 
   @inline private def writeIO1(address: Int, value: Int) : Unit = {
     if (isActive) {
@@ -64,8 +64,8 @@ class ActionReplay(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) exte
     if (isActive && exportRAM) crtRAM(0x1F00 + (address & 0xFF)) = value
   }
 
-  override def ROML = if (exportRAM) CRTRAM else super.ROML
-  override def ROMH = romh(romlBankIndex)
+  override def ROML: Memory = if (exportRAM) CRTRAM else super.ROML
+  override def ROMH: Memory = romh(romlBankIndex)
 
   override def isFreezeButtonSupported = true
 

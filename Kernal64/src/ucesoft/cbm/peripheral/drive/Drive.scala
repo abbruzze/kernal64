@@ -1,24 +1,25 @@
 package ucesoft.cbm.peripheral.drive
 
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.cpu.Memory
+import ucesoft.cbm.{CBMComponent, CBMComponentType}
 
 object DriveType extends Enumeration {
-  val _1541 = Value("1541")
-  val _1571 = Value("1571")
-  val _1581 = Value("1581")
-  val OTHER = Value("OTHER")
-  val LOCAL = Value("LOCAL")
+  val _1541: DriveType.Value = Value("1541")
+  val _1571: DriveType.Value = Value("1571")
+  val _1581: DriveType.Value = Value("1581")
+  val _8050: DriveType.Value = Value("8050")
+  val OTHER: DriveType.Value = Value("OTHER")
+  val LOCAL: DriveType.Value = Value("LOCAL")
 }
 
 trait Drive extends CBMComponent {
-  val componentType = CBMComponentType.DISK
+  val componentType: Type = CBMComponentType.DISK
   val driveType : DriveType.Value
   val formatExtList : List[String]
   var runningListener : (Boolean) => Unit = _
   
-  def disconnect : Unit = {}
+  def disconnect() : Unit = {}
   def setActive(active:Boolean) : Unit = {}
   def isRunning : Boolean = false
   def setCanSleep(canSleep:Boolean) : Unit = {}
@@ -30,7 +31,7 @@ trait Drive extends CBMComponent {
   def getFloppy : Floppy
   def getMem : Memory = Memory.empty
   
-  def getSpeedHz = -1  
+  def getSpeedHz: Int = -1
   def setSpeedHz(speed:Int) : Unit = {}
   val MIN_SPEED_HZ = 0
   val MAX_SPEED_HZ = 0

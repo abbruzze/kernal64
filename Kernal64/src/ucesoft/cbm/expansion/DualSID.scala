@@ -1,22 +1,23 @@
 package ucesoft.cbm.expansion
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
-
+import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.sid.SID
 import ucesoft.cbm.{ChipID, Clock}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 class DualSID(sid:SID,sidAddress:Int) extends ExpansionPort {
   val TYPE : ExpansionPortType.Value = ExpansionPortType.DUALSID
   override val name = "DualSID"
   override val componentID = "DualSID"
-  private[this] final val endAddress = sidAddress + 0x20
+  override lazy val endAddress = sidAddress + 0x20
       
   val EXROM = true
   val GAME = true
-  val ROML = null
-  val ROMH = null
+  val ROML: Memory = null
+  val ROMH: Memory = null
     
-  final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     if (address >= sidAddress && address < endAddress) sid.read(address) else super.read(address,chipID)
   }
   final override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
@@ -45,9 +46,10 @@ object DualSID {
 
   @inline private def isOnExp(address:Int) : Boolean = address >= 0xDE00 && address < 0xE000
 
-  def validAddresses(c64Mode:Boolean) : Array[String] = c64Mode match {
-    case true => C64_VALID_ADDRESSES
-    case false => C128_VALID_ADDRESSES
+  def validAddresses(c64Mode:Boolean) : Array[String] = if (c64Mode) {
+    C64_VALID_ADDRESSES
+  } else {
+    C128_VALID_ADDRESSES
   }
 
   def setDualSID(address:Option[Int],sid:SID): Unit = {

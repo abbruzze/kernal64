@@ -1,10 +1,12 @@
 package ucesoft.cbm.misc
 
 object TestCart {
-  private[this] final val EXITCODE_LOCATION = 0xD7FF
+  private[this] var EXITCODE_LOCATION = 0xD7FF
   var enabled = false
   var screenshotFile : Option[String] = None
   var screeshotHandler : (java.io.File,() => Unit) => Unit = _
+
+  def setCartLocation(loc:Int): Unit = EXITCODE_LOCATION = loc
 
   final def write(address:Int,value:Int) : Unit = {
     if (enabled && address == EXITCODE_LOCATION) exit(value)

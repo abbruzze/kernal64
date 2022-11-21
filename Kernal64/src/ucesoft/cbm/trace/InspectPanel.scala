@@ -1,27 +1,21 @@
 package ucesoft.cbm.trace
 
-import javax.swing._
-import ucesoft.cbm.CBMComponent
-import javax.swing.tree.DefaultMutableTreeNode
-import java.awt.BorderLayout
-import java.util.Properties
-import javax.swing.tree.DefaultTreeModel
-import javax.swing.tree.DefaultTreeCellRenderer
-import java.awt.FlowLayout
-import javax.swing.event.ChangeListener
-import javax.swing.event.ChangeEvent
-import ucesoft.cbm.cpu.Memory
-import ucesoft.cbm.cpu.RAMComponent
-import javax.swing.tree.DefaultTreeCellEditor
-import java.util.EventObject
+import ucesoft.cbm.{C128Model, C64Model, CBMComponent, CBMComputerModel, CBMIIModel, VIC20Model}
+import ucesoft.cbm.cpu.{Memory, RAMComponent}
+
 import java.awt.event.MouseEvent
+import java.awt.{BorderLayout, Component, FlowLayout}
+import java.util.{EventObject, Properties}
+import javax.swing._
+import javax.swing.event.{ChangeEvent, ChangeListener}
+import javax.swing.tree.{DefaultMutableTreeNode, DefaultTreeCellEditor, DefaultTreeCellRenderer, DefaultTreeModel}
 
 object InspectPanel {
-  def getInspectDialog(f: JFrame, root: CBMComponent) = new InspectPanelDialog(f,root)
+  def getInspectDialog(f: JFrame, root: CBMComponent,model:CBMComputerModel) = new InspectPanelDialog(f,root,model)
 }
 
-class InspectPanelDialog(f: JFrame,root: CBMComponent) extends JDialog(f, "Inspect panel") {
-  private[this] var panel = new InspectPanel(root)
+class InspectPanelDialog(f: JFrame,root: CBMComponent,model:CBMComputerModel) extends JDialog(f, "Inspect panel") {
+  private[this] var panel = new InspectPanel(root,model)
   
   override def setVisible(visible: Boolean) : Unit = {
     super.setVisible(visible)
@@ -30,28 +24,34 @@ class InspectPanelDialog(f: JFrame,root: CBMComponent) extends JDialog(f, "Inspe
   
   getContentPane.add("Center", panel)
   setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE)
-  pack
+  pack()
   
-  def updateRoot : Unit = {
+  def updateRoot() : Unit = {
     getContentPane.remove(panel)
-    panel = new InspectPanel(root)
+    panel = new InspectPanel(root,model)
     getContentPane.add("Center", panel)
-    revalidate
+    revalidate()
   }
 }
 
-private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnable with ChangeListener {
+private[trace] class InspectPanel(root: CBMComponent,model:CBMComputerModel) extends JPanel with Runnable with ChangeListener {
   private[this] val treeRoot = createTree(root)
   private[this] val lock = new Object
   private[this] val tree = new JTree(treeRoot)
   private[this] val spin = new JSpinner
-  private[this] var visible = false
+  private[this] var panelVisible = false
   private[this] var sleepPeriod = 1000
 
   spin.setValue(sleepPeriod)
   spin.addChangeListener(this)
   setLayout(new BorderLayout)
-  add("North", new JLabel(new ImageIcon(getClass.getResource("/resources/logo_bar_mini.png"))))
+  val logo = model match {
+    case C64Model => "/resources/logo_bar_mini.png"
+    case C128Model => "/resources/logo_bar_mini_128.png"
+    case VIC20Model => "/resources/logo_bar_mini_vic20.png"
+    case CBMIIModel => "/resources/logo_bar_mini_cbm2.png"
+  }
+  add("North", new JLabel(new ImageIcon(getClass.getResource(logo))))
   add("Center", new JScrollPane(tree))
   val southPanel = new JPanel(new FlowLayout)
   southPanel.add(new JLabel("Refresh period in millis:"))
@@ -60,7 +60,7 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
   tree.setCellRenderer(new Renderer)
   tree.setCellEditor(new Editor(tree, tree.getCellRenderer.asInstanceOf[DefaultTreeCellRenderer]))
   tree.setEditable(true)
-  new Thread(this).start
+  new Thread(this).start()
   
   private[this] class MemoryTreeNode(o:Object) extends DefaultMutableTreeNode(o) {
     override def setUserObject(o:Object) : Unit = {
@@ -73,7 +73,7 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
 
   private[this] class Renderer extends DefaultTreeCellRenderer {
     private val memoryPanel = new MemoryPanel
-    override def getTreeCellRendererComponent(tree: JTree, value: Object, sel: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean) = {
+    override def getTreeCellRendererComponent(tree: JTree, value: Object, sel: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean): Component = {
       value.asInstanceOf[DefaultMutableTreeNode].getUserObject match {
         case mn: MemoryNode =>
           memoryPanel.setAddressValue(mn.address, mn.mem.read(mn.address))
@@ -86,7 +86,7 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
   }
 
   private[this] class Editor(tree: JTree, renderer: DefaultTreeCellRenderer) extends DefaultTreeCellEditor(tree, renderer) {
-    override def isCellEditable(event: EventObject) = {
+    override def isCellEditable(event: EventObject): Boolean = {
       if (event.isInstanceOf[MouseEvent] && event.asInstanceOf[MouseEvent].getClickCount == 2) {
         val me = event.asInstanceOf[MouseEvent]
         val treePath = tree.getPathForLocation(me.getX,me.getY)
@@ -117,19 +117,19 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
   }
 
   private[this] class PropNode(var props: Properties, key: String) {
-    override def toString = key + " = " + props.getProperty(key)
+    override def toString: String = key + " = " + props.getProperty(key)
   }
   private[this] class ComponentNode(val node: CBMComponent) {
-    override def toString = node.componentID
+    override def toString: String = node.componentID
   }
   private[this] class MemoryNode(val mem: Memory, var address: Int) {
     override def toString = "Insert an hex address [=<new value>]"
   }
 
   def enableUpdating(enabled: Boolean) : Unit = {
-    visible = enabled
+    panelVisible = enabled
     if (enabled) lock.synchronized {
-      lock.notify
+      lock.notify()
     }
   }
 
@@ -137,14 +137,14 @@ private[trace] class InspectPanel(root: CBMComponent) extends JPanel with Runnab
     sleepPeriod = spin.getValue.asInstanceOf[Int]
   }
 
-  def run : Unit = {
+  def run() : Unit = {
     while (true) {
-      if (!visible) lock.synchronized {
-        while (!visible) lock.wait
+      if (!panelVisible) lock.synchronized {
+        while (!panelVisible) lock.wait()
       }
       Thread.sleep(sleepPeriod)
       SwingUtilities.invokeLater(new Runnable {
-        def run = updateTree(treeRoot)
+        def run(): Unit = updateTree(treeRoot)
       })
     }
   }

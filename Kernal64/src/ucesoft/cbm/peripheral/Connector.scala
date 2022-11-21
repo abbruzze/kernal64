@@ -1,18 +1,18 @@
 package ucesoft.cbm.peripheral
 
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponent, CBMComponentType}
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 abstract class Connector extends CBMComponent {
-  val componentType = CBMComponentType.INTERNAL
+  val componentType: Type = CBMComponentType.INTERNAL
   private var dir = 0 // 0=Input (read only), 1=Output (read and write) for each bit
   protected[this] var latch = 0
   
   def read : Int
-  final def write(data:Int) = {
+  final def write(data:Int): Unit = {
     latch = data
     performWrite(data)
   }
@@ -30,7 +30,7 @@ abstract class Connector extends CBMComponent {
     latch = 0
   }
   
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Ddr",Integer.toHexString(dir))
     properties.setProperty("Latch",Integer.toHexString(latch))
     properties
@@ -46,4 +46,10 @@ abstract class Connector extends CBMComponent {
     latch = in.readInt
   }
   protected def allowsStateRestoring : Boolean = true
+}
+
+object EmptyConnector extends Connector {
+  override val componentID: String = "EmptyConnector"
+  override def read : Int = 0xFF
+  override protected def performWrite(data: Int): Unit = {}
 }

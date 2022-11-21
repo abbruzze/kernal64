@@ -5,6 +5,7 @@ import scala.collection.mutable.Buffer
 object AsmEvaluator {
   import AsmParser._
   import Formats._
+
   import Ordering.Double.TotalOrdering
 
   // ====================== EVALUATION ===============================
@@ -39,10 +40,10 @@ object AsmEvaluator {
         case s@Some(_) => s
       }
     }
-    override def toString = if (n.isValidInt) n.toInt.toString else n.toString
+    override def toString: String = if (n.isValidInt) n.toInt.toString else n.toString
   }
   case class StringVal(s: String) extends RuntimeValue {
-    override def toString = s
+    override def toString: String = s
     override protected def fieldsOrMethods(f:(String,Int)) : Option[List[RuntimeValue] => RuntimeValue] = {
       super.fieldsOrMethods(f) match {
         case None =>
@@ -75,7 +76,7 @@ object AsmEvaluator {
     }
   }
   case class ListVal(list:Buffer[RuntimeValue]) extends RuntimeValue {
-    override def toString = list.mkString("[", ",", "]")
+    override def toString: String = list.mkString("[", ",", "]")
     override protected def fieldsOrMethods(f:(String,Int)) : Option[List[RuntimeValue] => RuntimeValue] = {
       super.fieldsOrMethods(f) match {
         case None =>
@@ -121,7 +122,7 @@ object AsmEvaluator {
 
     map.addAll(list map { case ListVal(l) => (l.head,l.tail.head) })
 
-    override def toString = map.map { kv => s"[${kv._1},${kv._2}]" } mkString("#[", ",", "]")
+    override def toString: String = map.map { kv => s"[${kv._1},${kv._2}]" } mkString("#[", ",", "]")
     override protected def fieldsOrMethods(f:(String,Int)) : Option[List[RuntimeValue] => RuntimeValue] = {
       super.fieldsOrMethods(f) match {
         case None =>
@@ -149,7 +150,7 @@ object AsmEvaluator {
     private def values : RuntimeValue = ListVal(map.values.toBuffer)
   }
   case class StructVal(structName: String,module:Option[String],fieldNames:List[String],map:collection.mutable.Map[String,RuntimeValue]) extends RuntimeValue {
-    override def toString = structName + fieldNames.flatMap(map.get).mkString("{",",","}")
+    override def toString: String = structName + fieldNames.flatMap(map.get).mkString("{",",","}")
 
     override protected def fieldsOrMethods(f:(String,Int)) : Option[List[RuntimeValue] => RuntimeValue] = {
       super.fieldsOrMethods(f) match {
@@ -199,9 +200,9 @@ object AsmEvaluator {
   case class Struct(name:String,module:String,ctx:EvaluationContext,isPrivate:Boolean,fields:List[String]) extends ModuleAware
   
   object VariableUpdate extends Enumeration {
-    val OK = Value
-    val CANNOT_MODIFY_CONSTANT = Value
-    val VARIABLE_NOT_EXISTS = Value
+    val OK: VariableUpdate.Value = Value
+    val CANNOT_MODIFY_CONSTANT: VariableUpdate.Value = Value
+    val VARIABLE_NOT_EXISTS: VariableUpdate.Value = Value
   }
 
   class EvaluationException(val msg: String) extends Exception(msg)
@@ -475,7 +476,7 @@ object AsmEvaluator {
                     case _:IOException =>
                       throw new EvaluationException(s"Error while loading file $fileName of import statement")
                   }
-                  finally in.close
+                  finally in.close()
                   ListVal(buffer map { b => NumberVal(b.toInt & 0xFF) } toBuffer)
                 case _ =>
                   throw new EvaluationException(s"Cannot determine the size of import statement")

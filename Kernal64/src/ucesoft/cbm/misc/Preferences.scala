@@ -27,12 +27,12 @@ object Preferences {
   val PREF_VICIINEW           = "viciinew"
   val PREF_WARPONLOAD         = "warponload"
   val PREF_PRGASDISK          = "prg-as-disk"
-  val PREF_DRIVE_X_ENABLED    = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-enabled").toArray
-  val PREF_DRIVE_X_FILE       = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-file").toArray
-  val PREF_DRIVE_X_TYPE       = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-type").toArray
-  val PREF_DRIVE12LOCALPATH   = "drive12-local-path"
+  val PREF_DRIVE_X_ENABLED: Array[String] = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-enabled").toArray
+  val PREF_DRIVE_X_FILE: Array[String] = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-file").toArray
+  val PREF_DRIVE_X_TYPE: Array[String] = (for(d <- 0 until TOTALDRIVES) yield s"drive${8 + d}-type").toArray
   val PREF_WRITEONDISK        = "write-on-disk"
   val PREF_CART               = "cart"
+  val PREF_RAW_CART           = "raw-cart"
   val PREF_PREFAUTOSAVE       = "pref-auto-save"
   val PREF_TRACE              = "trace"
   val PREF_VICPALETTE         = "vic-palette"
@@ -63,6 +63,29 @@ object Preferences {
   val PREF_WIC64_NETWORK      = "wic64-network-name"
   val PREF_WIC64_ENABLED      = "wic64-enabled"
   val PREF_MOUSE_DELAY_MILLIS = "mouse-delay-millis"
+  val PREF_IEEE488_ROM        = "ieee488rom"
+  // ================== CBM II ===================================
+  val PREF_CBM2_MODEL         = "model"
+  val PREF_CBM2_BASIC128      = "basic128"
+  val PREF_CBM2_BASIC256      = "basic256"
+  val PREF_CBM2_CHAR600       = "char600"
+  val PREF_CBM2_CHAR700       = "char700"
+  val PREF_CBM2_ROM1000       = "rom1000"
+  val PREF_CBM2_ROM2000       = "rom2000"
+  val PREF_CBM2_ROM4000       = "rom4000"
+  val PREF_CBM2_ROM6000       = "rom6000"
+  // ================== VIC 20 ===================================
+  val PREF_VIC20_KERNEL_PAL   = "kernel-pal"
+  val PREF_VIC20_KERNEL_NTSC  = "kernel-ntsc"
+  val PREF_VIC20_MEM_CONFIG   = "exp"
+  val PREF_VIC20_IO2_ENABLED  = "io2"
+  val PREF_VIC20_IO3_ENABLED  = "io3"
+  val PREF_VIC20_8K_EXP       = "8k"
+  val PREF_VIC20_16K_EXP      = "16k"
+  val PREF_VIC20_24K_EXP      = "24k"
+  val PREF_VIC20_32K_EXP      = "32k"
+  val PREF_VIC20_ULTIMEM      = "ultimem"
+  val PREF_VIC20_FE3          = "fe3"
   // =============================================================
   class PreferenceIllegalArgumentException(msg:String) extends Exception(msg)
 
@@ -77,17 +100,17 @@ object Preferences {
   }
 
   implicit object StringPreferenceConv extends PreferenceConv[String] {
-    def convert(value:String) = value
+    def convert(value:String): String = value
     val default = ""
     val consume = 1
   }
   implicit object IntPreferenceConv extends PreferenceConv[Int] {
-    def convert(value:String) = value.toInt
+    def convert(value:String): Int = value.toInt
     val default = 0
     val consume = 1
   }
   implicit object BooleanPreferenceConv extends PreferenceConv[Boolean] {
-    def convert(value:String) = value.toBoolean
+    def convert(value:String): Boolean = value.toBoolean
     val default = false
     val consume = 0
   }
@@ -106,7 +129,7 @@ object Preferences {
 
     def addChangeListener(l:PreferenceChangeListener) : Unit = if (!listeners.contains(l)) listeners ::= l
 
-    def notifyListeners : Unit = for(l <- listeners) l.preferenceHasChanged(this)
+    def notifyListeners() : Unit = for(l <- listeners) l.preferenceHasChanged(this)
 
     def load(p:Properties) : Unit = {
       p.getProperty(cmdLine) match {

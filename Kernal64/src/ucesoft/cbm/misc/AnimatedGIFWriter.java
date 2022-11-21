@@ -18,7 +18,8 @@ package ucesoft.cbm.misc;
  * WY    29Oct2015  Crop image if outside of logical screen
  * WY    28Oct2015  Initial creation
  */
-import java.awt.Dimension;
+
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBuffer;
 import java.awt.image.IndexColorModel;

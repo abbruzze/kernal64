@@ -1,12 +1,12 @@
 package ucesoft.cbm.peripheral.printer
 
-import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.ChipID
+import ucesoft.cbm.cpu.Memory
 
 class MPS803ROM extends Memory {
   val name = "MPS803ROM"
   val isRom = true
-  lazy val length = 7 * 512
+  lazy val length: Int = 7 * 512
   lazy val startAddress = 0
 
   private val rom = {
@@ -19,13 +19,13 @@ class MPS803ROM extends Memory {
       offset += read
       read = in.read(buffer, offset, length - offset)
     }
-    in.close
+    in.close()
     for (i <- 0 until length) mem(i) = buffer(i) & 0xff
     mem
   }
 
   def init : Unit = {}
   val isActive = true
-  def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = rom(address - startAddress)
+  def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = rom(address - startAddress)
   def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {}
 }

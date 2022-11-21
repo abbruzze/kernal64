@@ -1,10 +1,7 @@
 package ucesoft.cbm.cpu
 
-import ucesoft.cbm.ChipID
-import ucesoft.cbm.Chip
 import ucesoft.cbm.trace.TraceListener
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.ChipID
+import ucesoft.cbm.{CBMComponentType, Chip, ChipID}
 
 object CPU65xx {
   class CPUJammedException(val cpuID:ChipID.ID,val pcError:Int) extends Exception
@@ -25,7 +22,7 @@ object CPU65xx {
     val XAA, AHX, TAS, SHY, SHX, LAX, LAS, DCP, AXS = Value
     val ISC,LAXI = Value
 
-    val MARK = Value // mark value for instructions counting
+    val MARK: Instruction.Value = Value // mark value for instructions counting
   }
 
   object Mode extends Enumeration {
@@ -33,9 +30,9 @@ object CPU65xx {
     val ZP, ZPX, ZPY, IZX, IZY = Value
     val ABS, ABX, ABY = Value
     val IMM, IND, REL, IMP = Value
-    val UNKNOWN_ABS_OR_ZP = Value // just for assembler
-    val UNKNOWN_ABX_OR_ZPX = Value // just for assembler
-    val UNKNOWN_ABY_OR_ZPY = Value // just for assembler
+    val UNKNOWN_ABS_OR_ZP: Mode.Value = Value // just for assembler
+    val UNKNOWN_ABX_OR_ZPX: Mode.Value = Value // just for assembler
+    val UNKNOWN_ABY_OR_ZPY: Mode.Value = Value // just for assembler
   }
 
   private[cpu] type OperationCell = (Instruction.CODE, Mode.MODE, Int)
@@ -72,7 +69,7 @@ object CPU65xx {
     codes.groupBy(_._1) map { case (k, v) => k -> (v map { e => (e._3, e._2) }) }
   }
 
-  def findCode(op: String, mode: Mode.MODE) = {
+  def findCode(op: String, mode: Mode.MODE): Option[Int] = {
     OP_Map get op.toUpperCase match {
       case Some(list) =>
         list find { case (_, m) => m == mode } map { case (c, _) => c }
@@ -96,8 +93,8 @@ object CPU65xx {
 
   case class DisassembledInfo(address: Int, op: String, ind: String, bytes: Array[Int]) {
     val LENGHT = 30
-    val len = bytes.length
-    override def toString = {
+    val len: Int = bytes.length
+    override def toString: String = {
       val addressString = hex4(address)
       val bytesString = bytes map hex2 mkString " "
       val fmt = "%s  %-8s  %s %s".format(addressString, bytesString, op, ind)
@@ -106,7 +103,7 @@ object CPU65xx {
     }
   }
 
-  def disassemble(mem:Memory,address: Int) = {
+  def disassemble(mem:Memory,address: Int): DisassembledInfo = {
     val op = opcode(mem,address)
     val (ind, len) = op._2 match {
       case IMP => ("", 0)
@@ -131,12 +128,12 @@ object CPU65xx {
 
 trait CPU65xx extends Chip with TraceListener {
   override lazy val componentID = "6510"
-  override val componentType = CBMComponentType.CPU
+  override val componentType: CBMComponentType.Value = CBMComponentType.CPU
   
   def getPC : Int
   def getCurrentInstructionPC : Int
   def getMem(address:Int) : Int
-  def setOverflowFlag : Unit
+  def setOverflowFlag() : Unit
   def fetchAndExecute(cycles:Int) : Unit
   
   def nmiRequest(low: Boolean) : Unit

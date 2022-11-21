@@ -1,15 +1,12 @@
 package ucesoft.cbm.peripheral.vdc
 
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm._
 import ucesoft.cbm.cpu.RAMComponent
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.ChipID
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
-import ucesoft.cbm.Log
-import ucesoft.cbm.Clock
 import ucesoft.cbm.peripheral.vic.Display
-import ucesoft.cbm.ClockEvent
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 object VDC {
   final val SCREEN_HEIGHT = 312 // PAL rows
@@ -17,10 +14,10 @@ object VDC {
   final val PREFERRED_FRAME_SIZE = new java.awt.Dimension(SCREEN_WIDTH,SCREEN_HEIGHT * 2)
 
   private object VideoMode extends Enumeration {
-    val IDLE = Value
-    val TEXT = Value
-    val BITMAP = Value
-    val BLANK = Value
+    val IDLE: VideoMode.Value = Value
+    val TEXT: VideoMode.Value = Value
+    val BITMAP: VideoMode.Value = Value
+    val BLANK: VideoMode.Value = Value
   }
 }
 
@@ -71,7 +68,7 @@ class VDC extends RAMComponent {
   val isRom = false
   val startAddress = 0xD600
   val length = 0x2
-  val componentType = CBMComponentType.MEMORY
+  val componentType: Type = CBMComponentType.MEMORY
   val isActive = true
 
   final private[this] val X_LEFT_CLIP_COLS = 20 * 8
@@ -184,28 +181,28 @@ class VDC extends RAMComponent {
     recalculate_xsync
   })
   // Clock management ====================================
-  def pause : Unit = {
+  def pause() : Unit = {
     //if (clk != Clock.systemClock) clk.pause
     clk.cancel("VDC_TICK")
   }
-  def play : Unit = {
+  def play() : Unit = {
     //if (clk != Clock.systemClock) clk.play
     pause
     reschedule
   }
-  @inline private def reschedule : Unit = {
+  @inline private def reschedule() : Unit = {
     cycles_per_line_accu += cycles_per_line
     val next_clk = cycles_per_line_accu >> 16
     cycles_per_line_accu -= next_clk << 16
     clk.schedule(new ClockEvent("VDC_TICK",clk.currentCycles + next_clk,drawLine _))
   }
-  def setOwnThread : Unit = {
+  def setOwnThread() : Unit = {
     pause
     clk = Clock.makeClock("VDCClock",Some(errorHandler _))((cycles) => {})
     clk.play
     play
   }
-  def stopOwnThread : Unit = {
+  def stopOwnThread() : Unit = {
     if (clk != Clock.systemClock) {
       clk.halt
       clk = Clock.systemClock
@@ -299,7 +296,7 @@ class VDC extends RAMComponent {
     lpFlag | busyFlag | (if (vblank) 0x20 else 0) | vdc_revision
   }
   @inline private[this] def currentMemoryAddress = regs(18) << 8 | regs(19)
-  @inline private[this] def incCurrentMemoryAddress : Unit = {
+  @inline private[this] def incCurrentMemoryAddress() : Unit = {
     regs(19) += 1
     if (regs(19) == 0x100) {
       regs(19) = 0
@@ -467,7 +464,7 @@ class VDC extends RAMComponent {
   }
 
   // ============================================================================
-  @inline private def recalculate_xsync : Unit = {
+  @inline private def recalculate_xsync() : Unit = {
     val charWidth = if((regs(25) & 0x10) > 0) (regs(22) >> 4) << 1 /* double pixel a.k.a 40column mode */
     else 1 + (regs(22) >> 4)
 
@@ -480,7 +477,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  @inline private[this] def copyorfill : Unit = {
+  @inline private[this] def copyorfill() : Unit = {
     val length = if (regs(30) == 0) 0x100 else regs(30)
     // ------------------------------
     val copy = (regs(24) & 0x80) > 0
@@ -530,10 +527,10 @@ class VDC extends RAMComponent {
   // =======================================================================
 
   private def errorHandler(t:Throwable) : Unit = {
-    t.printStackTrace
+    t.printStackTrace()
   }
 
-  @inline private def latch_addresses: Unit = {
+  @inline private def latch_addresses(): Unit = {
     // update video & attributes address for the next frame
     ram_adr = regs(12) << 8 | regs(13)
     attr_adr = regs(20) << 8 | regs(21)
@@ -542,7 +539,7 @@ class VDC extends RAMComponent {
     if (regs(27) > 0) attr_base_ptr += 1
   }
 
-  @inline private def vsync : Unit = {
+  @inline private def vsync() : Unit = {
     rasterLine = 0
     nextFrame
   }
@@ -641,7 +638,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  @inline private def updateGeometry : Unit = {
+  @inline private def updateGeometry() : Unit = {
     visibleTextRows = regs(6)
     visibleScreenHeightPix = visibleTextRows * (ychars_total + 1)
     val charWidth = if((regs(25) & 0x10) > 0) (regs(22) >> 4) << 1 /* 40column mode */
@@ -677,13 +674,13 @@ class VDC extends RAMComponent {
       val doublePixFeature = (regs(25) & 0x10) > 0
       val semigraphicMode = (regs(25) & 0x20) > 0
       val charInfo = s"${charWidth}x${if (interlaceMode) (ychars_total + 1) >> 1 else (ychars_total + 1)} ${if (doublePixFeature) "D" else ""}${if (semigraphicMode) "S" else ""}"
-      if (textMode) geometryUpdateListener(s"Text mode ${regs(1)}x${visibleTextRows} ${charInfo} ${if (interlaceMode) "interlaced" else ""}")
-      else geometryUpdateListener(s"Bitmap mode ${regs(1) * charVisibleWidth}x$visibleScreenHeightPix ${charInfo} ${if (interlaceMode) "interlaced" else ""}")
+      if (textMode) geometryUpdateListener(s"Text mode ${regs(1)}x$visibleTextRows $charInfo ${if (interlaceMode) "interlaced" else ""}")
+      else geometryUpdateListener(s"Bitmap mode ${regs(1) * charVisibleWidth}x$visibleScreenHeightPix $charInfo ${if (interlaceMode) "interlaced" else ""}")
     }
-    if (debug) println(s"VDC: updated geometry. Text mode=$textMode interlaced=$interlaceMode ${regs(1) * charVisibleWidth}x${visibleScreenHeightPix} new borderWidth=$borderWidth")
+    if (debug) println(s"VDC: updated geometry. Text mode=$textMode interlaced=$interlaceMode ${regs(1) * charVisibleWidth}x$visibleScreenHeightPix new borderWidth=$borderWidth")
   }
 
-  @inline private def nextFrame : Unit = {
+  @inline private def nextFrame() : Unit = {
     blankMode = false
     frameBit = (frameBit + 1) & 1
     if (oneLineDrawn) display.showFrame(0,0,screenWidth,screenHeight)
@@ -732,7 +729,7 @@ class VDC extends RAMComponent {
     else display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS * (if (interlaceMode) 2 else 1),screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS * (if (interlaceMode) 2 else 1))
   }
 
-  @inline private def fetchGFXAndAttrs : Unit = {
+  @inline private def fetchGFXAndAttrs() : Unit = {
     val useAttributes = (regs(25) & 0x40) > 0
 
     var c = 0
@@ -868,7 +865,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  @inline private def drawBitmapLine : Unit = {
+  @inline private def drawBitmapLine() : Unit = {
     val doublePixFeature = (regs(25) & 0x10) > 0
     val realCharWidth = if (doublePixFeature) regs(22) >> 4 else 1 + (regs(22) >> 4)
     val charWidth = if (doublePixFeature) realCharWidth << 1 else realCharWidth
@@ -978,7 +975,7 @@ class VDC extends RAMComponent {
     writeOnPrevFrame = true
   }
 
-  def triggerLightPen : Unit = {
+  def triggerLightPen() : Unit = {
     lpFlag = 0x40
     regs(16) = ypos
     val delta = clk.currentCycles - clkStartLine
@@ -986,7 +983,7 @@ class VDC extends RAMComponent {
   }
 
   // =============== Properties ==========================
-  override def getProperties = {
+  override def getProperties: Properties = {
     properties.setProperty("Status",read_status.toString)
     properties.setProperty("Video mode",videoMode.toString)
     properties.setProperty("Cycles per line",cycles_per_line.toString)

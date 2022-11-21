@@ -1,15 +1,15 @@
 package ucesoft.cbm.peripheral.c2n
 
-import ucesoft.cbm.CBMComponent
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.Clock
-import ucesoft.cbm.ClockEvent
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.formats.TAP
+import ucesoft.cbm.{CBMComponent, CBMComponentType, Clock, ClockEvent}
+
 import java.io.{File, ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
   val componentID = "Datassette 1530"
-  val componentType = CBMComponentType.TAPE
+  val componentType: Type = CBMComponentType.TAPE
 
   private[this] final val MOTOR_DELAY = 32000
   private[this] var motorOn = false
@@ -25,7 +25,7 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
   private[this] var counter,counterOffset = 0
   private[this] var counterMap : TAP.TapCounterMap = _
 
-  def setTapeListener(tapeListener:DatassetteListener) = this.tapeListener = Some(tapeListener)
+  def setTapeListener(tapeListener:DatassetteListener): Unit = this.tapeListener = Some(tapeListener)
 
   def init  : Unit = {}
   def reset  : Unit = {
@@ -51,7 +51,7 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
     }
   }
   def isPlayPressed : Boolean = playPressed
-  def pressPlay  : Unit = {
+  def pressPlay()  : Unit = {
     if (!playPressed) {
       playPressed = true
       notifyStateChangedTo(DatassetteState.PLAYING)
@@ -62,13 +62,13 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
       }
     }
   }
-  def pressForward : Unit = {
+  def pressForward() : Unit = {
     pressStop
     notifyStateChangedTo(DatassetteState.FORWARD)
     clk.schedule(new ClockEvent(componentID, clk.nextCycles, clockForward(true) _))
   }
 
-  def pressStop  : Unit = {
+  def pressStop()  : Unit = {
     if (playPressed) {
       playPressed = false
     }
@@ -76,12 +76,12 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
     recordPressed = false
     clk.cancel(componentID)
   }
-  def pressRecordAndPlay  : Unit = {
+  def pressRecordAndPlay()  : Unit = {
     playPressed = true
     notifyStateChangedTo(DatassetteState.RECORDING)
     recordPressed = true
   }
-  def resetToStart   : Unit = {
+  def resetToStart()   : Unit = {
     playPressed = false
     recordPressed = false
     tap match {
@@ -94,13 +94,13 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
     update
   }
 
-  def pressRewind : Unit = {
+  def pressRewind() : Unit = {
     pressStop
     notifyStateChangedTo(DatassetteState.REWIND)
     clk.schedule(new ClockEvent(componentID, clk.nextCycles, clockForward(false) _))
   }
 
-  def resetCounter : Unit = {
+  def resetCounter() : Unit = {
     counterOffset = counter
     tapeListener match {
       case Some(tl) =>
@@ -129,7 +129,7 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
     }
   }
 
-  def setMotor(on: Boolean) = {
+  def setMotor(on: Boolean): Unit = {
     if (!motorOn && on) {
       if (!recordPressed) {
         clk.schedule(new ClockEvent(componentID + "_Motor",clk.currentCycles + MOTOR_DELAY,clockPlay _))
@@ -154,7 +154,7 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
     }
   }
 
-  override def getProperties = {
+  override def getProperties: Properties = {
     super.getProperties
     properties.setProperty("TAP file",if (tap.isDefined) tap.get.getFilename else "-")
     properties.setProperty("TAP version",if (tap.isDefined) tap.get.version.toString else "-")
@@ -202,7 +202,7 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
     }
   }
 
-  private def update : Unit = {
+  private def update() : Unit = {
     val progressPerc = ((tap.get.getOffset / tap.get.tapeLength.toDouble) * 100).toInt
     tapeListener match {
       case Some(tl) =>

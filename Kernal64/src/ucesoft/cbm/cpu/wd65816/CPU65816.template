@@ -9,6 +9,7 @@ import ucesoft.cbm.trace._
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import java.io.PrintWriter
+import ucesoft.cbm.trace.TraceListener._
 
 class CPU65816(private var mem:Memory) extends CPU65xx {
   val id = ChipID.CPU
@@ -22,6 +23,8 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
   private[this] var breakType: BreakType = null
   private[this] var breakCallBack: CpuStepInfo => Unit = _
   private[this] var stepCallBack: CpuStepInfo => Unit = _
+  private[this] var stepType : StepType = _
+  private[this] var stepOverTargetAddress = 0
   private[this] val syncObject = new Object
   private[this] var nmiOnNegativeEdge = false
   private[this] var irqLow = false
@@ -134,6 +137,11 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
     opcodes_table_emu(RESET_INDEX)()
     import ucesoft.cbm.cpu._
     Log.info(s"CPU 65816 reset! PC = ${hex4(PC.A)}")
+
+    if (breakType != null && breakType.isBreak(ResetBreakInfo())) {
+      tracing = true
+      breakCallBack(CpuStepInfo(PC.A,CPU65816Disassembler.traceRegisters(A,X,Y,D,S,DB,PC,P,E),formatDebug))
+    }
   }
 
   def setOverflowFlag : Unit = {}
@@ -192,27 +200,29 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
   protected def allowsStateRestoring : Boolean = true
 
     // ================== Tracing ==================================
-  def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {}
-  def setTrace(traceOn:Boolean) : Unit = tracing = traceOn
-  def step(updateRegisters: CpuStepInfo => Unit) : Unit = {
-    stepCallBack = updateRegisters
-        syncObject.synchronized {
-          syncObject.notify
+    override def getRegisters(): List[TraceRegister] = CPU65816Disassembler.traceRegisters(A,X,Y,D,S,DB,PC,P,E)
+    override def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {}
+    override def setTrace(traceOn:Boolean) : Unit = tracing = traceOn
+    override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType) : Unit = {
+      stepCallBack = updateRegisters
+      this.stepType = stepType
+          syncObject.synchronized {
+            syncObject.notify
+      }
     }
-  }
-  def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) : Unit = {
-    tracing = false
-    breakCallBack = callback
-    this.breakType = breakType match {
-          case NoBreak => null
-          case _ => breakType
-        }
-  }
-  def jmpTo(pc:Int) : Unit = PC.A = pc & 0xFFFF
-  def setCycleMode(cycleMode:Boolean) : Unit = {}
-  def disassemble(mem:Memory,address:Int) : (String,Int) = {
+    override def setBreakAt(breakType:BreakType,callback:CpuStepInfo => Unit) : Unit = {
+      tracing = false
+      breakCallBack = callback
+      this.breakType = breakType match {
+            case NoBreak => null
+            case _ => breakType
+          }
+    }
+    override def jmpTo(pc:Int) : Unit = PC.A = pc & 0xFFFF
+    override def setCycleMode(cycleMode:Boolean) : Unit = {}
+  override def disassemble(address:Int) : DisassembleInfo = {
     val dinfo = CPU65816Disassembler.disassemble(mem, address,P)
-    (dinfo.toString, dinfo.bytes)
+        DisassembleInfo(dinfo.toString, dinfo.bytes)
   }
 
   // ------------------------------------------------------------------------------
@@ -225,7 +235,7 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
     #include "cpumicro.h"
   // ------------------------------------------------------------------------------
 
-  protected def formatDebug = s"[${id.toString}] ${CPU65816Disassembler.disassemble(mem,PC.A,P).toString}"
+  protected def formatDebug = s"${CPU65816Disassembler.disassemble(mem,PC.A,P).toString}"
 
   override def toString = CPU65816Disassembler.formatRegisters(A,X,Y,D,S,DB,PC,P,E)
 
@@ -243,49 +253,69 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
       else if (ready) remaining_cpu_cycle_count = -c else remaining_cpu_cycle_count = 0
     }
 
-    @inline private def fetchAndExecute : Unit = {
-      if (breakType != null && breakType.isBreak(PC.A, false, false)) {
-        tracing = true
-        breakCallBack(CpuStepInfo(PC.A,toString))
-      }
-      if (cpu_stop) return
-        else {
-            cpu_cycle_count = 0
-            // check NMI first
-            if (nmiOnNegativeEdge) {
-                if (breakType != null && breakType.isBreak(PC.A, false, true)) {
-                    tracing = true
-                    breakCallBack(CpuStepInfo(PC.A,toString))
-                    Log.debug("NMI Break")
-                }
-                nmiOnNegativeEdge = false
-                opcode_table_ptr(NMI_INDEX)()
-            }
-            else if (irqLow && !((P & 0x04) == 0x04)) {
-                if (breakType != null && breakType.isBreak(PC.A, true, false)) {
-                    tracing = true
-                    breakCallBack(CpuStepInfo(PC.A,toString))
-                    Log.debug("IRQ Break")
-                }
-                opcode_table_ptr(IRQ_INDEX)()
-            }
-            else if (irqLow && cpu_wait) cpu_wait = false
-            else if (!cpu_wait) {
-                if (tracing) {
-                    Log.debug(formatDebug)
-                    stepCallBack(CpuStepInfo(PC.A,toString))
-                    syncObject.synchronized {
-                        syncObject.wait
+        @inline private def fetchAndExecute : Unit = {
+          if (breakType != null && breakType.isBreak(AddressBreakInfo(PC.A,ExecuteBreakAccess))) {
+            tracing = true
+            breakCallBack(CpuStepInfo(PC.A,CPU65816Disassembler.traceRegisters(A,X,Y,D,S,DB,PC,P,E),formatDebug))
+          }
+          if (cpu_stop) return
+            else {
+                cpu_cycle_count = 0
+                // check NMI first
+                if (nmiOnNegativeEdge) {
+                    if (breakType != null && breakType.isBreak(NMIBreakInfo())) {
+                        tracing = true
+                        breakCallBack(CpuStepInfo(PC.A,CPU65816Disassembler.traceRegisters(A,X,Y,D,S,DB,PC,P,E),formatDebug))
+                        Log.debug("NMI Break")
                     }
+                    nmiOnNegativeEdge = false
+                    opcode_table_ptr(NMI_INDEX)()
                 }
-                // fetching
-                opcode = mem.read(PC.A)
-                PC.W.PC_++
-                opcode_table_ptr(opcode)()
+                else if (irqLow && !((P & 0x04) == 0x04)) {
+                    if (breakType != null && breakType.isBreak(IRQBreakInfo())) {
+                        tracing = true
+                        breakCallBack(CpuStepInfo(PC.A,CPU65816Disassembler.traceRegisters(A,X,Y,D,S,DB,PC,P,E),formatDebug))
+                        Log.debug("IRQ Break")
+                    }
+                    opcode_table_ptr(IRQ_INDEX)()
+                }
+                else if (irqLow && cpu_wait) cpu_wait = false
+                else if (!cpu_wait) {
+                    if (tracing) {
+                        //Log.debug(formatDebug)
+                        val disa = formatDebug
+                        stepCallBack(CpuStepInfo(PC.A,CPU65816Disassembler.traceRegisters(A,X,Y,D,S,DB,PC,P,E),disa))
+                        syncObject.synchronized {
+                            syncObject.wait
+                        }
+                        if (PC.A == stepOverTargetAddress) tracing = true
+                        stepType match {
+                          case StepOver =>
+                            val opcode = mem.read(PC.A)
+                            val len = opcode match {
+                                case 0x20 => 3 // JSR addr
+                                case 0x22 => 4 // JSR long
+                                case 0xFC => 3 // JSR (addr,X)
+                                case _ => -1
+                            }
+                            if (len != -1) {
+                              stepOverTargetAddress = PC.A + len
+                              tracing = false
+                            }
+                            else stepType = StepIn
+                          case StepOut =>
+                            tracing = false
+                          case _ =>
+                        }
+                    }
+                    // fetching
+                    opcode = mem.read(PC.A)
+                    PC.W.PC_++
+                    opcode_table_ptr(opcode)()
+                }
+                else cpu_cycle_count = 1
             }
-            else cpu_cycle_count = 1
         }
-    }
 
   override def getMemory: Memory = mem
   override def setMemory(m: Memory): Unit = this.mem = m

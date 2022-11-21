@@ -1,8 +1,9 @@
 package ucesoft.cbm.expansion
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
-
 import ucesoft.cbm.ChipID
+import ucesoft.cbm.cpu.Memory
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 class GeoRAM(size:Int) extends ExpansionPort {
   val TYPE : ExpansionPortType.Value = ExpansionPortType.GEORAM
@@ -11,8 +12,8 @@ class GeoRAM(size:Int) extends ExpansionPort {
 
   val EXROM = true
   val GAME = true
-  val ROML = null
-  val ROMH = null
+  val ROML: Memory = null
+  val ROMH: Memory = null
 
   final private[this] val ram = Array.ofDim[Int](if (size == 256) 16 else 32,64,256)
   final private[this] val dfffMask = if (size == 256) 0x0F else 0x1F
@@ -34,7 +35,7 @@ class GeoRAM(size:Int) extends ExpansionPort {
     }
   }
 
-  final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
     if ((address & 0xFF00) == 0xDE00) rampage(address & 0xFF) else super.read(address,chipID)
   }
 

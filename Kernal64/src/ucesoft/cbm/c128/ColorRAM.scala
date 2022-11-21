@@ -1,16 +1,14 @@
 package ucesoft.cbm.c128
 
+import ucesoft.cbm.CBMComponentType.Type
+import ucesoft.cbm.{CBMComponentType, ChipID, Log}
 import ucesoft.cbm.cpu.RAMComponent
-import ucesoft.cbm.CBMComponentType
-import ucesoft.cbm.ChipID
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import javax.swing.JFrame
-import ucesoft.cbm.Log
+
+import java.io.{ObjectInputStream, ObjectOutputStream}
 
 class ColorRAM extends RAMComponent {
   val componentID = "128 COLOR RAM"
-  val componentType = CBMComponentType.MEMORY
+  val componentType: Type = CBMComponentType.MEMORY
   
   val isRom = false
   val name = "128_COLOR_RAM"
@@ -43,7 +41,7 @@ class ColorRAM extends RAMComponent {
     val bank = if (chipID == ChipID.VIC) vicBank else processorBank
     mem(bank)(address & 0x3FF)
   }
-  final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) = {
+  final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {
     val bank = if (chipID == ChipID.VIC) vicBank else processorBank
     mem(bank)(address & 0x3FF) = value & 0xff
   }

@@ -1,13 +1,13 @@
 package ucesoft.cbm.game
 
-import java.net.URL
-import scala.concurrent.Future
-import java.security.MessageDigest
 import java.awt.Dimension
 import java.io.File
+import java.net.URL
+import java.security.MessageDigest
+import scala.concurrent.Future
 
 final case class Game(name:String,imageURL:Option[URL],var downloadPageURL:Option[URL],date:String,genre:String,softwareHouse:String) {
-  lazy val id = {
+  lazy val id: String = {
     val sign = name + imageURL+ downloadPageURL + date + genre + softwareHouse
     val md = MessageDigest.getInstance("SHA")
     val hash = md.digest(sign.getBytes)
@@ -41,5 +41,5 @@ trait GameProvider {
   def setProgressListener(l:GameLoadingProgressListener) : Unit
   def games(constraint:Option[SyncConstraint]) : Future[List[Game]]
   def syncConstraints : List[SyncConstraint]
-  def interrupt : Unit
+  def interrupt() : Unit
 }

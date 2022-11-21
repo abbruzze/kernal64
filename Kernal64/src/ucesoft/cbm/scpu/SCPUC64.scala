@@ -1,18 +1,20 @@
 package ucesoft.cbm.scpu
 
+import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm._
 import ucesoft.cbm.c64._
-import ucesoft.cbm.cpu.ROM
 import ucesoft.cbm.cpu.wd65816.CPU65816
+import ucesoft.cbm.cpu.{Memory, ROM}
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.formats._
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
 import ucesoft.cbm.peripheral.bus.BusSnoop
 import ucesoft.cbm.peripheral.drive._
-import ucesoft.cbm.peripheral.keyboard.Keyboard
+import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.vic.VICType
-import ucesoft.cbm.trace.TraceDialog
+import ucesoft.cbm.trace.Tracer
+import ucesoft.cbm.trace.Tracer.TracedDisplay
 
 import java.awt._
 import java.io._
@@ -22,15 +24,17 @@ object SCPUC64 extends App {
   CBMComputer.turnOn(new SCPUC64,args)
 }
 
-class SCPUC64 extends CBMComputer {
+class SCPUC64 extends CBMHomeComputer {
+  override protected val cbmModel: CBMComputerModel = C64Model
+
   val componentID = "Commodore 64 SCPU"
-  val componentType = CBMComponentType.INTERNAL
+  val componentType: Type = CBMComponentType.INTERNAL
 
   protected val APPLICATION_NAME = "SCPU Kernal64"
   protected val CONFIGURATION_FILENAME = "SCPUC64.config"
   //override protected val PRG_RUN_DELAY_CYCLES = 220000
 
-  protected val keybMapper: keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)), "/resources/default_keyboard_c64")
+  protected val keybMapper: keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)), "/resources/default_keyboard_c64",C64Model)
 
   override protected val mmu = new SCPUC64MMU.SCPU_MMU(cpuFastMode _, simmUsage _)
   override protected lazy val cpu = new CPU65816(mmu)
@@ -53,8 +57,6 @@ class SCPUC64 extends CBMComputer {
   }
 
   def init : Unit = {
-    val sw = new StringWriter
-    Log.setOutput(new PrintWriter(sw))
     Log.setInfo
 
     Log.info("Building the system ...")
@@ -112,13 +114,13 @@ class SCPUC64 extends CBMComputer {
     wic64Panel = new WiC64Panel(displayFrame,preferences)
     WiC64.setListener(wic64Panel)
     add(WiC64)
-    rs232.setCIA12(cia1, cia2)
+    rs232.setBitReceivedListener(cia2.setFlagLow _)
     ParallelCable.ca2Callback = cia2.setFlagLow _
     add(ParallelCable)
-    vicChip = new vic.VIC(vicMemory, mmu.COLOR_RAM, irqSwitcher.setLine(Switcher.VIC,_), baLow _)
+    vicChip = new vic.VIC_II(vicMemory, mmu.COLOR_RAM, irqSwitcher.setLine(Switcher.VIC,_), baLow _)
     mmu.setLastByteReadMemory(vicMemory)
     // mapping I/O chips in memory
-    mmu.setIO(cia1, cia2, sid, vicChip)
+    mmu.setIO(cia1, cia2, sid, vicChip.asInstanceOf[vic.VIC_II])
     display = new vic.Display(vicChip.SCREEN_WIDTH, vicChip.SCREEN_HEIGHT, displayFrame.getTitle, displayFrame)
     add(display)
     display.setPreferredSize(new java.awt.Dimension(vicChip.VISIBLE_SCREEN_WIDTH, vicChip.VISIBLE_SCREEN_HEIGHT))
@@ -132,11 +134,7 @@ class SCPUC64 extends CBMComputer {
     display.addMouseListener(lightPen)
     configureJoystick
     // tracing
-    if (!headless) {
-      traceDialog = TraceDialog.getTraceDialog("CPU Debugger", displayFrame, mmu, cpu, display, vicChip)
-      diskTraceDialog = TraceDialog.getTraceDialog("Drive 8 Debugger", displayFrame, drives(0).getMem, drives(0))
-      Log.setOutput(traceDialog.logPanel.writer)
-    }
+    if (headless) Log.setOutput(null)
     else Log.setOutput(null)
     // tape
     // printer
@@ -151,10 +149,17 @@ class SCPUC64 extends CBMComputer {
     mmuStatusPanel.setSys1MhzAction(mmu.setSystem1Mhz _)
     displayFrame.getContentPane.add("South", infoPanel)
     displayFrame.setTransferHandler(DNDHandler)
-    Log.info(sw.toString)
 
     // GIF Recorder
     gifRecorder = GIFPanel.createGIFPanel(displayFrame,Array(display),Array("VIC"))
+
+    // trace
+    tracer.addDevice(Tracer.TracedDevice("Main 65816 CPU", mmu, cpu, true))
+    tracer.setDisplay(new TracedDisplay {
+      override def getRasterLineAndCycle(): (Int, Int) = (vicChip.getRasterLine, vicChip.getRasterCycle)
+      override def setDisplayRasterLine(line: Int): Unit = display.setRasterLineAt(line)
+      override def enableDisplayRasterLine(enabled: Boolean): Unit = display.setDrawRasterLine(enabled)
+    })
   }
 
   protected def mainLoop(cycles: Long) : Unit = {
@@ -182,7 +187,7 @@ class SCPUC64 extends CBMComputer {
       ExpansionPort.getExpansionPort.freezeButton
     }
     // CPU PHI2
-    ProgramLoader.checkLoadingInWarpMode(true)
+    ProgramLoader.checkLoadingInWarpMode(cbmModel,true)
     cpu.fetchAndExecute(cpuClocks)
     // SID
     if (sidCycleExact) sid.clock
@@ -209,9 +214,9 @@ class SCPUC64 extends CBMComputer {
     cpuClocks = if (fastMode) 20 else 1
   }
 
-  private def simmUsage(usage:Float) = mmuStatusPanel.setSIMMUsage(usage)
+  private def simmUsage(usage:Float): Unit = mmuStatusPanel.setSIMMUsage(usage)
 
-  override def isHeadless = headless
+  override def isHeadless: Boolean = headless
 
   // ======================================== Settings ==============================================
   override protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
@@ -219,11 +224,11 @@ class SCPUC64 extends CBMComputer {
     if (updateFrame) adjustRatio
   }
 
-  private def adjustRatio : Unit = {
+  private def adjustRatio() : Unit = {
     val dim = display.asInstanceOf[java.awt.Component].getSize
     dim.height = (dim.width / vicChip.SCREEN_ASPECT_RATIO).round.toInt
     display.setPreferredSize(dim)
-    displayFrame.pack
+    displayFrame.pack()
   }
 
   protected def loadPRGFile(file: File, autorun: Boolean) : Unit = {
@@ -231,11 +236,11 @@ class SCPUC64 extends CBMComputer {
     Log.info(s"BASIC program loaded from $start to $end")
     configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
     if (autorun) {
-      Keyboard.insertSmallTextIntoKeyboardBuffer("RUN" + 13.toChar, mmu, true)
+      HomeKeyboard.insertSmallTextIntoKeyboardBuffer("RUN" + 13.toChar, mmu, true)
     }
   }
 
-  private def takeSnapshot : Unit = {
+  private def takeSnapshot() : Unit = {
     val fc = new JFileChooser
     fc.showSaveDialog(displayFrame) match {
       case JFileChooser.APPROVE_OPTION =>
@@ -252,7 +257,7 @@ class SCPUC64 extends CBMComputer {
     driveMenu.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L, java.awt.event.InputEvent.ALT_DOWN_MASK))
     optionMenu.add(driveMenu)
     driveMenu.addActionListener(_ => DrivesConfigPanel.getDriveConfigDialog.setVisible(true))
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     val keybMenu = new JMenu("Keyboard")
     optionMenu.add(keybMenu)
@@ -264,15 +269,15 @@ class SCPUC64 extends CBMComputer {
     loadKeybItem.addActionListener(_ => loadKeyboard)
     keybMenu.add(loadKeybItem)
 
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setVolumeSettings(optionMenu)
 
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setWarpModeSettings(optionMenu)
 
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     val adjustRatioItem = new JMenuItem("Adjust display ratio")
     adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A, java.awt.event.InputEvent.ALT_DOWN_MASK))
@@ -304,7 +309,7 @@ class SCPUC64 extends CBMComputer {
     setFullScreenSettings(optionMenu)
     // -----------------------------------
 
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setJoysticsSettings(optionMenu)
 
@@ -312,7 +317,7 @@ class SCPUC64 extends CBMComputer {
 
     setMouseSettings(optionMenu)
 
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     val snapshotItem = new JMenuItem("Take a snapshot...")
     snapshotItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.ALT_DOWN_MASK))
@@ -324,19 +329,19 @@ class SCPUC64 extends CBMComputer {
     gifRecorderItem.addActionListener(_ => openGIFRecorder )
     optionMenu.add(gifRecorderItem)
 
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setPauseSettings(optionMenu)
 
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setPrinterSettings(optionMenu)
     // -----------------------------------
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setSIDSettings(optionMenu)
     // -----------------------------------
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setDrivesSettings
 
@@ -345,22 +350,22 @@ class SCPUC64 extends CBMComputer {
     busSnooperActiveItem.addActionListener(e => busSnooperActive = e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected)
     optionMenu.add(busSnooperActiveItem)
 
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     setRemotingSettings(optionMenu)
 
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     val IOItem = new JMenu("I/O")
     optionMenu.add(IOItem)
 
-    optionMenu.addSeparator
+    optionMenu.addSeparator()
 
     val rs232Item = new JMenuItem("RS-232 ...")
     rs232Item.addActionListener(_ => manageRS232)
     IOItem.add(rs232Item)
 
-    IOItem.addSeparator
+    IOItem.addSeparator()
 
     setFlyerSettings(IOItem)
 
@@ -372,17 +377,17 @@ class SCPUC64 extends CBMComputer {
 
     // -----------------------------------
 
-    IOItem.addSeparator
+    IOItem.addSeparator()
 
     setDigiMAXSettings(IOItem)
 
-    IOItem.addSeparator
+    IOItem.addSeparator()
 
     setGMOD3FlashSettings(IOItem)
 
     setEasyFlashSettings(IOItem)
 
-    IOItem.addSeparator
+    IOItem.addSeparator()
 
     setCPMSettings(IOItem)
 
@@ -390,9 +395,9 @@ class SCPUC64 extends CBMComputer {
     optionMenu.add(romItem)
     romItem.addActionListener(_ => {
       clock.pause
-      ROMPanel.showROMPanel(displayFrame, configuration, true,true, () => {
+      ROMPanel.showROMPanel(displayFrame, configuration, cbmModel,true, () => {
         saveSettings(false)
-        reset()
+        reset(false)
       })
       clock.play
     })
@@ -453,9 +458,9 @@ class SCPUC64 extends CBMComputer {
     }
   }
 
-  protected def getRAM = mmu.getRAM
+  protected def getRAM: Memory = mmu.getRAM
 
-  protected def getCharROM = mmu.CHAR_ROM
+  protected def getCharROM: Memory = mmu.CHAR_ROM
 
   // state
   protected def saveState(out: ObjectOutputStream) : Unit = {
@@ -501,11 +506,12 @@ class SCPUC64 extends CBMComputer {
     }
     // --headless handling to disable logging & debugging
     if (args.exists(_ == "--headless")) headless = true
-    swing { initComponent }
-    // VIC
-    swing { displayFrame.pack }
     // --ignore-config-file handling
     if (args.exists(_ == "--ignore-config-file")) configuration.clear()
+    swing { initComponent }
+    // VIC
+    swing { displayFrame.pack() }
+
     // screen's dimension and size restoration
     if (configuration.getProperty(CONFIGURATION_FRAME_DIM) != null) {
       val dim = configuration.getProperty(CONFIGURATION_FRAME_DIM) split "," map {

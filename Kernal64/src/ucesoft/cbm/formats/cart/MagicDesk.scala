@@ -21,7 +21,7 @@ class MagicDesk(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ra
       notifyMemoryConfigurationChange
     }
   }
-  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU) = reg
+  override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = reg
 
   override def saveState(out: ObjectOutputStream): Unit = {
     super.saveState(out)
