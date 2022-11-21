@@ -5,17 +5,27 @@
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
 
-Kernal64 ver 1.7.4b1
+# A Scala Commodore 64, 128, VIC20 and CBM 610/620/710/720 cycle-exact emulator
+
+Kernal64 ver 1.8.0b1
 ========
-![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
-<img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/>
-![](https://github.com/abbruzze/kernal64/blob/master/images/kernal64_scpu.gif)
+#### Commodore 64
+![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)<br>
+#### Commodore 128
+![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
+<img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/><br>
+#### VIC 20
+![](https://github.com/abbruzze/kernal64/blob/master/images/vic20.png)<br>
+#### SuperCPU
+![](https://github.com/abbruzze/kernal64/blob/master/images/kernal64_scpu.gif)<br>
+#### CBM II
+![](https://github.com/abbruzze/kernal64/blob/master/images/cbm2.png)
 
 ### Installation
 Go to https://github.com/abbruzze/kernal64/releases/latest and download and unzip on your computer the latest version.
 Be sure to have a jre (11 or above) in the path and launch:
-- On Windows: **k64.bat**, **kscpu64.bat** or **k128.bat**. If you want the shell support (for --help command line, for example) you could use the **k64s.bat**, **kscpu64s.bat** or **k128s.bat** scripts.
-- On Linux: **k64.sh**, **kscpu64.sh** or **k128.sh**.
+- On Windows: **k64.bat**, **kscpu64.bat**, **k128.bat**, **vic20.bat** or **cbm2.bat**. If you want the shell support (for --help command line, for example) you should use --shell as first option.
+- On Linux: **k64.sh**, **kscpu64.sh**, **k128.sh**, **vic20.sh** or **cbm2.sh**.
 
 The scripts start java with the -server option for performance reason. It could happen that your Java installation does not support the server option. In this case edit the script and remove the -server option.
 
@@ -23,6 +33,8 @@ If you want to load a 16M REU modify the memory settings inside the start script
 
 ### Wiki
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
+
+## What's new history
 
 ### What's new 1.7.4b1 (Jul 29th 2022)
 - General
