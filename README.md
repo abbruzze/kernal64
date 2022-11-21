@@ -9,17 +9,148 @@
 
 Kernal64 ver 1.8.0b1
 ========
+▶️<a href="#wn-latest">Go to latest release</a>
+
+<p id="c64-features"></p>
+
 #### Commodore 64
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)<br>
+##### Main features
+- [x] 6502 CPU cycle-exact
+- [x] True drive emulation of 1541, 1571, 1581. Supported disk images:
+	- D64
+	- D71
+	- D81
+	- G64
+	- G71
+- [x] Local filesystem mounted as a drive
+- [x] Tape emulation. Supported tape images:
+	- TAP
+	- T64
+- [x] Keyboard editor
+- [x] Joystick emulation:
+	- Keyboard
+	- USB joystick 
+- [x] SID 6581/8580
+- [x] Dual SID emulation
+- [x] Light pen and 1351 mouse emulation
+- [x] MPS803 printer emulation. Print preview panel.
+- [x] VIC II:
+	- PAL / NTSC model
+	- Palette
+	- Rendering options and effects
+	- Full screen
+- [x] Cartridges:
+	- WiC64
+	- BeamReacer
+	- REU
+	- GEORAM
+	- SwiftLink
+	- DigiMAX
+	- ActionReplay
+	- KCS
+	- FinalCartridge I
+	- FinalCartridge III
+	- Simon's Basic
+	- Comal 80
+	- Magic Desk
+	- Dinamic
+	- Game System
+	- Warp Speed
+	- Easy Flash
+	- Ocean
+	- Fun Play
+	- Super Games
+	- Epyx Fastloader
+	- Super snapshot 5
+	- GMOD2
+	- GMOD3
+	- Zaxxon
+	- Mach 5
+	- Page Fox
+	- CP/M
+- [x] RS-232 and Internet connection
+- [x] Flyer internet modem
+- [x] State saving
+- [x] GIF Recorder
+- [x] Assembler / Debugger
+- [x] Game portals
 #### Commodore 128
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c128.jpg)
 <img src="https://github.com/abbruzze/kernal64/blob/master/images/commodore128_vdc.jpg" alt="Commodore 128 VDC"/><br>
+##### Main features
+- [x] ▶️<a href="#c64-features">See C64's features</a>
+- [x] Z80 instruction-exact emulation
+- [x] MMU status panel
+- [x] VDC standard and interlaced modes
+- [x] 2Mhz mode
+- [x] Internal and external function roms   
+- [x] 128 Cartridges:
+	- Megabit
+	- Magic Desk 128
 #### VIC 20
 ![](https://github.com/abbruzze/kernal64/blob/master/images/vic20.png)<br>
+##### Main features
+- [x] 6502 CPU cycle-exact
+- [x] Memory configuration panel
+- [x] True drive emulation of 1541, 1571, 1581. Supported disk images:
+	- D64
+	- D71
+	- D81
+	- G64
+	- G71
+- [x] Local filesystem mounted as a drive
+- [x] Tape emulation. Supported tape images:
+	- TAP
+	- T64
+- [x] Keyboard editor
+- [x] Joystick emulation:
+	- Keyboard
+	- USB joystick 
+- [x] Light pen and 1351 mouse emulation
+- [x] MPS803 printer emulation. Print preview panel.
+- [x] VIC:
+	- PAL / NTSC model
+	- Palette
+	- Rendering options and effects
+	- Full screen
+	- NTSC interlaced mode
+- [x] Cartridges:
+	- Final Expansion 3
+	- Geo RAM
+	- Ultimem
+	- VIC 1112 IEEE488
+- [x] RS-232 and Internet connection
+- [x] Flyer internet modem
+- [x] State saving
+- [x] GIF Recorder
+- [x] Assembler / Debugger
+- [x] Game portals
 #### SuperCPU
-![](https://github.com/abbruzze/kernal64/blob/master/images/kernal64_scpu.gif)<br>
+![](https://github.com/abbruzze/kernal64/blob/master/images/kernal64_scpu.gif)![](https://github.com/abbruzze/kernal64/blob/master/images/scpu-metaldust.gif)<br>
+##### Main features
+- [x] ▶️<a href="#c64-features">See C64's features</a>
+- [x] WD65816 instruction-exact emulation
+- [x] SIMM memory: up to 16M
+- [x] Emulation of 1Mhz mode during I/O access partially supported
+- [x] Shipped with VICE's SCPU rom. CMD's rom 2.04 also supported
+- [x] Leds panel: native (65816 in native mode), 20Mhz (turbo mode on), clickable JIFFYDOS (jiffy dos enabled), clickable SPEED (master speed selector), SIMM usage (% of SIMM usage)
 #### CBM II
 ![](https://github.com/abbruzze/kernal64/blob/master/images/cbm2.png)
+##### Main features
+- [x] 6509 CPU cycle-exact
+- [x] Not true drive emulation of IEEE488 8050. Supported disk images:
+	- D80
+- [x] Models:
+	- 610 PAL/NTSC
+	- 620 PAL/NTSC
+	- 710 NTSC
+	- 720 NTSC
+- [x] MPS803 printer emulation. Print preview panel.
+- [x] ACIA and Internet connection
+- [x] State saving
+- [x] GIF Recorder
+- [x] Assembler / Debugger
 
 ### Installation
 Go to https://github.com/abbruzze/kernal64/releases/latest and download and unzip on your computer the latest version.
@@ -35,6 +166,7 @@ If you want to load a 16M REU modify the memory settings inside the start script
 Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
 ## What's new history
+<p id="wn-latest"></p>
 
 ### What's new 1.7.4b1 (Jul 29th 2022)
 - General
