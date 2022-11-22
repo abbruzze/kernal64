@@ -125,10 +125,10 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     lastCorrectionCycles = cycles
   }
 
-  override def hardReset(): Unit = {
+  /*override def hardReset(): Unit = {
     cycles = 0
     reset
-  }
+  }*/
 
   final override def run()  : Unit = {
     running = true
