@@ -28,19 +28,19 @@ Kernal64 ver 1.8.0b1
 	- TAP
 	- T64
 - [x] Keyboard editor
-- [x] Joystick emulation:
+- [x] Joystick emulation
 	- Keyboard
 	- USB joystick 
 - [x] SID 6581/8580
 - [x] Dual SID emulation
 - [x] Light pen and 1351 mouse emulation
 - [x] MPS803 printer emulation. Print preview panel.
-- [x] VIC II:
+- [x] VIC II
 	- PAL / NTSC model
 	- Palette
 	- Rendering options and effects
 	- Full screen
-- [x] Cartridges:
+- [x] Cartridges
 	- WiC64
 	- BeamReacer
 	- REU
@@ -104,18 +104,18 @@ Kernal64 ver 1.8.0b1
 	- TAP
 	- T64
 - [x] Keyboard editor
-- [x] Joystick emulation:
+- [x] Joystick emulation
 	- Keyboard
 	- USB joystick 
 - [x] Light pen and 1351 mouse emulation
 - [x] MPS803 printer emulation. Print preview panel.
-- [x] VIC:
+- [x] VIC
 	- PAL / NTSC model
 	- Palette
 	- Rendering options and effects
 	- Full screen
 	- NTSC interlaced mode
-- [x] Cartridges:
+- [x] Cartridges
 	- Final Expansion 3
 	- Geo RAM
 	- Ultimem
@@ -167,6 +167,48 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
 ## What's new history
 <p id="wn-latest"></p>
+
+### What's new 1.8.0b1 (Nov 22th 2022)
+- New emulators: **VIC20** and **CBM-II (610/620/710/720)**
+- New Debugger
+- USB Joystick: on (my) Windows 10 laptop jinput library seems to hang sometimes during initialization, freezing the whole emulator. Added a separate thread to check usb joystick availability.
+
+![](https://github.com/abbruzze/kernal64/blob/master/images/debug.png)<br>
+
+#### VIC20's main features
+- True drive emulation of 1541, 1571, 1581
+- Tape emulation
+- VIC
+	- PAL / NTSC model
+	- Palette
+	- Rendering options and effects
+	- Full screen
+	- **NTSC interlaced mode**
+- Cartridges
+	- Final Expansion 3
+	- Geo RAM
+	- Ultimem
+	- VIC 1112 IEEE488
+- RS-232 and Internet connection
+- MPS803 printer emulation. Print preview panel
+- Game portal (Pouet)
+
+![](https://github.com/abbruzze/kernal64/blob/master/images/vic20.png)
+![](https://github.com/abbruzze/kernal64/blob/master/images/vic20-interlaced.png)<br>
+
+#### CBM-II's main features
+- 6509 CPU cycle-exact
+- Not true drive emulation of IEEE488 8050. Supported disk images:
+	- D80
+- Models:
+	- 610 PAL/NTSC
+	- 620 PAL/NTSC
+	- 710 NTSC
+	- 720 NTSC
+- MPS803 printer emulation. Print preview panel
+- ACIA and Internet connection
+
+![](https://github.com/abbruzze/kernal64/blob/master/images/cbm2-spacechase.png)<br>
 
 ### What's new 1.7.4b1 (Jul 29th 2022)
 - General
