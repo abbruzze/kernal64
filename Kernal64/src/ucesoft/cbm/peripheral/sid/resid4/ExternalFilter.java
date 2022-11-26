@@ -1,4 +1,4 @@
-package ucesoft.cbm.peripheral.sid.resid2;
+package ucesoft.cbm.peripheral.sid.resid4;
 
 class ExternalFilter {
     private int Vlp;
@@ -26,6 +26,7 @@ class ExternalFilter {
         w0hp_1_s17 = 13;
         reset();
         set_sampling_parameter(15915.6);
+        set_chip_model();
     }
 
     private void set_sampling_parameter(final double pass_freq) {
@@ -34,6 +35,9 @@ class ExternalFilter {
         if (w0lp > 104858) {
             w0lp = 104858;
         }
+    }
+
+    private void set_chip_model() {
     }
 
     public void reset() {

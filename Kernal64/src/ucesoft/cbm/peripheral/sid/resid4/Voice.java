@@ -1,11 +1,11 @@
-package ucesoft.cbm.peripheral.sid.resid2;
+package ucesoft.cbm.peripheral.sid.resid4;
 
 class Voice {
     final WaveformGenerator wave;
-    public final EnvelopeGenerator envelope;
+    final EnvelopeGenerator envelope;
     private int wave_zero;
     private int voice_DC;
-    private boolean ON;
+    boolean ON;
 
     Voice() {
         wave = new WaveformGenerator();

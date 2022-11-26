@@ -1,6 +1,11 @@
-package ucesoft.cbm.peripheral.sid.resid2;
+package ucesoft.cbm.peripheral.sid.resid4;
 
-class WaveformGenerator implements SIDConstant {
+public class WaveformGenerator {
+    private final int FLOATING_OUTPUT_TTL_6581 = 200000;
+    private final int FLOATING_OUTPUT_TTL_8580 = 5000000;
+    private final int SHIFT_REGISTER_RESET_6581 = 32768;
+    private final int SHIFT_REGISTER_RESET_8580 = 9764864;
+
     int sid_model;
     int accumulator;
     int tri_saw_pipeline;
@@ -30,8 +35,8 @@ class WaveformGenerator implements SIDConstant {
     WaveformGenerator sync_dest;
 
     public WaveformGenerator() {
-        accumulator = 0x555555;
-        tri_saw_pipeline = 0x555;
+        accumulator = 5592405;
+        tri_saw_pipeline = 1365;
     }
 
     void set_sync_source(final WaveformGenerator source) {
@@ -44,7 +49,7 @@ class WaveformGenerator implements SIDConstant {
             if (shift_register_reset != 0 && --shift_register_reset == 0) {
                 reset_shift_register();
             }
-            pulse_output = 0xFFF;
+            pulse_output = 4095;
         } else {
             final int accumulator_next = accumulator + freq & 0xFFFFFF;
             final int accumulator_bits_set = ~accumulator & accumulator_next;

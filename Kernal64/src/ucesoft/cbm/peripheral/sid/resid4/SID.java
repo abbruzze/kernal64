@@ -1,4 +1,4 @@
-package ucesoft.cbm.peripheral.sid.resid2;
+package ucesoft.cbm.peripheral.sid.resid4;
 
 import ucesoft.cbm.Tickable;
 import ucesoft.cbm.peripheral.sid.SIDChip;
@@ -6,21 +6,21 @@ import ucesoft.cbm.peripheral.sid.SIDChip;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
-public class SID implements SIDChip,SIDConstant {
+public class SID implements SIDChip {
     private SIDModel current_model;
+    public boolean enabled;
     private static final SIDModel MOS_6581;
     private static final SIDModel MOS_8580;
     private final Voice[] voices;
+    public final Tickable clock;
     private final int[] register;
     private final SIDfilter filter;
     private final ExternalFilter extfilt;
     private int bus_value;
     private long bus_clock;
     public int type;
-    public static boolean rs;
-    private final Tickable clk;
 
-    public SID(Tickable clk) {
+    public SID(final Tickable clock) {
         voices = new Voice[3];
         register = new int[32];
         filter = new SIDfilter();
@@ -32,11 +32,11 @@ public class SID implements SIDChip,SIDConstant {
         voices[0].setSYNCsource(voices[2]);
         voices[1].setSYNCsource(voices[0]);
         voices[2].setSYNCsource(voices[1]);
+        this.clock = clock;
         setModel(type);
-        this.clk = clk;
     }
 
-    final public void clock() {
+    public void clock() {
         voices[0].envelope.clock();
         voices[1].envelope.clock();
         voices[2].envelope.clock();
@@ -52,11 +52,6 @@ public class SID implements SIDChip,SIDConstant {
         filter.clock(voices[0].generate(), voices[1].generate(), voices[2].generate());
         extfilt.clock(filter.output());
     }
-    @Override
-    public void updateBusValue(int value) {
-        bus_value = value;
-        bus_clock = clk.currentCycles();
-    }
 
     @Override
     final public int read(int offset) {
@@ -64,17 +59,17 @@ public class SID implements SIDChip,SIDConstant {
             case 25:
             case 26: { // must be managed externally
                 bus_value = 0;
-                bus_clock = clk.currentCycles();
+                bus_clock = clock.currentCycles();
                 break;
             }
             case 27: {
                 bus_value = voices[2].wave.readOSC();
-                bus_clock = clk.currentCycles();
+                bus_clock = clock.currentCycles();
                 break;
             }
             case 28: {
                 bus_value = voices[2].envelope.readENV();
-                bus_clock = clk.currentCycles();
+                bus_clock = clock.currentCycles();
                 break;
             }
             default: {
@@ -86,7 +81,7 @@ public class SID implements SIDChip,SIDConstant {
     }
     @Override
     final public void write(int offset, int value) {
-        bus_clock = clk.currentCycles();
+        bus_clock = clock.currentCycles();
         bus_value = (register[offset &= 0x1F] = value);
         switch (offset) {
             case 0: {
@@ -106,16 +101,16 @@ public class SID implements SIDChip,SIDConstant {
                 break;
             }
             case 4: {
-                voices[0].envelope.writeControlReg(value);
+                voices[0].envelope.writeCONTROL_REG(value);
                 voices[0].wave.writeCONTROL_REG(value);
                 break;
             }
             case 5: {
-                voices[0].envelope.writeAttackDecay(value);
+                voices[0].envelope.writeATTACK_DECAY(value);
                 break;
             }
             case 6: {
-                voices[0].envelope.writeSustainRelease(value);
+                voices[0].envelope.writeSUSTAIN_RELEASE(value);
                 break;
             }
             case 7: {
@@ -135,16 +130,16 @@ public class SID implements SIDChip,SIDConstant {
                 break;
             }
             case 11: {
-                voices[1].envelope.writeControlReg(value);
+                voices[1].envelope.writeCONTROL_REG(value);
                 voices[1].wave.writeCONTROL_REG(value);
                 break;
             }
             case 12: {
-                voices[1].envelope.writeAttackDecay(value);
+                voices[1].envelope.writeATTACK_DECAY(value);
                 break;
             }
             case 13: {
-                voices[1].envelope.writeSustainRelease(value);
+                voices[1].envelope.writeSUSTAIN_RELEASE(value);
                 break;
             }
             case 14: {
@@ -164,16 +159,16 @@ public class SID implements SIDChip,SIDConstant {
                 break;
             }
             case 18: {
-                voices[2].envelope.writeControlReg(value);
+                voices[2].envelope.writeCONTROL_REG(value);
                 voices[2].wave.writeCONTROL_REG(value);
                 break;
             }
             case 19: {
-                voices[2].envelope.writeAttackDecay(value);
+                voices[2].envelope.writeATTACK_DECAY(value);
                 break;
             }
             case 20: {
-                voices[2].envelope.writeSustainRelease(value);
+                voices[2].envelope.writeSUSTAIN_RELEASE(value);
                 break;
             }
             case 21: {
@@ -196,12 +191,16 @@ public class SID implements SIDChip,SIDConstant {
     }
 
     public void updateBus() {
-        if (clk.currentCycles() - bus_clock > ((current_model == SID.MOS_8580) ? 0x2000 : 0x1D00)) {
+        if (clock.currentCycles() - bus_clock > ((current_model == SID.MOS_8580) ? 663552 : 7424)) {
             bus_value = 0;
         }
     }
-    @Override
-    final public int output() {
+
+    @Override public void updateBusValue(int value) {
+        bus_value = value;
+    }
+
+    public int output() {
         final int sample = extfilt.output() / 11;
         if (sample >= 32768) {
             return 32767;
@@ -209,12 +208,11 @@ public class SID implements SIDChip,SIDConstant {
         return Math.max(sample, -32768);
     }
 
-    @Override
     public void setModel(final int type) {
         this.type = type;
-        if (type == MOS6581) {
+        if (type == 0) {
             current_model = SID.MOS_6581;
-        } else if (type == MOS8580) {
+        } else if (type == 1) {
             current_model = SID.MOS_8580;
         }
         voices[0].switch_model(current_model);
@@ -222,7 +220,7 @@ public class SID implements SIDChip,SIDConstant {
         voices[2].switch_model(current_model);
         filter.set_chip_model(type);
     }
-    @Override
+
     public void reset() {
         voices[0].reset();
         voices[1].reset();
@@ -231,6 +229,7 @@ public class SID implements SIDChip,SIDConstant {
         extfilt.reset();
         bus_value = 0;
     }
+
     @Override
     public void saveState(ObjectOutputStream out) {
         try {
@@ -241,15 +240,46 @@ public class SID implements SIDChip,SIDConstant {
             for (final Voice voice : voices) {
                 out.writeInt(voice.wave.accumulator);
                 out.writeInt(voice.wave.shift_register);
+                out.writeInt(voice.wave.shift_pipeline);
+                out.writeInt(voice.wave.shift_register_reset);
+                out.writeInt(voice.wave.floating_output_ttl);
+                out.writeInt(voice.wave.tri_saw_pipeline);
+                out.writeInt(voice.wave.freq);
+                out.writeInt(voice.wave.pw);
+                out.writeBoolean(voice.wave.msb_rising);
+                out.writeInt(voice.wave.waveform);
+                out.writeBoolean(voice.wave.test);
+                out.writeInt(voice.wave.ring_mod);
+                out.writeBoolean(voice.wave.sync);
+                out.writeInt(voice.wave.ring_msb_mask);
+                out.writeInt(voice.wave.no_noise);
+                out.writeInt(voice.wave.no_pulse);
+                out.writeInt(voice.wave.pulse_output);
+                out.writeInt(voice.wave.waveform_output);
+                out.writeInt(voice.wave.osc3);
+                out.writeInt(voice.wave.noise_output);
+                out.writeInt(voice.wave.no_noise_or_noise_output);
+
+                out.writeInt(voice.envelope.env3);
+                out.writeInt(voice.envelope.attack);
+                out.writeInt(voice.envelope.decay);
+                out.writeInt(voice.envelope.sustain);
+                out.writeInt(voice.envelope.release);
+                out.writeBoolean(voice.envelope.gate);
+                out.writeInt(voice.envelope.state);
+                out.writeInt(voice.envelope.next_state);
+                out.writeInt(voice.envelope.exponential_pipeline);
+                out.writeInt(voice.envelope.state_pipeline);
+                out.writeBoolean(voice.envelope.reset_rate_counter);
+                out.writeBoolean(voice.envelope.envON);
+                out.writeBoolean(voice.envelope.update);
                 out.writeInt(voice.envelope.rate_counter);
                 out.writeInt(voice.envelope.exponential_counter);
                 out.writeInt(voice.envelope.envelope_counter);
                 out.writeInt(voice.envelope.rate_period);
                 out.writeInt(voice.envelope.exponential_counter_period);
                 out.writeInt(voice.envelope.envelope_pipeline);
-                out.writeInt(voice.wave.shift_pipeline);
-                out.writeInt(voice.wave.shift_register_reset);
-                out.writeInt(voice.wave.floating_output_ttl);
+
             }
         }
         catch (Throwable e) {
@@ -268,15 +298,46 @@ public class SID implements SIDChip,SIDConstant {
             for (final Voice voice : voices) {
                 voice.wave.accumulator = in.readInt();
                 voice.wave.shift_register = in.readInt();
+                voice.wave.shift_pipeline = in.readInt();
+                voice.wave.shift_register_reset = in.readInt();
+                voice.wave.floating_output_ttl = in.readInt();
+                voice.wave.tri_saw_pipeline = in.readInt();
+                voice.wave.freq = in.readInt();
+                voice.wave.pw = in.readInt();
+                voice.wave.msb_rising = in.readBoolean();
+                voice.wave.waveform = in.readInt();
+                voice.wave.test = in.readBoolean();
+                voice.wave.ring_mod = in.readInt();
+                voice.wave.sync = in.readBoolean();
+                voice.wave.ring_msb_mask = in.readInt();
+                voice.wave.no_noise = in.readInt();
+                voice.wave.no_pulse = in.readInt();
+                voice.wave.pulse_output = in.readInt();
+                voice.wave.waveform_output = in.readInt();
+                voice.wave.osc3 = in.readInt();
+                voice.wave.noise_output = in.readInt();
+                voice.wave.no_noise_or_noise_output = in.readInt();
+
+                voice.envelope.env3 = in.readInt();
+                voice.envelope.attack = in.readInt();
+                voice.envelope.decay = in.readInt();
+                voice.envelope.sustain = in.readInt();
+                voice.envelope.release = in.readInt();
+                voice.envelope.gate = in.readBoolean();
+                voice.envelope.state = in.readInt();
+                voice.envelope.next_state = in.readInt();
+                voice.envelope.exponential_pipeline = in.readInt();
+                voice.envelope.state_pipeline = in.readInt();
+                voice.envelope.reset_rate_counter = in.readBoolean();
+                voice.envelope.envON = in.readBoolean();
+                voice.envelope.update = in.readBoolean();
                 voice.envelope.rate_counter = in.readInt();
                 voice.envelope.exponential_counter = in.readInt();
                 voice.envelope.envelope_counter = in.readInt();
                 voice.envelope.rate_period = in.readInt();
                 voice.envelope.exponential_counter_period = in.readInt();
                 voice.envelope.envelope_pipeline = in.readInt();
-                voice.wave.shift_pipeline = in.readInt();
-                voice.wave.shift_register_reset = in.readInt();
-                voice.wave.floating_output_ttl = in.readInt();
+
             }
         }
         catch (Throwable e) {
@@ -287,6 +348,5 @@ public class SID implements SIDChip,SIDConstant {
     static {
         MOS_6581 = new SIDModel("6581", 2.2, 896, 522240, false, 0);
         MOS_8580 = new SIDModel("8580", 2.0, 2528, 0, true, 1);
-        SID.rs = false;
     }
 }

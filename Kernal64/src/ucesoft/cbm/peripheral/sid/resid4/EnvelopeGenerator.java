@@ -1,28 +1,28 @@
-package ucesoft.cbm.peripheral.sid.resid2;
+package ucesoft.cbm.peripheral.sid.resid4;
 
-class EnvelopeGenerator {
+public class EnvelopeGenerator {
     private static final int[] rate_counter_period;
     private static final int[] sustain_level;
-    private int env3;
+    int env3;
     int rate_period;
     int exponential_counter;
     int exponential_counter_period;
     int envelope_counter;
     int envelope_pipeline;
-    private int attack;
-    private int decay;
-    private int sustain;
-    private int release;
-    private boolean gate;
-    private int state;
-    private int next_state;
+    int attack;
+    int decay;
+    int sustain;
+    int release;
+    boolean gate;
+    int state;
+    int next_state;
     int rate_counter;
-    private int exponential_pipeline;
-    private int state_pipeline;
-    private boolean reset_rate_counter;
-    private boolean envON;
+    int exponential_pipeline;
+    int state_pipeline;
+    boolean reset_rate_counter;
+    boolean envON;
     int[] model_dac;
-    private boolean update;
+    boolean update;
 
     EnvelopeGenerator() {
         reset();
@@ -113,10 +113,9 @@ class EnvelopeGenerator {
         return model_dac[envelope_counter];
     }
 
-    void writeControlReg(final int control) {
+    void writeCONTROL_REG(final int control) {
         if (gate ^ (control & 0x1) == 0x1) {
-            final boolean gate = this.gate ^ true;
-            this.gate = gate;
+            gate ^= true;
             next_state = (gate ? 0 : 2);
             if (next_state == 0) {
                 state = 1;
@@ -134,21 +133,21 @@ class EnvelopeGenerator {
         }
     }
 
-    void writeAttackDecay(final int attack_decay) {
+    void writeATTACK_DECAY(final int attack_decay) {
         attack = (attack_decay >> 4 & 0xF);
         decay = (attack_decay & 0xF);
         if (state == 0) {
-            rate_period = rate_counter_period[attack];
+            rate_period = EnvelopeGenerator.rate_counter_period[attack];
         } else if (state == 1) {
-            rate_period = rate_counter_period[decay];
+            rate_period = EnvelopeGenerator.rate_counter_period[decay];
         }
     }
 
-    void writeSustainRelease(final int sustain_release) {
+    void writeSUSTAIN_RELEASE(final int sustain_release) {
         sustain = (sustain_release >> 4 & 0xF);
         release = (sustain_release & 0xF);
         if (state == 2) {
-            rate_period = rate_counter_period[release];
+            rate_period = EnvelopeGenerator.rate_counter_period[release];
         }
     }
 
@@ -166,14 +165,15 @@ class EnvelopeGenerator {
         state_pipeline = 0;
         exponential_pipeline = 0;
         envelope_pipeline = 0;
-        release = 0;
-        sustain = 0;
-        decay = 0;
-        attack = 0;
+        final int n2 = 0;
+        release = n2;
+        sustain = n2;
+        decay = n2;
+        attack = n2;
         rate_counter = 0;
         reset_rate_counter = false;
         state = 2;
-        rate_period = rate_counter_period[release];
+        rate_period = EnvelopeGenerator.rate_counter_period[release];
         envON = true;
         update = true;
     }

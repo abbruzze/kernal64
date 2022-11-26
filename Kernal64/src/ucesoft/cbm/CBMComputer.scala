@@ -708,7 +708,6 @@ abstract class CBMComputer extends CBMComponent {
             val fn = new File(f).getName
             val dot = fn.indexOf('.')
             val cbmFile = if (dot > 0) fn.substring(0, dot) else f
-            if (!new File(cbmFile).exists()) throw new FileNotFoundException(cbmFile)
             delayedAutorun(cbmFile)
         }
     }

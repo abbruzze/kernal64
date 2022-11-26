@@ -1,4 +1,4 @@
-package ucesoft.cbm.peripheral.sid.resid2;
+package ucesoft.cbm.peripheral.sid.resid4;
 
 class SIDfilter {
     private boolean V3OFF;
@@ -8,7 +8,7 @@ class SIDfilter {
     private int filt;
     private boolean voice3off;
     private int hp_bp_lp;
-    private int vol;
+    int vol;
     private int mixer_DC;
     private int Vhp;
     private int Vbp;
@@ -215,8 +215,8 @@ class SIDfilter {
         Vlp = 0;
         Vnf = 0;
         enable_filter(true);
-        EC.interpolate(SIDfilter.f0_points_6581, 0, SIDfilter.f0_points_6581.length - 1, f0_6581, 1.0);
-        EC.interpolate(SIDfilter.f0_points_8580, 0, SIDfilter.f0_points_8580.length - 1, f0_8580, 1.0);
+        DAC.interpolate(SIDfilter.f0_points_6581, 0, SIDfilter.f0_points_6581.length - 1, f0_6581, 1.0);
+        DAC.interpolate(SIDfilter.f0_points_8580, 0, SIDfilter.f0_points_8580.length - 1, f0_8580, 1.0);
         set_chip_model(0);
         set_distortion_properties(999999, 999999, 0, 0, 0, 999999, 999999, 0, 0, 0);
     }

@@ -1,6 +1,6 @@
-package ucesoft.cbm.peripheral.sid.resid2;
+package ucesoft.cbm.peripheral.sid.resid4;
 
-class EC {
+public class DAC {
     static int[] build_dac_table(final int bits, final double _2R_div_R, final boolean term) {
         final double[] vbit = new double[bits];
         final int[] dac = new int[1 << bits];
@@ -119,14 +119,14 @@ class EC {
         private final int[] f;
 
         PointPlotter(final int[] arr) {
-            this.f = arr;
+            f = arr;
         }
 
         void plot(final double x, double y) {
             if (y < 0.0) {
                 y = 0.0;
             }
-            this.f[(int) x] = (int) (y + 0.5);
+            f[(int) x] = (int) (y + 0.5);
         }
     }
 }

@@ -7,20 +7,20 @@ class DefaultAudioDriver(override val sampleRate:Int,bufferSizeInMillis:Int,isSt
     val af = new AudioFormat(sampleRate, 16,if (isStereo) 2 else 1, true, false)
     val dli = new DataLine.Info(classOf[SourceDataLine], af)
     val dataLine = try {
-      AudioSystem.getLine(dli).asInstanceOf[SourceDataLine] 
+      AudioSystem.getLine(dli).asInstanceOf[SourceDataLine]
     }
     catch {
       case t:Throwable =>
         println("Warning: no audio available. Cause: " + t)
         null
     }
-    
+
     if (dataLine != null) dataLine.open(dataLine.getFormat)
-    dataLine    
+    dataLine
   }
   private[this] val volume : FloatControl = if (dataLine != null) dataLine.getControl(FloatControl.Type.MASTER_GAIN).asInstanceOf[FloatControl] else null
   private[this] var vol = 0
-  private[this] val buffer = Array.ofDim[Byte](2 * (sampleRate * bufferSizeInMillis / 1000.0).toInt)
+  private[this] val buffer = Array.ofDim[Byte]((if (isStereo) 2 else 1) * 2 * (sampleRate * bufferSizeInMillis / 1000.0).toInt)
   private[this] var pos = 0
   private[this] var muted = false
   private[this] var soundOn = true
@@ -38,12 +38,14 @@ class DefaultAudioDriver(override val sampleRate:Int,bufferSizeInMillis:Int,isSt
     }
   }
   final def addSample(sample:Int) : Unit = {
+    if (dataLine == null || !soundOn) return
+
     buffer(pos) = (sample & 0xff).toByte ; pos += 1
-    buffer(pos) = ((sample >> 8)).toByte ; pos += 1
+    buffer(pos) = (sample >> 8).toByte ; pos += 1
     if (pos == buffer.length) {      
       pos = 0
-      val bsize = buffer.length
-      if (dataLine == null || dataLine.available < bsize) return
+      val av = dataLine.available()
+      val bsize = if (av < buffer.length) av else buffer.length
       dataLine.write(buffer, 0, bsize)
     }
   }
