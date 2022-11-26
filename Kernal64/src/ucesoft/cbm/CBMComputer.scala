@@ -759,7 +759,8 @@ abstract class CBMComputer extends CBMComponent {
 
       while (!loaded && !aborted) try {
         in = new ObjectInputStream(new GZIPInputStream(new FileInputStream(fn.get)))
-        for(i <- 0 until APPLICATION_NAME.length) if (in.readChar != APPLICATION_NAME(i)) throw new IOException(s"Bad header: expected $APPLICATION_NAME")
+        val model = in.readObject().asInstanceOf[CBMComputerModel]
+        if (model != cbmModel) throw new IOException(s"Invalid state file. Found state saved for model ${model.modelName}, expected ${cbmModel.modelName}")
         val ver = in.readObject.asInstanceOf[String]
         val ts = in.readLong
         if (!loadStateFromOptions && !asked) {
@@ -828,7 +829,7 @@ abstract class CBMComputer extends CBMComponent {
           return
       }
       out = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(fn)))
-      out.writeChars(APPLICATION_NAME)
+      out.writeObject(cbmModel)
       out.writeObject(ucesoft.cbm.Version.VERSION)
       out.writeLong(System.currentTimeMillis)
       save(out)
