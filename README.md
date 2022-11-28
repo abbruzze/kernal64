@@ -7,7 +7,7 @@
 
 # A Scala Commodore 64, 128, VIC20 and CBM 610/620/710/720 cycle-exact emulator
 
-Kernal64 ver 1.8.0b1
+Kernal64 ver 1.8.0b2
 ========
 ▶️<a href="#wn-latest">Go to latest release</a>
 
@@ -168,10 +168,12 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 ## What's new history
 <p id="wn-latest"></p>
 
-### What's new 1.8.0b1 (Nov 22th 2022)
+### What's new 1.8.0b2 (coming soon)
 - New emulators: **VIC20** and **CBM-II (610/620/710/720)**
 - New Debugger
 - USB Joystick: on (my) Windows 10 laptop jinput library seems to hang sometimes during initialization, freezing the whole emulator. Added a separate thread to check usb joystick availability.
+- C64
+	- Dual SID fixed: some release ago was broken
 
 ![](https://github.com/abbruzze/kernal64/blob/master/images/debug.png)<br>
 
