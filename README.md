@@ -168,7 +168,7 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 ## What's new history
 <p id="wn-latest"></p>
 
-### What's new 1.8.0b2 (coming soon)
+### What's new 1.8.0b2 (Dic 1st 2022)
 - New emulators: **VIC20** and **CBM-II (610/620/710/720)**
 - New Debugger
 - USB Joystick: on (my) Windows 10 laptop jinput library seems to hang sometimes during initialization, freezing the whole emulator. Added a separate thread to check usb joystick availability.
