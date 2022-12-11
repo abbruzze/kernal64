@@ -1,4 +1,5 @@
-KERNAL64SCPU64OPTS+=" --shell"
+# use --shell for Windows only
+#KERNAL64SCPU64OPTS+=" --shell"
 KERNAL64SCPU64OPTS+=" --ignore-config-file"
 KERNAL64SCPU64OPTS+=" --testcart"
 KERNAL64SCPU64OPTS+=" --headless"

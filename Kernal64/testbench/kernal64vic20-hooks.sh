@@ -1,4 +1,5 @@
-KERNAL64VIC20OPTS+=" --shell"
+# use --shell for Windows only
+#KERNAL64VIC20OPTS+=" --shell"
 KERNAL64VIC20OPTS+=" --testcart"
 KERNAL64VIC20OPTS+=" --headless"
 KERNAL64VIC20OPTS+=" --warp"

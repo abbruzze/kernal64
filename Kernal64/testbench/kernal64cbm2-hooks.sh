@@ -1,5 +1,5 @@
-
-KERNAL64CBM2OPTS+=" --shell"
+# use --shell for Windows only
+#KERNAL64CBM2OPTS+=" --shell"
 KERNAL64CBM2OPTS+=" --testcart"
 KERNAL64CBM2OPTS+=" --headless"
 KERNAL64CBM2OPTS+=" --warp"

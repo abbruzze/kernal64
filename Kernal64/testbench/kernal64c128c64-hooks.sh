@@ -1,4 +1,5 @@
-KERNAL64C128C64OPTS+=" --shell"
+# use --shell for Windows only
+#KERNAL64C128C64OPTS+=" --shell"
 KERNAL64C128C64OPTS+=" --ignore-config-file"
 KERNAL64C128C64OPTS+=" --go64"
 KERNAL64C128C64OPTS+=" --testcart"
