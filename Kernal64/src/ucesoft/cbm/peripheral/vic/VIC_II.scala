@@ -85,6 +85,7 @@ final class VIC_II(mem: VIC_II_Memory,
   private[this] var lastModPixelX = model.BLANK_RIGHT_CYCLE << 3
   private[this] var lastModPixelY = 0 // last y pixel coordinate modified
   private[this] var lightPenEnabled = false
+  private[this] var lightPenOfsX,lightPenOfsY = 0
   private[this] var _baLow = false
   private[this] var baLowFirstCycle = 0L
   private[this] val clk = Clock.systemClock
@@ -918,13 +919,17 @@ final class VIC_II(mem: VIC_II_Memory,
     display.setClipArea(model.BLANK_LEFT_CYCLE << 3, model.BLANK_TOP_LINE + 1,model.BLANK_RIGHT_CYCLE << 3, model.BLANK_BOTTOM_LINE)
   }
 
-  def enableLightPen(enabled: Boolean): Unit = lightPenEnabled = enabled
+  def enableLightPen(enabled: Boolean,offsetX:Int,offsetY:Int): Unit = {
+    lightPenEnabled = enabled
+    lightPenOfsX = offsetX
+    lightPenOfsY = offsetY
+  }
 
   def triggerLightPen() : Unit = {
     if (canUpdateLightPenCoords) {
       canUpdateLightPenCoords = false
-      lightPenXYCoord(0) = ((xCoord(rasterCycle) >> 1) & 0xFF) + (if (isNewVICModel) 1 else 2)
-      lightPenXYCoord(1) = displayLine & 0xFF
+      lightPenXYCoord(0) = (lightPenOfsX + (xCoord(rasterCycle) >> 1) + (if (isNewVICModel) 1 else 2)) & 0xFF
+      lightPenXYCoord(1) = (lightPenOfsY + displayLine) & 0xFF
       interruptControlRegister |= 8
       // check if we must set interrupt
       //if ((interruptControlRegister & interruptMaskRegister & 0x0f) != 0) irqRequest

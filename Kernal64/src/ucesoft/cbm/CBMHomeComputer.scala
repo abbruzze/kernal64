@@ -89,6 +89,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected val LIGHT_PEN_NO_BUTTON = 0
   protected val LIGHT_PEN_BUTTON_UP = 1
   protected val LIGHT_PEN_BUTTON_LEFT = 2
+  protected val LIGHT_GUN_BUTTON_POTY = 4
   protected var lightPenButtonEmulation: Int = LIGHT_PEN_NO_BUTTON
 
   protected class LightPenButtonListener extends MouseAdapter with CBMComponent {
@@ -100,11 +101,13 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
         case LIGHT_PEN_NO_BUTTON =>
         case LIGHT_PEN_BUTTON_UP => controlPortB.emulateUp
         case LIGHT_PEN_BUTTON_LEFT => controlPortB.emulateLeft
+        case LIGHT_GUN_BUTTON_POTY => sid.setLightGunEnabled(true,potx = false,0)
       }
     }
     override def mouseReleased(e:MouseEvent) : Unit = {
       lightPenButtonEmulation match {
         case LIGHT_PEN_NO_BUTTON =>
+        case LIGHT_GUN_BUTTON_POTY => sid.setLightGunEnabled(true,potx = false)
         case _ => controlPortB.releaseEmulated
       }
     }
@@ -586,8 +589,13 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
   protected def setLightPen(setting:Int): Unit = {
     lightPenButtonEmulation = setting
-    vicChip.enableLightPen(setting != LIGHT_PEN_NO_BUTTON)
     controlPortB.setLightPenEmulation(setting != LIGHT_PEN_NO_BUTTON)
+    if (setting == LIGHT_GUN_BUTTON_POTY) {
+      sid.setLightGunEnabled(true,false)
+      vicChip.enableLightPen(true,16,-15)
+    }
+    else vicChip.enableLightPen(setting != LIGHT_PEN_NO_BUTTON,0,0
+    )
     if (setting == LIGHT_PEN_NO_BUTTON) display.setCursor(Cursor.getDefaultCursor)
     else display.setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR))
   }
@@ -1191,7 +1199,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     parent.add(swapJoyAItem)
   }
 
-  protected def setLightPenSettings(parent:JMenu,port:String = "2") : Unit = {
+  protected def setLightPenSettings(parent:JMenu,port:String = "1") : Unit = {
     val lightPenMenu = new JMenu("Light pen")
     parent.add(lightPenMenu)
     val group3 = new ButtonGroup
@@ -1213,6 +1221,10 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     penLeft.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_LEFT) )
     group3.add(penLeft)
     lightPenMenu.add(penLeft)
+    val gunPotY = new JRadioButtonMenuItem(s"Light gun \"Magnum Light Phaser\" on control port $port")
+    gunPotY.addActionListener(_ => setLightPen(LIGHT_GUN_BUTTON_POTY))
+    group3.add(gunPotY)
+    lightPenMenu.add(gunPotY)
   }
 
   protected def setMouseSettings(parent:JMenu) : Unit = {

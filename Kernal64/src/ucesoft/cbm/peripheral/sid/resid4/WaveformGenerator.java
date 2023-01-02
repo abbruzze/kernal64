@@ -1,38 +1,42 @@
 package ucesoft.cbm.peripheral.sid.resid4;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
 public class WaveformGenerator {
     private final int FLOATING_OUTPUT_TTL_6581 = 200000;
     private final int FLOATING_OUTPUT_TTL_8580 = 5000000;
     private final int SHIFT_REGISTER_RESET_6581 = 32768;
     private final int SHIFT_REGISTER_RESET_8580 = 9764864;
 
-    int sid_model;
-    int accumulator;
-    int tri_saw_pipeline;
-    int freq;
-    int pw;
-    boolean msb_rising;
-    int waveform;
-    boolean test;
-    int ring_mod;
-    boolean sync;
-    int ring_msb_mask;
-    int no_noise;
-    int no_pulse;
-    int pulse_output;
-    int shift_register;
-    int shift_register_reset;
-    int shift_pipeline;
-    int waveform_output;
-    int osc3;
-    int floating_output_ttl;
-    int noise_output;
-    int no_noise_or_noise_output;
+    private int sid_model;
+    private int accumulator;
+    private int tri_saw_pipeline;
+    private int freq;
+    private int pw;
+    private boolean msb_rising;
+    private int waveform;
+    private boolean test;
+    private int ring_mod;
+    private boolean sync;
+    private int ring_msb_mask;
+    private int no_noise;
+    private int no_pulse;
+    private int pulse_output;
+    private int shift_register;
+    private int shift_register_reset;
+    private int shift_pipeline;
+    private int waveform_output;
+    private int osc3;
+    private int floating_output_ttl;
+    private int noise_output;
+    private int no_noise_or_noise_output;
     private int[] wave;
     private int[][] waveforms;
     private int[] model_dac;
-    WaveformGenerator sync_source;
-    WaveformGenerator sync_dest;
+    private WaveformGenerator sync_source;
+    private WaveformGenerator sync_dest;
 
     public WaveformGenerator() {
         accumulator = 5592405;
@@ -214,5 +218,53 @@ public class WaveformGenerator {
         waveforms = model.waveforms;
         wave = waveforms[waveform & 0x7];
         model_dac = model.model_dacW;
+    }
+
+    void saveState(ObjectOutputStream out) throws IOException {
+        out.writeInt(accumulator);
+        out.writeInt(shift_register);
+        out.writeInt(shift_pipeline);
+        out.writeInt(shift_register_reset);
+        out.writeInt(floating_output_ttl);
+        out.writeInt(tri_saw_pipeline);
+        out.writeInt(freq);
+        out.writeInt(pw);
+        out.writeBoolean(msb_rising);
+        out.writeInt(waveform);
+        out.writeBoolean(test);
+        out.writeInt(ring_mod);
+        out.writeBoolean(sync);
+        out.writeInt(ring_msb_mask);
+        out.writeInt(no_noise);
+        out.writeInt(no_pulse);
+        out.writeInt(pulse_output);
+        out.writeInt(waveform_output);
+        out.writeInt(osc3);
+        out.writeInt(noise_output);
+        out.writeInt(no_noise_or_noise_output);
+    }
+
+    void loadState(ObjectInputStream in) throws IOException {
+        accumulator = in.readInt();
+        shift_register = in.readInt();
+        shift_pipeline = in.readInt();
+        shift_register_reset = in.readInt();
+        floating_output_ttl = in.readInt();
+        tri_saw_pipeline = in.readInt();
+        freq = in.readInt();
+        pw = in.readInt();
+        msb_rising = in.readBoolean();
+        waveform = in.readInt();
+        test = in.readBoolean();
+        ring_mod = in.readInt();
+        sync = in.readBoolean();
+        ring_msb_mask = in.readInt();
+        no_noise = in.readInt();
+        no_pulse = in.readInt();
+        pulse_output = in.readInt();
+        waveform_output = in.readInt();
+        osc3 = in.readInt();
+        noise_output = in.readInt();
+        no_noise_or_noise_output = in.readInt();
     }
 }

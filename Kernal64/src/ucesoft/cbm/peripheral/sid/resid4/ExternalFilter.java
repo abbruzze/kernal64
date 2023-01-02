@@ -1,13 +1,17 @@
 package ucesoft.cbm.peripheral.sid.resid4;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
 class ExternalFilter {
     private int Vlp;
     private int Vhp;
     private int Vo;
     private int w0lp;
     private int w0hp;
-    private int w0lp_1_s7;
-    private int w0hp_1_s17;
+    final private int w0lp_1_s7;
+    final private int w0hp_1_s17;
 
     public void clock(final int Vi) {
         final int dVlp = (w0lp >> 8) * (Vi - Vlp) >> 12;
@@ -26,7 +30,6 @@ class ExternalFilter {
         w0hp_1_s17 = 13;
         reset();
         set_sampling_parameter(15915.6);
-        set_chip_model();
     }
 
     private void set_sampling_parameter(final double pass_freq) {
@@ -37,12 +40,21 @@ class ExternalFilter {
         }
     }
 
-    private void set_chip_model() {
-    }
-
     public void reset() {
         Vlp = 0;
         Vhp = 0;
         Vo = 0;
+    }
+
+    void saveState(ObjectOutputStream out) throws IOException {
+        out.writeInt(Vlp);
+        out.writeInt(Vhp);
+        out.writeInt(Vlp);
+    }
+
+    void loadState(ObjectInputStream in) throws IOException {
+        Vlp = in.readInt();
+        Vhp = in.readInt();
+        Vlp = in.readInt();
     }
 }

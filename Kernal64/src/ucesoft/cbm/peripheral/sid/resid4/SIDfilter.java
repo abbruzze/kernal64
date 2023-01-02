@@ -1,5 +1,9 @@
 package ucesoft.cbm.peripheral.sid.resid4;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
 class SIDfilter {
     private boolean V3OFF;
     private boolean enabled;
@@ -297,14 +301,71 @@ class SIDfilter {
     }
 
     private void set_w0() {
-        final double pi = 3.141592653589793;
         w0 = (int) (6.283185307179586 * f0[fc] * 1.048576);
         final int w0_max_1 = 118591;
         w0_ceil_1 = ((w0 <= w0_max_1) ? w0 : w0_max_1);
     }
 
     private void set_Q() {
-        _1024_div_Q = SIDfilter._1024_div_Q_table[sid_model][res];
+        _1024_div_Q = _1024_div_Q_table[sid_model][res];
+    }
+
+    void saveState(ObjectOutputStream out) throws IOException {
+        out.writeBoolean(V3OFF);
+        out.writeBoolean(enabled);
+        out.writeInt(fc);
+        out.writeInt(res);
+        out.writeInt(filt);
+        out.writeBoolean(voice3off);
+        out.writeInt(hp_bp_lp);
+        out.writeInt(vol);
+        out.writeInt(mixer_DC);
+        out.writeInt(Vhp);
+        out.writeInt(Vbp);
+        out.writeInt(Vnf);
+        out.writeInt(DLthreshold);
+        out.writeInt(DLsteepness);
+        out.writeInt(DHthreshold);
+        out.writeInt(DHsteepness);
+        out.writeInt(DLlp);
+        out.writeInt(DLbp);
+        out.writeInt(DLhp);
+        out.writeInt(DHlp);
+        out.writeInt(DHbp);
+        out.writeInt(DHhp);
+        out.writeInt(w0);
+        out.writeInt(w0_ceil_1);
+        out.writeInt(_1024_div_Q);
+        out.writeInt(sid_model);
+    }
+
+    void loadState(ObjectInputStream in) throws IOException {
+        V3OFF = in.readBoolean();
+        enabled = in.readBoolean();
+        fc = in.readInt();
+        res = in.readInt();
+        filt = in.readInt();
+        voice3off = in.readBoolean();
+        hp_bp_lp = in.readInt();
+        vol = in.readInt();
+        mixer_DC = in.readInt();
+        Vhp = in.readInt();
+        Vbp = in.readInt();
+        Vnf = in.readInt();
+        DLthreshold = in.readInt();
+        DLsteepness = in.readInt();
+        DHthreshold = in.readInt();
+        DHsteepness = in.readInt();
+        DLlp = in.readInt();
+        DLbp = in.readInt();
+        DLhp = in.readInt();
+        DHlp = in.readInt();
+        DHbp = in.readInt();
+        DHhp = in.readInt();
+        w0 = in.readInt();
+        w0_ceil_1 = in.readInt();
+        _1024_div_Q = in.readInt();
+        sid_model = in.readInt();
     }
 
     static {

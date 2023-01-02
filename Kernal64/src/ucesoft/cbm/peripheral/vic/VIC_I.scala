@@ -257,6 +257,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   private var xpos = 0
 
   private var lightPenEnabled,lightPenTriggered = false
+  private var lightPenOfsX,lightPenOfsY = 0
   private var lpX,lpY = 0
 
   private var display: Display = _
@@ -327,13 +328,17 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
 
   def setDrawBorder(on:Boolean) : Unit = {}
 
-  def enableLightPen(enabled: Boolean): Unit = lightPenEnabled = enabled
+  def enableLightPen(enabled: Boolean,offsetX:Int,offsetY:Int): Unit = {
+    lightPenEnabled = enabled
+    lightPenOfsX = offsetX
+    lightPenOfsY = offsetY
+  }
 
   def triggerLightPen(): Unit = {
     if (!lightPenTriggered) {
       lightPenTriggered = true
-      lpX = (xpos >> 1) & 0xFF
-      lpY = (rasterLine >> 1) & 0xFF
+      lpX = (lightPenOfsX + (xpos >> 1)) & 0xFF
+      lpY = (lightPenOfsY + (rasterLine >> 1)) & 0xFF
     }
   }
 

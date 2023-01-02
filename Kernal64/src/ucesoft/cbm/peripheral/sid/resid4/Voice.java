@@ -1,5 +1,9 @@
 package ucesoft.cbm.peripheral.sid.resid4;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
 class Voice {
     final WaveformGenerator wave;
     final EnvelopeGenerator envelope;
@@ -35,5 +39,15 @@ class Voice {
     void reset() {
         envelope.reset();
         wave.reset();
+    }
+
+    void saveState(ObjectOutputStream out) throws IOException {
+        wave.saveState(out);
+        envelope.saveState(out);
+    }
+
+    void loadState(ObjectInputStream in) throws IOException {
+        wave.loadState(in);
+        envelope.loadState(in);
     }
 }

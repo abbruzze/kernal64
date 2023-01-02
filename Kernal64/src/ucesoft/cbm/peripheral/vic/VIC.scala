@@ -49,7 +49,7 @@ abstract class VIC extends RAMComponent {
 
   def setDrawBorder(on:Boolean) : Unit
 
-  def enableLightPen(enabled: Boolean): Unit
+  def enableLightPen(enabled: Boolean,offsetX:Int,offsetY:Int): Unit
 
   def triggerLightPen(): Unit
 }

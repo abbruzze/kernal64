@@ -474,12 +474,22 @@ object WiC64 extends CBMComponent with Runnable {
   }
 
   private def resolve(urlString:String): String = {
+    var newURL =
     if (urlString.nonEmpty) {
       var url = urlString
       if (url.charAt(0) == '!') url = server + urlString.substring(1)
       url.replaceAll("%mac", MAC_ADDRESS.replaceAll(":", "") + token).replaceAll("%ser", server)
     }
     else urlString
+
+    val wic64URLSrc = System.getProperty("wic64.url.src")
+    val wic64URLDst = System.getProperty("wic64.url.dst")
+    if (wic64URLSrc != null && wic64URLDst != null && newURL.startsWith(wic64URLSrc)) {
+      val prevURL = newURL
+      newURL = wic64URLDst + newURL.substring(wic64URLSrc.length)
+      log(s"Applying URL translation: wic64.url.src=$wic64URLSrc, wic64.url.dst=$wic64URLDst, URL=$prevURL translated URL=$newURL")
+    }
+    newURL
   }
 
   private def getMacAddress(): String = {

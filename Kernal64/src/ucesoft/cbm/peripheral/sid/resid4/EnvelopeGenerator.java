@@ -1,28 +1,32 @@
 package ucesoft.cbm.peripheral.sid.resid4;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
 public class EnvelopeGenerator {
     private static final int[] rate_counter_period;
     private static final int[] sustain_level;
-    int env3;
-    int rate_period;
-    int exponential_counter;
-    int exponential_counter_period;
-    int envelope_counter;
-    int envelope_pipeline;
-    int attack;
-    int decay;
-    int sustain;
-    int release;
-    boolean gate;
-    int state;
-    int next_state;
-    int rate_counter;
-    int exponential_pipeline;
-    int state_pipeline;
-    boolean reset_rate_counter;
+    private int env3;
+    private int rate_period;
+    private int exponential_counter;
+    private int exponential_counter_period;
+    private int envelope_counter;
+    private int envelope_pipeline;
+    private int attack;
+    private int decay;
+    private int sustain;
+    private int release;
+    private boolean gate;
+    private int state;
+    private int next_state;
+    private int rate_counter;
+    private int exponential_pipeline;
+    private int state_pipeline;
+    private boolean reset_rate_counter;
     boolean envON;
     int[] model_dac;
-    boolean update;
+    private boolean update;
 
     EnvelopeGenerator() {
         reset();
@@ -176,6 +180,50 @@ public class EnvelopeGenerator {
         rate_period = EnvelopeGenerator.rate_counter_period[release];
         envON = true;
         update = true;
+    }
+
+    void saveState(ObjectOutputStream out) throws IOException {
+        out.writeInt(env3);
+        out.writeInt(attack);
+        out.writeInt(decay);
+        out.writeInt(sustain);
+        out.writeInt(release);
+        out.writeBoolean(gate);
+        out.writeInt(state);
+        out.writeInt(next_state);
+        out.writeInt(exponential_pipeline);
+        out.writeInt(state_pipeline);
+        out.writeBoolean(reset_rate_counter);
+        out.writeBoolean(envON);
+        out.writeBoolean(update);
+        out.writeInt(rate_counter);
+        out.writeInt(exponential_counter);
+        out.writeInt(envelope_counter);
+        out.writeInt(rate_period);
+        out.writeInt(exponential_counter_period);
+        out.writeInt(envelope_pipeline);
+    }
+
+    void loadState(ObjectInputStream in) throws IOException {
+        env3 = in.readInt();
+        attack = in.readInt();
+        decay = in.readInt();
+        sustain = in.readInt();
+        release = in.readInt();
+        gate = in.readBoolean();
+        state = in.readInt();
+        next_state = in.readInt();
+        exponential_pipeline = in.readInt();
+        state_pipeline = in.readInt();
+        reset_rate_counter = in.readBoolean();
+        envON = in.readBoolean();
+        update = in.readBoolean();
+        rate_counter = in.readInt();
+        exponential_counter = in.readInt();
+        envelope_counter = in.readInt();
+        rate_period = in.readInt();
+        exponential_counter_period = in.readInt();
+        envelope_pipeline = in.readInt();
     }
 
     static {

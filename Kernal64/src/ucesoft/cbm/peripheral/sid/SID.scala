@@ -33,7 +33,8 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
 
   private[this] val POTX_OFS = 0x19
   private[this] val POTY_OFS = 0x1A
-  private[this] var mouseEnabled = false
+  private[this] var mouseEnabled,lightGunOnPOTXEnabled,lightGunOnPOTYEnabled = false
+  private[this] var lightGunPOTValue = 0xFF
   private[this] var sid2 : SID = null
 
   private[this] var lastCycles = Clock.systemClock.currentCycles
@@ -80,8 +81,10 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     if (this.sid2 != null) this.sid2.setCycleExact(cycleExact)
     externalDriver match {
       case None =>
+        val volume = driver.getMasterVolume
         driver.discard
         driver = new DefaultAudioDriver(SAMPLE_RATE, audioBuffer,isStereo)
+        driver.setMasterVolume(volume)
       case Some(_) =>
     }
 
@@ -129,15 +132,19 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
   }
   
   def setMouseEnabled(enabled:Boolean): Unit = mouseEnabled = enabled
+  def setLightGunEnabled(enabled:Boolean,potx:Boolean,value:Int = 0xFF): Unit = {
+    if (potx) lightGunOnPOTXEnabled = enabled else lightGunOnPOTYEnabled = enabled
+    lightGunPOTValue = value
+  }
   
   final def read(address: Int, chipID: ChipID.ID) : Int = decode(address) match {
     case -1 => sid2.read(address)
     case POTX_OFS =>
-      val value = if (mouseEnabled) (MouseCage.x & 0x7F) << 1 else 0xFF
+      val value = if (lightGunOnPOTXEnabled) lightGunPOTValue else if (mouseEnabled) (MouseCage.x & 0x7F) << 1 else 0xFF
       sid.updateBusValue(value)
       value
     case POTY_OFS =>
-      val value = if (mouseEnabled) (0x7F - (MouseCage.y & 0x7F)) << 1 else 0xFF
+      val value = if (lightGunOnPOTYEnabled) lightGunPOTValue else if (mouseEnabled) (0x7F - (MouseCage.y & 0x7F)) << 1 else 0xFF
       sid.updateBusValue(value)
       value
     case ofs => sid.read(ofs)

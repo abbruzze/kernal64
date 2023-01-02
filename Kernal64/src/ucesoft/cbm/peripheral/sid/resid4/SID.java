@@ -238,49 +238,10 @@ public class SID implements SIDChip {
             out.writeInt(bus_value);
             out.writeLong(bus_clock);
             for (final Voice voice : voices) {
-                out.writeInt(voice.wave.accumulator);
-                out.writeInt(voice.wave.shift_register);
-                out.writeInt(voice.wave.shift_pipeline);
-                out.writeInt(voice.wave.shift_register_reset);
-                out.writeInt(voice.wave.floating_output_ttl);
-                out.writeInt(voice.wave.tri_saw_pipeline);
-                out.writeInt(voice.wave.freq);
-                out.writeInt(voice.wave.pw);
-                out.writeBoolean(voice.wave.msb_rising);
-                out.writeInt(voice.wave.waveform);
-                out.writeBoolean(voice.wave.test);
-                out.writeInt(voice.wave.ring_mod);
-                out.writeBoolean(voice.wave.sync);
-                out.writeInt(voice.wave.ring_msb_mask);
-                out.writeInt(voice.wave.no_noise);
-                out.writeInt(voice.wave.no_pulse);
-                out.writeInt(voice.wave.pulse_output);
-                out.writeInt(voice.wave.waveform_output);
-                out.writeInt(voice.wave.osc3);
-                out.writeInt(voice.wave.noise_output);
-                out.writeInt(voice.wave.no_noise_or_noise_output);
-
-                out.writeInt(voice.envelope.env3);
-                out.writeInt(voice.envelope.attack);
-                out.writeInt(voice.envelope.decay);
-                out.writeInt(voice.envelope.sustain);
-                out.writeInt(voice.envelope.release);
-                out.writeBoolean(voice.envelope.gate);
-                out.writeInt(voice.envelope.state);
-                out.writeInt(voice.envelope.next_state);
-                out.writeInt(voice.envelope.exponential_pipeline);
-                out.writeInt(voice.envelope.state_pipeline);
-                out.writeBoolean(voice.envelope.reset_rate_counter);
-                out.writeBoolean(voice.envelope.envON);
-                out.writeBoolean(voice.envelope.update);
-                out.writeInt(voice.envelope.rate_counter);
-                out.writeInt(voice.envelope.exponential_counter);
-                out.writeInt(voice.envelope.envelope_counter);
-                out.writeInt(voice.envelope.rate_period);
-                out.writeInt(voice.envelope.exponential_counter_period);
-                out.writeInt(voice.envelope.envelope_pipeline);
-
+                voice.saveState(out);
             }
+            filter.saveState(out);
+            extfilt.saveState(out);
         }
         catch (Throwable e) {
             throw new RuntimeException("Can't save SID state",e);
@@ -296,49 +257,10 @@ public class SID implements SIDChip {
             bus_value = in.readInt();
             bus_clock = in.readLong();
             for (final Voice voice : voices) {
-                voice.wave.accumulator = in.readInt();
-                voice.wave.shift_register = in.readInt();
-                voice.wave.shift_pipeline = in.readInt();
-                voice.wave.shift_register_reset = in.readInt();
-                voice.wave.floating_output_ttl = in.readInt();
-                voice.wave.tri_saw_pipeline = in.readInt();
-                voice.wave.freq = in.readInt();
-                voice.wave.pw = in.readInt();
-                voice.wave.msb_rising = in.readBoolean();
-                voice.wave.waveform = in.readInt();
-                voice.wave.test = in.readBoolean();
-                voice.wave.ring_mod = in.readInt();
-                voice.wave.sync = in.readBoolean();
-                voice.wave.ring_msb_mask = in.readInt();
-                voice.wave.no_noise = in.readInt();
-                voice.wave.no_pulse = in.readInt();
-                voice.wave.pulse_output = in.readInt();
-                voice.wave.waveform_output = in.readInt();
-                voice.wave.osc3 = in.readInt();
-                voice.wave.noise_output = in.readInt();
-                voice.wave.no_noise_or_noise_output = in.readInt();
-
-                voice.envelope.env3 = in.readInt();
-                voice.envelope.attack = in.readInt();
-                voice.envelope.decay = in.readInt();
-                voice.envelope.sustain = in.readInt();
-                voice.envelope.release = in.readInt();
-                voice.envelope.gate = in.readBoolean();
-                voice.envelope.state = in.readInt();
-                voice.envelope.next_state = in.readInt();
-                voice.envelope.exponential_pipeline = in.readInt();
-                voice.envelope.state_pipeline = in.readInt();
-                voice.envelope.reset_rate_counter = in.readBoolean();
-                voice.envelope.envON = in.readBoolean();
-                voice.envelope.update = in.readBoolean();
-                voice.envelope.rate_counter = in.readInt();
-                voice.envelope.exponential_counter = in.readInt();
-                voice.envelope.envelope_counter = in.readInt();
-                voice.envelope.rate_period = in.readInt();
-                voice.envelope.exponential_counter_period = in.readInt();
-                voice.envelope.envelope_pipeline = in.readInt();
-
+                voice.loadState(in);
             }
+            filter.loadState(in);
+            extfilt.loadState(in);
         }
         catch (Throwable e) {
             throw new RuntimeException("Can't load SID state",e);
