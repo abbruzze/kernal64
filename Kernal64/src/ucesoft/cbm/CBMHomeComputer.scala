@@ -1221,7 +1221,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     penLeft.addActionListener(_ => setLightPen(LIGHT_PEN_BUTTON_LEFT) )
     group3.add(penLeft)
     lightPenMenu.add(penLeft)
-    val gunPotY = new JRadioButtonMenuItem(s"Light gun \"Magnum Light Phaser\" on control port $port")
+    val gunPotY = new JRadioButtonMenuItem(s"Light gun 'Magnum Light Phaser' on control port $port")
     gunPotY.addActionListener(_ => setLightPen(LIGHT_GUN_BUTTON_POTY))
     group3.add(gunPotY)
     lightPenMenu.add(gunPotY)
