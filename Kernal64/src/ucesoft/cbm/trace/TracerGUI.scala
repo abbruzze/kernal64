@@ -71,7 +71,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
           eventMap.get(event.toString) match {
             case Some(e) if e.enabled =>
               true
-            case None =>
+            case _ =>
               false
           }
       }

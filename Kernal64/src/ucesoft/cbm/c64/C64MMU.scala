@@ -3,11 +3,11 @@ package ucesoft.cbm.c64
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.cpu._
 import ucesoft.cbm.expansion.{ExpansionPort, ExpansionPortConfigurationListener, LastByteReadMemory}
-import ucesoft.cbm.misc.TestCart
+import ucesoft.cbm.misc.{MemoryInitPattern, TestCart}
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.sid.SID
-import ucesoft.cbm.peripheral.vic.{VIC}
+import ucesoft.cbm.peripheral.vic.VIC
 import ucesoft.cbm.{CBMComponentType, ChipID, Clock, Log}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
@@ -51,28 +51,7 @@ object C64MMU {
     final val isActive = true
     def init  : Unit = {
       Log.info("Initializing RAM memory ...")
-      var m = 0
-      var v0 = 0xFF
-      var v2 = 0
-      for(_ <- 0 to 255) {
-        if (m == 0x4000) {
-          v0 = 0
-          v2 = 0xFF
-        }
-        else
-        if (m == 0xC000) {
-          v0 = 0xFF
-          v2 = 0
-        }
-        for(j <- 0 to 127) {
-          mem(m) = if (j == 0) ~v0 & 0xFF else v0
-          m += 1
-        }
-        for(_ <- 0 to 127) {
-          mem(m) = v2
-          m += 1
-        }
-      }
+      MemoryInitPattern.initRAM(mem)
     }
     def reset  : Unit = {}
     override def hardReset : Unit = init

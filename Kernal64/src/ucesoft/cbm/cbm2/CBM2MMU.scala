@@ -4,7 +4,7 @@ import ucesoft.cbm.CBMComponentType
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.{CPU6510_CE, RAMComponent, ROM}
-import ucesoft.cbm.misc.TestCart
+import ucesoft.cbm.misc.{MemoryInitPattern, TestCart}
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.crtc.CRTC6845
 import ucesoft.cbm.peripheral.mos6525.MOS6525
@@ -76,7 +76,7 @@ class CBM2MMU extends RAMComponent {
   override def hardReset(): Unit = {
     reset()
     for(b <- banks) {
-      if (b != null) java.util.Arrays.fill(b,0)
+      if (b != null) MemoryInitPattern.initRAM(b)//java.util.Arrays.fill(b,0)
     }
     java.util.Arrays.fill(ram,0xFF)
     java.util.Arrays.fill(screenRam,0xFF)
@@ -86,7 +86,10 @@ class CBM2MMU extends RAMComponent {
     for(i <- 0 until banks.length) banks(i) = null
 
     val bs = model.memoryK / 64
-    for(b <- 1 to bs) banks(b) = Array.fill[Int](0x10000)(0xFF)
+    for(b <- 1 to bs) {
+      banks(b) = Array.fill[Int](0x10000)(0xFF)
+      MemoryInitPattern.initRAM(banks(b))
+    }
   }
 
   def setROM1000(rom:Array[Int]): Unit = romSlot(0) = rom

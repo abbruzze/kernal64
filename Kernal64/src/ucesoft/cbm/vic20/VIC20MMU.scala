@@ -4,7 +4,7 @@ import ucesoft.cbm.ChipID.ID
 import ucesoft.cbm.cpu.{RAMComponent, ROM}
 import ucesoft.cbm.expansion.vic20.VIC20ExpansionPort
 import ucesoft.cbm.formats.Cartridge
-import ucesoft.cbm.misc.TestCart
+import ucesoft.cbm.misc.{MemoryInitPattern, TestCart}
 import ucesoft.cbm.peripheral.drive.VIA
 import ucesoft.cbm.peripheral.vic.{VICType, VIC_I}
 import ucesoft.cbm.{CBMComponentType, ChipID}
@@ -269,6 +269,7 @@ class VIC20MMU extends RAMComponent {
   }
 
   override def init(): Unit = {
+    MemoryInitPattern.initRAM(ram)
     for(r <- 0 until 0x10000) {
       memRW(r) =
         if (r < 0x400) RAM_RW
@@ -298,7 +299,7 @@ class VIC20MMU extends RAMComponent {
   }
 
   override def hardReset(): Unit = {
-    java.util.Arrays.fill(ram,0)
+    MemoryInitPattern.initRAM(ram)//java.util.Arrays.fill(ram,0)
     /*
     for(e <- expansionBlocks) {
       e.removeROM()

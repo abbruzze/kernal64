@@ -3,6 +3,7 @@ package ucesoft.cbm.c128
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.{CBMComponentType, ChipID, Log}
 import ucesoft.cbm.cpu.{Memory, RAMComponent}
+import ucesoft.cbm.misc.MemoryInitPattern
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 import java.util.Properties
@@ -74,30 +75,8 @@ private[c128] class C128RAM extends RAMComponent {
     // only the first two banks are initialized
     mem(0) = Array.ofDim[Int](0x10000)
     mem(1) = Array.ofDim[Int](0x10000)
-    for(b <- 0 until 4;if mem(b) != null) {
-      var m = 0
-      var v0 = 0xFF
-      var v2 = 0
-      for(_ <- 0 to 255) {
-        if (m == 0x4000) {
-          v0 = 0
-          v2 = 0xFF
-        }
-        else
-        if (m == 0xC000) {
-          v0 = 0xFF
-          v2 = 0
-        }
-        for(j <- 0 to 127) {
-          mem(b)(m) = if (j == 0) ~v0 & 0xFF else v0
-          m += 1
-        }
-        for(_ <- 0 to 127) {
-          mem(b)(m) = v2
-          m += 1
-        }
-      }
-    }
+    MemoryInitPattern.initRAM(mem(0))
+    MemoryInitPattern.initRAM(mem(1))
   }
   
   final def reset  : Unit = {
