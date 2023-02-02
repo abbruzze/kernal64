@@ -77,18 +77,20 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
         }
         else 0xFF
       case PB =>
-        (super.read(address,chipID) & 0x1A) | (bus.data|data_out) | (bus.clk|clock_out) << 2 | bus.atn << 7 | IDJACK << 5
-        
-      case ofs => super.read(address,chipID)
+        //(super.read(address,chipID) & 0x1A) | (bus.data|data_out) | (bus.clk|clock_out) << 2 | bus.atn << 7 | IDJACK << 5
+        super.read(address,chipID)
+        val res = (((bus.data|data_out) | (bus.clk|clock_out) << 2 | bus.atn << 7 | IDJACK << 5) & ~regs(DDRB)) | (regs(PB) & regs(DDRB))
+        addPB7(res)
+      case _ => super.read(address,chipID)
     }
     
     override def write(address: Int, value: Int, chipID: ChipID.ID) : Unit = {
       super.write(address,value,chipID)
-      (address & 0x0F) match {
-        case PB|DDRB =>        
+      address & 0x0F match {
+        case PB|DDRB =>
           bus.setLine(this,IECBusLine.DATA,data_out)
           bus.setLine(this,IECBusLine.CLK,clock_out)
-          
+
           autoacknwoledgeData
         case ad@(PA|PA2) =>
           if (jackID == 0 && ParallelCable.enabled) {
@@ -145,7 +147,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
           clk.schedule(new ClockEvent("DiskWaitingInserting",cycles + REMOVING_DISK_WAIT, cycles => {
             isDiskChanged = true
             viaBus.irq_set(IRQ_CA2)
-            clk.schedule(new ClockEvent("DiskWaitingClearing",cycles + WRITE_PROTECT_SENSE_WAIT, cycles => {
+            clk.schedule(new ClockEvent("DiskWaitingClearing",cycles + WRITE_PROTECT_SENSE_WAIT, _ => {
               isDiskChanged = false
               isDiskChanging = false
               RW_HEAD.setFloppy(floppy)
@@ -162,15 +164,20 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     override def read(address: Int, chipID: ChipID.ID): Int = (address & 0x0F) match {
       case PB =>
         val wps = if (isDiskChanging) isDiskChanged else RW_HEAD.isWriteProtected
+        /*
         (super.read(address, chipID) & ~(WRITE_PROTECT_SENSE | SYNC_DETECTION_LINE)) |
           (if (RW_HEAD.isSync) 0x00 else SYNC_DETECTION_LINE) |
           (if (wps) 0x00 else WRITE_PROTECT_SENSE)
+         */
+        super.read(address, chipID)
+        val res = ((if (RW_HEAD.isSync) 0x00 else SYNC_DETECTION_LINE) | (if (wps) 0x00 else WRITE_PROTECT_SENSE) & ~regs(DDRB)) | ((regs(PB) & regs(DDRB)) & ~(WRITE_PROTECT_SENSE | SYNC_DETECTION_LINE))
+        addPB7(res)
       case PA|PA2 =>
         super.read(address, chipID)
         floppy.notifyTrackSectorChangeListener
         if ((regs(PCR) & 0x0C) == 0x08) RW_HEAD.canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
         RW_HEAD.getLastRead
-      case ofs => super.read(address, chipID)
+      case _ => super.read(address, chipID)
     }
   
     override def write(address: Int, value: Int, chipID: ChipID.ID) : Unit = {
@@ -204,6 +211,8 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
           // check the head step indication
           val oldStepHead = regs(PB) & 0x03
           val stepHead = value & 0x03
+
+          bus.freeSpinStepperOn = (value & 1) == 1
           
           if (motorOn && oldStepHead == ((stepHead + 1) & 0x03)) RW_HEAD.moveHead(moveOut = true)
           else 

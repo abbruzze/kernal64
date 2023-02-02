@@ -117,6 +117,8 @@ abstract class VIA(val name:String,
 
   @inline private def srMode(): Int = (regs(ACR) >> 2) & 7
 
+  protected def addPB7(value:Int):Int = if (is_set(ACR,0x80)) (value & 0x7F) | PB7 else value
+
   /*
    * Ignores DDRA & DDRB. Subclasses are in charge for this check
    */
@@ -217,6 +219,9 @@ abstract class VIA(val name:String,
       acrNew = true
       regs(ACR) = value
       oneshotBNew = !is_set(ACR,0x20)
+      //if (!is_set(ACR,0x80)) PB7 = 0x00
+      PB7 = if (is_set(ACR,0x80)) 0x80 else 0x00
+
       checkSR()
     case PCR =>
       regs(PCR) = value

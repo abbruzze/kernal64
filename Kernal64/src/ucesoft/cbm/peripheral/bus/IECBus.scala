@@ -39,6 +39,9 @@ class IECBus extends CBMComponent {
   private[this] var SRQ : Long = VOLTAGE
   private[this] var listeners : List[IECBusListener] = Nil
   private[this] var listenersBitMap = 0L
+
+  /* hack to enable driver's sound for freespin demo */
+  var freeSpinStepperOn = false
   
   override def getProperties: Properties = {
     properties.setProperty("ATN",normalize(ATN).toString)
@@ -81,15 +84,15 @@ class IECBus extends CBMComponent {
   
   final def setLine(l:IECBusListener,line:IECBusLine.Line,value:Int) : Unit = {
     line match {
-      case IECBusLine.ATN => 
+      case IECBusLine.ATN =>
         val preATN = ATN
         if (value == GROUND) ATN |= 1 << l.bitmap else ATN &= ~(1 << l.bitmap)
         if (preATN != ATN) notifyATNChange(preATN,ATN)
-      case IECBusLine.CLK => 
+      case IECBusLine.CLK =>
         if (value == GROUND) CLK |= 1 << l.bitmap else CLK &= ~(1 << l.bitmap)
-      case IECBusLine.DATA => 
+      case IECBusLine.DATA =>
         if (value == GROUND) DATA |= 1 << l.bitmap else DATA &= ~(1 << l.bitmap)
-      case IECBusLine.SRQ => 
+      case IECBusLine.SRQ =>
         if (value == GROUND) SRQ |= 1 << l.bitmap else SRQ &= ~(1 << l.bitmap)
     }
   }
