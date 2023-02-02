@@ -114,7 +114,7 @@ abstract class CBMComputer extends CBMComponent {
     }).toArray
   }
   // -------------- AUDIO ----------------------
-  protected val volumeDialog: JDialog
+  protected val volumeDialog: VolumeSettingsPanel.VolumeDialog
   // -------------------- PRINTER --------------
   protected var printerEnabled = false
   protected val printerGraphicsDriver = new MPS803GFXDriver(new MPS803ROM)

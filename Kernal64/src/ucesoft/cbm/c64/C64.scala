@@ -11,7 +11,8 @@ import ucesoft.cbm.peripheral.bus.BusSnoop
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
-import ucesoft.cbm.peripheral.vic.VICType
+import ucesoft.cbm.peripheral.vic.renderer.DriveRenderer
+import ucesoft.cbm.peripheral.vic.{VICType, VIC_II}
 import ucesoft.cbm.trace.Tracer
 import ucesoft.cbm.trace.Tracer.TracedDisplay
 
@@ -372,6 +373,17 @@ class C64 extends CBMHomeComputer {
     IOItem.addSeparator()
 
     setCPMSettings(IOItem)
+
+    IOItem.addSeparator()
+
+    val ren = new JCheckBoxMenuItem("FreeSpin cable enabled")
+    IOItem.add(ren)
+    ren.addActionListener(_ => {
+      clock.pause()
+      val rend = if (ren.isSelected) new DriveRenderer(bus, display, volumeDialog) else null
+      vicChip.asInstanceOf[VIC_II].setExternalRenderer(rend)
+      clock.play()
+    })
 
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)

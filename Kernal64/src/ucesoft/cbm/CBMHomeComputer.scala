@@ -78,7 +78,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     ProcessRS232)
   override protected val printer : Printer = new MPS803(bus,printerGraphicsDriver)
   // -------------- AUDIO ----------------------
-  override protected lazy val volumeDialog : JDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
+  override protected lazy val volumeDialog : VolumeSettingsPanel.VolumeDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
   // ------------ Control Port -----------------------
   protected lazy val gameControlPort = new controlport.GamePadControlPort(configuration)
   protected val keypadControlPort: ControlPort with MouseListener with KeyListener = controlport.ControlPort.keypadControlPort

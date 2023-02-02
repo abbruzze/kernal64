@@ -186,6 +186,11 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   def setClipArea(x1: Int, y1: Int, x2: Int, y2: Int) : Unit = {
     clipArea = (new Point(x1, y1), new Point(x2, y2))
   }
+  def removeClipArea(): Option[(Point,Point)] = {
+    val clip = clipArea
+    clipArea = null
+    Option(clip)
+  }
 
   final override def update(g: Graphics) : Unit = {
     paint(g)
@@ -258,6 +263,10 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
       if (remote != null) remote.updateVideo(x1,y1,x2,y2)
     }
     else if (drawRasterLine || mouseZoomEnabled) repaint()
+    else {
+      displayImage.newPixels()
+      repaint()
+    }
 
     if (waitFrameAndSaveSnapshotFile != null) {
       if (waitFrameAndSaveSnapshotCounter < 2) waitFrameAndSaveSnapshotCounter += 1

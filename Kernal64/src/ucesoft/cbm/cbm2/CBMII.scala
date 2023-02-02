@@ -44,7 +44,7 @@ class CBMII extends CBMComputer {
 
   override protected val mmu = new CBM2MMU
   protected val sid : SID = new SID()
-  override protected lazy val volumeDialog: JDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
+  override protected lazy val volumeDialog: VolumeSettingsPanel.VolumeDialog = VolumeSettingsPanel.getDialog(displayFrame,sid.getDriver)
   protected val bus = new IEEE488Bus
   override protected val printer: Printer = new IEEE488MPS803("MPS803",4,bus,printerGraphicsDriver)
 

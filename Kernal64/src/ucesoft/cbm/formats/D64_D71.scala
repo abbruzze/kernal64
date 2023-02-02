@@ -218,7 +218,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   // --------------------- Floppy -------------------------  
   val totalTracks: Int = TOTAL_TRACKS
   override lazy val singleSide: Boolean = bamInfo.singleSide
-  
+
   private[this] var track = 1
   private[this] var sector = 0
   private[this] var gcrSector = gcrImageOf(track, sector)
@@ -308,23 +308,21 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   def notifyTrackSectorChangeListener: Unit = if (trackChangeListener != null) trackChangeListener(track,false,Some(sector))
   def currentTrack: Int = track
   def currentSector: Option[Int] = Some(sector)
+
   /**
    * tracksteps & 1 == 0 are valid tracks, the others are half tracks not used
    * in the D64 format.
    */
   def changeTrack(trackSteps:Int) : Unit = {
-    val isOnTrack = (trackSteps & 1) == 0    
-    if (isOnTrack) {
-      val newTrack = trackSteps >> 1
-      if (track != newTrack) {
-        track = trackSteps >> 1
-        sectorsPerCurrentTrack = TRACK_ALLOCATION(track)
-        sector = 0   
-        bit = 1
-        gcrSector = gcrImageOf(track, sector)
-        gcrIndex = gcrIndex % gcrSector.length
-        notifyTrackSectorChangeListener
-      }
+    val newTrack = trackSteps >> 1
+    if (track != newTrack) {
+      track = newTrack
+      sectorsPerCurrentTrack = TRACK_ALLOCATION(track)
+      sector = 0
+      bit = 1
+      gcrSector = gcrImageOf(track, sector)
+      gcrIndex = gcrIndex % gcrSector.length
+      notifyTrackSectorChangeListener
     }
   }
   

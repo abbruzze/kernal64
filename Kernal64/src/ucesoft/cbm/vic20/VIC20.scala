@@ -49,7 +49,7 @@ class VIC20 extends CBMHomeComputer {
   protected var via1 : VIC20Via1 = _
   protected var via2 : VIC20Via2 = _
   protected val audioDriver = new DefaultAudioDriver(44100,26)
-  override protected lazy val volumeDialog : JDialog = VolumeSettingsPanel.getDialog(displayFrame,audioDriver)
+  override protected lazy val volumeDialog : VolumeSettingsPanel.VolumeDialog = VolumeSettingsPanel.getDialog(displayFrame,audioDriver)
 
   override protected lazy val keyb = new keyboard.HomeKeyboard(keybMapper,low => via1.restoreKeyPressed(low),false)
 

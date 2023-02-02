@@ -101,6 +101,8 @@ final class VIC_II(mem: VIC_II_Memory,
   private[this] var _2MhzMode = false
   // ------------------------ COPROCESSOR -----------------------------------------------------------------
   private[this] var coprocessor : VICCoprocessor = null
+  // ------------------------ EXT. RENDERER ---------------------------------------------------------------
+  private[this] var externalRenderer : ExternalRenderer = _
   // ------------------------ PUBLIC REGISTERS ------------------------------------------------------------
   /*
    * $D000 - $D00F
@@ -894,6 +896,11 @@ final class VIC_II(mem: VIC_II_Memory,
     pendingDrawBorderModeChange = true
   }
 
+  def setExternalRenderer(externalRenderer: ExternalRenderer): Unit = {
+    if (this.externalRenderer != null && externalRenderer == null) this.externalRenderer.stop()
+    this.externalRenderer = externalRenderer
+  }
+
   override def setCoprocessor(cop:VICCoprocessor) : Unit = {
     if (cop != null) {
       if (coprocessor != null) {
@@ -1138,12 +1145,14 @@ final class VIC_II(mem: VIC_II_Memory,
   }
 
   final def clock() : Unit = {
+    /* to be investigated more */
     if (c128TestBitEnabled) {
       rasterCycle = 0
       updateRasterLine
       gfxShifter.reset
       return
     }
+
     refreshCycle = false
 
     // End of PHI2 phase
@@ -1281,6 +1290,7 @@ final class VIC_II(mem: VIC_II_Memory,
 
     internalDataBus = 0xFF
     if (coprocessor != null && coprocessor.isActive) coprocessor.cycle(rasterLine,rasterCycle)
+    if (externalRenderer != null) externalRenderer.renderCycle()
 
     // PIPELINE
     /*
@@ -1319,7 +1329,7 @@ final class VIC_II(mem: VIC_II_Memory,
     if (displayLine == 0) {
       denOn30 = false
       canUpdateLightPenCoords = true
-      display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY + 1)
+      if (externalRenderer == null) display.showFrame(firstModPixelX, firstModPixelY, lastModPixelX, lastModPixelY + 1)
       firstModPixelX = -1
       ref = 0xFF
       vcbase = 0
@@ -1335,14 +1345,16 @@ final class VIC_II(mem: VIC_II_Memory,
   }
 
   @inline private[this] def drawPixel(index: Int, y: Int, pixel: Int): Unit = {
-    val color = VIC_RGB(pixel & 0x0F)
-    if (displayMem(index) != color) {
-      displayMem(index) = color
-      if (firstModPixelX == -1) {
-        firstModPixelY = y
-        firstModPixelX = model.BLANK_LEFT_CYCLE << 3
+    if (externalRenderer == null) {
+      val color = VIC_RGB(pixel & 0x0F)
+      if (displayMem(index) != color) {
+        displayMem(index) = color
+        if (firstModPixelX == -1) {
+          firstModPixelY = y
+          firstModPixelX = model.BLANK_LEFT_CYCLE << 3
+        }
+        lastModPixelY = y
       }
-      lastModPixelY = y
     }
   }
 

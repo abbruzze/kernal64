@@ -574,7 +574,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   }
   // I/O
   @inline private[this] def mem_read_0xD000_0xDFFF(address:Int) : Int = {
-    ioacc = true
+    //ioacc = true
     // VIC ---------------------------------------------------------------
     if (address < 0xD400) {
       // additional VIC registers D02F & D030
@@ -584,7 +584,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       return vic.read(address)
     }
     // SID ---------------------------------------------------------------
-    if (address < 0xD500) return sid.read(address)
+    if (address < 0xD500) { ioacc = true ; return sid.read(address) }
     // MMU REGS ----------------------------------------------------------
     if (address == MMU_CR1) return cr_reg
     if (address == 0xD505) return MMU_D505_read
@@ -598,9 +598,9 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // Color RAM ---------------------------------------------------------
     if (address < 0xDC00) return COLOR_RAM.read(address) & 0x0F | lastByteRead & 0xF0
     // CIA 1 -------------------------------------------------------------
-    if (address < 0xDD00) return cia_dc00.read(address)
+    if (address < 0xDD00) { ioacc = true ; return cia_dc00.read(address) }
     // CIA 2 -------------------------------------------------------------
-    if (address < 0xDE00) return cia_dd00.read(address)
+    if (address < 0xDE00) { ioacc = true ; return cia_dd00.read(address) }
     // I/O expansion slots 1 & 2 -----------------------------------------
     expansionPort.read(address)
   }
@@ -626,7 +626,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     }
   }
   @inline private[this] def mem_write_0xD000_0xDFFF(address:Int,value:Int) : Unit = {
-    ioacc = true
+    //ioacc = true
     // TestCart
     if (TestCart.enabled) TestCart.write(address,value)
     // VIC ---------------------------------------------------------------
@@ -641,7 +641,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       else vic.write(address,value)
     }
     // SID ---------------------------------------------------------------
-    else if (address < 0xD500) sid.write(address,value)
+    else if (address < 0xD500) { ioacc = true ; sid.write(address,value) }
     // MMU REGS ----------------------------------------------------------
     else if (address == MMU_CR1) MMU_CR_write(value)
     else if (address < 0xD50C) mem_write_D5xx(address,value)
@@ -651,14 +651,13 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // Unused I/O --------------------------------------------------------
     else if (address < 0xD800) {
       if (address == 0xD700 && internalROMType == FunctionROMType.MEGABIT) setInternalROMPage(value)
-      return
     }
     // Color RAM ---------------------------------------------------------
     else if (address < 0xDC00) COLOR_RAM.write(address,value & 0x0F)
      // CIA 1 -------------------------------------------------------------
-    else if (address < 0xDD00) cia_dc00.write(address,value)
+    else if (address < 0xDD00) { ioacc = true ; cia_dc00.write(address,value) }
     // CIA 2 -------------------------------------------------------------
-    else if (address < 0xDE00) cia_dd00.write(address,value)
+    else if (address < 0xDE00) { ioacc = true ; cia_dd00.write(address,value) }
     // I/O expansion slots 1 & 2 -----------------------------------------
     else expansionPort.write(address,value)
   }
