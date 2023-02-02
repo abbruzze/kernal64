@@ -7,7 +7,7 @@
 
 # A Scala Commodore 64, 128, VIC20 and CBM 610/620/710/720 cycle-exact emulator
 
-Kernal64 ver 1.8.0b2
+Kernal64 ver 1.8.1b1 (Feb 2nd, 2023)
 ========
 ▶️<a href="#wn-latest">Go to latest release</a>
 
@@ -167,6 +167,18 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
 ## What's new history
 <p id="wn-latest"></p>
+
+### What's new 1.8.1b1 (Feb 2nd 2023)
+- Added support for Magnum Light Phaser light gun. Duck Hunt can be played now (https://csdb.dk/release/?id=226342)
+- Fixed audio state saving.
+- New initialization memory pattern for all machines.
+- Added video & audio support for freespin demo (http://www.quiss.org/freespin/). How to lunch the demo:
+  1) Run the demo
+  2) When it is asked to open/close the driver's lever, re-insert the same demo disk
+  3) Under Settings -> I/O check "freespin cable enabled"
+  4) When the demo finishes uncheck the "freespin cable enabled"
+  
+![](https://github.com/abbruzze/kernal64/blob/master/images/freespin.gif)<br>
 
 ### What's new 1.8.0b2 (Dic 1st 2022)
 - New emulators: **VIC20** and **CBM-II (610/620/710/720)**
