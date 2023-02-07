@@ -1,8 +1,9 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import ucesoft.cbm.CBMComponentType
+import ucesoft.cbm.{CBMComponentType, CBMComputerModel}
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.cbm2.CBM2MMU
+import ucesoft.cbm.peripheral.keyboard.CKey.CBM2_SHIFT
 
 import java.awt.event.KeyEvent
 import java.io.{ObjectInputStream, ObjectOutputStream}
@@ -39,26 +40,10 @@ object BKeyboard {
   }
 }
 
-class BKeyboard(private var km:KeyboardMapper) extends Keyboard {
+class BKeyboard(_km:KeyboardMapper,override protected val model:CBMComputerModel) extends Keyboard(_km,model) {
   val componentID = "Keyboard"
   val componentType: Type = CBMComponentType.INPUT_DEVICE
-
-  private val keysPressed = collection.mutable.Set.empty[CKey.Key]
-  private var keyMap = km.map
-  private var keyPadMap = km.keypad_map
   private var colAddress = 0
-
-  override def init : Unit = {}
-  override def reset : Unit = {
-    keysPressed.clear()
-  }
-
-  override def setKeyboardMapper(km:KeyboardMapper): Unit = {
-    keyMap = km.map
-    keyPadMap = km.keypad_map
-    this.km = km
-  }
-  override def getKeyboardMapper : KeyboardMapper = km
 
   final def selectLowColAddress(address:Int): Unit = colAddress = (~address & 0xFF) | (colAddress & 0xFF00)
   final def selectHighColAddress(address:Int): Unit = colAddress = ((~address & 0xFF) << 8) | (colAddress & 0xFF)
@@ -77,28 +62,21 @@ class BKeyboard(private var km:KeyboardMapper) extends Keyboard {
   }
 
   override final def keyPressed(e: KeyEvent): Unit = {
-    if (!e.isAltDown) {
-      val keyMap = if (e.getKeyLocation == KeyEvent.KEY_LOCATION_NUMPAD) this.keyPadMap else this.keyMap
-      keyMap get e.getExtendedKeyCode match {
-        case Some(key) =>
-          keysPressed += key
-        case None =>
-      }
+    findPressedKey(e) match {
+      case Some(keys) =>
+        for(key <- keys) keysPressed += key
+      case None =>
     }
   }
 
   override final def keyReleased(e: KeyEvent): Unit = {
-    if (!e.isAltDown) {
-      val keyMap = if (e.getKeyLocation == KeyEvent.KEY_LOCATION_NUMPAD) this.keyPadMap else this.keyMap
-      keyMap get e.getExtendedKeyCode match {
-        case Some(key) =>
-          keysPressed -= key
+    findPressedKey(e) match {
+        case Some(keys) =>
+          for(key <- keys) keysPressed -= key
         case None =>
       }
-    }
+    if (e.getKeyCode == KeyEvent.VK_SHIFT) clearAllPressedShifts()
   }
-
-  override final def keyTyped(e: KeyEvent) : Unit = {}
 
   override protected def saveState(out:ObjectOutputStream) : Unit = {}
   override protected def loadState(in:ObjectInputStream) : Unit = {}

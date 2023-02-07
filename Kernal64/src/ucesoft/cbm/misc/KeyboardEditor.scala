@@ -1,22 +1,22 @@
 package ucesoft.cbm.misc
 
 import ucesoft.cbm.peripheral.keyboard.CKey.Key
-import ucesoft.cbm.peripheral.keyboard.{CKey, Keyboard, KeyboardMapper, KeyboardMapperStore}
+import ucesoft.cbm.peripheral.keyboard.{CKey, HostKey, Keyboard, KeyboardMapper, KeyboardMapperStore}
 import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, CBMIIModel, VIC20Model}
 
-import java.awt._
+import java.awt.{List => AWTList, _}
 import java.awt.event.{ActionEvent, ActionListener, KeyEvent, KeyListener}
 import javax.swing._
 
 class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerModel) extends JPanel with ActionListener with KeyListener {
   private val map = {
     val m = new collection.mutable.HashMap[CKey.Key,Int]
-    for(kv <- keybm.map) m += ((kv._2,kv._1))
+    for(kv <- keybm.map) m += ((kv._2.head,kv._1.code))
     m
   }
   private val keypad_map = {
     val m = new collection.mutable.HashMap[CKey.Key,Int]
-    for(kv <- keybm.keypad_map) m += ((kv._2,kv._1))
+    for(kv <- keybm.keypad_map) m += ((kv._2.head,kv._1.code))
     m
   }
   
@@ -139,7 +139,7 @@ class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerM
       if (e.getKeyCode != KeyEvent.VK_UNDEFINED) map(keys(waitingIndex)) = e.getKeyCode
       else map(keys(waitingIndex)) = e.getExtendedKeyCode
 
-      keyboard.setKeyboardMapper(makeKeyboardMapper)
+      keyboard.setKeyboardMapper(makeKeyboardMapper(None))
     }
     
     for(b <- buttons) b.setEnabled(true)
@@ -149,20 +149,22 @@ class KeyboardEditor(keyboard:Keyboard, keybm:KeyboardMapper, model:CBMComputerM
   def keyReleased(e:KeyEvent) : Unit = {}
   def keyTyped(e:KeyEvent) : Unit = {}
   
-  private def makeKeyboardMapper : KeyboardMapper = new KeyboardMapper {
-    val map: Map[Int, Key] = KeyboardEditor.this.map map { kv => (kv._2,kv._1) } toMap
-    val keypad_map: Map[Int, Key] = KeyboardEditor.this.keypad_map map { kv => (kv._2,kv._1) } toMap
+  private def makeKeyboardMapper(file:Option[String]) : KeyboardMapper = new KeyboardMapper {
+    override val configuration = file
+    override val locale = None
+    val map: Map[HostKey, List[Key]] = KeyboardEditor.this.map map { kv => (HostKey(kv._2,false,false),List(kv._1)) } toMap
+    val keypad_map: Map[HostKey, List[Key]] = KeyboardEditor.this.keypad_map map { kv => (HostKey(kv._2,false,false),List(kv._1)) } toMap
   }
   
   private def save()  : Unit = {
     val fc = new JFileChooser
     fc.setDialogTitle("Choose where to save this keyboard configuration")
-    val fn: Unit = fc.showSaveDialog(this) match {
+    fc.showSaveDialog(this) match {
       case JFileChooser.APPROVE_OPTION =>
-        val kbm = makeKeyboardMapper
+        val kbm = makeKeyboardMapper(Some(fc.getSelectedFile.toString))
         import java.io._
         val pw = new PrintWriter(new FileOutputStream(fc.getSelectedFile))
-        KeyboardMapperStore.store(kbm,pw)
+        KeyboardMapperStore.store(kbm,pw,model)
         pw.close()
       case _ =>
     }

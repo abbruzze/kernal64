@@ -50,6 +50,8 @@ abstract class CBMComputer extends CBMComponent {
   protected val CONFIGURATION_FRAME_DIM = "frame.dim"
   protected val CONFIGURATION_KEYB_MAP_FILE = "keyb.map.file"
 
+  protected val DEFAULT_KEYBOARD_RESOURCE_NAME : String
+
   protected def PRG_LOAD_ADDRESS() = 0x801
   protected def PRG_RUN_DELAY_CYCLES = 2200000
   protected var lastLoadedPrg : Option[File] = None
@@ -65,7 +67,7 @@ abstract class CBMComputer extends CBMComponent {
   protected val cartMenu = new JMenu("Cartridge")
   protected var cartButtonRequested = false
 
-  protected val keybMapper : keyboard.KeyboardMapper
+  protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),DEFAULT_KEYBOARD_RESOURCE_NAME,cbmModel)
   protected val keyb : Keyboard
 
   protected var display : Display = _
@@ -77,6 +79,7 @@ abstract class CBMComputer extends CBMComponent {
       override def windowClosing(e:WindowEvent) : Unit = turnOff
     })
     f.setIconImage(new ImageIcon(getClass.getResource("/resources/commodore.png")).getImage)
+    f.setFocusTraversalKeysEnabled(false) // to enable TAB key
     f
   }
 
@@ -437,19 +440,14 @@ abstract class CBMComputer extends CBMComponent {
         fc.setDialogTitle("Choose a keyboard layout")
         fc.showOpenDialog(displayFrame) match {
           case JFileChooser.APPROVE_OPTION =>
-            val in = new BufferedReader(new InputStreamReader(new FileInputStream(fc.getSelectedFile)))
             try {
-              keyboard.KeyboardMapperStore.load(in,cbmModel)
+              keyboard.KeyboardMapperStore.loadMapper(Some(fc.getSelectedFile.toString),DEFAULT_KEYBOARD_RESOURCE_NAME,cbmModel)
               configuration.setProperty(CONFIGURATION_KEYB_MAP_FILE,fc.getSelectedFile.toString)
               JOptionPane.showMessageDialog(displayFrame,"Reboot the emulator to activate the new keyboard", "Keyboard..",JOptionPane.INFORMATION_MESSAGE)
             }
             catch {
               case _:IllegalArgumentException =>
-
                 showError("Keyboard..","Invalid keyboard layout file")
-            }
-            finally {
-              in.close()
             }
           case _ =>
         }

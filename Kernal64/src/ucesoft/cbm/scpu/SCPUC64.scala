@@ -33,8 +33,7 @@ class SCPUC64 extends CBMHomeComputer {
   protected val APPLICATION_NAME = "SCPU Kernal64"
   protected val CONFIGURATION_FILENAME = "SCPUC64.config"
   //override protected val PRG_RUN_DELAY_CYCLES = 220000
-
-  protected val keybMapper: keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)), "/resources/default_keyboard_c64",C64Model)
+  protected val DEFAULT_KEYBOARD_RESOURCE_NAME = "/resources/default_keyboard_c64"
 
   override protected val mmu = new SCPUC64MMU.SCPU_MMU(cpuFastMode _, simmUsage _)
   override protected lazy val cpu = new CPU65816(mmu)

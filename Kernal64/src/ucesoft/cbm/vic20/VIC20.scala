@@ -40,9 +40,7 @@ class VIC20 extends CBMHomeComputer {
 
   protected val APPLICATION_NAME = "Kernal64 - VIC20"
   protected val CONFIGURATION_FILENAME = "VIC20.config"
-
-  // TODO change
-  protected val keybMapper: keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)), "/resources/default_keyboard_vic20", VIC20Model)
+  protected val DEFAULT_KEYBOARD_RESOURCE_NAME = "/resources/default_keyboard_vic20"
 
   protected val mmu = new VIC20MMU
 
@@ -51,7 +49,7 @@ class VIC20 extends CBMHomeComputer {
   protected val audioDriver = new DefaultAudioDriver(44100,26)
   override protected lazy val volumeDialog : VolumeSettingsPanel.VolumeDialog = VolumeSettingsPanel.getDialog(displayFrame,audioDriver)
 
-  override protected lazy val keyb = new keyboard.HomeKeyboard(keybMapper,low => via1.restoreKeyPressed(low),false)
+  override protected lazy val keyb = new keyboard.HomeKeyboard(keybMapper,low => via1.restoreKeyPressed(low),cbmModel)
 
   protected val memoryConfigLabel = new JLabel()
   protected val interlaceModeLabel = new JLabel()

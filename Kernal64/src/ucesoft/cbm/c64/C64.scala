@@ -32,8 +32,7 @@ class C64 extends CBMHomeComputer {
 
   protected val APPLICATION_NAME = "Kernal64"
   protected val CONFIGURATION_FILENAME = "C64.config"
-
-  protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_c64",C64Model)
+  protected val DEFAULT_KEYBOARD_RESOURCE_NAME = "/resources/default_keyboard_c64"
 
   protected val mmu = new C64MMU.MAIN_MEMORY
   protected val busSnooper = new BusSnoop(bus)
@@ -236,6 +235,9 @@ class C64 extends CBMHomeComputer {
     val loadKeybItem = new JMenuItem("Set keyboard layout ...")
     loadKeybItem.addActionListener(_ => loadKeyboard )
     keybMenu.add(loadKeybItem)
+    val keyTest = new JMenuItem("Keyboard layout test ...")
+    keyTest.addActionListener(_ => KeyboardHelper.getDialog(displayFrame).setVisible(true) )
+    keybMenu.add(keyTest)
     
     optionMenu.addSeparator()
 

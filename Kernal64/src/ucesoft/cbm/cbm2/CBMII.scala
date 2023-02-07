@@ -39,8 +39,9 @@ class CBMII extends CBMComputer {
   override protected val cbmModel: CBMComputerModel = CBMIIModel
   override protected val APPLICATION_NAME: String = "CBMII"
   override protected val CONFIGURATION_FILENAME: String = "CBMII.config"
-  protected val keybMapper : KeyboardMapper = KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),"/resources/default_keyboard_cbm2",CBMIIModel)
-  override protected val keyb = new BKeyboard(keybMapper)
+  protected val DEFAULT_KEYBOARD_RESOURCE_NAME = "/resources/default_keyboard_cbm2"
+
+  override protected val keyb = new BKeyboard(keybMapper,cbmModel)
 
   override protected val mmu = new CBM2MMU
   protected val sid : SID = new SID()

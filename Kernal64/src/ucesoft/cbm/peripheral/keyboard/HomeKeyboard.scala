@@ -1,6 +1,6 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import ucesoft.cbm.CBMComponentType
+import ucesoft.cbm.{C128Model, CBMComponentType, CBMComputerModel, VIC20Model}
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.keyboard.CKey._
@@ -52,56 +52,44 @@ object HomeKeyboard {
   }
 }
 
-class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) => Unit = x => {}, c128 : Boolean = false) extends Keyboard {
+class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ => {},override protected val model:CBMComputerModel) extends Keyboard(_keyMapper,model) {
   val componentID = "Keyboard"
   val componentType: Type = CBMComponentType.INPUT_DEVICE
 
-  private[this] val keysPressed = collection.mutable.Set.empty[CKey.Key]
-  private[this] var keyMap = keyMapper.map
-  private[this] var keyPadMap = keyMapper.keypad_map
   private[this] val rowSelector,c128ExtendedRowSelector = Array.fill(8)(false)
   private[this] val colSelector = Array.fill(8)(false)
-  private[this] var enabled,keypadEnabled = true
   // 128 CAPS-LOCK & 40/80 keys handling
   private[this] var c128_CapsLockPressed = false
   private[this] var c128_40_80_Pressed = false
-  private[this] var _40_80_KEY : Int = keyMapper.map.map(kv => (kv._2,kv._1)).getOrElse(_40_80,KeyEvent.VK_F9)
-  private[this] var CAPS_LOCK_KEY : Int = keyMapper.map.map(kv => (kv._2,kv._1)).getOrElse(CAPS_LOCK,KeyEvent.VK_CAPS_LOCK)
+  private[this] var _40_80_KEY : Int = findCKey(_40_80,KeyEvent.VK_F9)
+  private[this] var CAPS_LOCK_KEY : Int = findCKey(CAPS_LOCK,KeyEvent.VK_CAPS_LOCK)
+  private final val c128 = model == C128Model
+  private final val vic20 = model == VIC20Model
+
+  private var hideShift = false
 
   override def setKeyboardMapper(km:KeyboardMapper): Unit = {
-    keyMapper = km
-    keyMap = keyMapper.map
-    keyPadMap = keyMapper.keypad_map
-    _40_80_KEY = keyMapper.map.map(kv => (kv._2,kv._1)).getOrElse(_40_80,KeyEvent.VK_F9)
-    CAPS_LOCK_KEY = keyMapper.map.map(kv => (kv._2,kv._1)).getOrElse(CAPS_LOCK,KeyEvent.VK_CAPS_LOCK)
+    super.setKeyboardMapper(km)
+    _40_80_KEY = findCKey(_40_80,KeyEvent.VK_F9)
+    CAPS_LOCK_KEY = findCKey(CAPS_LOCK,KeyEvent.VK_CAPS_LOCK)
   }
-
-  override def getKeyboardMapper : KeyboardMapper = keyMapper
 
   def isCapsLockPressed: Boolean = c128_CapsLockPressed
   def is4080Pressed: Boolean = c128_40_80_Pressed
   def set4080Pressed(pressed:Boolean): Unit = c128_40_80_Pressed = pressed
 
-  def init : Unit = {}
-  def reset : Unit = {
-    keysPressed.clear
+  override def reset() : Unit = {
+    super.reset()
     for(i <- 0 until rowSelector.length) rowSelector(i) = false
     for(i <- 0 until rowSelector.length) c128ExtendedRowSelector(i) = false
     for(i <- 0 until rowSelector.length) colSelector(i) = false
     HomeKeyboard.keybThreadRunning = false
+    hideShift = false
   }
     
   override def getProperties: Properties = {
-    properties.setProperty("Number of key pressed",keysPressed.size.toString)
+    properties.setProperty("Number of key pressed", keysPressed.size.toString)
     properties
-  }
-
-  final def setEnabled(enabled: Boolean) : Unit ={
-    this.enabled = enabled
-  }
-  
-  final def enableKeypad(enabled:Boolean) : Unit = {
-    keypadEnabled = enabled
   }
 
   final def keyPressed(e: KeyEvent) : Unit = synchronized {
@@ -113,54 +101,35 @@ class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) =
       c128_40_80_Pressed = !c128_40_80_Pressed
       return
     }
-    if (e.getKeyLocation == KeyEvent.KEY_LOCATION_NUMPAD) {
-      if (keypadEnabled)
-      keyPadMap get e.getKeyCode match {
-        case Some(key) =>
-          keysPressed += key
-        case None =>
-      }
-    }
-    else {
-      if (!e.isAltDown) {
-        val key = if (e.getKeyCode != KeyEvent.VK_UNDEFINED) e.getKeyCode else e.getExtendedKeyCode
-        keyMap get key match {
-          case None =>
-          case Some(key) =>
-            //Log.debug("Pressed: " + KeyEvent.getKeyText(e.getKeyCode) + " loc:" + e.getKeyLocation)
-            if (key == RESTORE || key == VIC20_RESTORE) {
-              nmiAction(true)
-              nmiAction(false) // clears immediately NMI
-            }
-            else
-            if (key == L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed += R_SHIFT
-            else if (key == VIC20_L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed += VIC20_R_SHIFT
-            else keysPressed += key
-        }      
-      }
+    findPressedKey(e) match {
+      case Some(keys) =>
+        println(s"MATCH: $keys set=$keysPressed shift=${e.isShiftDown}")
+        var shiftReq = false
+        for (key <- keys) {
+          if (key == RESTORE || key == VIC20_RESTORE) {
+            nmiAction(true)
+            nmiAction(false) // clears immediately NMI
+          }
+          else {
+            shiftReq |= CKey.isShift(key)
+            keysPressed += remapShift(key,e)
+          }
+        }
+        hideShift = e.isShiftDown && !shiftReq
+      case None =>
+        println(s"Unmatched: $e alt=${e.isAltDown} altg=${e.isAltGraphDown}")
     }
   }
   final def keyReleased(e: KeyEvent): Unit = synchronized {
-    if (e.getKeyLocation == KeyEvent.KEY_LOCATION_NUMPAD) {
-      if (keypadEnabled)
-      keyPadMap get e.getKeyCode match {
-        case Some(key) =>
-          keysPressed -= key
-        case None =>
-      }
+    findReleasedKey(e) match {
+      case Some(keys) =>
+        for (key <- keys) keysPressed -= key
+      case None =>
+        //if (e.getKeyCode == KeyEvent.VK_SHIFT) keysPressed -= getModelShift(e)
+      keysPressed.clear()
     }
-    else {
-      val key = if (e.getKeyCode != KeyEvent.VK_UNDEFINED) e.getKeyCode else e.getExtendedKeyCode
-      keyMap get key match {
-        case None =>
-        case Some(key) =>
-          if (key == L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed -= R_SHIFT
-          else if (key == VIC20_L_SHIFT && e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT) keysPressed -= VIC20_R_SHIFT
-          else if (key != RESTORE && key != VIC20_RESTORE) keysPressed -= key// else nmiAction(false)
-      }
-    }
+    if (e.getKeyCode == KeyEvent.VK_SHIFT) clearAllPressedShifts()
   }
-  final def keyTyped(e: KeyEvent) : Unit = {}
 
   private final def select(value: Int,selector:Array[Boolean]) : Unit = {
     var mask = 1
@@ -186,10 +155,13 @@ class HomeKeyboard(private var keyMapper: KeyboardMapper, nmiAction: (Boolean) =
       val keys = keysPressed.iterator
       while (keys.hasNext) {
         val k = keys.next
-        val (r, c) = CKey.getRowCol(k)
-        val row = if (isRowSel) r else c
-        val col = if (!isRowSel) r else c
-        if (CKey.is128Key(k) == isExtendedSelector && selector(row)) res |= 1 << col 
+        val skip = hideShift && (k == R_SHIFT || k == L_SHIFT || k == VIC20_L_SHIFT || k == VIC20_R_SHIFT)
+        if (!skip) {
+          val (r, c) = CKey.getRowCol(k)
+          val row = if (isRowSel) r else c
+          val col = if (!isRowSel) r else c
+          if (CKey.is128Key(k) == isExtendedSelector && selector(row)) res |= 1 << col
+        }
       }
       0xFF - res
     } 

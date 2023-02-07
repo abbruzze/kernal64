@@ -1,5 +1,7 @@
 package ucesoft.cbm.peripheral.keyboard
 
+import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, CBMIIModel, VIC20Model}
+
 object CKey extends Enumeration {
 	  type Key = Value
 		/* ============================ C64 =============================
@@ -346,6 +348,28 @@ object CKey extends Enumeration {
 		def isCBM2Key(k:Key): Boolean = (k.id & 0x200) > 0
 		def isVIC20Key(k:Key): Boolean = (k.id & 0x400) > 0
 		def isC64Key(k:Key): Boolean = k.id < 0x100
+		def isShift(key:Key): Boolean = key == R_SHIFT || key == L_SHIFT || key == VIC20_L_SHIFT || key == VIC20_R_SHIFT || key == CBM2_SHIFT
+
+		def getKey(key:String,model:CBMComputerModel) : CKey.Value = {
+			val name = model match {
+				case C64Model|C128Model =>
+					key
+				case VIC20Model =>
+					if (!key.startsWith("VIC20_")) s"VIC20_$key" else key
+				case CBMIIModel =>
+					if (!key.startsWith("CBM2_")) s"CBM2_$key" else key
+			}
+			CKey.withName(name)
+		}
+
+		def getKeyWithoutPrefix(key:CKey.Value,model:CBMComputerModel): String = {
+			val k = key.toString
+			model match {
+				case C64Model|C128Model => k
+				case VIC20Model => k.substring("VIC20_".length)
+				case CBMIIModel => k.substring("CBM2_".length)
+			}
+		}
 	  
 	  def getRowCol(k:Key): (Int,Int) = {
 	    val id = k.id

@@ -52,7 +52,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected val nmiSwitcher = new Switcher("NMI",cpu.nmiRequest _)//new NMISwitcher(cpu.nmiRequest _)
   protected val irqSwitcher = new Switcher("IRQ",cpu.irqRequest _)//new IRQSwitcher(cpu.irqRequest _)
   protected val dmaSwitcher = new Switcher("DMA",setDMA _)
-  override protected lazy val keyb = new keyboard.HomeKeyboard(keybMapper,nmiSwitcher.setLine(Switcher.KB,_),!isC64Mode)	// key listener
+  override protected lazy val keyb = new keyboard.HomeKeyboard(keybMapper,nmiSwitcher.setLine(Switcher.KB,_),cbmModel)	// key listener
 
   protected val bus = new IECBus
   protected val ieee488Bus = new IEEE488Bus
