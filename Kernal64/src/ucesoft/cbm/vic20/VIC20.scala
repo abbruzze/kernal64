@@ -724,15 +724,9 @@ class VIC20 extends CBMHomeComputer {
 
     setDriveMenu(optionMenu)
 
-    val keybMenu = new JMenu("Keyboard")
-    optionMenu.add(keybMenu)
-
-    val keybEditorItem = new JMenuItem("Keyboard editor ...")
-    keybEditorItem.addActionListener(_ => showKeyboardEditor(true))
-    keybMenu.add(keybEditorItem)
-    val loadKeybItem = new JMenuItem("Set keyboard layout ...")
-    loadKeybItem.addActionListener(_ => loadKeyboard)
-    keybMenu.add(loadKeybItem)
+    val keybEditorItem = new JMenuItem("Keyboard settings ...")
+    keybEditorItem.addActionListener(_ => showKeyboardEditor())
+    optionMenu.add(keybEditorItem)
 
     optionMenu.addSeparator()
 

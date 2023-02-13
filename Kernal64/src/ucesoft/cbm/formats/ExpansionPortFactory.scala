@@ -65,8 +65,8 @@ object ExpansionPortFactory {
 
     private var _romlBankIndex = 0
     private var _romhBankIndex = 0
-    private var romLBank : Memory = null
-    private var romHBank : Memory = null
+    protected var romLBank : Memory = null
+    protected var romHBank : Memory = null
     protected var game: Boolean = crt.GAME
     protected var exrom: Boolean = crt.EXROM
 
@@ -114,7 +114,12 @@ object ExpansionPortFactory {
   }
 
   // ====================================================================================================
-  def loadExpansionPort(crtName: String, irqAction: (Boolean) => Unit, nmiAction: (Boolean) => Unit, ram: Memory,forwardRam:Memory,config:Properties): ExpansionPort = {
+  def loadExpansionPort(crtName: String,
+                        irqAction: Boolean => Unit,
+                        nmiAction: Boolean => Unit,
+                        ram: Memory,forwardRam:Memory,
+                        reset: () => Unit,
+                        config:Properties): ExpansionPort = {
     import cart._
     val crt = new Cartridge(crtName)
     if (crt.cbmType != Cartridge.CBMType.C64) throw new IllegalArgumentException(s"Unsupported cartridge signature '${crt.cbmType}'")
@@ -141,6 +146,7 @@ object ExpansionPortFactory {
       case 18 => new Zaxxon(crt,ram)
       case 51 => new Mach5(crt,ram)
       case 53 => new PageFox(crt,ram)
+      case 48 => new SuperExplode(crt,ram,reset)
       case _ =>
         throw new IllegalArgumentException(s"Unsupported cartridge type ${crt.ctrType} for ${crt.name}")
     }

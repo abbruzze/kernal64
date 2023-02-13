@@ -3,8 +3,6 @@ package ucesoft.cbm.peripheral.keyboard
 import ucesoft.cbm.{CBMComponentType, CBMComputerModel}
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.cbm2.CBM2MMU
-import ucesoft.cbm.peripheral.keyboard.CKey.CBM2_SHIFT
-
 import java.awt.event.KeyEvent
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
@@ -53,8 +51,11 @@ class BKeyboard(_km:KeyboardMapper,override protected val model:CBMComputerModel
       val keys = keysPressed.iterator
       while (keys.hasNext) {
         val k = keys.next
-        val (r, c) = CKey.getRowCol(k)
-        if ((colAddress & (1 << c)) > 0) byte &= ~(1 << r)
+        val skip = hideShift && CKey.isShift(k)
+        if (!skip) {
+          val (r, c) = CKey.getRowCol(k)
+          if ((colAddress & (1 << c)) > 0) byte &= ~(1 << r)
+        }
       }
     }
 

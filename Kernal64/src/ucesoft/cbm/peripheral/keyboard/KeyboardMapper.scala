@@ -9,6 +9,7 @@ import java.io._
 trait KeyboardMapper {
   val configuration : Option[String]
   val locale : Option[String]
+  val content: String
 	val map : Map[HostKey,List[CKey.Key]]
 	val keypad_map : Map[HostKey,List[CKey.Key]]
 }
@@ -68,7 +69,11 @@ object KeyboardMapperStore {
     var line = in.readLine
     var map : collection.mutable.HashMap[HostKey,List[CKey.Key]] = null
 
+    val fileContent = new StringBuilder
     while (line != null) {
+      fileContent.append(line)
+      fileContent.append('\n')
+
       line = line.trim
       //println(line)
       if (!line.startsWith("#") && !line.isEmpty) {
@@ -108,6 +113,7 @@ object KeyboardMapperStore {
     new KeyboardMapper {
       override val configuration = file
       override val locale = _locale
+      override val content = fileContent.toString
       override val map: Map[HostKey, List[Key]] = e_map.toMap
       override val keypad_map: Map[HostKey, List[Key]] = e_keypad_map.toMap
     }

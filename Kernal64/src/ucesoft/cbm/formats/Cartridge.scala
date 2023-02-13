@@ -18,7 +18,7 @@ object Cartridge {
   }
 
   def main(args:Array[String]): Unit = {
-    println(new Cartridge(args(0),true))
+    println(new Cartridge(args(0),false))
   }
 
   object CBMType extends Enumeration {

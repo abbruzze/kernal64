@@ -1,6 +1,6 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import ucesoft.cbm.{C128Model, CBMComponentType, CBMComputerModel, VIC20Model}
+import ucesoft.cbm.{C128Model, CBMComponentType, CBMComputerModel}
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.cpu.Memory
 import ucesoft.cbm.peripheral.keyboard.CKey._
@@ -64,9 +64,6 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
   private[this] var _40_80_KEY : Int = findCKey(_40_80,KeyEvent.VK_F9)
   private[this] var CAPS_LOCK_KEY : Int = findCKey(CAPS_LOCK,KeyEvent.VK_CAPS_LOCK)
   private final val c128 = model == C128Model
-  private final val vic20 = model == VIC20Model
-
-  private var hideShift = false
 
   override def setKeyboardMapper(km:KeyboardMapper): Unit = {
     super.setKeyboardMapper(km)
@@ -103,19 +100,15 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
     }
     findPressedKey(e) match {
       case Some(keys) =>
-        println(s"MATCH: $keys set=$keysPressed shift=${e.isShiftDown}")
-        var shiftReq = false
+        val oldPressed = keysPressed.clone()
         for (key <- keys) {
           if (key == RESTORE || key == VIC20_RESTORE) {
             nmiAction(true)
             nmiAction(false) // clears immediately NMI
           }
-          else {
-            shiftReq |= CKey.isShift(key)
-            keysPressed += remapShift(key,e)
-          }
+          else keysPressed += remapShift(key,e)
         }
-        hideShift = e.isShiftDown && !shiftReq
+        println(s"MATCH: hideShift=$hideShift | $oldPressed -> $keysPressed event=$e")
       case None =>
         println(s"Unmatched: $e alt=${e.isAltDown} altg=${e.isAltGraphDown}")
     }
@@ -135,7 +128,7 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
     var mask = 1
     var row = 0
     while (mask != 0x100) {
-      selector(row) = (!((value & mask) == mask))
+      selector(row) = !((value & mask) == mask)
       row += 1
       mask <<= 1
     }
@@ -155,7 +148,7 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
       val keys = keysPressed.iterator
       while (keys.hasNext) {
         val k = keys.next
-        val skip = hideShift && (k == R_SHIFT || k == L_SHIFT || k == VIC20_L_SHIFT || k == VIC20_R_SHIFT)
+        val skip = hideShift && CKey.isShift(k)
         if (!skip) {
           val (r, c) = CKey.getRowCol(k)
           val row = if (isRowSel) r else c

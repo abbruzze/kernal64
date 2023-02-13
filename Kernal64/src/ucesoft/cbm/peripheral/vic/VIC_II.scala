@@ -76,7 +76,7 @@ final class VIC_II(mem: VIC_II_Memory,
   private[this] var mainBorderFF = false // main border flip flop
   private[this] var verticalBorderFF = false // vertical border flip flop
 
-  private[this] var rasterCycle = 1 // horizontal cycle 1-63
+  private[this] var rasterCycle = 0 // horizontal cycle
   // graphics management
   private[this] var isBlank = false // valid inside drawCycle: tells if we are in the blank area
   private[this] var display: Display = null // the display
@@ -834,7 +834,15 @@ final class VIC_II(mem: VIC_II_Memory,
     super.getProperties
   }
 
-  def reset : Unit = {
+  override def reset(): Unit = {
+    if (coprocessor != null) coprocessor.reset
+    rasterLine = 0
+    rasterCycle = 6
+    rasterIRQTriggered = false
+    canUpdateLightPenCoords = false
+  }
+
+  override def hardReset() : Unit = {
     videoMatrixAddress = 0
     characterAddress = 0
     bitmapAddress = 0
@@ -880,13 +888,16 @@ final class VIC_II(mem: VIC_II_Memory,
     firstModPixelX = -1//model.BLANK_LEFT_CYCLE << 3
     firstModPixelY = 0
     lastBackground = 0
+    isBlank = false
+    rasterIRQTriggered = false
+    canUpdateLightPenCoords = false
     /*
     dataToDrawPipe = 0
     displayLineToDrawPipe = 0
     rasterCycleToDrawPipe = 0
     vmliToDrawPipe = 0
     */ // TODO : PIPE
-    if (coprocessor != null) coprocessor.reset
+    if (coprocessor != null) coprocessor.hardReset()
   }
 
   def setNEWVICModel(newModel:Boolean) : Unit = isNewVICModel = newModel || isVICIIe

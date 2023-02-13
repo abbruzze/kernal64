@@ -329,14 +329,14 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     try {
       if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
       ExpansionPort.getExpansionPort.eject
-      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.setLine(Switcher.CRT,_),nmiSwitcher.setLine(Switcher.CRT,_),getRAM,mmu,configuration)
+      val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.setLine(Switcher.CRT,_),nmiSwitcher.setLine(Switcher.CRT,_),getRAM,mmu,() => reset(true),configuration)
       println(ep)
       cartMenu.setVisible(true)
       ExpansionPort.setExpansionPort(ep)
       ExpansionPort.currentCartFileName = file.toString
       Log.info(s"Attached cartridge ${ExpansionPort.getExpansionPort.name}")
       preferences.updateWithoutNotify(Preferences.PREF_CART,file.toString)
-      if (!stateLoading) reset(false)
+      if (!stateLoading) hardReset(false)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
       detachCtrItem.setEnabled(true)
       // easyflash

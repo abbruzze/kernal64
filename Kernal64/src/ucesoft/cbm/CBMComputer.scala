@@ -67,7 +67,7 @@ abstract class CBMComputer extends CBMComponent {
   protected val cartMenu = new JMenu("Cartridge")
   protected var cartButtonRequested = false
 
-  protected val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),DEFAULT_KEYBOARD_RESOURCE_NAME,cbmModel)
+  protected lazy val keybMapper : keyboard.KeyboardMapper = keyboard.KeyboardMapperStore.loadMapper(Option(configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE)),DEFAULT_KEYBOARD_RESOURCE_NAME,cbmModel)
   protected val keyb : Keyboard
 
   protected var display : Display = _
@@ -309,14 +309,9 @@ abstract class CBMComputer extends CBMComponent {
     }
   }
 
-  protected def showKeyboardEditor(c64Mode:Boolean): Unit = {
-    val source = configuration.getProperty(CONFIGURATION_KEYB_MAP_FILE,java.awt.im.InputContext.getInstance().getLocale.getLanguage.toUpperCase())
-    val kbef = new JFrame(s"Keyboard editor ($source)")
-    val kbe = new KeyboardEditor(keyb,keyb.getKeyboardMapper,cbmModel)
-    kbef.getContentPane.add("Center",kbe)
-    kbef.pack()
-    kbef.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
-    kbef.setVisible(true)
+  protected def showKeyboardEditor(): Unit = {
+    val editor = KeyboardConfigEditor.getEditor(displayFrame,keyb.getKeyboardMapper,configuration,CONFIGURATION_KEYB_MAP_FILE)
+    editor.setVisible(true)
   }
 
   protected def showAbout()  : Unit = {
@@ -426,32 +421,6 @@ abstract class CBMComputer extends CBMComponent {
     }
     finally {
       configuration.setProperty(resource, if (oldLocation == null) "" else oldLocation)
-    }
-  }
-
-  protected def loadKeyboard()  : Unit = {
-    JOptionPane.showConfirmDialog(displayFrame,"Would you like to set default keyboard or load a configuration from file ?","Keyboard layout selection", JOptionPane.YES_NO_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE) match {
-      case JOptionPane.YES_OPTION =>
-        configuration.remove(CONFIGURATION_KEYB_MAP_FILE)
-        JOptionPane.showMessageDialog(displayFrame,"Reboot the emulator to activate the new keyboard", "Keyboard..",JOptionPane.INFORMATION_MESSAGE)
-      case JOptionPane.NO_OPTION =>
-        val fc = new JFileChooser
-        fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-        fc.setDialogTitle("Choose a keyboard layout")
-        fc.showOpenDialog(displayFrame) match {
-          case JFileChooser.APPROVE_OPTION =>
-            try {
-              keyboard.KeyboardMapperStore.loadMapper(Some(fc.getSelectedFile.toString),DEFAULT_KEYBOARD_RESOURCE_NAME,cbmModel)
-              configuration.setProperty(CONFIGURATION_KEYB_MAP_FILE,fc.getSelectedFile.toString)
-              JOptionPane.showMessageDialog(displayFrame,"Reboot the emulator to activate the new keyboard", "Keyboard..",JOptionPane.INFORMATION_MESSAGE)
-            }
-            catch {
-              case _:IllegalArgumentException =>
-                showError("Keyboard..","Invalid keyboard layout file")
-            }
-          case _ =>
-        }
-      case JOptionPane.CANCEL_OPTION =>
     }
   }
 

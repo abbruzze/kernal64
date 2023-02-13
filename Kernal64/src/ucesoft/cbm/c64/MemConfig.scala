@@ -19,8 +19,8 @@ object MemConfig {
           MemConfig(basic=false,roml=false,romh=false,char=false,kernal=true,io=true,romhultimax=false)
         case 29|13 =>
           MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=true,romhultimax=false)
-        case 28|24 =>
-          MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=false,romhultimax=false)
+        /*case 28|24 =>
+          MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=false,romhultimax=false)*/
         case 27 =>
           MemConfig(basic=true,roml=false,romh=false,char=true,kernal=true,io=false,romhultimax=false)
         case 26|10 =>
@@ -31,8 +31,8 @@ object MemConfig {
           MemConfig(basic=false,roml=true,romh=false,char=false,kernal=false,io=true,romhultimax=true)
         case 15 =>
           MemConfig(basic=true,roml=true,romh=false,char=false,kernal=true,io=true,romhultimax=false)
-        case 12|8|4|0 =>
-          MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=false,romhultimax=false)
+        /*case 12|8|4|0 =>
+          MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=false,romhultimax=false)*/
         case 11 =>
           MemConfig(basic=true,roml=true,romh=false,char=true,kernal=true,io=false,romhultimax=false)
         case 7 =>
@@ -45,11 +45,28 @@ object MemConfig {
           MemConfig(basic=false,roml=true,romh=true,char=true,kernal=true,io=false,romhultimax=false)
         case 2 =>
           MemConfig(basic=false,roml=false,romh=true,char=true,kernal=true,io=false,romhultimax=false)
-        case 1 =>
+        case _ =>
           MemConfig(basic=false,roml=false,romh=false,char=false,kernal=false,io=false,romhultimax=false)
        }
       mem(m) = mc
     }
     mem
+  }
+  def main(args:Array[String]): Unit = {
+    while (true) {
+      val bits = io.StdIn.readLine(">")
+      for(m <- gen(bits)) {
+        println(m + " " + Integer.parseInt(m.reverse,2))
+      }
+    }
+  }
+
+  private def gen(s:String): List[String] = {
+    def gen2(l:List[String]): List[String] = l.flatMap(gen)
+    val p = s.indexOf('x')
+    if (p == -1) return List(s)
+    val s1 = s.substring(0,p) + '0' + s.substring(p + 1)
+    val s2 = s.substring(0,p) + '1' + s.substring(p + 1)
+    gen2(List(s1,s2))
   }
 }

@@ -558,15 +558,12 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     
     val enableKeypadItem = new JCheckBoxMenuItem("Keypad enabled")
     enableKeypadItem.setSelected(true)
-    enableKeypadItem.addActionListener(e => keyb.asInstanceOf[HomeKeyboard].enableKeypad(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    enableKeypadItem.addActionListener(e => keyb.enableKeypad(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     keybMenu.add(enableKeypadItem)
     
-    val keybEditorItem = new JMenuItem("Keyboard editor ...")
-    keybEditorItem.addActionListener(_ => showKeyboardEditor(c64Mode) )
+    val keybEditorItem = new JMenuItem("Keyboard settings ...")
+    keybEditorItem.addActionListener(_ => showKeyboardEditor() )
     keybMenu.add(keybEditorItem)
-    val loadKeybItem = new JMenuItem("Set keyboard layout ...")
-    loadKeybItem.addActionListener(_ => loadKeyboard )
-    keybMenu.add(loadKeybItem)
     
     optionMenu.addSeparator()
 

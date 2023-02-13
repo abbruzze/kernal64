@@ -226,18 +226,9 @@ class C64 extends CBMHomeComputer {
 
     optionMenu.addSeparator()
 
-    val keybMenu = new JMenu("Keyboard")
-    optionMenu.add(keybMenu)
-
-    val keybEditorItem = new JMenuItem("Keyboard editor ...")
-    keybEditorItem.addActionListener(_ => showKeyboardEditor(true) )
-    keybMenu.add(keybEditorItem)
-    val loadKeybItem = new JMenuItem("Set keyboard layout ...")
-    loadKeybItem.addActionListener(_ => loadKeyboard )
-    keybMenu.add(loadKeybItem)
-    val keyTest = new JMenuItem("Keyboard layout test ...")
-    keyTest.addActionListener(_ => KeyboardHelper.getDialog(displayFrame).setVisible(true) )
-    keybMenu.add(keyTest)
+    val keybEditorItem = new JMenuItem("Keyboard settings ...")
+    keybEditorItem.addActionListener(_ => showKeyboardEditor() )
+    optionMenu.add(keybEditorItem)
     
     optionMenu.addSeparator()
 

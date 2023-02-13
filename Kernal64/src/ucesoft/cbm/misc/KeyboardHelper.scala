@@ -3,17 +3,14 @@ package ucesoft.cbm.misc
 import java.awt.datatransfer.StringSelection
 import java.awt.{BorderLayout, Color, Dimension, FlowLayout, Font, Toolkit}
 import java.awt.event.{KeyEvent, KeyListener}
-import javax.swing.{BorderFactory, JButton, JDialog, JFrame, JLabel, JPanel}
+import javax.swing.{BorderFactory, JButton, JDialog, JFrame, JLabel, JPanel, WindowConstants}
 
 object KeyboardHelper {
-  def main(args:Array[String]): Unit = {
-    getDialog(null).setVisible(true)
-  }
-
-  def getDialog(frame:JFrame): JDialog = {
-    val dialog = new JDialog(frame,"Keyboard layout test",true)
-    dialog.getContentPane.add(new KeyboardHelper(() => dialog.dispose()))
+  def getDialog(frame:JFrame,closeAction: () => Unit): JDialog = {
+    val dialog = new JDialog(frame,"Keyboard layout test",false)
+    dialog.getContentPane.add(new KeyboardHelper(() => { dialog.dispose() ; closeAction() }))
     dialog.pack()
+    dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE)
     dialog.setLocationRelativeTo(frame)
     dialog
   }

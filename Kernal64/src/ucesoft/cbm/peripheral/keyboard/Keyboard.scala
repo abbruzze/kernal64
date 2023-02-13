@@ -15,6 +15,7 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
   private final val ALT_CTRL_ALTG_MASK = ALT_DOWN_MASK | ALT_GRAPH_DOWN_MASK | CTRL_DOWN_MASK
   private var isLastShiftRight = false
   private final val windowsOS = System.getProperty("os.name").toUpperCase().startsWith("WINDOWS")
+  protected var hideShift = false
 
   final def setEnabled(enabled: Boolean): Unit = {
     this.enabled = enabled
@@ -37,6 +38,7 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
     keysPressed.clear()
     lastKey = null
     isLastShiftRight = false
+    hideShift = false
   }
 
   override final def keyTyped(e: KeyEvent) : Unit = {}
@@ -60,7 +62,13 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
     else keyMap
 
     val hk = HostKey(e.getExtendedKeyCode, e.isShiftDown, e.isAltGraphDown)
-    map.get(hk)
+    map.get(hk) match {
+      case None =>
+        None
+      case list@Some(keys) =>
+        hideShift = !keys.exists(k => CKey.isShift(k)) && e.isShiftDown
+        list
+    }
   }
 
   protected def findReleasedKey(e: KeyEvent): Option[List[CKey.Value]] = {
