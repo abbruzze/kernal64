@@ -130,6 +130,12 @@ class VIC20 extends CBMHomeComputer {
     via2 = new VIC20Via2(bus,keyb,controlPortB,datassette,cpu.irqRequest _,via1)
     add(via1)
     add(via2)
+    // WiC64
+    WiC64.flag2Action = () => {
+      via1.CB1In(true) ; via1.CB1In(false)
+    }
+    wic64Panel = new WiC64Panel(displayFrame,preferences)
+    WiC64.setListener(wic64Panel)
     // mapping I/O chips in memory
     mmu.setIO(via1,via2,vicChip.asInstanceOf[vic.VIC_I])
     display = new vic.Display(vicChip.SCREEN_WIDTH, vicChip.SCREEN_HEIGHT, displayFrame.getTitle, displayFrame)
@@ -818,6 +824,7 @@ class VIC20 extends CBMHomeComputer {
     setUltimemSettings(IOItem)
     setFE3Settings(IOItem)
     setVIC1112IEEE488Settings(IOItem)
+    setWiC64Settings(IOItem)
 
     // -----------------------------------
 
@@ -905,6 +912,17 @@ class VIC20 extends CBMHomeComputer {
     preferences.add(PREF_TRACE, "Starts the emulator in trace mode", false, Set(), false) { trace =>
       traceOption = trace
       tracer.enableTracing(trace)
+    }
+
+    preferences.add(PREF_WIC64_NETWORK, "Sets the network interface of WiC64", "") {
+      wic64Panel.setNetwork(_)
+    }
+    preferences.add(PREF_WIC64_ENABLED, "Enables/disables WiC64 at startup", false) { enabled =>
+      wic64Panel.setWiC64Enabled(enabled)
+      if (!headless) wic64Panel.dialog.setVisible(true)
+    }
+    preferences.add(PREF_MOUSE_DELAY_MILLIS, "Sets the mouse delay parameter in millis", 20) { delay =>
+      MouseCage.setRatioMillis(delay)
     }
   }
 

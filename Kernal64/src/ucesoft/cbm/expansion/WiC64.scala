@@ -24,8 +24,10 @@ object WiC64 extends CBMComponent with Runnable {
 
   private var _enabled = false
 
-  final val RECEIVING_MODE = 4
-  final val SENDING_MODE = 0
+  final private val RESPONSE_DELAY = 1000
+
+  final private val RECEIVING_MODE = 4
+  final private val SENDING_MODE = 0
 
   private var networkif : NetworkInterface = _
   private var MAC_ADDRESS = getMacAddress()
@@ -271,10 +273,13 @@ object WiC64 extends CBMComponent with Runnable {
   private def prepareResponse(resp:Array[Int]): Unit = {
     sendMode = SENDING_MODE_WAITING_DUMMY
     responseBuffer = resp
-    flag2Action()
+    clk.schedule(new ClockEvent("WiC64",clk.currentCycles + RESPONSE_DELAY,_ => flag2Action()))
+    //flag2Action()
   }
 
-  @inline private def log(s:String): Unit = if (logEnabled && listener != null) listener.log(s)
+  @inline private def log(s:String): Unit = {
+    if (logEnabled && listener != null) listener.log(s)
+  }
 
   private def checkHttpResponse(rcode:Int,content:Array[Int]): Option[String] = {
     if (rcode == 201) {
@@ -361,7 +366,12 @@ object WiC64 extends CBMComponent with Runnable {
       //connection.connect()
       val rcode = connection.getResponseCode
       log(s"HTTP code=$rcode")
-      if (rcode != 200 && rcode != 201) {
+      if (rcode == HttpURLConnection.HTTP_MOVED_TEMP || rcode == HttpURLConnection.HTTP_MOVED_PERM || rcode == HttpURLConnection.HTTP_SEE_OTHER) {
+        val redirectedLocation = connection.getHeaderField("Location")
+        log(s"Redirect: $redirectedLocation")
+        sendHttpPOST(redirectedLocation,fileName,postContent,streaming)
+      }
+      else if (rcode != 200 && rcode != 201) {
         log(s"Returning error code for http result code: $rcode")
         sendMode = SENDING_MODE_WAITING_DUMMY
         buffer = "!0".toArray.map(_.toInt)
@@ -405,9 +415,14 @@ object WiC64 extends CBMComponent with Runnable {
       connection.setInstanceFollowRedirects(true)
       connection.setRequestProperty("User-Agent","ESP32HTTPClient")
       connection.connect()
-      val rcode = connection.getResponseCode
+      var rcode = connection.getResponseCode
       log(s"HTTP code=$rcode")
-      if (rcode != 200 && rcode != 201) {
+      if (rcode == HttpURLConnection.HTTP_MOVED_TEMP || rcode == HttpURLConnection.HTTP_MOVED_PERM || rcode == HttpURLConnection.HTTP_SEE_OTHER) {
+        val redirectedLocation = connection.getHeaderField("Location")
+        log(s"Redirect: $redirectedLocation")
+        sendHttpGET(redirectedLocation,streaming)
+      }
+      else if (rcode != 200 && rcode != 201) {
         log(s"Returning error code for http result code: $rcode")
         prepareResponse("!0")
       }

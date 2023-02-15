@@ -1,6 +1,7 @@
 package ucesoft.cbm.vic20
 
 import ucesoft.cbm.ChipID
+import ucesoft.cbm.expansion.WiC64
 import ucesoft.cbm.peripheral.bus.IECBus.{GROUND, VOLTAGE}
 import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
 import ucesoft.cbm.peripheral.c2n.Datassette
@@ -83,6 +84,8 @@ class VIC20Via1(bus:IECBus,
         PB5 = fire ( = 16)
        */
       super.read(address, chipID)
+      if (WiC64.enabled) return WiC64.read()
+
       val joy = userPort.readPort
       val userJoy = (joy & 7) << 2 | (joy & 8) >> 2 | (joy & 16) << 1 | 0xC1
       val user = userJoy & (if (rs232.isEnabled) rs232.getOthers else 0xFF)
@@ -97,6 +100,9 @@ class VIC20Via1(bus:IECBus,
       super.write(address, value, chipID)
       bus.setLine(this,IECBusLine.ATN,if ((value & 0x80) > 0) GROUND else VOLTAGE)
       if ((regs(DDRA) & 0x20) > 0 && (oldValue & 0x20) > 0 && (value & 0x20) == 0) lightPenTriggerHandler() // raising edge
+    case PB =>
+      super.write(address, value, chipID)
+      if (WiC64.enabled) WiC64.write(value)
     case _ =>
       super.write(address, value, chipID)
   }
@@ -104,5 +110,8 @@ class VIC20Via1(bus:IECBus,
   def restoreKeyPressed(pressed:Boolean): Unit = CA1In(pressed)
 
   override def CA2Out(state: Boolean): Unit = datassette.setMotor(!state)
-  override def CB2Out(state: Boolean): Unit = rs232.setTXD(if (state) 1 else 0)
+  override def CB2Out(state: Boolean): Unit = {
+    rs232.setTXD(if (state) 1 else 0)
+    if (WiC64.enabled) WiC64.setMode(if (state) 4 else 0)
+  }
 }
