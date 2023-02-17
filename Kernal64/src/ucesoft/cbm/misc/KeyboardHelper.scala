@@ -107,8 +107,8 @@ class KeyboardHelper(closeEvent: () => Unit) extends JPanel with KeyListener {
   private def getKeyEventMap(): Map[Int, String] = {
     val clazz = classOf[KeyEvent]
     val fields = clazz.getDeclaredFields
-    fields filter {
-      _.getName.startsWith("VK_")
+    fields filter { f =>
+      f.getName.startsWith("VK_") && f.getName != "VK_UNDEFINED"
     } map { f => (f.get(null).asInstanceOf[Int], f.getName) } toMap
   }
 }

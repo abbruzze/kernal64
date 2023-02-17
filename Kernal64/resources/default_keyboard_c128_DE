@@ -6,7 +6,9 @@
 # while in the second keys of the numeric keypad are configured, if any.
 #
 # every configuration line is composed by
-#   <modifiers><host key name or key code> = <emulated key>,<emulated key>,...,<emulated key> [<comment>]
+#   [[w|x|m]]<modifiers><host key name or key code> = <emulated key>,<emulated key>,...,<emulated key> [<comment>]
+# where [[w|x|m]] is an optional modifier to indicate that the row must be included in the configuration for the given OS only: w=Windows,x=Linux,m=Mac, discarded otherwise
+# in this way the same emulated keys can be configured for different OS
 # where <modifiers> can be a combination of:
 # + for shift (shifted host key)
 # ^ for altg  (altg + host key)
@@ -103,10 +105,13 @@ F6 			= F5,L_SHIFT
 F7 			= F7
 F8 			= F7,L_SHIFT
 # numbers row
--DEAD_CIRCUMFLEX= L_ARROW
+[w]-DEAD_CIRCUMFLEX= L_ARROW
+# ö
+[x]!16777430=L_ARROW
+[m]!16777430=L_ARROW
 1 			= N_1
 2 			= N_2
-# +3 = 
+# +3 =
 -3 			= N_3
 -NUMBER_SIGN= N_3,L_SHIFT
 4 			= N_4
@@ -121,7 +126,11 @@ PLUS 		= PLUS
 MINUS 		= MINUS
 HOME 		= CLR_HOME
 +HOME 		= CLR_HOME,L_SHIFT
-!16777412	= LIRA
+# ä
+[w]!16777412= LIRA
+# ß
+[x]!16777439= LIRA
+[m]!16777439= LIRA
 BACK_SPACE 	= INST_DEL
 # QWERTZ row
 # =====================================
@@ -136,9 +145,17 @@ U 			= U
 I 			= I
 O 			= O
 P 			= P
-^Q 			= AT
-+PLUS 		= STAR
-DEAD_ACUTE	= EXP
+# #
+[w]^Q 			= AT
+[x]^AT 			= AT
+[m]^AT 			= AT
+[w]+PLUS 		= STAR
+[x]+PLUS 		= STAR
+[m]+ASTERISK    = STAR
+[w]DEAD_ACUTE	= EXP
+# ä
+[x]!16777412    = EXP
+[m]!16777412    = EXP
 DELETE		= RESTORE
 # ASDF row
 # =====================================
@@ -152,10 +169,18 @@ H 			= H
 J 			= J
 K 			= K
 L 			= L
-+PERIOD 	= COLON
-+COMMA 		= SEMICOL
-^9			= SEMICOL,L_SHIFT
-^8			= COLON,L_SHIFT
+[w]+PERIOD 	= COLON
+[x]+PERIOD 	= COLON
+[m]+COLON 	= COLON
+[w]+COMMA 		= SEMICOL
+[x]+COMMA 		= SEMICOL
+[m]+SEMICOLON	= SEMICOL
+[w]^9			= SEMICOL,L_SHIFT
+[x]^CLOSE_BRACKET= SEMICOL,L_SHIFT
+[m]^CLOSE_BRACKET= SEMICOL,L_SHIFT
+[w]^8			= COLON,L_SHIFT
+[x]^OPEN_BRACKET= COLON,L_SHIFT
+[m]^OPEN_BRACKET= COLON,L_SHIFT
 +0			= EQUAL
 ENTER 		= RETURN
 # YXCV row

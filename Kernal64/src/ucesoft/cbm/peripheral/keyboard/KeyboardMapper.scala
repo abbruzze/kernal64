@@ -87,8 +87,10 @@ object KeyboardMapperStore {
           val ckeys = emulatedKeys.split(",").map(k => CKey.getKey(k.trim,model)).toList
           HostKey.parse(k,s => KEY_EVENT_REV_MAP.get(if (!s.startsWith("VK_")) "VK_" + s else s)) match {
             case Some(hk) =>
-              map += hk -> ckeys
-              if (!hk.isNoShift() && !hk.shifted) map += hk.copy(shifted = true) -> (L_SHIFT :: ckeys)
+              if (!hk.mustBeFilteredByOS()) { // check if the key must not be configured for this OS
+                map += hk -> ckeys
+                if (!hk.isNoShift() && !hk.shifted) map += hk.copy(shifted = true) -> (L_SHIFT :: ckeys)
+              }
             case None =>
               throw new IllegalArgumentException
           }

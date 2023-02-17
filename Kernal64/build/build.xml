@@ -114,6 +114,10 @@
 		<fixcrlf srcdir="${dist.dir}/pack/kernal64" includes="*.sh" eol="unix"/>
 		<fixcrlf srcdir="${dist.dir}/pack/kernal64" includes="*.bat" eol="dos"/>
 		<mkdir dir="${dist.dir}/pack/kernal64/roms"/>
+		<mkdir dir="${dist.dir}/pack/kernal64/keyboard"/>
+		<copy todir="${dist.dir}/pack/kernal64/keyboard">
+			<fileset dir="${basedir}/resources" includes="default_keyboard*"/>
+		</copy>
 		<zip destfile="${c64.install}" basedir="${dist.dir}/pack" excludes="**/*.sh">
 			<zipfileset dir="${dist.dir}/pack" includes="kernal64/*.sh" filemode="755"/>
 		</zip>

@@ -3,9 +3,11 @@ package ucesoft.cbm.peripheral.keyboard
 case class HostKey(code:Int,shifted:Boolean,altG:Boolean) {
   private var noshift = false
   private var numberCode = false
+  private var osFilter : String = _
 
   def isNoShift(): Boolean = noshift
   def isNumberCode(): Boolean = numberCode
+  def mustBeFilteredByOS(): Boolean = osFilter != null && !System.getProperty("os.name").toUpperCase().startsWith(osFilter)
 
   def flags : String = {
     val sb = new StringBuilder()
@@ -24,6 +26,20 @@ object HostKey {
     var code = false
     var noshift = false
     var k = key
+    var os : String = null
+
+    if (k.startsWith("[x]")) {
+      k = k.substring(3)
+      os = "LINUX"
+    }
+    else if (k.startsWith("[w]")) {
+      k = k.substring(3)
+      os = "WINDOWS"
+    }
+    else if (k.startsWith("[m]")) {
+      k = k.substring(3)
+      os = "MAC"
+    }
 
     while (!k.charAt(0).isLetterOrDigit && k.length > 0) {
       if (k.startsWith("+")) {
@@ -62,6 +78,7 @@ object HostKey {
     val hk = HostKey(keyCode,shifted,altg)
     hk.noshift = noshift
     hk.numberCode = code
+    hk.osFilter = os
     Some(hk)
   }
 }
