@@ -1133,9 +1133,30 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
-  override protected def setRenderingSettings(parent:JMenu) : Unit = {
-    super.setRenderingSettings(parent)
-    setPaletteSettings(parent)
+  override protected def setRenderingSettings(parent:JMenu,includePalette:Boolean = true) : Unit = {
+    super.setRenderingSettings(parent,false)
+    if (includePalette) setPaletteSettings(parent)
+  }
+
+  protected def loadPaletteFromFile(prefItem:String): Option[String] = {
+    import Preferences._
+    val fc = new JFileChooser()
+    fc.setDialogTitle("Load VPL palette file")
+    fc.setFileFilter(new FileFilter {
+      override def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase().endsWith("VPL")
+      override def getDescription: String = "VPL palette file"
+    })
+    preferences[String](prefItem) match {
+      case None =>
+      case Some(file) =>
+        fc.setSelectedFile(new File(file))
+    }
+    fc.showOpenDialog(displayFrame) match {
+      case JFileChooser.APPROVE_OPTION =>
+        Some(fc.getSelectedFile.toString)
+      case _ =>
+        None
+    }
   }
 
   protected def setPaletteSettings(parent:JMenu): Unit = {
@@ -1161,20 +1182,37 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     colordorePalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "colodore")
     paletteItem.add(colordorePalItem)
     groupP.add(colordorePalItem)
+    val filePalItem = new JRadioButtonMenuItem("From file ...")
+    filePalItem.addActionListener(_ => {
+      loadPaletteFromFile(PREF_VICPALETTE_FILE) match {
+        case Some(file) =>
+          preferences(PREF_VICPALETTE_FILE) = file
+        case None =>
+      }
+    })
+    paletteItem.add(filePalItem)
+    groupP.add(filePalItem)
 
-    preferences.add(PREF_VICPALETTE, "Set the palette type (bright,vice,pepto,colodore)", "", Set("bright", "vice", "pepto", "colodore")) { pal =>
+    preferences.add(PREF_VICPALETTE_FILE, "Load VIC's palette from vpl file", "") { vpl =>
+      if (Palette.setVICPaletteFromFile(vpl)) {
+        preferences.updateWithoutNotify(PREF_VICPALETTE,"")
+        filePalItem.setSelected(true)
+      }
+    }
+
+    preferences.add(PREF_VICPALETTE, "Set the VIC's palette type (bright,vice,pepto,colodore)", "", Set("bright", "vice", "pepto", "colodore","")) { pal =>
       pal match {
         case "bright" | "" =>
-          Palette.setPalette(PaletteType.BRIGHT)
+          Palette.setVICPalette(PaletteType.BRIGHT)
           brightPalItem.setSelected(true)
         case "vice" =>
-          Palette.setPalette(PaletteType.VICE)
+          Palette.setVICPalette(PaletteType.VICE)
           vicePalItem.setSelected(true)
         case "pepto" =>
-          Palette.setPalette(PaletteType.PEPTO)
+          Palette.setVICPalette(PaletteType.PEPTO)
           peptoPalItem.setSelected(true)
         case "colodore" =>
-          Palette.setPalette(PaletteType.COLORDORE)
+          Palette.setVICPalette(PaletteType.COLORDORE)
           colordorePalItem.setSelected(true)
         case _ =>
       }
@@ -1191,6 +1229,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
   protected def setJoysticsSettings(parent:JMenu) : Unit = {
     val joyAItem = new JMenuItem("Joystick...")
+    joyAItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_J, java.awt.event.InputEvent.ALT_DOWN_MASK))
     joyAItem.addActionListener(_ => joySettings )
     parent.add(joyAItem)
 

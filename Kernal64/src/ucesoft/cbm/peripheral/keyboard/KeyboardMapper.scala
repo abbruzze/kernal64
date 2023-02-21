@@ -69,6 +69,12 @@ object KeyboardMapperStore {
     var line = in.readLine
     var map : collection.mutable.HashMap[HostKey,List[CKey.Key]] = null
 
+    val VIRTUAL_SHIFT = model match {
+      case C64Model | C128Model => CKey.L_SHIFT
+      case VIC20Model => CKey.VIC20_L_SHIFT
+      case CBMIIModel => CKey.CBM2_SHIFT
+    }
+
     val fileContent = new StringBuilder
     while (line != null) {
       fileContent.append(line)
@@ -89,7 +95,7 @@ object KeyboardMapperStore {
             case Some(hk) =>
               if (!hk.mustBeFilteredByOS()) { // check if the key must not be configured for this OS
                 map += hk -> ckeys
-                if (!hk.isNoShift() && !hk.shifted) map += hk.copy(shifted = true) -> (L_SHIFT :: ckeys)
+                if (!hk.isNoShift() && !hk.shifted) map += hk.copy(shifted = true) -> (VIRTUAL_SHIFT :: ckeys)
               }
             case None =>
               throw new IllegalArgumentException
@@ -101,16 +107,7 @@ object KeyboardMapperStore {
     
     if (map == null) throw new IllegalArgumentException
 
-    model match {
-      case C64Model | C128Model =>
-        // add l-shift button
-        e_map += HostKey(KeyEvent.VK_SHIFT,true,false) -> List(CKey.L_SHIFT)
-      case VIC20Model =>
-        // add l-shift button
-        e_map += HostKey(KeyEvent.VK_SHIFT,true,false) -> List(CKey.VIC20_L_SHIFT)
-      case CBMIIModel =>
-        e_map += HostKey(KeyEvent.VK_SHIFT,true,false) -> List(CKey.CBM2_SHIFT)
-    }
+    e_map += HostKey(KeyEvent.VK_SHIFT,true,false) -> List(VIRTUAL_SHIFT)
     
     new KeyboardMapper {
       override val configuration = file

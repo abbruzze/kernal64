@@ -65,8 +65,11 @@ class BKeyboard(_km:KeyboardMapper,override protected val model:CBMComputerModel
   override final def keyPressed(e: KeyEvent): Unit = {
     findPressedKey(e) match {
       case Some(keys) =>
+        val oldPressed = keysPressed.clone()
         for(key <- keys) keysPressed += key
+        //println(s"MATCH: hideShift=$hideShift | $oldPressed -> $keysPressed event=$e")
       case None =>
+        //Keyprintln(s"Unmatched: $e alt=${e.isAltDown} altg=${e.isAltGraphDown}")
     }
   }
 
@@ -75,6 +78,7 @@ class BKeyboard(_km:KeyboardMapper,override protected val model:CBMComputerModel
         case Some(keys) =>
           for(key <- keys) keysPressed -= key
         case None =>
+          keysPressed.clear()
       }
     if (e.getKeyCode == KeyEvent.VK_SHIFT) clearAllPressedShifts()
   }

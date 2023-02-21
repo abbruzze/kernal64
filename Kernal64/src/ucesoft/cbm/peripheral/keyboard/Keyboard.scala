@@ -45,6 +45,11 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
 
   protected def findCKey(key:CKey.Value,defaultKey:Int): Int = km.map.map(kv => (kv._2,kv._1)).find(lkv => lkv._1.contains(key)).map(_._2.code).getOrElse(defaultKey)
 
+  protected def getKeyCode(e:KeyEvent): Int = {
+    val extCode = e.getExtendedKeyCode
+    if (extCode == KeyEvent.VK_UNDEFINED) e.getKeyCode else extCode
+  }
+
   protected def findPressedKey(e: KeyEvent): Option[List[CKey.Value]] = {
     if (e.isAltDown && !e.isAltGraphDown) return None // only ALT
     if (e.getID == KeyEvent.KEY_PRESSED && e.getKeyCode == KeyEvent.VK_SHIFT) isLastShiftRight = e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT
@@ -61,7 +66,7 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
     }
     else keyMap
 
-    val hk = HostKey(e.getExtendedKeyCode, e.isShiftDown, e.isAltGraphDown)
+    val hk = HostKey(getKeyCode(e), e.isShiftDown, e.isAltGraphDown)
     map.get(hk) match {
       case None =>
         None
@@ -77,7 +82,8 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
     }
     else keyMap
 
-    val keys = map.view.filter(kv => kv._1.code == e.getExtendedKeyCode).map(_._2).flatten.toList
+    val keyCode = getKeyCode(e)
+    val keys = map.view.filter(kv => kv._1.code == keyCode).map(_._2).flatten.toList
     if (keys.isEmpty) None else Some(keys)
   }
 

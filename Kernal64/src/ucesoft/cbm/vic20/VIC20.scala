@@ -507,17 +507,34 @@ class VIC20 extends CBMHomeComputer {
     colordorePalItem.addActionListener(_ => preferences(PREF_VICPALETTE) = "colodore")
     paletteItem.add(colordorePalItem)
     groupP.add(colordorePalItem)
+    val filePalItem = new JRadioButtonMenuItem("From file ...")
+    filePalItem.addActionListener(_ => {
+      loadPaletteFromFile(PREF_VICPALETTE_FILE) match {
+        case Some(file) =>
+          preferences(PREF_VICPALETTE_FILE) = file
+        case None =>
+      }
+    })
+    paletteItem.add(filePalItem)
+    groupP.add(filePalItem)
 
-    preferences.add(PREF_VICPALETTE, "Set the palette type (vice,mike_pal,colodore)", "", Set("vice", "mike_pal", "colodore")) { pal =>
+    preferences.add(PREF_VICPALETTE_FILE, "Load VIC's palette from vpl file", "") { vpl =>
+      if (Palette.setVICPaletteFromFile(vpl)) {
+        preferences.updateWithoutNotify(PREF_VICPALETTE, "")
+        filePalItem.setSelected(true)
+      }
+    }
+
+    preferences.add(PREF_VICPALETTE, "Set the palette type (vice,mike_pal,colodore)", "", Set("vice", "mike_pal", "colodore","")) { pal =>
       pal match {
         case "vice" =>
-          Palette.setPalette(PaletteType.VIC20_VICE)
+          Palette.setVICPalette(PaletteType.VIC20_VICE)
           vicePalItem.setSelected(true)
         case "mike_pal"| "" =>
-          Palette.setPalette(PaletteType.VIC20_MIKE_PAL)
+          Palette.setVICPalette(PaletteType.VIC20_MIKE_PAL)
           peptoPalItem.setSelected(true)
         case "colodore" =>
-          Palette.setPalette(PaletteType.VIC20_COLODORE)
+          Palette.setVICPalette(PaletteType.VIC20_COLODORE)
           colordorePalItem.setSelected(true)
         case _ =>
       }

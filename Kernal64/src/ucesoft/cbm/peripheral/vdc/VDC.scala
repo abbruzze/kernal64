@@ -3,7 +3,7 @@ package ucesoft.cbm.peripheral.vdc
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm._
 import ucesoft.cbm.cpu.RAMComponent
-import ucesoft.cbm.peripheral.vic.Display
+import ucesoft.cbm.peripheral.vic.{Display, Palette}
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 import java.util.Properties
@@ -156,24 +156,7 @@ class VDC extends RAMComponent {
   private[this] var deinterlaceMode = true
   private[this] var frameBit = 0
   // COLOR PALETTE =======================================
-  private[this] val PALETTE = Array(
-    0xFF000000,  // 00 Black
-    0xFF555555,  // 01 Medium Gray
-    0xFF0000AA,  // 02 Blue
-    0xFF5555FF,  // 03 Light blue
-    0xFF00AA00,  // 04 Green
-    0xFF55FF55,  // 05 Light green
-    0xFF00AAAA,  // 06 Dark cyan
-    0xFF55FFFF,  // 07 Light cyan
-    0xFFAA0000,  // 08 Dark red
-    0xFFFF5555,  // 09 Light red
-    0xFFAA00AA,  // 10 Dark purple
-    0xFFFF55FF,  // 11 Light purple
-    0xFFAA5500,  // 12 Brown
-    0xFFFFFF55,  // 13 Yellow
-    0xFFAAAAAA,  // 14 Light Gray
-    0xFFFFFFFF   // 15 White
-  )
+  private[this] val PALETTE = Palette.VDC_DEFAULT
 
   // ============ Constructor ============================
   clk.addChangeFrequencyListener(f => {

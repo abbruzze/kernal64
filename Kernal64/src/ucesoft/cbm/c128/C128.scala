@@ -12,7 +12,7 @@ import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
 import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.vdc.VDC
-import ucesoft.cbm.peripheral.vic.VICType
+import ucesoft.cbm.peripheral.vic.{Palette, VICType}
 import ucesoft.cbm.trace.Tracer
 import ucesoft.cbm.trace.Tracer.TracedDisplay
 
@@ -583,11 +583,29 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     adjustMenu.add(vicAdjMenu)
     adjustMenu.add(vdcAdjMenu)
 
+    setPaletteSettings(vicAdjMenu)
+
+    val vdcPalette = new JMenu("Palette")
+    vdcAdjMenu.add(vdcPalette)
+    val filePalItem = new JMenuItem("From file ...")
+    filePalItem.addActionListener(_ => {
+      loadPaletteFromFile(PREF_VDCPALETTEFILE) match {
+        case Some(file) =>
+          preferences(PREF_VDCPALETTEFILE) = file
+        case None =>
+      }
+    })
+    vdcPalette.add(filePalItem)
+
+    preferences.add(PREF_VDCPALETTEFILE, "Load VDC's palette from vpl file", "") { vpl =>
+      Palette.setVDCPaletteFromFile(vpl)
+    }
+
     val adjustRatioItem = new JMenuItem("Adjust VIC display ratio")
     adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A,java.awt.event.InputEvent.ALT_DOWN_MASK))
     adjustRatioItem.addActionListener(_ => adjustRatio(true) )
     vicAdjMenu.add(adjustRatioItem)
-    
+
     val adjustVDCRatioItem = new JMenuItem("Adjust VDC display ratio")
     adjustVDCRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_D,java.awt.event.InputEvent.ALT_DOWN_MASK))
     adjustVDCRatioItem.addActionListener(_ => adjustRatio(false,true) )
@@ -623,10 +641,8 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     setVICBorderMode(vicAdjMenu)
 
     setFullScreenSettings(adjustMenu)
-    
-    val renderingItem = new JMenu("Rendering")
-    adjustMenu.add(renderingItem)
-    setRenderingSettings(renderingItem)
+
+    setRenderingSettings(adjustMenu,false)
 
     val vicDisplayEffectsItem = new JMenuItem("VIC's display effects ...")
     val vdcDisplayEffectsItem = new JMenuItem("VDC's display effects ...")

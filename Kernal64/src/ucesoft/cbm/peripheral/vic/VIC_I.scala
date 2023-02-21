@@ -281,7 +281,7 @@ class VIC_I(mem:Memory,audioDriver:AudioDriverDevice) extends VIC {
   private var interlaceModeListener : Boolean => Unit = _
 
   // Constructor
-  Palette.setPalette(PaletteType.VIC20_VICE)
+  Palette.setVICPalette(PaletteType.VIC20_VICE)
   setVICModel(VIC_I_PAL)
   audio.setCPUFrequency(Clock.systemClock.getClockHz)
   Clock.systemClock.addChangeFrequencyListener(audio.setCPUFrequency _)

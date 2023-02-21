@@ -6,9 +6,9 @@
 # while in the second keys of the numeric keypad are configured, if any.
 #
 # every configuration line is composed by
-#   [[w|x|m]]<modifiers><host key name or key code> = <emulated key>,<emulated key>,...,<emulated key> [<comment>]
-# where [[w|x|m]] is an optional modifier to indicate that the row must be included in the configuration for the given OS only: w=Windows,x=Linux,m=Mac, discarded otherwise
-# in this way the same emulated keys can be configured for different OS
+#   [[(w|x|m)+]]<modifiers><host key name or key code> = <emulated key>,<emulated key>,...,<emulated key> [<comment>]
+# where [[(w|x|m)+]] is an optional modifier to indicate that the row must be included in the configuration for the given OS(es) only: w=Windows,x=Linux,m=Mac, discarded otherwise
+# in this way the same emulated keys can be configured for different OS. For example: [xm] will define a row for Linux and Mac only.
 # where <modifiers> can be a combination of:
 # + for shift (shifted host key)
 # ^ for altg  (altg + host key)

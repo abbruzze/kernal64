@@ -512,6 +512,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // 64/128 mode
     val old128Mode = c128Mode
     c128Mode = (value & 0x40) == 0
+    ram.setC64Mode(!c128Mode)
     if (z80enabled != oldZ80enabled) mmuChangeListener.cpuChanged(!z80enabled)
     if (!c128Mode && old128Mode && !z80enabled) { 
       mmuChangeListener.c64Mode(true)

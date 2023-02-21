@@ -37,6 +37,8 @@ private[c128] class C128RAM extends RAMComponent {
   private[this] var page_1 = 1
   // DMA
   private[this] var dma = false
+  // C64 mode
+  private var c64mode = false
   // -----------------------------------------------
   private object Bank0 extends Memory {
     val isRom = false
@@ -53,6 +55,8 @@ private[c128] class C128RAM extends RAMComponent {
   def getBank0 : Memory = Bank0
 
   final def setDMA(dma:Boolean) : Unit = this.dma = dma
+
+  final def setC64Mode(c64mode:Boolean): Unit = this.c64mode = c64mode
   
   override def getProperties: Properties = {
     super.getProperties
@@ -161,26 +165,14 @@ private[c128] class C128RAM extends RAMComponent {
     Log.debug(s"Common area set to $commonArea. Common area size set to $commonAreaSize. Common bottom limit ${Integer.toHexString(commonAreaBottomLimit)}. Common top limit ${Integer.toHexString(commonAreaTopLimit)}")
     //println(s"Common area set to $commonArea. Common area size set to $commonAreaSize. Common bottom limit ${Integer.toHexString(commonAreaBottomLimit)}. Common top limit ${Integer.toHexString(commonAreaTopLimit)}")
   }
-  
-  @inline private def page_0_1(_address:Int) : Int = {
-    var address = _address
-    if ((address & 0xFF00) == 0) address |= page_0 << 8
-    else
-    if ((address & 0xFF00) == 0x100) address = page_1 << 8 | address & 0xFF
-    else
-    if ((address & 0xFF00) == (page_0 << 8) && processorBank == page_0_bank) address &= 0xFF
-    else
-    if ((address & 0xFF00) == (page_1 << 8) && processorBank == page_1_bank) address = address & 0xFF | 0x100
-
-    address
-  }
 
   @inline private def page2_0_1(_address:Int) : Int = {
     var address = _address
-    if ((address & 0xFF00) == 0) address |= page_0 << 8 | page_0_bank << 16
-    else if ((address & 0xFF00) == 0x100) address = page_1 << 8 | address & 0xFF | page_1_bank << 16
-    else if ((address & 0xFF00) == (page_0 << 8) && processorBank == page_0_bank) address &= 0xFF
+    if (!c64mode && (address & 0xFF00) == 0) address |= page_0 << 8 | page_0_bank << 16
+    else if (!c64mode && (address & 0xFF00) == 0x100) address = page_1 << 8 | address & 0xFF | page_1_bank << 16
     else if ((address & 0xFF00) == (page_1 << 8) && processorBank == page_1_bank) address = address & 0xFF | 0x100
+    else if ((address & 0xFF00) == (page_0 << 8) && processorBank == page_0_bank) address &= 0xFF
+
     address
   }
   

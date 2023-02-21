@@ -6,9 +6,9 @@
 # while in the second keys of the numeric keypad are configured, if any.
 #
 # every configuration line is composed by
-#   [[w|x|m]]<modifiers><host key name or key code> = <emulated key>,<emulated key>,...,<emulated key> [<comment>]
-# where [[w|x|m]] is an optional modifier to indicate that the row must be included in the configuration for the given OS only: w=Windows,x=Linux,m=Mac, discarded otherwise
-# in this way the same emulated keys can be configured for different OS
+#   [[(w|x|m)+]]<modifiers><host key name or key code> = <emulated key>,<emulated key>,...,<emulated key> [<comment>]
+# where [[(w|x|m)+]] is an optional modifier to indicate that the row must be included in the configuration for the given OS(es) only: w=Windows,x=Linux,m=Mac, discarded otherwise
+# in this way the same emulated keys can be configured for different OS. For example: [xm] will define a row for Linux and Mac only.
 # where <modifiers> can be a combination of:
 # + for shift (shifted host key)
 # ^ for altg  (altg + host key)
@@ -112,8 +112,7 @@ BACK_SLASH 	= L_ARROW
 +3			= LIRA
 # #
 [w]^!16777440	= N_3,L_SHIFT
-[x]^NUMBER_SIGN	= N_3,L_SHIFT
-[m]^NUMBER_SIGN	= N_3,L_SHIFT
+[xm]^NUMBER_SIGN	= N_3,L_SHIFT
 4 			= N_4
 5 			= N_5
 6 			= N_6
@@ -141,9 +140,8 @@ I 			= I
 O 			= O
 P 			= P
 # @
-[w]^!16777458 	= AT
-[x]^AT		= AT
-[m]^AT		= AT
+[w]^!16777458= AT
+[xm]^AT		= AT
 +PLUS 		= STAR
 #ì
 !16777452	= EXP
@@ -164,12 +162,10 @@ L 			= L
 +COMMA 		= SEMICOL
 # ]
 [w]^PLUS		= SEMICOL,L_SHIFT
-[x]^CLOSE_BRACKET= SEMICOL,L_SHIFT
-[m]^CLOSE_BRACKET= SEMICOL,L_SHIFT
+[xm]^CLOSE_BRACKET= SEMICOL,L_SHIFT
 # [
 [w]^!16777448	= COLON,L_SHIFT
-[x]^OPEN_BRACKET= COLON,L_SHIFT
-[m]^OPEN_BRACKET= COLON,L_SHIFT
+[xm]^OPEN_BRACKET= COLON,L_SHIFT
 +0			= EQUAL
 ENTER 		= RETURN
 # ZXCV row

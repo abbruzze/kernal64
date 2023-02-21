@@ -108,9 +108,9 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
           }
           else keysPressed += remapShift(key,e)
         }
-        println(s"MATCH: hideShift=$hideShift | $oldPressed -> $keysPressed event=$e")
+        //println(s"MATCH: hideShift=$hideShift | $oldPressed -> $keysPressed event=$e")
       case None =>
-        println(s"Unmatched: $e alt=${e.isAltDown} altg=${e.isAltGraphDown}")
+        //println(s"Unmatched: $e alt=${e.isAltDown} altg=${e.isAltGraphDown}")
     }
   }
   final def keyReleased(e: KeyEvent): Unit = synchronized {

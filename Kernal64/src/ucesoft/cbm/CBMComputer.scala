@@ -190,7 +190,7 @@ abstract class CBMComputer extends CBMComponent {
     if (Thread.currentThread != Clock.systemClock) clock.pause
     resetComponent
     if (loadAndRunLastPrg) lastLoadedPrg.foreach( f =>
-      clock.schedule(new ClockEvent("RESET_PRG",clock.currentCycles + PRG_RUN_DELAY_CYCLES,(cycles) => loadPRGFile(f,true)))
+      clock.schedule(new ClockEvent("RESET_PRG",clock.currentCycles + (PRG_RUN_DELAY_CYCLES * 1.5).toInt,_ => loadPRGFile(f,true)))
     )
 
     if (play) clock.play
@@ -246,7 +246,7 @@ abstract class CBMComputer extends CBMComponent {
     display.setRenderingHints(hints)
   }
 
-  protected def setRenderingSettings(parent: JMenu): Unit = {
+  protected def setRenderingSettings(parent: JMenu,includePalette:Boolean = false): Unit = {
     import Preferences._
     // RENDERING-TYPE ======================================================================================
     val renderingItem = new JMenu("Rendering")

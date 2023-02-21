@@ -25,15 +25,17 @@ class KeyboardHelper(closeEvent: () => Unit) extends JPanel with KeyListener {
 
   override def keyTyped(e: KeyEvent): Unit = {}
   override def keyPressed(e: KeyEvent): Unit = {
-    VK_MAP.get(e.getExtendedKeyCode) match {
+    var code = e.getExtendedKeyCode
+    if (code == 0) code = e.getKeyCode
+    VK_MAP.get(code) match {
       case Some(vk) =>
         vkName.setText(vk.substring(3))
         vkCode.setText("")
         key.setText(vk.substring(3))
       case None =>
         vkName.setText("UNDEFINED")
-        vkCode.setText("!" + e.getExtendedKeyCode)
-        key.setText("!" + e.getExtendedKeyCode)
+        vkCode.setText(s"!$code")
+        key.setText(s"!$code")
     }
     val pos = e.getKeyLocation() match {
       case KeyEvent.KEY_LOCATION_NUMPAD => "NUM PAD"
