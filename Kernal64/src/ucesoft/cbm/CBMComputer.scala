@@ -53,7 +53,7 @@ abstract class CBMComputer extends CBMComponent {
   protected val DEFAULT_KEYBOARD_RESOURCE_NAME : String
 
   protected def PRG_LOAD_ADDRESS() = 0x801
-  protected def PRG_RUN_DELAY_CYCLES = 2200000
+  protected def PRG_RUN_DELAY_CYCLES = 2500000
   protected var lastLoadedPrg : Option[File] = None
   protected var headless = false // used with --testcart command options
   protected var cpujamContinue = false // used with --cpujam-continue
@@ -190,7 +190,7 @@ abstract class CBMComputer extends CBMComponent {
     if (Thread.currentThread != Clock.systemClock) clock.pause
     resetComponent
     if (loadAndRunLastPrg) lastLoadedPrg.foreach( f =>
-      clock.schedule(new ClockEvent("RESET_PRG",clock.currentCycles + (PRG_RUN_DELAY_CYCLES * 1.5).toInt,_ => loadPRGFile(f,true)))
+      clock.schedule(new ClockEvent("RESET_PRG",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => loadPRGFile(f,true)))
     )
 
     if (play) clock.play
