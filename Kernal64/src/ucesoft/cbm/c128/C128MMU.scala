@@ -514,7 +514,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     c128Mode = (value & 0x40) == 0
     ram.setC64Mode(!c128Mode)
     if (z80enabled != oldZ80enabled) mmuChangeListener.cpuChanged(!z80enabled)
-    if (!c128Mode && old128Mode && !z80enabled) { 
+    if (!c128Mode && old128Mode/* && !z80enabled*/) {
       mmuChangeListener.c64Mode(true)
       check64_1
     }
@@ -587,11 +587,15 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // SID ---------------------------------------------------------------
     if (address < 0xD500) { ioacc = true ; return sid.read(address) }
     // MMU REGS ----------------------------------------------------------
-    if (address == MMU_CR1) return cr_reg
-    if (address == 0xD505) return MMU_D505_read
-    if (address < 0xD50B) return D500_REGS(address & 0xF)
-    if (address == 0xD50B) return MMU_D50B_read
-    if (address < 0xD600) return 0xFF // unused MMU space
+    if (address < 0xD600) {
+      if (!c128Mode) return lastByteRead // in c64 mode these registers are not visible
+
+      if (address == MMU_CR1) return cr_reg
+      if (address == 0xD505) return MMU_D505_read
+      if (address < 0xD50B) return D500_REGS(address & 0xF)
+      if (address == 0xD50B) return MMU_D50B_read
+      return 0xFF // unused MMU space
+    }
     // VDC ---------------------------------------------------------------
     if (address < 0xD700) return vdc.read(address) 
     // Unused I/O --------------------------------------------------------
@@ -644,9 +648,13 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // SID ---------------------------------------------------------------
     else if (address < 0xD500) { ioacc = true ; sid.write(address,value) }
     // MMU REGS ----------------------------------------------------------
-    else if (address == MMU_CR1) MMU_CR_write(value)
-    else if (address < 0xD50C) mem_write_D5xx(address,value)
-    else if (address < 0xD600) return // unused MMU space
+    else if (address < 0xD600) {
+      if (!c128Mode) return // in c64 mode these registers are not visible
+
+      if (address == MMU_CR1) MMU_CR_write(value)
+      else if (address < 0xD50C) mem_write_D5xx(address, value)
+      // unused MMU space
+    }
     // VDC ---------------------------------------------------------------
     else if (address < 0xD700) vdc.write(address,value)
     // Unused I/O --------------------------------------------------------
