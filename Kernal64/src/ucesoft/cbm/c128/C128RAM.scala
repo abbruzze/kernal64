@@ -171,17 +171,25 @@ private[c128] class C128RAM extends RAMComponent {
     val page = (address >> 8) & 0xFF
     val offset = address & 0xFF
 
-    if (page == 0 && page_1 != 0) {
-      if (!c64mode) address = offset | page_0 << 8 | page_0_bank << 16
-    }
-    else if (page == 1 && page_0 != 1) {
-      if (!c64mode) address = offset | page_1 << 8 | page_1_bank << 16
+    if (c64mode) {
+      if (page == 0 && page_1 != 0) {}
+      else if (page == 1 && page_0 != 1) {}
+      else {
+        if (page == page_0 && processorBank == page_0_bank)
+          address = offset
+        if (page == page_1 && processorBank == page_1_bank)
+          address = offset | 0x100
+      }
     }
     else {
-      if (page == page_0 && processorBank == page_0_bank)
-        address = offset
-      if (page == page_1 && processorBank == page_1_bank)
-        address = offset | 0x100
+      if (page == 0) address = offset | page_0 << 8 | page_0_bank << 16
+      else if (page == 1) address = offset | page_1 << 8 | page_1_bank << 16
+      else {
+        if (page == page_0 && processorBank == page_0_bank)
+          address = offset
+        if (page == page_1 && processorBank == page_1_bank)
+          address = offset | 0x100
+      }
     }
 
     address
