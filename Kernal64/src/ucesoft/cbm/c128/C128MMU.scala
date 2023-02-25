@@ -11,7 +11,7 @@ import ucesoft.cbm.peripheral.keyboard.HomeKeyboard
 import ucesoft.cbm.peripheral.sid.SID
 import ucesoft.cbm.peripheral.vdc.VDC
 import ucesoft.cbm.peripheral.vic.{VIC_II, VIC_II_Memory}
-import ucesoft.cbm.{CBMComponentType, ChipID, Clock, Log}
+import ucesoft.cbm._
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 import java.util.Properties
@@ -61,6 +61,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   final private[this] val BASIC128_ROM = new ROM(ram,"BASIC128_LOW_HI",BASIC_LOW_ADDR,0x8000,C128_BASIC_ROM_PROP)
   final private[this] val KERNAL128_ROM = new ROM(ram, "KERNAL128", KERNAL_ADDR, 0x4000,C128_KERNAL_ROM_PROP)
   final private[this] val CHARACTERS128_ROM = new ROM(ram, "CHARACTERS128", CHARACTERS128_ADDR, 0x1000, C128_CHAR_ROM_PROP,0x1000)
+  final private val clk = Clock.systemClock
   private[this] var c128Mode = true
   private[this] val expansionPort = ExpansionPort.getExpansionPort
   // MMU ======================================================================================
@@ -575,7 +576,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   }
   // I/O
   @inline private[this] def mem_read_0xD000_0xDFFF(address:Int) : Int = {
-    //ioacc = true
+    ioacc = true
     // VIC ---------------------------------------------------------------
     if (address < 0xD400) {
       // additional VIC registers D02F & D030
@@ -585,7 +586,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       return vic.read(address)
     }
     // SID ---------------------------------------------------------------
-    if (address < 0xD500) { ioacc = true ; return sid.read(address) }
+    if (address < 0xD500) return sid.read(address)
     // MMU REGS ----------------------------------------------------------
     if (address < 0xD600) {
       if (!c128Mode) return lastByteRead // in c64 mode these registers are not visible
@@ -603,9 +604,9 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // Color RAM ---------------------------------------------------------
     if (address < 0xDC00) return COLOR_RAM.read(address) & 0x0F | lastByteRead & 0xF0
     // CIA 1 -------------------------------------------------------------
-    if (address < 0xDD00) { ioacc = true ; return cia_dc00.read(address) }
+    if (address < 0xDD00) return cia_dc00.read(address)
     // CIA 2 -------------------------------------------------------------
-    if (address < 0xDE00) { ioacc = true ; return cia_dd00.read(address) }
+    if (address < 0xDE00) return cia_dd00.read(address)
     // I/O expansion slots 1 & 2 -----------------------------------------
     expansionPort.read(address)
   }
@@ -613,7 +614,10 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     val old_clkrate = vic_clkrate_reg & 1
     vic_clkrate_reg = value
     val clkrate = value & 1
-    if (clkrate != old_clkrate) mmuChangeListener.frequencyChanged(clkrate + 1)
+    if (clkrate != old_clkrate) {
+      val delay = if (old_clkrate == 0 && clkrate == 1) 1 else 2
+      clk.schedule(new ClockEvent("ChangeFreqDelay",clk.currentCycles + delay,_ => mmuChangeListener.frequencyChanged(clkrate + 1)))
+    }
     //if ((value & 2) > 0) println("VIC D030 trick mode...")
     vic.c128TestBitEnabled((value & 2) > 0)
     Log.debug(s"Clock frequency set to ${clkrate + 1} Mhz")
@@ -631,7 +635,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     }
   }
   @inline private[this] def mem_write_0xD000_0xDFFF(address:Int,value:Int) : Unit = {
-    //ioacc = true
+    ioacc = true
     // TestCart
     if (TestCart.enabled) TestCart.write(address,value)
     // VIC ---------------------------------------------------------------
@@ -646,7 +650,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       else vic.write(address,value)
     }
     // SID ---------------------------------------------------------------
-    else if (address < 0xD500) { ioacc = true ; sid.write(address,value) }
+    else if (address < 0xD500) sid.write(address,value)
     // MMU REGS ----------------------------------------------------------
     else if (address < 0xD600) {
       if (!c128Mode) return // in c64 mode these registers are not visible
@@ -664,9 +668,9 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // Color RAM ---------------------------------------------------------
     else if (address < 0xDC00) COLOR_RAM.write(address,value & 0x0F)
      // CIA 1 -------------------------------------------------------------
-    else if (address < 0xDD00) { ioacc = true ; cia_dc00.write(address,value) }
+    else if (address < 0xDD00) cia_dc00.write(address,value)
     // CIA 2 -------------------------------------------------------------
-    else if (address < 0xDE00) { ioacc = true ; cia_dd00.write(address,value) }
+    else if (address < 0xDE00) cia_dd00.write(address,value)
     // I/O expansion slots 1 & 2 -----------------------------------------
     else expansionPort.write(address,value)
   }
@@ -764,7 +768,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     
     if (address < 2) {
       if (address == 0) _0 = value & 0xFF else _1 = value
-      val clk = Clock.systemClock.currentCycles
+      val clk = this.clk.currentCycles
 
       if ((_0 & 0x80) > 0) {
         data_set_clk_bit7 = clk + CAPACITOR_FADE_CYCLES
@@ -828,7 +832,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     val capsLockSense = if (keyboard.isCapsLockPressed) 0x0 else 0x1
     var one = capsLockSense << 6 | data_read & 0xBF
 
-    val clk = Clock.systemClock.currentCycles
+    val clk = this.clk.currentCycles
     if (data_falloff_bit7 && (data_set_clk_bit7 < clk)) {
       data_falloff_bit7 = false;
       data_set_bit7 = 0;
