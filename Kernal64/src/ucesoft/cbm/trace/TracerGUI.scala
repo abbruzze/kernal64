@@ -511,6 +511,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
 
   override def enableTracing(enabled: Boolean): Unit = {
     traceEnabled = enabled
+    if (enabled) Log.setDebug() else Log.setInfo()
     if (enabled) onOffButton.setToolTipText("Disable tracing")
     else onOffButton.setToolTipText("Enable tracing")
     onOffButton.setSelected(enabled)
