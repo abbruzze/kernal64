@@ -1156,21 +1156,18 @@ final class VIC_II(mem: VIC_II_Memory,
   }
 
   final def clock() : Unit = {
-    /* to be investigated more */
+    /* to be more investigated  */
     if (c128TestBitEnabled) {
-      rasterCycle = 0
-      updateRasterLine
-      gfxShifter.reset
-      return
+      if (rasterCycle != model.RASTER_CYCLES) updateRasterLine()
     }
 
     refreshCycle = false
 
     // End of PHI2 phase
 
-    if (badLine && rasterCycle > 14 && rasterCycle < 55) cAccess
+    if (badLine && rasterCycle > 14 && rasterCycle < 55) cAccess()
 
-    drawCycle
+    drawCycle()
 
     /*
     if (backgroundColorChangedIndex != -1) {
@@ -1184,7 +1181,7 @@ final class VIC_II(mem: VIC_II_Memory,
 
     if (rasterCycle == model.RASTER_CYCLES) {
       rasterCycle = 0
-      updateRasterLine
+      updateRasterLine()
       gfxShifter.reset
     }
 
@@ -1208,13 +1205,13 @@ final class VIC_II(mem: VIC_II_Memory,
     (rasterCycle: @switch) match {
       case 1 =>
         // check raster line with raster latch if irq enabled
-        if (rasterLine > 0) checkRasterIRQ
+        if (rasterLine > 0) checkRasterIRQ()
       case 2 =>
         // check raster line with raster latch if irq enabled
-        if (rasterLine == 0) checkRasterIRQ
+        if (rasterLine == 0) checkRasterIRQ()
       case 3|4|5|6|7|8|9|10 =>
       case 11 =>
-        refreshAccess
+        refreshAccess()
       case 55 =>
         var c = 0
         while (c < 8) {
@@ -1223,11 +1220,11 @@ final class VIC_II(mem: VIC_II_Memory,
         }
         if (isInDisplayState) {
           // g-access
-          dataToDraw = gAccess
+          dataToDraw = gAccess()
           vc = (vc + 1) & 0x3FF //% 1024
           vmli = (vmli + 1) & 0x3F
         }
-        else dataToDraw = idleAccess
+        else dataToDraw = idleAccess()
       case 56 =>
         var c = 0
         while (c < 8) {
@@ -1238,7 +1235,7 @@ final class VIC_II(mem: VIC_II_Memory,
       case 58 =>
         var c = 0
         while (c < 8) {
-          sprites(c).check58
+          sprites(c).check58()
           c += 1
         }
         if (rc == 7) {
@@ -1254,30 +1251,30 @@ final class VIC_II(mem: VIC_II_Memory,
       case 59|60|61|62|63 =>
       case 12|13 =>
         setBaLow(badLine)
-        refreshAccess
+        refreshAccess()
       case 14 =>
         setBaLow(badLine)
-        refreshAccess
+        refreshAccess()
         vc = vcbase
         vmli = 0
         if (badLine) rc = 0
       case 15 =>
         setBaLow(badLine)
-        refreshAccess
+        refreshAccess()
       case _ if rasterCycle < 55 => // 16 - 54
         setBaLow(badLine)
         if (isInDisplayState) {
           // g-access
-          dataToDraw = gAccess
+          dataToDraw = gAccess()
           vc = (vc + 1) & 0x3FF
           vmli = (vmli + 1) & 0x3F
         }
-        else dataToDraw = idleAccess
+        else dataToDraw = idleAccess()
 
         if (rasterCycle == 16) {
           var c = 0
           while (c < 8) {
-            sprites(c).check16
+            sprites(c).check16()
             c += 1
           }
         }
@@ -1319,7 +1316,7 @@ final class VIC_II(mem: VIC_II_Memory,
     refreshCycle = true
   }
 
-  @inline private def idleAccess : Int = {
+  @inline private def idleAccess() : Int = {
     if (_2MhzMode) mem.byteOnBUS
     else {
       val cop = if (coprocessor != null && coprocessor.isActive) coprocessor.g_access(rasterCycle) else -1
@@ -1508,7 +1505,7 @@ final class VIC_II(mem: VIC_II_Memory,
     }
   }
 
-  @inline private def gAccess : Int = {
+  @inline private def gAccess() : Int = {
     val coprocessor_gdata = if (!isVICIIe && coprocessor != null && coprocessor.isActive) coprocessor.g_access(rasterCycle) else -1
     if (coprocessor_gdata != -1) coprocessor_gdata
     else
