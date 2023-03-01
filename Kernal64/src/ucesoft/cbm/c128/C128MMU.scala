@@ -200,20 +200,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       externalFunctionROM_mid = internalBankedROM(0)
       externalFunctionROM_high = internalBankedROM(0)
       return
-      /*
-      internalBankedROM = Array.ofDim[Array[Int]](rom.length / 16384)
-      var offset = 0
-      var b = 0
-      while (offset < rom.length) {
-        internalBankedROM(b) = Array.ofDim[Int](16384)
-        System.arraycopy(rom,offset,internalBankedROM(b),0,16384)
-        offset += 16384
-        b += 1
-      }
-      internalFunctionROM_mid = internalBankedROM(0)
-      internalFunctionROM_high = internalBankedROM(0)
-      return
-       */
     }
     if (_rom.length <= 16384) { // only mid affected      
       if (internal) {
@@ -301,19 +287,19 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     val address = _address & 0xFFFF
     if (chipID == ChipID.VIC) return vicRead(address)
     ioacc = false
-    lastByteOnBUS = if (c128Mode) {
-      if (z80enabled) readZ80(address) else read128(address)
-    }
+    lastByteOnBUS = if (z80enabled) readZ80(address)
+    else if (c128Mode) read128(address)
     else read64(address)
+
     lastByteOnBUS
   }
   final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
     val address = _address & 0xFFFF
     ioacc = false
-    if (c128Mode) {
-      if (z80enabled) writeZ80(address,value) else write128(address,value)
-    }
+    if (z80enabled) writeZ80(address,value)
+    else if (c128Mode) write128(address,value)
     else write64(address,value)
+
     lastByteOnBUS = value
   }
   
@@ -350,16 +336,26 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   final def in(addressHI:Int,addressLO:Int) : Int = {
     val address = addressHI << 8 | addressLO
     if (address < 0x1000) return ram.read(0xD000 | address,0)
-    if (address < 0x1400) return COLOR_RAM.read(address & 0x3FF)
-    if (address >= 0xD800 && address < 0xDC00) return ram.read(address)
+    if (address < 0x1400) {
+      if (!c128Mode || ram.getProcessorBank() == 0) return COLOR_RAM.read(address & 0x3FF) else return lastByteRead
+    }
+    if (address >= 0xD800 && address < 0xDC00) {
+      /*if (c128Mode) return ram.read(address)
+      else*/ return COLOR_RAM.read(address & 0x3FF)
+    }
     if (address >= 0xD000 && address < 0xE000) return mem_read_0xD000_0xDFFF(address)
     read128(address)
   }
   final def out(addressHI:Int,addressLO:Int,value:Int) : Unit = {
     val address = addressHI << 8 | addressLO
     if (address < 0x1000) ram.write(0xD000 | address,0,value)
-    else if (address < 0x1400) COLOR_RAM.write(address & 0x3FF,value)
-    else if (address >= 0xD800 && address < 0xDC00) ram.write(address,value)
+    else if (address < 0x1400) {
+      if (!c128Mode || ram.getProcessorBank() == 0) COLOR_RAM.write(address & 0x3FF,value)
+    }
+    else if (address >= 0xD800 && address < 0xDC00) {
+      /*if (c128Mode) ram.write(address,value)
+      else*/ COLOR_RAM.write(address,value)
+    }
     else if (address >= 0xD000 && address < 0xE000) mem_write_0xD000_0xDFFF(address,value)
     else write128(address,value)    
   }      
@@ -380,10 +376,13 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
    */
   @inline private[this] def readZ80(address:Int) : Int = {
     if (address < 0x1000) {
-      if (ramBank == 0) return KERNAL128_ROM.read(Z80_BIOS_ADDR | address)
+      if (ramBank == 0 && c128Mode) return KERNAL128_ROM.read(Z80_BIOS_ADDR | address)
       return ram.read(address)
     }
-    if (address < 0x1400 && cr_reg == 0x3E) return COLOR_RAM.read(address & 0x3FF)
+    if (address < 0x1400) {
+      if (cr_reg == 0x3E || !c128Mode) return COLOR_RAM.read(address & 0x3FF)
+      else return ram.read(address)
+    }
     // FF00-FF04 --------------------------------------------
     if (address == 0xFF00) return cr_reg
     if (address > 0xFF00 && address < 0xFF05) return D500_REGS(address & 7) // read the preconfiguration registers
@@ -392,21 +391,34 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // 4000-7FFF --------------------------------------------
     if (address < 0x8000) return mem_read_0x4000_0x7FFF(address)
     // 8000-BFFF --------------------------------------------
-    if (address < 0xC000) return mem_read_0x8000_0xBFFF(address)
+    if (address < 0xC000) {
+      if (!c128Mode) return BASIC64_ROM.read(address)
+
+      return mem_read_0x8000_0xBFFF(address)
+    }
     // I/O --------------------------------------------------
-    if (address >= 0xD000 && address < 0xE000) return ram.read(address)
+    if (address >= 0xD000 && address < 0xE000) {
+      if (c128Mode) return ram.read(address)
+      else return read64_IO(address)
+    }
     // C000-FFFF --------------------------------------------
     mem_read_0xC000_0xFFFF(address,false)
   }
   @inline private[this] def writeZ80(address:Int,value:Int) : Unit = {
     if (address < 0x1000) {
-      if (ramBank == 0) KERNAL128_ROM.write(Z80_BIOS_ADDR | address,value) // ?
+      if (ramBank == 0 && c128Mode) KERNAL128_ROM.write(Z80_BIOS_ADDR | address,value) // ?
       else ram.write(address,value)
     }
-    else if (address < 0x1400 && cr_reg == 0x3E) COLOR_RAM.write(address & 0x3FF,value)
+    else if (address < 0x1400) {
+      if (cr_reg == 0x3E || !c128Mode) COLOR_RAM.write(address & 0x3FF,value) else ram.write(address,value)
+    }
     // FF00-FF04 --------------------------------------------
     else if (address == 0xFF00) MMU_CR_write(value)
     else if (address > 0xFF00 && address < 0xFF05) MMU_FF01_4_write(address & 7) // load cr from preconfiguration registers
+    else if (address >= 0xD000 && address < 0xE000) {
+      if (c128Mode) ram.write(address,value)
+      else write64_IO(address,value)
+    }
     else ram.write(address,value)
   }
   // 8502 =======================================================================
@@ -514,6 +526,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     val old128Mode = c128Mode
     c128Mode = (value & 0x40) == 0
     ram.setC64Mode(!c128Mode)
+    colorRAM.setC64Mode(!c128Mode)
     if (z80enabled != oldZ80enabled) mmuChangeListener.cpuChanged(!z80enabled)
     if (!c128Mode && old128Mode/* && !z80enabled*/) {
       mmuChangeListener.c64Mode(true)
@@ -615,10 +628,10 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     vic_clkrate_reg = value
     val clkrate = value & 1
     if (clkrate != old_clkrate) {
-      val delay = if (old_clkrate == 0 && clkrate == 1) 1 else 2
-      clk.schedule(new ClockEvent("ChangeFreqDelay",clk.currentCycles + delay,_ => mmuChangeListener.frequencyChanged(clkrate + 1)))
+      val delay = if (old_clkrate == 1 && clkrate == 0) 2 else 1
+      if (delay > 0) clk.schedule(new ClockEvent("ChangeFreqDelay",clk.currentCycles + delay,_ => mmuChangeListener.frequencyChanged(clkrate + 1)))
+      else mmuChangeListener.frequencyChanged(clkrate + 1)
     }
-    //if ((value & 2) > 0) println("VIC D030 trick mode...")
     vic.c128TestBitEnabled((value & 2) > 0)
     Log.debug(s"Clock frequency set to ${clkrate + 1} Mhz")
   }
@@ -706,6 +719,36 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // ============================================================================
   
   // C64 Management =============================================================
+  @inline private def read64_IO(address:Int): Int = {
+    if (c64MC.io/* || z80enabled*/) { // I/O
+      if (address < 0xD400) {
+        val reg = address & 0x3F
+        if (reg == VIC_XSCAN_REG) return vic_xscan_reg | 0xF8
+        if (reg == VIC_CLKRATE_REG) return vic_clkrate_reg | 0xFC
+        return vic.read(address)
+      }
+
+      /** *** MMU is not visible in C64 mode
+       * if (address >= 0xD500 && address < 0xD50C) {
+       * // MMU REGS ----------------------------------------------------------
+       * if (address == MMU_CR1) return cr_reg
+       * if (address == 0xD505) return MMU_D505_read
+       * if (address < 0xD50B) return D500_REGS(address & 0xF)
+       * if (address == 0xD50B) return MMU_D50B_read
+       * // -------------------------------------------------------------------
+       * }
+       */
+      if (address >= 0xD600 && address < 0xD700) return vdc.read(address)
+      if (address < 0xD800) return sid.read(address)
+      if (address < 0xDC00) return COLOR_RAM.read(address) & 0x0F | lastByteRead & 0xF0
+      if (address < 0xDD00) return cia_dc00.read(address)
+      if (address < 0xDE00) return cia_dd00.read(address)
+
+      return expansionPort.read(address)
+    }
+    if (c64MC.char) return CHARACTERS64_ROM.read(address)
+    ram.read(address)
+  }
   @inline private[this] def read64(address: Int): Int = {
     if (ULTIMAX) {
       if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return lastByteRead
@@ -727,38 +770,41 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     }
     if (address < 0xD000) return ram.read(address) // RAM
     if (address < 0xE000) { // I/O or RAM or CHAR
-      if (c64MC.io) { // I/O               
-        if (address < 0xD400) {
-          val reg = address & 0x3F
-          if (reg == VIC_XSCAN_REG) return vic_xscan_reg | 0xF8
-          if (reg == VIC_CLKRATE_REG) return vic_clkrate_reg | 0xFC
-          return vic.read(address)
-        }
-        /***** MMU is not visible in C64 mode
-        if (address >= 0xD500 && address < 0xD50C) {
-          // MMU REGS ----------------------------------------------------------
-          if (address == MMU_CR1) return cr_reg
-          if (address == 0xD505) return MMU_D505_read
-          if (address < 0xD50B) return D500_REGS(address & 0xF)
-          if (address == 0xD50B) return MMU_D50B_read
-          // -------------------------------------------------------------------
-        }
-         */
-        if (address >= 0xD600 && address < 0xD700) return vdc.read(address)
-        if (address < 0xD800) return sid.read(address)
-        if (address < 0xDC00) return COLOR_RAM.read(address) & 0x0F | lastByteRead & 0xF0
-        if (address < 0xDD00) return cia_dc00.read(address)
-        if (address < 0xDE00) return cia_dd00.read(address)
-        
-        return expansionPort.read(address)
-      }
-      if (c64MC.char) return CHARACTERS64_ROM.read(address)
-      return ram.read(address)
+      return read64_IO(address)
     }
     // KERNAL or RAM or ROMHULTIMAX
     if (c64MC.kernal) return KERNAL64_ROM.read(address)
     if (c64MC.romhultimax) return ROMH_ULTIMAX.read(address)
     ram.read(address)
+  }
+
+  private def write64_IO(address:Int,value:Int): Unit = {
+    if (c64MC.io) { // I/O
+      if (address < 0xD400) {
+        val reg = address & 0x3F
+        if (reg == VIC_XSCAN_REG) {
+          vic_xscan_reg = value
+          keyboard.selectC128ExtendedRow(value)
+        }
+        else if (reg == VIC_CLKRATE_REG) mem_write_D030(reg, value)
+        else vic.write(address, value)
+      }
+      // MMU REGS ----------------------------------------------------------
+      /** *** MMU is not visible in C64 mode
+       * else if (address == MMU_CR1) MMU_CR_write(value)
+       * else if (address > 0xD500 && address < 0xD50C) mem_write_D5xx(address,value)
+       */
+      else if (address >= 0xD600 && address < 0xD700) vdc.write(address, value)
+      // -------------------------------------------------------------------
+      else if (address < 0xD800) sid.write(address, value)
+      else if (address < 0xDC00) COLOR_RAM.write(address, value)
+      else if (address < 0xDD00) cia_dc00.write(address, value)
+      else if (address < 0xDE00) cia_dd00.write(address, value)
+      else expansionPort.write(address, value)
+      // TestCart
+      if (TestCart.enabled) TestCart.write(address, value)
+    }
+    else ram.write(address, value)
   }
   private[this] def write64(address: Int,value:Int) : Unit = {
     if (ULTIMAX) {
@@ -787,32 +833,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     }
     else if (address < 0xD000) ram.write(address,value) // RAM
     else if (address < 0xE000) { // I/O or RAM or CHAR
-      if (c64MC.io) { // I/O        
-        if (address < 0xD400) {
-          val reg = address & 0x3F
-          if (reg == VIC_XSCAN_REG) {
-            vic_xscan_reg = value
-            keyboard.selectC128ExtendedRow(value)
-          }
-          else if (reg == VIC_CLKRATE_REG) mem_write_D030(reg,value)
-          else vic.write(address,value)
-        }
-        // MMU REGS ----------------------------------------------------------
-        /***** MMU is not visible in C64 mode
-        else if (address == MMU_CR1) MMU_CR_write(value)
-        else if (address > 0xD500 && address < 0xD50C) mem_write_D5xx(address,value)
-        */
-        else if (address >= 0xD600 && address < 0xD700) vdc.write(address,value)
-        // -------------------------------------------------------------------
-        else if (address < 0xD800) sid.write(address,value)
-        else if (address < 0xDC00) COLOR_RAM.write(address,value)
-        else if (address < 0xDD00) cia_dc00.write(address,value)
-        else if (address < 0xDE00) cia_dd00.write(address,value)
-        else expansionPort.write(address,value)
-        // TestCart
-        if (TestCart.enabled) TestCart.write(address,value)
-      }
-      else ram.write(address,value)
+      write64_IO(address,value)
     }
     // KERNAL or RAM or ROMH
     else if (c64MC.romhultimax) ROMH_ULTIMAX.write(address,value) else ram.write(address,value)

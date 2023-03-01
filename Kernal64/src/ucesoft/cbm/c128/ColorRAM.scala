@@ -17,6 +17,7 @@ class ColorRAM extends RAMComponent {
 
   private[this] val mem = Array.ofDim[Int](2,length)
   private[this] var processorBank,vicBank = 0
+  private var c64Mode = false
   
   final val isActive = true
   final def init  : Unit = {}
@@ -24,7 +25,10 @@ class ColorRAM extends RAMComponent {
     for(b <- 0 until 2;i <- 0 until length) mem(b)(i) = 0xFF
     processorBank = 0
     vicBank = 0
+    c64Mode = false
   }
+
+  def setC64Mode(c64Mode:Boolean): Unit = this.c64Mode = c64Mode
   
   /**
    * Set the color bank seen by the processor and by the VIC
@@ -38,11 +42,15 @@ class ColorRAM extends RAMComponent {
   }
   
   final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
-    val bank = if (chipID == ChipID.VIC) vicBank else processorBank
+    //val bank = if (chipID == ChipID.VIC) vicBank
+    //else if (c64Mode) 1 else processorBank
+    val bank = if (c64Mode) 1 else if (chipID == ChipID.VIC) vicBank else processorBank
     mem(bank)(address & 0x3FF)
   }
   final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {
-    val bank = if (chipID == ChipID.VIC) vicBank else processorBank
+    //val bank = if (chipID == ChipID.VIC) vicBank
+    //else if (c64Mode) 1 else processorBank
+    val bank = if (c64Mode) 1 else if (chipID == ChipID.VIC) vicBank else processorBank
     mem(bank)(address & 0x3FF) = value & 0xff
   }
   // state
@@ -51,12 +59,14 @@ class ColorRAM extends RAMComponent {
     out.writeObject(mem(1))
     out.writeInt(processorBank)
     out.writeInt(vicBank)
+    out.writeBoolean(c64Mode)
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     loadMemory[Int](mem(0),in)
     loadMemory[Int](mem(1),in)
     processorBank = in.readInt
     vicBank = in.readInt
+    c64Mode = in.readBoolean()
   }
   protected def allowsStateRestoring : Boolean = true
 }

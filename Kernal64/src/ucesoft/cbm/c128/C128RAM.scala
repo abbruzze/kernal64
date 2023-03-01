@@ -15,8 +15,8 @@ private[c128] class C128RAM extends RAMComponent {
   val startAddress = 0
   val length = 0x10000
   val componentType: Type = CBMComponentType.MEMORY
-  val isActive = true  
-  
+  val isActive = true
+
   // RAM BANKS 0,1,2,3 ------------------------------------
   private[this] final val mem = Array.ofDim[Array[Int]](4)
   private[this] var processorBank,VICbank = 0
@@ -45,19 +45,22 @@ private[c128] class C128RAM extends RAMComponent {
     val length = 0x10000
     val startAddress = 0
     val name = "RAM_bank0"
-    
+
     def init  : Unit = {}
-    def isActive = true  
+    def isActive = true
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(0)(address)
     def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = mem(0)(address) = value
   }
-  
+
   def getBank0 : Memory = Bank0
+
+  def getProcessorBank(): Int = processorBank
+  def getVICBank(): Int = VICbank
 
   final def setDMA(dma:Boolean) : Unit = this.dma = dma
 
   final def setC64Mode(c64mode:Boolean): Unit = this.c64mode = c64mode
-  
+
   override def getProperties: Properties = {
     super.getProperties
     properties.setProperty("Processor memory bank",processorBank.toString)
@@ -73,7 +76,7 @@ private[c128] class C128RAM extends RAMComponent {
     properties.setProperty("Page 1 address:",Integer.toHexString(page_1 << 8 | page_1_bank << 16))
     properties
   }
-  
+
   final def init  : Unit = {
     Log.info("Initializing C128 RAM memory ...")
     // only the first two banks are initialized
@@ -82,7 +85,7 @@ private[c128] class C128RAM extends RAMComponent {
     MemoryInitPattern.initRAM(mem(0))
     MemoryInitPattern.initRAM(mem(1))
   }
-  
+
   final def reset  : Unit = {
     processorBank = 0
     VICbank = 0
@@ -93,35 +96,35 @@ private[c128] class C128RAM extends RAMComponent {
     page_0 = 0
     page_0_bank = 0
     page_1 = 1
-    page_1_bank = 0    
+    page_1_bank = 0
   }
 
   override def hardReset : Unit = {
     init
     reset
   }
-  
+
   final def getBanksNumber : Int = if (expanded) 4 else 2
   /**
    * Set the bank that the processor sees
    * $D500/$FF00 (bit 7-6)
    */
   final def setProcessorBank(bank:Int) : Unit = {
-    if (expanded) processorBank = bank & 0x3 
+    if (expanded) processorBank = bank & 0x3
     else processorBank = bank & 0x1
     Log.debug(s"Set processor bank to $processorBank")
     //println(s"Set processor bank to $processorBank")
-  }  
+  }
   /**
    * Set the bank that the VIC sees
    * $D506 (bit 7-6)
    */
   final def setVICBank(bank:Int) : Unit = {
-    if (expanded) VICbank = bank & 0x3 
-    else VICbank = bank & 0x1 
+    if (expanded) VICbank = bank & 0x3
+    else VICbank = bank & 0x1
     Log.debug(s"Set VIC bank to $VICbank")
     //println(s"Set VIC bank to $VICbank")
-  }  
+  }
   /**
    *  Set the redirecting page 0/1 page
    *  $D507/$D508
@@ -139,7 +142,7 @@ private[c128] class C128RAM extends RAMComponent {
     Log.debug(s"Page $page diverted to ${Integer.toHexString(divertedPage << 8 | (divertedPageBank & 1) << 16)}")
     //println(s"Set diverted page $page $divertedPage $divertedPageBank")
   }
-  
+
   final def setExpansionBanks(expanded:Boolean) : Unit = {
     this.expanded = expanded
     if (expanded) {
@@ -167,7 +170,7 @@ private[c128] class C128RAM extends RAMComponent {
   }
 
   @inline private def getBankAndAddressP0_P1(_address: Int): Int = {
-    var address = _address
+    var address = _address | processorBank << 16
     val page = (address >> 8) & 0xFF
     val offset = address & 0xFF
 
@@ -176,82 +179,86 @@ private[c128] class C128RAM extends RAMComponent {
       else if (page == 1 && page_0 != 1) {}
       else {
         if (page == page_0 && processorBank == page_0_bank)
-          address = offset
+          address = offset | processorBank << 16
         if (page == page_1 && processorBank == page_1_bank)
-          address = offset | 0x100
+          address = offset | 0x100 | processorBank << 16
       }
     }
     else {
-      if (page == 0) address = offset | page_0 << 8 | page_0_bank << 16
+      if (page == 0 && page_0 == 0 && page_0_bank == 0) address = offset | page_0 << 8
+      else if (page == 0) address = offset | page_0 << 8 | page_0_bank << 16
+      else if (page == 1 && page_1 == 1 && page_1_bank == 0) address = offset | page_1 << 8
       else if (page == 1) address = offset | page_1 << 8 | page_1_bank << 16
       else {
         if (page == page_0 && processorBank == page_0_bank)
-          address = offset
+          address = offset | processorBank << 16
         if (page == page_1 && processorBank == page_1_bank)
-          address = offset | 0x100
+          address = offset | 0x100 | processorBank << 16
       }
     }
 
     address
   }
-  
+
   final def read(address:Int,bank:Int) : Int = mem(bank)(address)
   final def write(address:Int,bank:Int,value:Int): Unit = mem(bank)(address) = value
-  
-  final def read(_address: Int, chipID: ChipID.ID = ChipID.CPU) : Int = {
-    if (chipID == ChipID.VIC) return mem(VICbank)(_address)
 
-    if (dma) return mem(VICbank)(_address) // to be investigated if it's correct
+  final def read(originAddress: Int, chipID: ChipID.ID = ChipID.CPU) : Int = {
+    if (chipID == ChipID.VIC) return mem(VICbank)(originAddress)
 
-    val pagedAddress = getBankAndAddressP0_P1(_address)
+    if (dma) return mem(VICbank)(originAddress) // to be investigated if it's correct
+
+    val pagedAddress = getBankAndAddressP0_P1(originAddress)
     val address = pagedAddress & 0xFFFF
     val bank = pagedAddress >> 16
-    if (_address < 0x100) return mem(if (commonArea == BOTTOM_COMMON_RAM || commonArea == TOP_BOTTOM_COMMON_RAM) 0 else bank)(address)
-    if (_address < 0x200) return mem(if (commonArea == BOTTOM_COMMON_RAM || commonArea == TOP_BOTTOM_COMMON_RAM) 0 else bank)(address)
-    
-    commonArea match {
-      case BOTTOM_COMMON_RAM => 
-        if (address < commonAreaBottomLimit) mem(0)(address)
-        else mem(processorBank)(address)
-      case TOP_COMMON_RAM =>
-        if (address > commonAreaTopLimit) mem(0)(address)
-        else mem(processorBank)(address)
-      case TOP_BOTTOM_COMMON_RAM =>
-        if (address < commonAreaBottomLimit || address > commonAreaTopLimit) mem(0)(address)
-        else mem(processorBank)(address)
-      case NO_COMMON_RAM =>
-        mem(processorBank)(address)
-    }
+    if (originAddress < 0x200) return mem(if (commonArea == BOTTOM_COMMON_RAM || commonArea == TOP_BOTTOM_COMMON_RAM) 0 else bank)(address)
+
+    if (bank == 0 && processorBank == 0) mem(0)(address)
+    else
+      commonArea match {
+        case BOTTOM_COMMON_RAM =>
+          if (originAddress < commonAreaBottomLimit) mem(0)(originAddress)
+          else mem(bank)(address)
+        case TOP_COMMON_RAM =>
+          if (originAddress > commonAreaTopLimit) mem(0)(originAddress)
+          else mem(bank)(address)
+        case TOP_BOTTOM_COMMON_RAM =>
+          if (originAddress < commonAreaBottomLimit || originAddress > commonAreaTopLimit) mem(0)(originAddress)
+          else mem(bank)(address)
+        case NO_COMMON_RAM =>
+          mem(bank)(address)
+      }
   }
-  
-  final def write(_address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
+
+  final def write(originAddress: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
     if (dma) { // to be investigated if it's correct
-      mem(VICbank)(_address) = value
+      mem(VICbank)(originAddress) = value
       return
     }
-    val pagedAddress = getBankAndAddressP0_P1(_address)
+    val pagedAddress = getBankAndAddressP0_P1(originAddress)
     val address = pagedAddress & 0xFFFF
     val bank = pagedAddress >> 16
-    if (_address < 0x100) mem(if (commonArea == BOTTOM_COMMON_RAM || commonArea == TOP_BOTTOM_COMMON_RAM) 0 else bank)(address) = value
-    else if (_address < 0x200) mem(if (commonArea == BOTTOM_COMMON_RAM || commonArea == TOP_BOTTOM_COMMON_RAM) 0 else bank)(address) = value
+    if (originAddress < 0x200) mem(if (commonArea == BOTTOM_COMMON_RAM || commonArea == TOP_BOTTOM_COMMON_RAM) 0 else bank)(address) = value
     else {
-      commonArea match {
-        case BOTTOM_COMMON_RAM => 
-          if (address < commonAreaBottomLimit) mem(0)(address) = value
-          else mem(processorBank)(address) = value
-        case TOP_COMMON_RAM =>
-          if (address > commonAreaTopLimit) mem(0)(address) = value
-          else mem(processorBank)(address) = value
-        case TOP_BOTTOM_COMMON_RAM =>
-          if (address < commonAreaBottomLimit || address > commonAreaTopLimit) mem(0)(address) = value
-          else mem(processorBank)(address) = value
-        case NO_COMMON_RAM =>
-          mem(processorBank)(address) = value
-      }
+      if (bank == 0 && processorBank == 0) mem(0)(address) = value
+      else
+        commonArea match {
+          case BOTTOM_COMMON_RAM =>
+            if (originAddress < commonAreaBottomLimit) mem(0)(originAddress) = value
+            else mem(bank)(address) = value
+          case TOP_COMMON_RAM =>
+            if (originAddress > commonAreaTopLimit) mem(0)(originAddress) = value
+            else mem(bank)(address) = value
+          case TOP_BOTTOM_COMMON_RAM =>
+            if (originAddress < commonAreaBottomLimit || originAddress > commonAreaTopLimit) mem(0)(originAddress) = value
+            else mem(bank)(address) = value
+          case NO_COMMON_RAM =>
+            mem(bank)(address) = value
+        }
     }
   }
   // state -----------------------------------------------
-  
+
   protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeBoolean(expanded)
     out.writeObject(mem(0))
@@ -261,7 +268,7 @@ private[c128] class C128RAM extends RAMComponent {
       out.writeObject(mem(3))
     }
     out.writeInt(processorBank)
-    out.writeInt(VICbank)    
+    out.writeInt(VICbank)
     out.writeInt(commonAreaSize)
     out.writeInt(commonArea)
     out.writeInt(commonAreaBottomLimit)
@@ -273,7 +280,7 @@ private[c128] class C128RAM extends RAMComponent {
     out.writeBoolean(dma)
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
-    expanded = in.readBoolean    
+    expanded = in.readBoolean
     loadMemory[Int](mem(0),in)
     loadMemory[Int](mem(1),in)
     if (expanded) {
@@ -281,7 +288,7 @@ private[c128] class C128RAM extends RAMComponent {
       loadMemory[Int](mem(3),in)
     }
     processorBank = in.readInt
-    VICbank = in.readInt    
+    VICbank = in.readInt
     commonAreaSize = in.readInt
     commonArea = in.readInt
     commonAreaBottomLimit = in.readInt
