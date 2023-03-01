@@ -314,7 +314,7 @@ object WiC64 extends CBMComponent with Runnable {
       offsetHex = ("0" * (4 - offsetHex.length)) + offsetHex
       sb.append(s"$offsetHex ")
       while (i < row.length) {
-        val hex = if (row(i) < 0xF) s"0${row(i).toHexString}" else row(i).toHexString
+        val hex = if (row(i) < 0x10) s"0${row(i).toHexString}" else row(i).toHexString
         sb.append(s"$hex ")
         i += 1
       }
@@ -415,7 +415,7 @@ object WiC64 extends CBMComponent with Runnable {
       connection.setInstanceFollowRedirects(true)
       connection.setRequestProperty("User-Agent","ESP32HTTPClient")
       connection.connect()
-      var rcode = connection.getResponseCode
+      val rcode = connection.getResponseCode
       log(s"HTTP code=$rcode")
       if (rcode == HttpURLConnection.HTTP_MOVED_TEMP || rcode == HttpURLConnection.HTTP_MOVED_PERM || rcode == HttpURLConnection.HTTP_SEE_OTHER) {
         val redirectedLocation = connection.getHeaderField("Location")
