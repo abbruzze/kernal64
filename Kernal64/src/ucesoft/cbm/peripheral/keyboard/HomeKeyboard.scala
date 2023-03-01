@@ -81,7 +81,6 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
     for(i <- 0 until rowSelector.length) c128ExtendedRowSelector(i) = false
     for(i <- 0 until rowSelector.length) colSelector(i) = false
     HomeKeyboard.keybThreadRunning = false
-    hideShift = false
   }
     
   override def getProperties: Properties = {
@@ -99,8 +98,8 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
       return
     }
     findPressedKey(e) match {
-      case Some(keys) =>
-        val oldPressed = keysPressed.clone()
+      case Some(PressedKeys(hideShift,keys)) =>
+        //val oldPressed = keysPressed.clone()
         for (key <- keys) {
           if (key == RESTORE || key == VIC20_RESTORE) {
             nmiAction(true)
@@ -108,6 +107,7 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
           }
           else keysPressed += remapShift(key,e)
         }
+        if (hideShift) clearAllPressedShifts()
         //println(s"MATCH: hideShift=$hideShift | $oldPressed -> $keysPressed event=$e")
       case None =>
         //println(s"Unmatched: $e alt=${e.isAltDown} altg=${e.isAltGraphDown}")
@@ -148,13 +148,10 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
       val keys = keysPressed.iterator
       while (keys.hasNext) {
         val k = keys.next
-        val skip = hideShift && CKey.isShift(k)
-        if (!skip) {
-          val (r, c) = CKey.getRowCol(k)
-          val row = if (isRowSel) r else c
-          val col = if (!isRowSel) r else c
-          if (CKey.is128Key(k) == isExtendedSelector && selector(row)) res |= 1 << col
-        }
+        val (r, c) = CKey.getRowCol(k)
+        val row = if (isRowSel) r else c
+        val col = if (!isRowSel) r else c
+        if (CKey.is128Key(k) == isExtendedSelector && selector(row)) res |= 1 << col
       }
       0xFF - res
     } 

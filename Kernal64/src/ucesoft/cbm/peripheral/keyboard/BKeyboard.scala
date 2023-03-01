@@ -51,11 +51,8 @@ class BKeyboard(_km:KeyboardMapper,override protected val model:CBMComputerModel
       val keys = keysPressed.iterator
       while (keys.hasNext) {
         val k = keys.next
-        val skip = hideShift && CKey.isShift(k)
-        if (!skip) {
-          val (r, c) = CKey.getRowCol(k)
-          if ((colAddress & (1 << c)) > 0) byte &= ~(1 << r)
-        }
+        val (r, c) = CKey.getRowCol(k)
+        if ((colAddress & (1 << c)) > 0) byte &= ~(1 << r)
       }
     }
 
@@ -64,9 +61,10 @@ class BKeyboard(_km:KeyboardMapper,override protected val model:CBMComputerModel
 
   override final def keyPressed(e: KeyEvent): Unit = {
     findPressedKey(e) match {
-      case Some(keys) =>
-        val oldPressed = keysPressed.clone()
+      case Some(PressedKeys(hideShift, keys)) =>
+        //val oldPressed = keysPressed.clone()
         for(key <- keys) keysPressed += key
+        if (hideShift) clearAllPressedShifts()
         //println(s"MATCH: hideShift=$hideShift | $oldPressed -> $keysPressed event=$e")
       case None =>
         //Keyprintln(s"Unmatched: $e alt=${e.isAltDown} altg=${e.isAltGraphDown}")
@@ -74,7 +72,7 @@ class BKeyboard(_km:KeyboardMapper,override protected val model:CBMComputerModel
   }
 
   override final def keyReleased(e: KeyEvent): Unit = {
-    findPressedKey(e) match {
+    findReleasedKey(e) match {
         case Some(keys) =>
           for(key <- keys) keysPressed -= key
         case None =>

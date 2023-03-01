@@ -15,7 +15,8 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
   private final val ALT_CTRL_ALTG_MASK = ALT_DOWN_MASK | ALT_GRAPH_DOWN_MASK | CTRL_DOWN_MASK
   private var isLastShiftRight = false
   private final val windowsOS = System.getProperty("os.name").toUpperCase().startsWith("WINDOWS")
-  protected var hideShift = false
+
+  protected case class PressedKeys(hideShift:Boolean,keys:List[CKey.Value])
 
   final def setEnabled(enabled: Boolean): Unit = {
     this.enabled = enabled
@@ -38,7 +39,6 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
     keysPressed.clear()
     lastKey = null
     isLastShiftRight = false
-    hideShift = false
   }
 
   override final def keyTyped(e: KeyEvent) : Unit = {}
@@ -50,7 +50,7 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
     if (extCode == KeyEvent.VK_UNDEFINED) e.getKeyCode else extCode
   }
 
-  protected def findPressedKey(e: KeyEvent): Option[List[CKey.Value]] = {
+  protected def findPressedKey(e: KeyEvent): Option[PressedKeys] = {
     if (e.isAltDown && !e.isAltGraphDown) return None // only ALT
     if (e.getID == KeyEvent.KEY_PRESSED && e.getKeyCode == KeyEvent.VK_SHIFT) isLastShiftRight = e.getKeyLocation == KeyEvent.KEY_LOCATION_RIGHT
     // On Windows if you press AltGr, it is generated for first a CTRL press followed by the key with ALT+CTRL+AltGr modifiers
@@ -70,9 +70,9 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
     map.get(hk) match {
       case None =>
         None
-      case list@Some(keys) =>
-        hideShift = !keys.exists(k => CKey.isShift(k)) && e.isShiftDown
-        list
+      case Some(keys) =>
+        val hideShift = !keys.exists(k => CKey.isShift(k)) && e.isShiftDown
+        Some(PressedKeys(hideShift,keys))
     }
   }
 
