@@ -428,8 +428,11 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       else ram.write(address,value)
     }
     else if (address < 0x1400) {
-      if (cr_reg == 0x3E || cr_reg == 0x7E/* || !c128Mode*/) COLOR_RAM.write(address & 0x3FF,value)
-      else ram.write(address,value) // bleeding through effect ??
+      if (cr_reg == 0x3E || cr_reg == 0x7E/* || !c128Mode*/) {
+        COLOR_RAM.write(address & 0x3FF,value)
+        if (!c128Mode) ram.write(address,value) // bleeding through effect
+      }
+      else ram.write(address,value)
     }
     // FF00-FF04 --------------------------------------------
     else if (address == 0xFF00) MMU_CR_write(value)
