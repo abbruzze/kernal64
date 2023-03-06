@@ -2,7 +2,7 @@ package ucesoft.cbm.misc
 
 import ucesoft.cbm.peripheral.drive.DriveLedListener
 
-abstract class AbstractDriveLedListener(led:DriveLed) extends DriveLedListener {
+abstract class AbstractDriveLedListener(led:DriveLed,id:Int) extends DriveLedListener {
   override def writeMode(enabled:Boolean): Unit = {
     led.driveWriteMode = enabled
     led.repaint()
@@ -37,5 +37,9 @@ abstract class AbstractDriveLedListener(led:DriveLed) extends DriveLedListener {
     info.append("%s%02d".format(if (halfTrack) "." else "",track))
     if (sector.isDefined) info.append(".%02d".format(sector.get))
     led.showLedInfo(info.toString)
+    if (DiskTrace.isEnabled()) {
+      info.insert(0,s"TrackSector #$id ")
+      DiskTrace.trace(info.toString)
+    }
   }
 }

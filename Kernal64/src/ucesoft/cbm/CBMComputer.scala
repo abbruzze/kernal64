@@ -111,7 +111,7 @@ abstract class CBMComputer extends CBMComponent {
   protected val floppyComponents: Array[FloppyComponent] = Array.ofDim[FloppyComponent](TOTAL_DRIVES)
   protected val driveLedListeners: Array[AbstractDriveLedListener] = {
     (for(d <- 0 until TOTAL_DRIVES) yield {
-      new AbstractDriveLedListener(driveLeds(d)) {
+      new AbstractDriveLedListener(driveLeds(d),d + 8) {
         if (d > 0) driveLeds(d).setVisible(false)
       }
     }).toArray
@@ -182,6 +182,7 @@ abstract class CBMComputer extends CBMComponent {
     for (d <- drives)
       d.getFloppy.close
     shutdownComponent
+    DiskTrace.close()
     sys.exit(0)
   }
 
@@ -327,6 +328,7 @@ abstract class CBMComputer extends CBMComponent {
   protected def ejectDisk(driveID:Int) : Unit = {
     drives(driveID).getFloppy.close
     driveLeds(driveID).setToolTipText("")
+    if (DiskTrace.isEnabled()) DiskTrace.trace(s"Disk ejected from drive #${driveID + 8}")
     if (!tracer.isTracing()) clock.pause
     if (drives(driveID).driveType == DriveType._1581) drives(driveID).setDriveReader(D1581.MFMEmptyFloppy,true)
     else drives(driveID).setDriveReader(EmptyFloppy,true)

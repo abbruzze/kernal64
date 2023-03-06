@@ -941,6 +941,9 @@ class VIC20 extends CBMHomeComputer {
     preferences.add(PREF_MOUSE_DELAY_MILLIS, "Sets the mouse delay parameter in millis", 20) { delay =>
       MouseCage.setRatioMillis(delay)
     }
+    preferences.add(PREF_DISK_TRACE_FILE, "Enable disk activity tracing on given file", "") { file =>
+      DiskTrace.setTrace(file)
+    }
   }
 
   protected def saveSettings(save: Boolean): Unit = {
