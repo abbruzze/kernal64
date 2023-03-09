@@ -37,9 +37,5 @@ abstract class AbstractDriveLedListener(led:DriveLed,id:Int) extends DriveLedLis
     info.append("%s%02d".format(if (halfTrack) "." else "",track))
     if (sector.isDefined) info.append(".%02d".format(sector.get))
     led.showLedInfo(info.toString)
-    if (DiskTrace.isEnabled()) {
-      info.insert(0,s"TrackSector #$id ")
-      DiskTrace.trace(info.toString)
-    }
   }
 }

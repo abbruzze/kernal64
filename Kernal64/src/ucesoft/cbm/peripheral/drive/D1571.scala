@@ -127,7 +127,7 @@ class D1571(val driveID: Int,
    * 
    ***********************************************************************************************************/
   private[this] var ciaRunning = true
-  private[this] val CIA = new CIA("CIA_FAST_" + driveID,0x4000,EmptyCIAConnector,EmptyCIAConnector,IRQSwitcher.ciaIRQ _,isIdle => ciaRunning = !isIdle,false) with IECBusListener {
+  private[this] val CIA = new CIA(s"CIA_FAST_$driveID",0x4000,EmptyCIAConnector,EmptyCIAConnector,IRQSwitcher.ciaIRQ _,isIdle => ciaRunning = !isIdle,false) with IECBusListener {
     val busid: String = name
     setCIAModel(ucesoft.cbm.peripheral.cia.CIA.CIA_MODEL_8521)
     
@@ -150,8 +150,8 @@ class D1571(val driveID: Int,
    * VIA1 IEC Bus Manager
    * 
    ***********************************************************************************************************/
-  private[this] val VIA1 = new VIA("VIA1571_IECBus" + driveID,0x1800,IRQSwitcher.viaBusIRQ _) with IECBusListener {
-    override lazy val componentID = "VIA1571_1 (Bus)"
+  private[this] val VIA1 = new VIA(s"VIA1571_IECBus_$driveID",0x1800,IRQSwitcher.viaBusIRQ _) with IECBusListener {
+    override lazy val componentID = s"VIA1571_1 (Bus)_$driveID"
     val busid: String = name
     private[this] val IDJACK = driveID & 0x03
     private[this] var driveEnabled = true
@@ -223,8 +223,8 @@ class D1571(val driveID: Int,
    * VIA2 Disk Controller
    * 
    ***********************************************************************************************************/
-  private[this] val VIA2 = new VIA("VIA1571_DiskControl", 0x1C00,IRQSwitcher.viaDiskIRQ _) {
-    override lazy val componentID = "VIA1571_2 (DC)"
+  private[this] val VIA2 = new VIA(s"VIA1571_DiskControl_$driveID", 0x1C00,IRQSwitcher.viaDiskIRQ _) {
+    override lazy val componentID = s"VIA1571_2 (DC)_$driveID"
     private[this] val WRITE_PROTECT_SENSE = 0x10
     private[this] val WRITE_PROTECT_SENSE_WAIT = 3 * 400000L
     private[this] val REMOVING_DISK_WAIT = 500000L
@@ -453,7 +453,7 @@ class D1571(val driveID: Int,
     _1541Mode = true  
     busDataDirection = 0
     activeHead = 0
-    canSleep = true
+    //canSleep = true
     running = true
     runningListener(true)
     awakeCycles = 0

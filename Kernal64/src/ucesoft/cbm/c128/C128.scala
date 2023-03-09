@@ -79,6 +79,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     ProgramLoader.reset
     cia12Running(0) = true
     cia12Running(1) = true
+    FSDIRasInput = true
   }
 
   def init  : Unit = {
@@ -359,7 +360,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     //println(s"FSDIR set to input $input")
   }
   
-  def _1571mode(_1571Mode:Boolean) : Unit = {
+  override def _1571mode(_1571Mode:Boolean) : Unit = {
     mmuStatusPanel._1571mode(_1571Mode)
   }
 

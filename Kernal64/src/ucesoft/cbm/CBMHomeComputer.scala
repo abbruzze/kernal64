@@ -221,7 +221,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
         case _ =>
       }
       driveLeds(driveID).setToolTipText(disk.toString)
-      if (DiskTrace.isEnabled()) DiskTrace.trace(s"Drive #${driveID + 8} loaded with disk $file")
     }
     catch {
       case t:Throwable =>
@@ -498,6 +497,8 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
   }
 
+  protected def _1571mode(_1571Mode:Boolean) : Unit = {}
+
   override protected def initDrive(id:Int,driveType:DriveType.Value) : Unit = {
     val old = Option(drives(id))
     old match {
@@ -507,7 +508,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     drives(id) = driveType match {
       case DriveType._1571 =>
         driveLedListeners(id).setPowerLedMode(false)
-        new D1571(id,bus,driveLedListeners(id),_ => {})
+        new D1571(id,bus,driveLedListeners(id),_1571mode _)
       case DriveType._1541 =>
         driveLedListeners(id).setPowerLedMode(false)
         new C1541(id,bus,driveLedListeners(id))
@@ -896,9 +897,6 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
     preferences.add(PREF_MOUSE_DELAY_MILLIS,"Sets the mouse delay parameter in millis",20) { delay =>
       MouseCage.setRatioMillis(delay)
-    }
-    preferences.add(PREF_DISK_TRACE_FILE,"Enable disk activity tracing on given file","") { file =>
-      DiskTrace.setTrace(file)
     }
   }
 

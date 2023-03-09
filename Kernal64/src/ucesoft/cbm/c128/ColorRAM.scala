@@ -51,7 +51,7 @@ class ColorRAM extends RAMComponent {
     //val bank = if (chipID == ChipID.VIC) vicBank
     //else if (c64Mode) 1 else processorBank
     val bank = if (c64Mode) 1 else if (chipID == ChipID.VIC) vicBank else processorBank
-    mem(bank)(address & 0x3FF) = value & 0xff
+    mem(bank)(address & 0x3FF) = value & 0x0F
   }
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
