@@ -915,5 +915,9 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     // PLAY    
     vdc.play
     clock.play
+    // KEYBOARD LAYOUT
+    swing {
+      checkKeyboardLayout()
+    }
   }
 }

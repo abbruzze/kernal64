@@ -1,7 +1,7 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import ucesoft.cbm.{C128Model, C64Model, CBMComputerModel, CBMIIModel, Log, VIC20Model}
-import ucesoft.cbm.peripheral.keyboard.CKey.{Key, L_SHIFT}
+import ucesoft.cbm._
+import ucesoft.cbm.peripheral.keyboard.CKey.Key
 
 import java.awt.event.KeyEvent
 import java.io._
@@ -9,14 +9,18 @@ import java.io._
 trait KeyboardMapper {
   val configuration : Option[String]
   val locale : Option[String]
+  val defaultConfigurationNotFound : Boolean
   val content: String
 	val map : Map[HostKey,List[CKey.Key]]
 	val keypad_map : Map[HostKey,List[CKey.Key]]
 }
 
 object KeyboardMapperStore {
+  val envKeyboardLayout = System.getProperty("keyboard.layout")
   private val KEY_EVENT_MAP = getKeyEventMap
   private val KEY_EVENT_REV_MAP = getKeyEventMap map { kv => (kv._2,kv._1) }
+
+  def getLocaleLang(): Option[String] = Option(java.awt.im.InputContext.getInstance().getLocale).map(_.getLanguage)
 
   def getKey(code:Int) : String = KEY_EVENT_MAP get code match {
     case None =>
@@ -44,12 +48,12 @@ object KeyboardMapperStore {
     }
   }
   
-  private def loadFromResource(name:String,model:CBMComputerModel) : Option[KeyboardMapper] = {
+  private def loadFromResource(name:String,model:CBMComputerModel,defaultConfigurationNotFound:Boolean = false) : Option[KeyboardMapper] = {
     val in = getClass.getResourceAsStream(name)
     if (in == null) None
     else {
       try {
-        val map = Some(load(new BufferedReader(new InputStreamReader(in)),model,None,Some(name.takeRight(2))))
+        val map = Some(load(new BufferedReader(new InputStreamReader(in)),model,None,Some(name.takeRight(2)),defaultConfigurationNotFound))
         in.close()
         map
       }
@@ -62,7 +66,7 @@ object KeyboardMapperStore {
     }
   }
 
-  private def load(in:BufferedReader,model:CBMComputerModel,file:Option[String],_locale:Option[String]) : KeyboardMapper = {
+  private def load(in:BufferedReader,model:CBMComputerModel,file:Option[String],_locale:Option[String],_defaultConfigurationNotFound:Boolean = false) : KeyboardMapper = {
     val e_map = new collection.mutable.HashMap[HostKey,List[CKey.Key]]
     val e_keypad_map = new collection.mutable.HashMap[HostKey,List[CKey.Key]]
     
@@ -112,6 +116,7 @@ object KeyboardMapperStore {
     new KeyboardMapper {
       override val configuration = file
       override val locale = _locale
+      override val defaultConfigurationNotFound = _defaultConfigurationNotFound
       override val content = fileContent.toString
       override val map: Map[HostKey, List[Key]] = e_map.toMap
       override val keypad_map: Map[HostKey, List[Key]] = e_keypad_map.toMap
@@ -153,7 +158,7 @@ object KeyboardMapperStore {
     }
   }
 
-  private def getDefaultKeyboardByInputContext(): String = Option(java.awt.im.InputContext.getInstance().getLocale).map(_.getLanguage).getOrElse("IT")
+  private def getDefaultKeyboardByInputContext(): String = getLocaleLang().getOrElse("IT")
 
   /*
     Check keyboard.layout env variabile first.
@@ -162,7 +167,7 @@ object KeyboardMapperStore {
       2. If command fails or OS is not linux try to use InputContext
    */
   private def findDefaultKeyboardLayoutForLocale(internalResource:String) : String = {
-    val _layout = if (System.getProperty("keyboard.layout") != null) System.getProperty("keyboard.layout") else {
+    val _layout = if (envKeyboardLayout != null) envKeyboardLayout else {
       if (System.getProperty("os.name").toUpperCase().startsWith("LINUX")) {
         checkLinuxKeyboardLayout() match {
           case Some(layout) => layout
@@ -185,7 +190,7 @@ object KeyboardMapperStore {
           case None =>
             println(s"Cannot find internal default layout '$internalResource'. Using IT layout.")
             // layout not found, switching to IT
-            loadFromResource(s"${_internalResource}_IT",model) match {
+            loadFromResource(s"${_internalResource}_IT",model,true) match {
               case None =>
                 throw new FileNotFoundException(s"Can't find default keyboard file: ${_internalResource}")
               case Some(m) =>
@@ -210,7 +215,14 @@ object KeyboardMapperStore {
             Log.info(s"Cannot load keyboard file $file: " + t)
             println(s"Cannot load keyboard file $file: ")
             t.printStackTrace()
-            loadMapper(None,_internalResource,model)
+            externalFile match {
+              case Some(_) =>
+                loadMapper(None,_internalResource,model)
+              case None =>
+                println("Fatal error cannot find keyboard layout.")
+                sys.exit(1)
+            }
+
         }
     }
   }

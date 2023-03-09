@@ -1086,6 +1086,10 @@ class VIC20 extends CBMHomeComputer {
     }
     // PLAY
     clock.play
+    // KEYBOARD LAYOUT
+    swing {
+      checkKeyboardLayout()
+    }
   }
 
   override def shutdown(): Unit = {

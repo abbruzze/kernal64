@@ -1,8 +1,9 @@
 package ucesoft.cbm.peripheral.keyboard
 
-import ucesoft.cbm.{CBMComponentType, CBMComputerModel}
 import ucesoft.cbm.CBMComponentType.Type
 import ucesoft.cbm.cbm2.CBM2MMU
+import ucesoft.cbm.{CBMComponentType, CBMComputerModel}
+
 import java.awt.event.KeyEvent
 import java.io.{ObjectInputStream, ObjectOutputStream}
 

@@ -4,7 +4,7 @@ import ucesoft.cbm.cpu.{CPU65xx, Memory, ROM}
 import ucesoft.cbm.formats.{Diskette, TAP}
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral.c2n.Datassette
-import ucesoft.cbm.peripheral.drive.{D1581, Drive, DriveIDMismatch, DriveType, EmptyFloppy}
+import ucesoft.cbm.peripheral.drive._
 import ucesoft.cbm.peripheral.keyboard
 import ucesoft.cbm.peripheral.keyboard.Keyboard
 import ucesoft.cbm.peripheral.printer.{MPS803GFXDriver, MPS803ROM, Printer}
@@ -811,6 +811,15 @@ abstract class CBMComputer extends CBMComponent {
     finally {
       if (out != null) out.close()
       clock.play
+    }
+  }
+
+  protected def checkKeyboardLayout(): Unit = {
+    if (!headless) {
+      if (keybMapper.defaultConfigurationNotFound) {
+        val locale = Option(keyboard.KeyboardMapperStore.envKeyboardLayout).getOrElse(keyboard.KeyboardMapperStore.getLocaleLang().getOrElse("?")).toUpperCase()
+        JOptionPane.showMessageDialog(displayFrame,s"Default keyboard configuration file not found for your locale '$locale'","Keyboard layout warning",JOptionPane.WARNING_MESSAGE)
+      }
     }
   }
 }

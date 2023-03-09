@@ -3,8 +3,8 @@ package ucesoft.cbm.peripheral.keyboard
 import ucesoft.cbm.peripheral.keyboard.CKey.{CBM2_SHIFT, L_SHIFT, R_SHIFT, VIC20_L_SHIFT, VIC20_R_SHIFT}
 import ucesoft.cbm.{CBMComponent, CBMComputerModel, CBMIIModel, VIC20Model}
 
-import java.awt.event.{KeyEvent, KeyListener}
 import java.awt.event.InputEvent._
+import java.awt.event.{KeyEvent, KeyListener}
 
 abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMComputerModel) extends CBMComponent with KeyListener {
   protected val keysPressed = collection.mutable.Set.empty[CKey.Key]

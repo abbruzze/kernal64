@@ -528,5 +528,9 @@ class SCPUC64 extends CBMHomeComputer {
     }
     // PLAY
     clock.play
+    // KEYBOARD LAYOUT
+    swing {
+      checkKeyboardLayout()
+    }
   }
 }
