@@ -789,7 +789,7 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
   }
   // ==============================================================================
   
-  def reset : Unit = {
+  def reset() : Unit = {
     cmd = IdleCommand
     track = 0
     sector = 0
@@ -799,7 +799,7 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     step = NoStep
     crc = 0
   }
-  def init : Unit = {}
+  def init() : Unit = {}
   
   // ==============================================================================
   @inline private def stat : Int = {
