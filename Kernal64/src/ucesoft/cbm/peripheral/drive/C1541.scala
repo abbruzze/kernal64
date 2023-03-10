@@ -40,7 +40,10 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
    * VIA1 Disk Controller
    * 
    ***********************************************************************************************************/
-  private[this] val viaBus = new VIA("VIA_IECBus" + jackID,0x1800,IRQSwitcher.viaBusIRQ _) with IECBusListener {
+  private trait VIABus {
+    def setEnabled(enabled:Boolean): Unit
+  }
+  private[this] val viaBus = new VIA("VIA_IECBus" + jackID,0x1800,IRQSwitcher.viaBusIRQ _) with IECBusListener with VIABus {
     override lazy val componentID = "VIA1 (Bus)"
     val busid: String = name
     private[this] val IDJACK = jackID & 0x03
@@ -53,7 +56,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       super.reset()
     }
     
-    def setEnabled(enabled:Boolean): Unit = driveEnabled = enabled
+    override def setEnabled(enabled:Boolean): Unit = driveEnabled = enabled
     
     override def atnChanged(oldValue:Int,newValue:Int) : Unit = {
       if (driveEnabled) {
@@ -126,7 +129,11 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
    * VIA2 Disk Controller
    * 
    ***********************************************************************************************************/
-  private[this] val viaDisk = new VIA("VIA1541_DiskControl", 0x1C00,IRQSwitcher.viaDiskIRQ _) {
+  private trait VIADisk {
+    def setDriveReader(driveReader:Floppy,emulateInserting:Boolean): Unit
+    def byteReady() : Unit
+  }
+  private[this] val viaDisk = new VIA("VIA1541_DiskControl", 0x1C00,IRQSwitcher.viaDiskIRQ _) with VIADisk {
     override lazy val componentID = "VIA1541_2 (DC)"
     private[this] val WRITE_PROTECT_SENSE = 0x10
     private[this] val WRITE_PROTECT_SENSE_WAIT = 3 * 400000L
@@ -135,7 +142,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
     private[this] var isDiskChanged = true
     private[this] var isDiskChanging = false
       
-    def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) : Unit = {
+    override def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) : Unit = {
       floppy = driveReader
       if (emulateInserting) {
         RW_HEAD.setFloppy(EmptyFloppy)
@@ -223,7 +230,7 @@ class C1541(val jackID: Int, bus: IECBus, ledListener: DriveLedListener) extends
       super.write(address, value, chipID)
     }
           
-    final def byteReady() : Unit = {
+    override final def byteReady() : Unit = {
       cpu.setOverflowFlag()
       irq_set(IRQ_CA1)
       

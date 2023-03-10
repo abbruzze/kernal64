@@ -75,6 +75,18 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
   @inline private def isf(flag:Int) = (status & flag) == flag 
   
   private abstract class Step(name:String) {
+    var byteCounter = 0
+    var dataCrc = 0
+    var crcCount = 0
+    var gapCount = 0
+    var zeroCount = 0
+    var dataFieldCount = 0
+    var dataCount = 0
+    var byteIndex = 0
+    var indexHoleFound = false
+    var byteCount = 0
+    var indexHoleStatus = 0
+    var crcWriting, lastWritten = 0
     var lastStep : Step = _
     def apply() : Unit
     
@@ -269,7 +281,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
   }
   
   private class FindDataField(foundStep:Step,notFoundStep:Step) extends Step("FindDataField") {
-    private var byteCount = 0
     private var A1FBcount = 0
     def apply() : Unit = {
       if (rwh.getLastByteReady) { // ok, byte ready
@@ -447,7 +458,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_5 = new Step("TypeIIMainStep_5") {
-      var byteCounter = 0      
       def apply() : Unit = {
         if (rwh.getLastByteReady) { // ok, first byte ready
           val byte = rwh.getLastRead
@@ -468,8 +478,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_6 = new Step("TypeIIMainStep_6") {
-      var dataCrc = 0
-      var crcCount = 0
       def apply() : Unit = {
         if (rwh.getLastByteReady) { // ok, first byte ready
           val byte = rwh.getLastRead
@@ -495,7 +503,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_7 = new Step("TypeIIMainStep_7") {
-      var gapCount = 0
       def apply() : Unit = {
         if (rwh.getLastByteReady) {
           if (DEBUG) println("Read GAP " + rwh.getLastRead)
@@ -519,7 +526,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_8 = new Step("TypeIIMainStep_8") {
-      var zeroCount = 0
       def apply() : Unit = {
         if (rwh.getLastByteReady) {
           zeroCount += 1
@@ -534,7 +540,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_8_1 = new Step("TypeIIMainStep_8_1") {
-      var dataFieldCount = 0
       def apply() : Unit = {
         if (rwh.getLastByteReady) {
           dataFieldCount += 1
@@ -557,7 +562,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_9 = new Step("TypeIIMainStep_9") {
-      var dataCount = 0
       def apply() : Unit = {
         if (rwh.getLastByteReady) {
           dataCount -= 1
@@ -584,7 +588,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_10 = new Step("TypeIIMainStep_10") {
-      var crcCount = 0
       def apply() : Unit = {
         if (rwh.getLastByteReady) {
           crcCount += 1
@@ -653,7 +656,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_4 = new Step("TypeIIIMainStep_4") {
-      var byteIndex = 0
       def apply() : Unit = {
         if (!isf(DRQ_FLAG)) { // ok, byte read from computer
           byteIndex += 1
@@ -670,7 +672,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_5 = new Step("TypeIIIMainStep_5") {
-      var indexHoleFound = false
       def apply() : Unit = {
         if (!indexHoleFound) {
           if (rwh.isOnIndexHole) indexHoleFound = true // wait the first index hole          
@@ -708,7 +709,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_8 = new Step("TypeIIIMainStep_8") {
-      var byteCount = 0
       def apply() : Unit = {
         if (rwh.getByteReadySignal == 0) { // ok, byte ready
           rwh.resetByteReadySignal()
@@ -729,7 +729,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_9 = new Step("TypeIIIMainStep_9") {
-      var indexHoleStatus = 0
       def apply() : Unit = {
         indexHoleStatus match {
           case 0 =>
@@ -747,7 +746,6 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
     
     private val step_10 = new Step("TypeIIIMainStep_10") {
-      var crcWriting,lastWritten = 0
       def apply() : Unit = {
         if (rwh.getByteReadySignal == 0) { // ok, byte written
           rwh.resetByteReadySignal()

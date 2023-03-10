@@ -111,12 +111,14 @@ class D1581(val driveID: Int,
       ledListener.turnPower(powerLed)
     }
   }
-  private[this] val CIAPortBConnector = new Connector with IECBusListener {
+  private trait CIAPort {
+    var releaseFSLine : () => Unit = _
+  }
+  private[this] val CIAPortBConnector = new Connector with IECBusListener with CIAPort {
     import IECBus._
     val busid: String = "CIAPortBConnector_" + driveID
     val componentID = "1581_CIA_PortBConnector"
-    var releaseFSLine : () => Unit = _
-    
+
     bus.registerListener(this)
     
     // 0x3A = 00111010 => reset latch's input pins
@@ -154,7 +156,10 @@ class D1581(val driveID: Int,
     cpu.irqRequest(low)
   }
   private[this] var ciaRunning = true
-  private[this] val CIA = new CIA("1581_CIA_FAST_" + driveID,0x4000,CIAPortAConnector,CIAPortBConnector,ciairq _, isIdle => ciaRunning = !isIdle,false) with IECBusListener {
+  private trait CIAFast {
+    def releaseDataLine() : Unit
+  }
+  private[this] val CIA = new CIA("1581_CIA_FAST_" + driveID,0x4000,CIAPortAConnector,CIAPortBConnector,ciairq _, isIdle => ciaRunning = !isIdle,false) with IECBusListener with CIAFast {
     val busid: String = name
     setCIAModel(ucesoft.cbm.peripheral.cia.CIA.CIA_MODEL_8521)
     
@@ -167,7 +172,7 @@ class D1581(val driveID: Int,
       }
     }
     
-    def releaseDataLine() : Unit = {
+    override def releaseDataLine() : Unit = {
       bus.setLine(this,IECBusLine.DATA,IECBus.VOLTAGE)
     }
     

@@ -57,7 +57,12 @@ class D1571(val driveID: Int,
   /**
    * IRQ Manager for VIA1,VIA2 and CIA
    */
-  private[this] val IRQSwitcher = new CBMComponent {
+  private trait CIAVIAIRQ {
+    def viaBusIRQ(low: Boolean): Unit
+    def viaDiskIRQ(low: Boolean): Unit
+    def ciaIRQ(low: Boolean): Unit
+  }
+  private[this] val IRQSwitcher = new CBMComponent with CIAVIAIRQ {
     val componentID = "IRQ Switcher (VIA1,VIA2,CIA)"
     val componentType: Type = CBMComponentType.INTERNAL
 
@@ -78,17 +83,17 @@ class D1571(val driveID: Int,
       properties
     }
 
-    final def viaBusIRQ(low: Boolean) : Unit = {
+    override final def viaBusIRQ(low: Boolean) : Unit = {
       Log.debug("VIABus setting IRQ as " + low)
       viaBusIRQLow = low
       handleIRQ()
     }
-    final def viaDiskIRQ(low: Boolean) : Unit = {
+    override final def viaDiskIRQ(low: Boolean) : Unit = {
       Log.debug("VIADisk setting IRQ as " + low)
       viaDiskIRQLow = low
       handleIRQ()
     }
-    final def ciaIRQ(low: Boolean) : Unit = {
+    override final def ciaIRQ(low: Boolean) : Unit = {
       Log.debug("CIA setting IRQ as " + low)
       ciaIRQLow = low
       handleIRQ()
@@ -150,7 +155,10 @@ class D1571(val driveID: Int,
    * VIA1 IEC Bus Manager
    * 
    ***********************************************************************************************************/
-  private[this] val VIA1 = new VIA(s"VIA1571_IECBus_$driveID",0x1800,IRQSwitcher.viaBusIRQ _) with IECBusListener {
+  private trait VIABus {
+    def setEnabled(enabled: Boolean): Unit
+  }
+  private[this] val VIA1 = new VIA(s"VIA1571_IECBus_$driveID",0x1800,IRQSwitcher.viaBusIRQ _) with IECBusListener with VIABus {
     override lazy val componentID = s"VIA1571_1 (Bus)_$driveID"
     val busid: String = name
     private[this] val IDJACK = driveID & 0x03
@@ -158,7 +166,7 @@ class D1571(val driveID: Int,
     
     bus.registerListener(this)
     
-    def setEnabled(enabled:Boolean): Unit = driveEnabled = enabled
+    override def setEnabled(enabled:Boolean): Unit = driveEnabled = enabled
     
     override def atnChanged(oldValue:Int,newValue:Int) : Unit = {
       if (driveEnabled) {
@@ -223,7 +231,11 @@ class D1571(val driveID: Int,
    * VIA2 Disk Controller
    * 
    ***********************************************************************************************************/
-  private[this] val VIA2 = new VIA(s"VIA1571_DiskControl_$driveID", 0x1C00,IRQSwitcher.viaDiskIRQ _) {
+  private trait VIADisk {
+    def setDriveReader(driveReader: Floppy, emulateInserting: Boolean): Unit
+    def byteReady(): Unit
+  }
+  private[this] val VIA2 = new VIA(s"VIA1571_DiskControl_$driveID", 0x1C00,IRQSwitcher.viaDiskIRQ _) with VIADisk {
     override lazy val componentID = s"VIA1571_2 (DC)_$driveID"
     private[this] val WRITE_PROTECT_SENSE = 0x10
     private[this] val WRITE_PROTECT_SENSE_WAIT = 3 * 400000L
@@ -232,7 +244,7 @@ class D1571(val driveID: Int,
     private[this] var isDiskChanged = true
     private[this] var isDiskChanging = false
 
-    def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) : Unit = {
+    override def setDriveReader(driveReader:Floppy,emulateInserting:Boolean) : Unit = {
       floppy = driveReader
       if (emulateInserting) {
         RW_HEAD.setFloppy(EmptyFloppy)
@@ -315,7 +327,7 @@ class D1571(val driveID: Int,
       super.write(address, value, chipID)
     }
           
-    final def byteReady() : Unit = {
+    override final def byteReady() : Unit = {
       cpu.setOverflowFlag()
       irq_set(IRQ_CA1)
       
@@ -394,7 +406,7 @@ class D1571(val driveID: Int,
   override def getMem: Memory = this
   // ===============================================================
   
-  override def disconnect : Unit = {
+  override def disconnect() : Unit = {
     bus.unregisterListener(VIA1)
     bus.unregisterListener(CIA)
   }
