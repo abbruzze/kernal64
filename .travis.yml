@@ -5,5 +5,6 @@ scala:
 jdk: oraclejdk17
 
 script:
+  - cd Kernal64
   - sbt compile
   - sbt buildK64Dist
