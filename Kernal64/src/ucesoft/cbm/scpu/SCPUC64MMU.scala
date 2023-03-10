@@ -42,7 +42,7 @@ object SCPUC64MMU {
     private[SCPUC64MMU] var lastByteReadMemory : LastByteReadMemory = _
     
     final val isActive = true
-    def init : Unit = {
+    def init() : Unit = {
       Log.info("Initializing RAM memory ...")
       var m = 0
       var v0 = 0xFF
@@ -67,9 +67,9 @@ object SCPUC64MMU {
         }
       }
     }
-    def reset : Unit = {}
+    def reset() : Unit = {}
 
-    override def hardReset: Unit = init
+    override def hardReset(): Unit = init()
     
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (ULTIMAX && chipID == ChipID.CPU) {
@@ -111,8 +111,8 @@ object SCPUC64MMU {
     final val isActive = true
     private[this] var lastByteReadMemory : LastByteReadMemory = _
 
-    def init : Unit = {}
-    def reset : Unit = {}
+    def init() : Unit = {}
+    def reset() : Unit = {}
     def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory): Unit = {
       this.lastByteReadMemory = lastByteReadMemory
     }
@@ -289,7 +289,7 @@ object SCPUC64MMU {
       Log.debug(s"New memory configuration $c64MemConfig")
     }
     
-    def init : Unit = {
+    def init() : Unit = {
       Log.info("Initializing main memory ...")
       add(ram)
       add(CHAR_ROM)
@@ -330,26 +330,26 @@ object SCPUC64MMU {
       }
     }
     
-    override def afterInitHook : Unit = {
-      check0001
+    override def afterInitHook() : Unit = {
+      check0001()
       SCPU_ROM_MASK = (0xF7 + SCPU_ROM.getDynamicLength / 65536) << 16 | 0xFFFF
     }
 
-    override def hardReset: Unit = {
-      reset
+    override def hardReset(): Unit = {
+      reset()
       Log.debug("Initializing static & SIMM ram ...")
       initSIMMMemory(fastram)
       initSIMMMemory(simmram)
     }
     
-    def reset : Unit = {
+    def reset() : Unit = {
       Log.info("Resetting main memory...")
       ddr = 0
       pr = 7
       memConfig = -1
       ULTIMAX = false
       ram.ULTIMAX = false
-      check0001
+      check0001()
       // SCPU
       bootMap = true
       reg_sw_1Mhz = false
@@ -516,7 +516,7 @@ object SCPUC64MMU {
         }
         else if (address == 1) {
           pr = value & 0x07
-          check0001
+          check0001()
           clockStretchingRequest()
         }
         fastram(address) = value
@@ -652,27 +652,27 @@ object SCPUC64MMU {
         case 0xD074 => // set optimization mode
           if (reg_hw_enabled) {
             reg_opt_mode = 0x00 // VIC Bank 2
-            updateMirroringMode
+            updateMirroringMode()
           }
         case 0xD075 => // set optimization mode
           if (reg_hw_enabled) {
             reg_opt_mode = 0x40 // VIC Bank 1
-            updateMirroringMode
+            updateMirroringMode()
           }
         case 0xD076 => // set optimization mode
           if (reg_hw_enabled) {
             reg_opt_mode = 0x80 // BASIC
-            updateMirroringMode
+            updateMirroringMode()
           }
         case 0xD077 => // set optimization mode
           if (reg_hw_enabled) {
             reg_opt_mode = 0xC0 // No optimization
-            updateMirroringMode
+            updateMirroringMode()
           }
         case 0xD078 => // SIMM configuration
           if (reg_hw_enabled && reg_simm_config != value) {
             reg_simm_config = value
-            updateSIMMConfig
+            updateSIMMConfig()
           }
         case 0xD07A => // software 1Mhz enable
           if (!reg_sw_1Mhz) {
@@ -715,12 +715,12 @@ object SCPUC64MMU {
         case 0xD0B3 => // optimization mode
           if (reg_hw_enabled) {
             reg_opt_mode = (reg_opt_mode & 0x38) | (value & 0xC7)
-            updateMirroringMode
+            updateMirroringMode()
           }
         case 0xD0B4 => // optimization mode
           if (reg_hw_enabled) {
             reg_opt_mode = (reg_opt_mode & 0x3F) | (value & 0xC0)
-            updateMirroringMode
+            updateMirroringMode()
           }
         case 0xD0B5 => // do nothing
         case 0xD0B6 => // disable bootmap
@@ -884,7 +884,7 @@ object SCPUC64MMU {
       game = in.readBoolean
       memConfig = in.readInt
       c64MemConfig = MEM_CONFIG(memConfig)
-      check0001
+      check0001()
       loadMemory[Int](fastram,in)
       loadMemory[Int](simmram,in)
       loadMemory[Boolean](simmuseMap,in)
@@ -903,7 +903,7 @@ object SCPUC64MMU {
       simm_banks = in.readInt
       reg_opt_mode = in.readInt
       cpuEmulationMode = in.readBoolean
-      updateMirroringMode
+      updateMirroringMode()
       localCpuFastModeListener(!(reg_sys_1Mhz || reg_sw_1Mhz || (switch_1Mhz && !reg_hw_enabled)))
     }
 

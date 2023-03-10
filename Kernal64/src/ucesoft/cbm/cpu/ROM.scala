@@ -25,10 +25,10 @@ class ROM(ram: Memory,
   final def isActive: Boolean = active
   def setActive(active:Boolean): Unit = this.active = active
 
-  def init  : Unit = {
+  def init(): Unit = {
     mem = Array.fill(length)(0)
     Log.info(s"Initialaizing $name memory ...")
-    reload
+    reload()
   }
 
   def reload() : Unit = {
@@ -63,7 +63,7 @@ class ROM(ram: Memory,
 
   protected def transform(buffer:Array[Int]): Array[Int] = buffer
 
-  def reset  : Unit = {}
+  def reset(): Unit = {}
 
   final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address - startAddress)
   def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = if (ram != null) ram.write(address,value,chipID)
@@ -148,7 +148,7 @@ object ROM {
   def reload(resource:String) : Unit = {
     registeredROMMap get resource match {
       case Some(rom) =>
-        rom.reload
+        rom.reload()
       case None =>
     }
     reloadListeners.foreach(_(resource))

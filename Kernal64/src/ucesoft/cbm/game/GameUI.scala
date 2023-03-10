@@ -121,9 +121,9 @@ object GameUI {
     
     for(tf <- filterTextFields) tf.getDocument.addDocumentListener(this)
     
-    def changedUpdate(e:DocumentEvent): Unit = updateFilter
-    def insertUpdate(e:DocumentEvent): Unit = updateFilter
-    def removeUpdate(e:DocumentEvent): Unit = updateFilter
+    def changedUpdate(e:DocumentEvent): Unit = updateFilter()
+    def insertUpdate(e:DocumentEvent): Unit = updateFilter()
+    def removeUpdate(e:DocumentEvent): Unit = updateFilter()
     
     private def updateFilter()  : Unit = {
       table.getRowSorter.asInstanceOf[DefaultRowSorter[GameTableModel,Int]].setRowFilter(createTableFilter(this))
@@ -186,7 +186,7 @@ object GameUI {
     private val gameIcon = new JLabel
     private var filterPanel : JPanel with DocumentListener = _
     
-    init
+    init()
     
     private def init()  : Unit = {
       setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
@@ -213,7 +213,7 @@ object GameUI {
       tablePanel.add("North",new JScrollPane(filterPanel,ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED))
       scrollPane = new JScrollPane(table)
       tablePanel.add("Center",scrollPane)
-      updateGamesCount
+      updateGamesCount()
       // table buttons
       val tableButtons = new JPanel(new GridLayout(0,4))
       tableButtons.setBorder(BorderFactory.createTitledBorder(BorderFactory.createRaisedSoftBevelBorder,"Actions"))
@@ -345,7 +345,7 @@ object GameUI {
       private def cancelSync(cancelButton:AbstractButton) : Unit = {
         cancelButton.setEnabled(false)
         msg.setText("Canceling operation ...")
-        provider.interrupt
+        provider.interrupt()
       }
       
       def update(perc:Int): Unit = swing {
@@ -356,7 +356,7 @@ object GameUI {
     private def clearCache(syncButton:AbstractButton) : Unit = {
       JOptionPane.showConfirmDialog(this,s"Are you sure you want to clear the cache ?","Cache",JOptionPane.YES_NO_OPTION,JOptionPane.QUESTION_MESSAGE) match {
         case JOptionPane.YES_OPTION =>
-          provider.repository.clearCache
+          provider.repository.clearCache()
           tableModel.fireTableDataChanged()
         case _ =>
       }
@@ -378,30 +378,30 @@ object GameUI {
               }
           }
           syncButton.setEnabled(false)
-          provider.repository.clearCache
+          provider.repository.clearCache()
           val syncDialog = new SyncDialog
           provider.setProgressListener(syncDialog)
           setCursor(new Cursor(Cursor.WAIT_CURSOR))
           val games = provider.games(constraint)                
           games.onComplete { 
             case Success(games) =>
-              endDownload
+              endDownload()
               syncDialog.dispose()
               provider.repository.save(games)
               tableModel.fillWith(games.toArray)
               setCursor(new Cursor(Cursor.DEFAULT_CURSOR))
               JOptionPane.showMessageDialog(this,"Synchronization completed successfully!",s"Synchronization",JOptionPane.INFORMATION_MESSAGE)
               syncButton.setEnabled(true)
-              updateGamesCount
+              updateGamesCount()
             case Failure(t) =>
-              endDownload
+              endDownload()
               syncDialog.dispose()
               t.printStackTrace()
               JOptionPane.showMessageDialog(this,t.toString,s"Error while synchronizing with ${provider.name}'s server",JOptionPane.ERROR_MESSAGE)
               setCursor(new Cursor(Cursor.DEFAULT_CURSOR))
               syncButton.setEnabled(true)            
           }
-          beginDownload
+          beginDownload()
           syncDialog.setVisible(true)
         case _ =>
       }
@@ -419,11 +419,11 @@ object GameUI {
       val row = table.getRowSorter.convertRowIndexToModel(table.getSelectedRow)
       val game = tableModel.getGame(row)
       Future {
-        beginDownload
+        beginDownload()
         provider.repository.saveInCache(game) 
       } onComplete {
         case Failure(t) => swing {
-          endDownload
+          endDownload()
           JOptionPane.showMessageDialog(this,t.toString,s"Error while loading game ${game.name}",JOptionPane.ERROR_MESSAGE)
         }          
         case Success(_) =>

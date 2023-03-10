@@ -12,7 +12,7 @@ class Zaxxon(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,ram)
     val length = 8192
     val isRom = true
     def isActive = true
-    def init  : Unit = {}
+    def init(): Unit = {}
     val roml: ROM = Zaxxon.super.ROML.asInstanceOf[ROM]
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       romhBankIndex = if ((address & 0x9000) != 0x8000) 1 else 0

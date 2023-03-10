@@ -251,7 +251,7 @@ class VIC20Ultimem(val rom:Array[Int],
     reset()
   }
 
-  override def hardReset: Unit = {
+  override def hardReset(): Unit = {
     java.util.Arrays.fill(regs,0)
     java.util.Arrays.fill(ram,0)
     reset()

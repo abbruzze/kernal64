@@ -44,12 +44,12 @@ object C1541Mems {
     def isChannelActive: Boolean = channelActive != 0
     def getChannelsState: Int = channelActive
     
-    def init : Unit = {
+    def init() : Unit = {
       Log.info("Initialaizing C1541 RAM memory ...")
       java.util.Arrays.fill(mem,0)
     }
-    def reset : Unit = {}
-    override def hardReset: Unit = init
+    def reset() : Unit = {}
+    override def hardReset(): Unit = init()
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address & 0xFFFF)
     final def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
       mem(address & 0xFFFF) = value & 0xff
@@ -81,12 +81,12 @@ object C1541Mems {
     private[this] val mem = Array.fill(length)(0)
     var isActive = false
     
-    def init : Unit = {
+    def init() : Unit = {
       Log.info(s"Initialaizing C1541 Extended RAM ${Integer.toHexString(baseAddress)} memory ...")
       java.util.Arrays.fill(mem,0)
     }
-    def reset : Unit = {}
-    override def hardReset: Unit = init
+    def reset() : Unit = {}
+    override def hardReset(): Unit = init()
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = if (isActive) mem(address - baseAddress) else {
       if (baseAddress < KERNEL.startAddress) 0 else KERNEL.read(address)
     }
@@ -124,7 +124,7 @@ object C1541Mems {
         
     private[this] val RAM = new RAM
     
-    def init : Unit = {
+    def init() : Unit = {
       addBridge(KERNEL)
       addBridge(RAM)
       addBridge(RAM_EXP_2000)
@@ -134,7 +134,7 @@ object C1541Mems {
       addBridge(RAM_EXP_A000)
     }
     
-    def reset : Unit = {}
+    def reset() : Unit = {}
     
     def isChannelActive: Boolean = RAM.isChannelActive
     def getChannelsState: Int = RAM.getChannelsState

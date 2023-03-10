@@ -35,14 +35,14 @@ class VIC20GeoRAM(val size:Int,
     signals.pref.update(PREF_GEORAM,"none")
   }
 
-  final override def reset: Unit = {
+  final override def reset(): Unit = {
     block = 0
     page = 0
     rampage = ram(0)(0)
   }
 
-  override def hardReset: Unit = {
-    reset
+  override def hardReset(): Unit = {
+    reset()
     for (i <- 0 until ram.length; j <- 0 until ram(i).length) {
       java.util.Arrays.fill(ram(i)(j), 0)
     }

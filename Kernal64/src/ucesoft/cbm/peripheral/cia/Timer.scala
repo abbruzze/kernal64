@@ -49,9 +49,9 @@ abstract class Timer(ciaName: String,
     properties
   }
 
-  def init : Unit = {}
+  def init(): Unit = {}
 
-  def reset: Unit = {
+  def reset(): Unit = {
     state = 0
     lastControlValue = 0
     timer = 0xFFFF
@@ -114,7 +114,7 @@ abstract class Timer(ciaName: String,
       // Implementation of the serial port
       if (/*!oneShot &&*/ serialActionCallback != null && (lastControlValue & 0x40) == 0x40) serialActionCallback()
       // Timer A signals underflow handling: IRQ/B-count
-      underflow
+      underflow()
     }
 
     if ((state & CIAT_LOAD) != 0) {
@@ -122,7 +122,7 @@ abstract class Timer(ciaName: String,
       state &= ~CIAT_COUNT3
     }
 
-    checkIdle
+    checkIdle()
   }
 
   @inline private def checkIdle() : Unit = {

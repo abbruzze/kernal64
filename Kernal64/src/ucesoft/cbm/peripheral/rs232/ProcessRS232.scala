@@ -28,21 +28,21 @@ object ProcessRS232 extends StreamRS232 {
     val lastEnabled = isEnabled
     
     if (enabled) {
-      if (lastEnabled) disconnect
+      if (lastEnabled) disconnect()
       val pars = processStr.split(" ")
       val pb = new ProcessBuilder(pars:_*)
       process = pb.start
       Log.info(s"$processStr started")
       setStreams(process.getInputStream,process.getOutputStream,processStr)
     }
-    else disconnect
+    else disconnect()
     super.setEnabled(enabled)
   }
   
-  override def disconnect : Unit = {
+  override def disconnect() : Unit = {
     try {
       if (process != null) process.destroy()
-      super.disconnect
+      super.disconnect()
       Log.info(s"Process $processStr terminated")
     }
     catch {

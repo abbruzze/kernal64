@@ -34,7 +34,7 @@ class MFMRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
     
   }
   
-  final protected def readNextBit : Unit = {
+  final protected def readNextBit() : Unit = {
     if (bitCounter == 8) {
       bitCounter = 0
       byteReady = true
@@ -42,7 +42,7 @@ class MFMRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
     }
   }
   
-  final protected def writeNextBit : Unit = {
+  final protected def writeNextBit() : Unit = {
     if (bitCounter == 8) {
       bitCounter = 0      
       floppy.writeNextByte(nextWrite)      
@@ -51,10 +51,10 @@ class MFMRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
     }
   }
   
-  override def reset : Unit = {
-    super.reset
+  override def reset() : Unit = {
+    super.reset()
     canSetByteReady = true
     track = 1
-    floppy.reset
+    floppy.reset()
   }
 }

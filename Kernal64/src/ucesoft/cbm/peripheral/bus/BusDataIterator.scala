@@ -12,7 +12,7 @@ object BusDataIterator {
   
   class StringDataIterator(data: String) extends DataIterator {
     protected val dataLength: Int = data.length
-    override def next: Int = {
+    override def next(): Int = {
       val c = data.charAt(index).toInt
       index += 1
       c
@@ -21,7 +21,7 @@ object BusDataIterator {
   
   class ArrayDataIterator(data: Array[Byte], sizeLimit: Option[Int] = None) extends DataIterator {
     protected val dataLength: Int = data.length
-    override def next: Int = {
+    override def next(): Int = {
       val c = data(index).toInt
       sizeLimit match {
         case None => index += 1
@@ -33,7 +33,7 @@ object BusDataIterator {
   
   class ArrayIntDataIterator(data: Array[Int]) extends DataIterator {
     protected val dataLength: Int = data.length
-    override def next: Int = {
+    override def next(): Int = {
       val c = data(index)
       index += 1
       c

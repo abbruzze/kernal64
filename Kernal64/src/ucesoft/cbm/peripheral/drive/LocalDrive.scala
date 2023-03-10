@@ -36,7 +36,7 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
   
   status = STATUS_WELCOME
   
-  def reset : Unit = {}
+  def reset() : Unit = {}
   
   def getCurrentDir: File = currentDir
   def setCurrentDir(dir:File): Unit = currentDir = dir
@@ -71,15 +71,15 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
     }
   }
   
-  override def open : Unit = {
-    super.open
+  override def open() : Unit = {
+    super.open()
     channel match {
       case 0 => // LOADING FILE
         loading = true
         channels(channel).readDirection = true
       case 1 => // SAVING FILE
         loading = false
-        channels(channel).open
+        channels(channel).open()
         channels(channel).readDirection = false
       case 15 =>
       case _ =>
@@ -91,12 +91,12 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
     super.byteJustRead(byte, isLast)
   }
   
-  override def open_channel : Unit = {
-    super.open_channel
+  override def open_channel() : Unit = {
+    super.open_channel()
     if (!channels(channel).isOpened) {
-      channels(channel).open
+      channels(channel).open()
       channel match {
-        case 15 => handleChannel15
+        case 15 => handleChannel15()
         case 0 => load(channels(channel).fileName.toString)
         case 1 => // saving ...
         case _ =>
@@ -105,8 +105,8 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
     }
   }
   
-  override def close : Unit = {
-    super.close
+  override def close() : Unit = {
+    super.close()
     if (!loading) {
       var out : FileOutputStream = null
       try {
@@ -125,18 +125,18 @@ class LocalDrive(bus: IECBus, device: Int = 9) extends AbstractDrive(bus, device
     setStatus(STATUS_OK)
   }  
   
-  override def dataNotFound : Unit = {
-    super.dataNotFound
+  override def dataNotFound() : Unit = {
+    super.dataNotFound()
     setStatus(STATUS_FILE_NOT_FOUND)
   }
   
-  protected def handleChannel15 : Unit = {
+  protected def handleChannel15() : Unit = {
     val cmd = if (channels(channel).fileName.length > 0) channels(channel).fileName.toString else channels(channel).bufferToString
     if (cmd.length > 0) {
       executeCommand(cmd)
-      channels(channel).buffer.clear      
+      channels(channel).buffer.clear()
     }
-    sendStatus
+    sendStatus()
   }
   
   private def executeCommand(cmd: String) : Unit = {

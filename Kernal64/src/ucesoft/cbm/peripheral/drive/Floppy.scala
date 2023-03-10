@@ -83,7 +83,7 @@ trait Floppy {
   def load(in:ObjectInputStream) : Unit
   
   protected def saveFile(out:ObjectOutputStream) : Unit = {
-    flush
+    flush()
     val len = new File(file).length.toInt
     val f = new DataInputStream(new FileInputStream(file))
     try {
@@ -120,15 +120,15 @@ class EmptyFloppy extends Floppy {
     if (isOnTrack) {
       track = trackSteps >> 1
     }
-    notifyTrackSectorChangeListener
+    notifyTrackSectorChangeListener()
   }
   def setTrackChangeListener(l:TrackListener): Unit = listener = l
-  def notifyTrackSectorChangeListener : Unit = {
+  def notifyTrackSectorChangeListener() : Unit = {
     if (listener != null) listener(track,false,None)
   }
     
-  def close : Unit = {}
-  def reset : Unit = {
+  def close() : Unit = {}
+  def reset() : Unit = {
     track = 1
   }
   // state

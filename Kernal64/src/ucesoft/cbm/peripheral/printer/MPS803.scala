@@ -17,11 +17,11 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
   protected def isDeviceReady: Boolean = active
   protected def loadData(fileName:String): Option[BusDataIterator] = None
   
-  def init : Unit = {}
+  def init() : Unit = {}
   
-  def reset : Unit = {}
+  def reset() : Unit = {}
   
-  override def open_channel : Unit = {
+  override def open_channel() : Unit = {
     channel match {
       case 7 => driver.print(17) 
       case _ => driver.print(145)
@@ -30,7 +30,7 @@ class MPS803(bus:IECBus,driver:PrinterDriver,device:Int = 4) extends IECBusDevic
   
   override protected def byteJustRead(byte:Int,isLast:Boolean) : Unit = {
     //println("MPS803: byte read " + Integer.toHexString(byte) + " " + byte.toChar + " last=" + isLast) 
-    channels(channel).clear
+    channels(channel).clear()
     driver.print(byte)
   }
 

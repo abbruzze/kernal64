@@ -25,7 +25,7 @@ object MPS803GFXDriver extends App {
   canvas.print(15)
   "PIPPO" foreach { c => canvas.print(c) }
   canvas.print(13)
-  canvas.checkSize
+  canvas.checkSize()
   f.getContentPane.add("Center", canvas)
   f.pack()
   f.setVisible(true)
@@ -87,11 +87,11 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
   private[this] var bitmapActive = false
   
   def clearPages() : Unit = {
-    operations.clear
+    operations.clear()
     quote = 0
     state = WAITING_CHAR
     bitmapActive = false
-    checkSize
+    checkSize()
     repaint()
   }
 
@@ -190,7 +190,7 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
 
     val opIterator = operations.iterator
     while (opIterator.hasNext) {
-      opIterator.next match {
+      opIterator.next() match {
         case Print(ch) =>
           if (bitmapMode) {
             val byte = ch & 0x7F // clear 8th bit

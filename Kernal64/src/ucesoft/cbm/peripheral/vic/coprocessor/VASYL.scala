@@ -105,7 +105,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     istr
   }
 
-  override def reset: Unit = {
+  override def reset(): Unit = {
     displayListFetchBank = 0
     portBank = 0
     portMem = banks(0)
@@ -151,17 +151,17 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
     updatePCWithDLIST2LH = false
   }
 
-  override def hardReset: Unit = {
-    reset
+  override def hardReset(): Unit = {
+    reset()
     for(b <- banks) java.util.Arrays.fill(b,0)
   }
 
-  override def init: Unit = {}
+  override def init(): Unit = {}
 
-  def disinstall : Unit = {
+  def disinstall() : Unit = {
     cpu.setMemory(lastCPUMem)
   }
-  def install : Unit = {
+  def install() : Unit = {
     cpu.setMemory(this)
   }
 
@@ -211,8 +211,8 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
     if ((v_arg == 0 || compareV(rasterCounter)) && compareH(h_arg)) {
       fetchOp = true
-      clearMaskh
-      clearMaskv
+      clearMaskh()
+      clearMaskv()
     }
   }
 
@@ -231,8 +231,8 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
     if (compareH(0) && compareV(rasterCounter)) {
       fetchOp = true
-      clearMaskh
-      clearMaskv
+      clearMaskh()
+      clearMaskv()
       executeNextNow = true
     }
   }
@@ -310,14 +310,14 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
         if (compareV(v_arg,true) || (compareV(v_arg) && compareH(h_arg,true))) {
           pc = (pc + 2) & 0xFFFF
-          clearMaskv
-          clearMaskh
+          clearMaskv()
+          clearMaskh()
         }
       }
       else
       if (compareV(v_arg,true) || (compareV(v_arg) && compareH(h_arg,true))) {
-        clearMaskv
-        clearMaskh
+        clearMaskv()
+        clearMaskh()
         executeNextNow = true
         return
       }
@@ -326,8 +326,8 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
     if (compareV(v_arg) && compareH(h_arg)) {
       fetchOp = true
-      clearMaskh
-      clearMaskv
+      clearMaskh()
+      clearMaskv()
       executeNextNow = true
     }
   }
@@ -430,7 +430,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
       reg match {
         case 0x2E =>
           if ((value & 0x40) > 0) { // un-knock
-            deactivate
+            deactivate()
           }
         case 0x32 =>
           if (debug) println(s"DLISTL = ${value.toHexString}, execution address = ${(value | regs(0x33) << 8).toHexString}")
@@ -588,7 +588,7 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
 
   private def activateListExecution() : Unit = {
     dlistExecutionActive = true
-    reloadPcFromRegs
+    reloadPcFromRegs()
     if (debug) println(s"VASYL list execution started at ${pc.toHexString}")
   }
 
@@ -657,17 +657,17 @@ class VASYL(vicCtx:VICContext,cpu:CPU65xx,dmaHandler:(Boolean) => Unit) extends 
       // skip reset
       skipNextWait = false
 
-      if (dlistExecutionActive) reloadPcFromRegs
+      if (dlistExecutionActive) reloadPcFromRegs()
       else
       if (dlistOnPendingOnNextFrame) {
         dlistOnPendingOnNextFrame = false
-        activateListExecution
+        activateListExecution()
       }
     }
     //=========================================================
     if (dlistOnPendingOnNextCycle) {
       dlistOnPendingOnNextCycle = false
-      activateListExecution
+      activateListExecution()
     }
     // execution
     do {

@@ -20,8 +20,8 @@ class ColorRAM extends RAMComponent {
   private var c64Mode = false
   
   final val isActive = true
-  final def init  : Unit = {}
-  final def reset  : Unit = {
+  final def init()  : Unit = {}
+  final def reset()  : Unit = {
     for(b <- 0 until 2;i <- 0 until length) mem(b)(i) = 0xFF
     processorBank = 0
     vicBank = 0

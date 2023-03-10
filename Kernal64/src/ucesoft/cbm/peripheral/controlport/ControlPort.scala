@@ -17,8 +17,8 @@ abstract class ControlPort extends CBMComponent {
   private[this] var lightPenEmulationEnabled = false
   private[this] var mouse1351EmulationEnabled = false
   
-  def init : Unit = {}
-  def reset : Unit = {
+  def init() : Unit = {}
+  def reset() : Unit = {
     emulatedBit = 0
   }
   
@@ -152,7 +152,7 @@ object ControlPort {
     private[this] var downLeftKey = 0
     private[this] var fireKey = 0
 
-    updateConfiguration
+    updateConfiguration()
 
     override def consumeKey(e:KeyEvent): Boolean = {
       import KeyEvent._
@@ -181,7 +181,7 @@ object ControlPort {
       else 0
     }
 
-    override def updateConfiguration : Unit = {
+    override def updateConfiguration() : Unit = {
       upKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_UP,"-1").toInt
       downKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_DOWN,"-1").toInt
       leftKey = conf.getProperty(CONFIGURATION_UD_JOYSTICK_LEFT,"-1").toInt

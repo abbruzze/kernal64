@@ -33,9 +33,9 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
   }
   def getKeyboardMapper : KeyboardMapper = km
 
-  override def init: Unit = {}
+  override def init(): Unit = {}
 
-  override def reset: Unit = {
+  override def reset(): Unit = {
     keysPressed.clear()
     lastKey = null
     isLastShiftRight = false

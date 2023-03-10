@@ -81,22 +81,22 @@ class D1571(val driveID: Int,
     final def viaBusIRQ(low: Boolean) : Unit = {
       Log.debug("VIABus setting IRQ as " + low)
       viaBusIRQLow = low
-      handleIRQ
+      handleIRQ()
     }
     final def viaDiskIRQ(low: Boolean) : Unit = {
       Log.debug("VIADisk setting IRQ as " + low)
       viaDiskIRQLow = low
-      handleIRQ
+      handleIRQ()
     }
     final def ciaIRQ(low: Boolean) : Unit = {
       Log.debug("CIA setting IRQ as " + low)
       ciaIRQLow = low
-      handleIRQ
+      handleIRQ()
     }
 
-    def init : Unit = {}
+    def init() : Unit = {}
 
-    def reset : Unit = {
+    def reset() : Unit = {
       viaBusIRQLow = false
       viaDiskIRQLow = false
       ciaIRQLow = false      
@@ -131,7 +131,7 @@ class D1571(val driveID: Int,
     val busid: String = name
     setCIAModel(ucesoft.cbm.peripheral.cia.CIA.CIA_MODEL_8521)
     
-    override def srqTriggered: Unit = if (busDataDirection == 0) serialIN(bus.data == IECBus.GROUND)
+    override def srqTriggered(): Unit = if (busDataDirection == 0) serialIN(bus.data == IECBus.GROUND)
     
     bus.registerListener(this)
     setSerialOUT(b => {
@@ -164,9 +164,9 @@ class D1571(val driveID: Int,
       if (driveEnabled) {
         if (newValue == IECBus.GROUND) {
           irq_set(IRQ_CA1)
-          awake
+          awake()
         }
-        autoacknwoledgeData
+        autoacknwoledgeData()
       }
     }
         
@@ -186,7 +186,7 @@ class D1571(val driveID: Int,
         case PB|DDRB =>        
           bus.setLine(this,IECBusLine.DATA,data_out)
           bus.setLine(this,IECBusLine.CLK,clock_out)          
-          autoacknwoledgeData
+          autoacknwoledgeData()
         case ad@(PA|PA2) =>
           busDataDirection = (value & 2) >> 1
           if (busDataDirection == 0) bus.setLine(CIA,IECBusLine.DATA,IECBus.VOLTAGE)
@@ -255,7 +255,7 @@ class D1571(val driveID: Int,
       else {
         RW_HEAD.setFloppy(floppy)
       }
-      awake
+      awake()
     }
     
     override def read(address: Int, chipID: ChipID.ID): Int = (address & 0x0F) match {
@@ -266,9 +266,9 @@ class D1571(val driveID: Int,
           (if (wps) 0x00 else WRITE_PROTECT_SENSE)
       case PA|PA2 =>
         super.read(address, chipID)
-        floppy.notifyTrackSectorChangeListener
+        floppy.notifyTrackSectorChangeListener()
         if ((regs(PCR) & 0x0C) == 0x08) RW_HEAD.canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
-        RW_HEAD.resetByteReadySignal
+        RW_HEAD.resetByteReadySignal()
         RW_HEAD.getLastRead
       case ofs => super.read(address, chipID)
     }
@@ -278,7 +278,7 @@ class D1571(val driveID: Int,
         case PA =>
           if ((regs(PCR) & 0x0C) == 0x08) RW_HEAD.canSetByteReady = (regs(PCR) & 0x0E) == 0x0A
           RW_HEAD.setNextToWrite(value)
-          RW_HEAD.resetByteReadySignal
+          RW_HEAD.resetByteReadySignal()
         case PCR =>
           value & 0x0E match {
             case 0xE => RW_HEAD.canSetByteReady = true        // 111 => Manual output mode high
@@ -295,7 +295,7 @@ class D1571(val driveID: Int,
           val motorOn = (value & 0x04) > 0
           RW_HEAD.setMotor(motorOn)
           if (ledListener != null) {
-            if (ledOn) ledListener.turnOn else ledListener.turnOff
+            if (ledOn) ledListener.turnOn() else ledListener.turnOff()
             if (!motorOn) {
               if (lastMotorOn && !motorOn) RW_HEAD.setCurrentFileName("")
             }
@@ -316,7 +316,7 @@ class D1571(val driveID: Int,
     }
           
     final def byteReady() : Unit = {
-      cpu.setOverflowFlag
+      cpu.setOverflowFlag()
       irq_set(IRQ_CA1)
       
       regs(PCR) & 0x0E match {
@@ -427,13 +427,13 @@ class D1571(val driveID: Int,
   override def canGoSleeping: Boolean = this.canSleep
   override def setCanSleep(canSleep: Boolean) : Unit = {
     this.canSleep = canSleep
-    awake
+    awake()
   }
 
   override def isReadOnly: Boolean = RW_HEAD.isWriteProtected
   override def setReadOnly(readOnly:Boolean): Unit = RW_HEAD.setWriteProtected(readOnly)
   
-  def init : Unit = {
+  def init(): Unit = {
     Log.info("Initializing C1571...")
     add(cpu)
     add(IRQSwitcher)
@@ -443,11 +443,11 @@ class D1571(val driveID: Int,
     add(CIA)    
     add(RW_HEAD)
     add(WD1770)
-    if (ledListener != null) ledListener.turnOn
+    if (ledListener != null) ledListener.turnOn()
     java.util.Arrays.fill(ram,0)
   }
   
-  def reset : Unit = {
+  def reset(): Unit = {
     tracing = false
     channelActive = 0
     _1541Mode = true  
@@ -458,12 +458,12 @@ class D1571(val driveID: Int,
     runningListener(true)
     awakeCycles = 0
     cycleFrac = 0.0
-    if (ledListener != null) ledListener.turnOn
+    if (ledListener != null) ledListener.turnOn()
     ciaRunning = true
   }
 
-  override def hardReset: Unit = {
-    reset
+  override def hardReset(): Unit = {
+    reset()
     java.util.Arrays.fill(ram,0)
   }
   
@@ -487,7 +487,7 @@ class D1571(val driveID: Int,
   
   @inline private def checkPC(cycles: Long) : Unit = {
     val pc = cpu.getPC
-    if (pc == _1541_LOAD_ROUTINE || pc == _1571_LOAD_ROUTINE) setFilename
+    if (pc == _1541_LOAD_ROUTINE || pc == _1571_LOAD_ROUTINE) setFilename()
     else 
     if (pc == _1541_WAIT_LOOP_ROUTINE && canSleep && channelActive == 0 && !RW_HEAD.isMotorOn && (cycles - awakeCycles) > WAIT_CYCLES_FOR_STOPPING && !tracing) {
       running = false
@@ -517,8 +517,8 @@ class D1571(val driveID: Int,
         n_cycles -= 1
       }
       
-      if (RW_HEAD.rotate) VIA2.byteReady
-      WD1770.clock
+      if (RW_HEAD.rotate) VIA2.byteReady()
+      WD1770.clock()
     }
   }
   
@@ -538,7 +538,7 @@ class D1571(val driveID: Int,
   override def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {/* ignored */}
   override def setTrace(traceOn: Boolean) : Unit = {
     tracing = traceOn
-    if (tracing) awake
+    if (tracing) awake()
     cpu.setTrace(traceOn)
   }
   override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType): Unit = cpu.step(updateRegisters,stepType)
@@ -560,7 +560,7 @@ class D1571(val driveID: Int,
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     if (ledListener != null) {
-      if (in.readBoolean) ledListener.turnOn else ledListener.turnOff
+      if (in.readBoolean) ledListener.turnOn() else ledListener.turnOff()
     }
     loadMemory[Int](ram,in)
     channelActive = in.readInt

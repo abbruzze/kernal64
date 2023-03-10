@@ -75,8 +75,8 @@ class DriveLed(id:Int) extends JComponent with CBMComponent {
     properties
   }
 
-  def init  : Unit = {}
-  def reset  : Unit = {}
+  def init(): Unit = {}
+  def reset(): Unit = {}
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
     out.writeBoolean(powerOn)

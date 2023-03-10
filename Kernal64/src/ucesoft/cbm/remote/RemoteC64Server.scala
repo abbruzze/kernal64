@@ -73,7 +73,7 @@ class RemoteC64Server(port:Int,keyListeners:List[KeyListener],videoBuffer:Array[
     }
   }  
   
-  def stopRemoting : Unit = {
+  def stopRemoting() : Unit = {
     running = false
     interrupt()
   }

@@ -22,13 +22,13 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
     val length = 8192
     val isRom = true
     def isActive = true
-    def init  : Unit = {}
+    def init(): Unit = {}
 
     private val amf29f040 = new AMF29F040(AMF29F040.AMF29F040TypeB,low,this)
     val bankErasedMap: Array[Boolean] = Array.ofDim[Boolean](64)
 
-    updateROMBank
-    checkErasedBanks
+    updateROMBank()
+    checkErasedBanks()
 
     private def checkErasedBanks() : Unit = {
       val map = if (low) romlBanks else romhBanks
@@ -59,7 +59,7 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
           romhBanks += bank -> newBank
           romhBankIndex = bank // force the new bank to be selected
         }
-        updateROMBank
+        updateROMBank()
         newBank
       } else if (low) EasyFlash.super.ROML else EasyFlash.super.ROMH
     }
@@ -100,25 +100,25 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
         //println(s"Selecting bank $bank")
         romlBankIndex = bank
         romhBankIndex = bank
-        flashL.updateROMBank
-        flashH.updateROMBank
+        flashL.updateROMBank()
+        flashH.updateROMBank()
       }
       else {
         //println(s"EasyFlash Control = $value (${address.toHexString})")
         val gameControlledViaBit0 = (value & 4) == 4
         exrom = (value & 2) == 0
         game = if (gameControlledViaBit0) (value & 1) == 0 else EasyFlash.jumper
-        notifyMemoryConfigurationChange
+        notifyMemoryConfigurationChange()
       }
     }
   }
 
-  override def reset  : Unit = {
+  override def reset(): Unit = {
     game = EasyFlash.jumper
     exrom = true
     romlBankIndex = 0
     romhBankIndex = 0
-    notifyMemoryConfigurationChange
+    notifyMemoryConfigurationChange()
   }
 
   override def saveState(out: ObjectOutputStream): Unit = {
@@ -144,6 +144,6 @@ class EasyFlash(crt: Cartridge, ram:Memory) extends CartridgeExpansionPort(crt,r
         }
       }
     }
-    builder.finish
+    builder.finish()
   }
 }

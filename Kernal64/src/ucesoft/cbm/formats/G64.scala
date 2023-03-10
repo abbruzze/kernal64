@@ -36,7 +36,7 @@ private[formats] class G64(val file:String) extends Diskette {
   private[this] var _singleSide = true
   private[this] var lastTrackSteps = -1
   
-  loadTracks
+  loadTracks()
   val canBeEmulated = false  
   lazy val totalTracks: Int = tracks.length
   
@@ -184,7 +184,7 @@ private[formats] class G64(val file:String) extends Diskette {
     }   
   }
   
-  def reset  : Unit = {
+  def reset(): Unit = {
     bit = 1
     trackIndex = 0
     track = 0
@@ -213,7 +213,7 @@ private[formats] class G64(val file:String) extends Diskette {
   
   final def nextBit: Int = {
     val b = (tracks(track + trackSideOffset)(trackIndex) >> (8 - bit)) & 1
-    if (bit == 8) rotate else bit += 1
+    if (bit == 8) rotate() else bit += 1
     checkSector(b)
     b
   }
@@ -238,13 +238,13 @@ private[formats] class G64(val file:String) extends Diskette {
   }
 
   final def writeNextBit(value:Boolean) : Unit = {
-    if (trackOffsets(track + trackSideOffset) == 0) writeNewTrack // writing on an empty track
+    if (trackOffsets(track + trackSideOffset) == 0) writeNewTrack() // writing on an empty track
 
     checkSector(if (value) 1 else 0)
     trackIndexModified = true
     val mask = 1 << (8 - bit)
     if (value) tracks(track + trackSideOffset)(trackIndex) |= mask else tracks(track + trackSideOffset)(trackIndex) &= ~mask
-    if (bit == 8) rotate else bit += 1
+    if (bit == 8) rotate() else bit += 1
   }
   final def nextByte : Int = tracks(track + trackSideOffset)(trackIndex)
   def writeNextByte(b:Int): Unit = tracks(track + trackSideOffset)(trackIndex) = b & 0xFF
@@ -259,7 +259,7 @@ private[formats] class G64(val file:String) extends Diskette {
     trackIndex = (trackIndex + 1) % tracks(track + trackSideOffset).length
   }
   
-  def notifyTrackSectorChangeListener  : Unit = {
+  def notifyTrackSectorChangeListener(): Unit = {
     if (trackChangeListener != null) trackChangeListener(((track + trackSideOffset) >> 1) + 1,(track & 1) == 1,sector)
   }
   def currentTrack: Int = track + 1
@@ -273,11 +273,11 @@ private[formats] class G64(val file:String) extends Diskette {
     lastTrackSteps = trackSteps
     trackIndex = trackIndex % tracks(track + trackSideOffset).length
     bit = 1
-    notifyTrackSectorChangeListener
+    notifyTrackSectorChangeListener()
   }
   def setTrackChangeListener(l:TrackListener): Unit = trackChangeListener = l
     
-  def close: Unit = disk.close()
+  def close(): Unit = disk.close()
   
   override def toString = s"G64 $file total tracks=$totalTracks"
   // state

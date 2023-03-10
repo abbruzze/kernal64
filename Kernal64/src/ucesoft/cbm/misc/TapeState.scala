@@ -18,7 +18,7 @@ class TapeState(datassette:Datassette) extends JComponent with DatassetteListene
   progressBar.setStringPainted(true)
   setVisible(false)
   setToolTipText("Click to show controls")
-  initPopup
+  initPopup()
 
   override def paint(g: Graphics): Unit = {
     val size = getSize()
@@ -72,31 +72,31 @@ class TapeState(datassette:Datassette) extends JComponent with DatassetteListene
 
   private def initPopup() : Unit = {
     val tapePlayItem = new JMenuItem("Press play")
-    tapePlayItem.addActionListener(_ => datassette.pressPlay)
+    tapePlayItem.addActionListener(_ => datassette.pressPlay())
     pop.add(tapePlayItem)
 
     val tapeStopItem = new JMenuItem("Press stop")
-    tapeStopItem.addActionListener(_ => datassette.pressStop)
+    tapeStopItem.addActionListener(_ => datassette.pressStop())
     pop.add(tapeStopItem)
 
     val tapeRecordItem = new JMenuItem("Press record & play")
-    tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay)
+    tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay())
     pop.add(tapeRecordItem)
 
     val tapeRewindItem = new JMenuItem("Press rewind")
-    tapeRewindItem.addActionListener(_ => datassette.pressRewind)
+    tapeRewindItem.addActionListener(_ => datassette.pressRewind())
     pop.add(tapeRewindItem)
 
     val tapeForwardItem = new JMenuItem("Press forward")
-    tapeForwardItem.addActionListener(_ => datassette.pressForward)
+    tapeForwardItem.addActionListener(_ => datassette.pressForward())
     pop.add(tapeForwardItem)
 
     val tapeResetItem = new JMenuItem("Reset")
-    tapeResetItem.addActionListener(_ => datassette.resetToStart)
+    tapeResetItem.addActionListener(_ => datassette.resetToStart())
     pop.add(tapeResetItem)
 
     val tapeResetCounterItem = new JMenuItem("Reset counter")
-    tapeResetCounterItem.addActionListener(_ => datassette.resetCounter)
+    tapeResetCounterItem.addActionListener(_ => datassette.resetCounter())
     pop.add(tapeResetCounterItem)
 
     addMouseListener(new MouseAdapter {

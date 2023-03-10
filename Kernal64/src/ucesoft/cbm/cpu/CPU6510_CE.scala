@@ -76,7 +76,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
     private def stepAndWait(): Unit = {
       tracing = true
-      breakCallBack(CpuStepInfo(CURRENT_OP_PC, buildCpuStepInfo, formatDebug(CURRENT_OP_PC)))
+      breakCallBack(CpuStepInfo(CURRENT_OP_PC, buildCpuStepInfo(), formatDebug(CURRENT_OP_PC)))
       syncObject.synchronized {
         syncObject.wait()
       }
@@ -208,7 +208,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
   /**
    * SO of 6502 used by 1541
    */
-  def setOverflowFlag: Unit = sev
+  def setOverflowFlag(): Unit = sev()
 
   override def getProperties: Properties = {
     properties.setProperty("PC", hex4(PC))
@@ -574,8 +574,8 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
   @inline private[this] final def set_nz(src: Int) : Unit = {
     val value = src & 0xff
-    if (value >= 0x80) sen else cln
-    if (value == 0) sez else clz
+    if (value >= 0x80) sen() else cln()
+    if (value == 0) sez() else clz()
   }
 
   @inline private[this] def DoRMW()  : Unit = {
@@ -627,7 +627,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         }
         case IRQ_STATE_5 => () => {
           push(SR & ~B_FLAG)
-          sei
+          sei()
           state = IRQ_STATE_6
         }
         case IRQ_STATE_6 => () => {
@@ -639,7 +639,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case IRQ_STATE_7 => () => {
           if (ready) {
             PC |= mem.read(0xffff) << 8
-            Last
+            Last()
           }
         }
         // NMI
@@ -665,7 +665,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         }
         case NMI_STATE_5 => () => {
           push(SR & ~B_FLAG)
-          sei
+          sei()
           state = NMI_STATE_6
         }
         case NMI_STATE_6 => () => {
@@ -677,7 +677,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case NMI_STATE_7 => () => {
           if (ready) {
             PC |= mem.read(0xfffb) << 8
-            Last
+            Last()
           }
         }
         // Addressing modes: Fetch effective address, no extra cycles (-> ar)
@@ -685,7 +685,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             ar = mem.read(PC)
             PC = (PC + 1) & 0xFFFF
-            Execute
+            Execute()
           }
         }
         case A_ZEROX => () => {
@@ -699,7 +699,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             mem.read(ar)
             ar = (ar + X) & 0xff
-            Execute
+            Execute()
           }
         }
         case A_ZEROY => () => {
@@ -713,7 +713,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             mem.read(ar)
             ar = (ar + Y) & 0xff
-            Execute
+            Execute()
           }
         }
         case A_ABS => () => {
@@ -728,7 +728,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(PC)
             PC = (PC + 1) & 0xFFFF
             ar = ar | (data << 8)
-            Execute
+            Execute()
           }
         }
         case A_ABSX => () => {
@@ -749,7 +749,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case A_ABSX2 => () => { // No page crossed
           if (ready) {
             mem.read(ar)
-            Execute
+            Execute()
           }
         }
         case A_ABSX3 => () => { // Page crossed
@@ -757,7 +757,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
             pageCrossed = true
-            Execute
+            Execute()
           }
         }
         case A_ABSY => () => {
@@ -778,7 +778,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case A_ABSY2 => () => { // No page crossed
           if (ready) {
             mem.read(ar)
-            Execute
+            Execute()
           }
         }
         case A_ABSY3 => () => { // Page crossed
@@ -786,7 +786,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
             pageCrossed = true
-            Execute
+            Execute()
           }
         }
         case A_INDX => () => {
@@ -813,7 +813,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             data = mem.read((ar2 + 1) & 0xff)
             ar = ar | (data << 8)
-            Execute
+            Execute()
           }
         }
         case A_INDY => () => {
@@ -839,7 +839,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case A_INDY3 => () => { // No page crossed
           if (ready) {
             mem.read(ar)
-            Execute
+            Execute()
           }
         }
         case A_INDY4 => () => { // Page crossed
@@ -847,7 +847,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
             pageCrossed = true
-            Execute
+            Execute()
           }
         }
         // Addressing modes: Fetch effective address, extra cycle on page crossing (-> ar)
@@ -864,7 +864,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             if (ar + X < 0x100) {
               ar = (ar + X) & 0xff | (data << 8)
-              Execute
+              Execute()
             } else {
               ar = (ar + X) & 0xff | (data << 8)
               state = AE_ABSX2
@@ -876,7 +876,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
             pageCrossed = true
-            Execute
+            Execute()
           }
         }
         case AE_ABSY => () => {
@@ -892,7 +892,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             if (ar + Y < 0x100) {
               ar = (ar + Y) & 0xff | (data << 8)
-              Execute
+              Execute()
             } else {
               ar = (ar + Y) & 0xff | (data << 8)
               state = AE_ABSY2
@@ -904,7 +904,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
             pageCrossed = true
-            Execute
+            Execute()
           }
         }
         case AE_INDY => () => {
@@ -925,7 +925,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read((ar2 + 1) & 0xff)
             if (ar + Y < 0x100) {
               ar = (ar + Y) & 0xff | (data << 8)
-              Execute
+              Execute()
             } else {
               ar = (ar + Y) & 0xff | (data << 8)
               state = AE_INDY3
@@ -937,7 +937,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
             pageCrossed = true
-            Execute
+            Execute()
           }
         }
         // Addressing modes: Read operand, write it back, no extra cycles (-> ar, rdbuf)
@@ -945,7 +945,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             ar = mem.read(PC)
             PC = (PC + 1) & 0xFFFF
-            DoRMW
+            DoRMW()
           }
         }
         case M_ZEROX => () => {
@@ -959,7 +959,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             mem.read(ar)
             ar = (ar + X) & 0xff
-            DoRMW
+            DoRMW()
           }
         }
         case M_ZEROY => () => {
@@ -973,7 +973,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             mem.read(ar)
             ar = (ar + Y) & 0xff
-            DoRMW
+            DoRMW()
           }
         }
         case M_ABS => () => {
@@ -988,7 +988,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(PC)
             PC = (PC + 1) & 0xFFFF
             ar = ar | (data << 8)
-            DoRMW
+            DoRMW()
           }
         }
         case M_ABSX => () => {
@@ -1009,7 +1009,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case M_ABSX2 => () => { // No page crossed
           if (ready) {
             mem.read(ar)
-            DoRMW
+            DoRMW()
           }
         }
         case M_ABSX3 => () => { // Page crossed
@@ -1017,7 +1017,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
             pageCrossed = true
-            DoRMW
+            DoRMW()
           }
         }
         case M_ABSY => () => {
@@ -1038,7 +1038,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case M_ABSY2 => () => { // No page crossed
           if (ready) {
             mem.read(ar)
-            DoRMW
+            DoRMW()
           }
         }
         case M_ABSY3 => () => { // Page crossed
@@ -1046,7 +1046,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
             pageCrossed = true
-            DoRMW
+            DoRMW()
           }
         }
         case M_INDX => () => {
@@ -1073,7 +1073,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             data = mem.read((ar2 + 1) & 0xff)
             ar = ar | (data << 8)
-            DoRMW
+            DoRMW()
           }
         }
         case M_INDY => () => {
@@ -1099,7 +1099,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case M_INDY3 => () => { // No page crossed
           if (ready) {
             mem.read(ar)
-            DoRMW
+            DoRMW()
           }
         }
         case M_INDY4 => () => { // Page crossed
@@ -1107,7 +1107,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(ar)
             ar = (ar + 0x100) & 0xFFFF
             pageCrossed = true
-            DoRMW
+            DoRMW()
           }
         }
         case RMW_DO_IT => () => {
@@ -1118,7 +1118,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         }
         case RMW_DO_IT1 => () => {
           /*if (!dma)*/mem.write(ar, rdbuf)
-          Execute
+          Execute()
         }
         // ------------------ OPERATIONS -------------------------------
         // Load group
@@ -1127,7 +1127,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(ar)
             A = data
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_LDA_I => () => {
@@ -1136,7 +1136,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             A = data
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_LDX => () => {
@@ -1144,7 +1144,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(ar)
             X = data
             set_nz(X)
-            Last
+            Last()
           }
         }
         case O_LDX_I => () => {
@@ -1153,7 +1153,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             X = data
             set_nz(X)
-            Last
+            Last()
           }
         }
         case O_LDY => () => {
@@ -1161,7 +1161,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(ar)
             Y = data
             set_nz(Y)
-            Last
+            Last()
           }
         }
         case O_LDY_I => () => {
@@ -1170,21 +1170,21 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             Y = data
             set_nz(Y)
-            Last
+            Last()
           }
         }
         // Store group
         case O_STA => () => {
           /*if (!dma)*/mem.write(ar, A)
-          Last
+          Last()
         }
         case O_STX => () => {
           /*if (!dma)*/mem.write(ar, X)
-          Last
+          Last()
         }
         case O_STY => () => {
           /*if (!dma)*/mem.write(ar, Y)
-          Last
+          Last()
         }
         // Transfer group
         case O_TAX => () => {
@@ -1192,7 +1192,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(PC)
             X = A
             set_nz(X)
-            Last
+            Last()
           }
         }
         case O_TXA => () => {
@@ -1200,7 +1200,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(PC)
             A = X
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_TAY => () => {
@@ -1208,7 +1208,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(PC)
             Y = A
             set_nz(Y)
-            Last
+            Last()
           }
         }
         case O_TYA => () => {
@@ -1216,7 +1216,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(PC)
             A = Y
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_TSX => () => {
@@ -1224,14 +1224,14 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(PC)
             X = SP
             set_nz(X)
-            Last
+            Last()
           }
         }
         case O_TXS => () => {
           if (ready) {
             mem.read(PC)
             SP = X
-            Last
+            Last()
           }
         }
         // Arithmetic group
@@ -1239,7 +1239,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             data = mem.read(ar)
             do_adc(data)
-            Last
+            Last()
           }
         }
         case O_ADC_I => () => {
@@ -1247,14 +1247,14 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(PC)
             PC = (PC + 1) & 0xFFFF
             do_adc(data)
-            Last
+            Last()
           }
         }
         case O_SBC => () => {
           if (ready) {
             data = mem.read(ar)
             do_sbc(data)
-            Last
+            Last()
           }
         }
         case O_SBC_I => () => {
@@ -1262,7 +1262,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(PC)
             PC = (PC + 1) & 0xFFFF
             do_sbc(data)
-            Last
+            Last()
           }
         }
         // Increment/decrement group
@@ -1271,7 +1271,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(PC)
             X = (X + 1) & 0xFF
             set_nz(X)
-            Last
+            Last()
           }
         }
         case O_DEX => () => {
@@ -1279,7 +1279,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(PC)
             X = (X - 1) & 0xFF
             set_nz(X)
-            Last
+            Last()
           }
         }
         case O_INY => () => {
@@ -1287,7 +1287,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(PC)
             Y = (Y + 1) & 0xFF
             set_nz(Y)
-            Last
+            Last()
           }
         }
         case O_DEY => () => {
@@ -1295,20 +1295,20 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             mem.read(PC)
             Y = (Y - 1) & 0xFF
             set_nz(Y)
-            Last
+            Last()
           }
         }
         case O_INC => () => {
           rdbuf = (rdbuf + 1) & 0xFF
           set_nz(rdbuf)
           /*if (!dma)*/mem.write(ar, rdbuf)
-          Last
+          Last()
         }
         case O_DEC => () => {
           rdbuf = (rdbuf - 1) & 0xFF
           set_nz(rdbuf)
           /*if (!dma)*/mem.write(ar, rdbuf)
-          Last
+          Last()
         }
         // Logic group
         case O_AND => () => {
@@ -1316,7 +1316,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(ar)
             A &= data
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_AND_I => () => {
@@ -1325,7 +1325,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             A &= data
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_ORA => () => {
@@ -1333,7 +1333,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(ar)
             A |= data
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_ORA_I => () => {
@@ -1342,7 +1342,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             A |= data
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_EOR => () => {
@@ -1350,7 +1350,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(ar)
             A ^= data
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_EOR_I => () => {
@@ -1359,7 +1359,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             A ^= data
             set_nz(A)
-            Last
+            Last()
           }
         }
         // Compare group
@@ -1368,8 +1368,8 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(ar)
             ar = A - data
             set_nz(ar)
-            if (ar >= 0) sec else clc
-            Last
+            if (ar >= 0) sec() else clc()
+            Last()
           }
         }
         case O_CMP_I => () => {
@@ -1378,8 +1378,8 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             ar = A - data
             set_nz(ar)
-            if (ar >= 0) sec else clc
-            Last
+            if (ar >= 0) sec() else clc()
+            Last()
           }
         }
         case O_CPX => () => {
@@ -1387,8 +1387,8 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(ar)
             ar = X - data
             set_nz(ar)
-            if (ar >= 0) sec else clc
-            Last
+            if (ar >= 0) sec() else clc()
+            Last()
           }
         }
         case O_CPX_I => () => {
@@ -1397,8 +1397,8 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             ar = X - data
             set_nz(ar)
-            if (ar >= 0) sec else clc
-            Last
+            if (ar >= 0) sec() else clc()
+            Last()
           }
         }
         case O_CPY => () => {
@@ -1406,8 +1406,8 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(ar)
             ar = Y - data
             set_nz(ar)
-            if (ar >= 0) sec else clc
-            Last
+            if (ar >= 0) sec() else clc()
+            Last()
           }
         }
         case O_CPY_I => () => {
@@ -1416,87 +1416,87 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             ar = Y - data
             set_nz(ar)
-            if (ar >= 0) sec else clc
-            Last
+            if (ar >= 0) sec() else clc()
+            Last()
           }
         }
         // Bit-test group
         case O_BIT => () => {
           if (ready) {
             data = mem.read(ar)
-            if (data >= 0x80) sen else cln
-            if ((data & V_FLAG) == V_FLAG) sev else clv
-            if ((A & data) == 0) sez else clz
-            Last
+            if (data >= 0x80) sen() else cln()
+            if ((data & V_FLAG) == V_FLAG) sev() else clv()
+            if ((A & data) == 0) sez() else clz()
+            Last()
           }
         }
         // Shift/rotate group
         case O_ASL => () => {
-          if ((rdbuf & N_FLAG) == N_FLAG) sec else clc
+          if ((rdbuf & N_FLAG) == N_FLAG) sec() else clc()
           rdbuf = (rdbuf << 1) & 0xFF
           /*if (!dma)*/mem.write(ar, rdbuf)
           set_nz(rdbuf)
-          Last
+          Last()
         }
         case O_ASL_A => () => {
           if (ready) {
             mem.read(PC)
-            if ((A & N_FLAG) == N_FLAG) sec else clc
+            if ((A & N_FLAG) == N_FLAG) sec() else clc()
             A = (A << 1) & 0xFF
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_LSR => () => {
-          if ((rdbuf & 0x01) == 0x01) sec else clc
+          if ((rdbuf & 0x01) == 0x01) sec() else clc()
           rdbuf = (rdbuf >> 1) & 0xFF
           /*if (!dma)*/mem.write(ar, rdbuf)
           set_nz(rdbuf)
-          Last
+          Last()
         }
         case O_LSR_A => () => {
           if (ready) {
             mem.read(PC)
-            if ((A & 0x01) == 0x01) sec else clc
+            if ((A & 0x01) == 0x01) sec() else clc()
             A = (A >> 1) & 0xFF
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_ROL => () => {
           val oldC = if (isCarry) 1 else 0
-          if ((rdbuf & N_FLAG) == N_FLAG) sec else clc
+          if ((rdbuf & N_FLAG) == N_FLAG) sec() else clc()
           rdbuf = ((rdbuf << 1) & 0xff) | oldC
           set_nz(rdbuf)
           /*if (!dma)*/mem.write(ar, rdbuf)
-          Last
+          Last()
         }
         case O_ROL_A => () => {
           if (ready) {
             mem.read(PC)
             val oldC = if (isCarry) 1 else 0
-            if ((A & N_FLAG) == N_FLAG) sec else clc
+            if ((A & N_FLAG) == N_FLAG) sec() else clc()
             A = ((A << 1) & 0xff) | oldC
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_ROR => () => {
           val oldC = if (isCarry) 0x80 else 0
-          if ((rdbuf & 1) == 1) sec else clc
+          if ((rdbuf & 1) == 1) sec() else clc()
           rdbuf = ((rdbuf >> 1) & 0xff) | oldC
           set_nz(rdbuf)
           /*if (!dma)*/mem.write(ar, rdbuf)
-          Last
+          Last()
         }
         case O_ROR_A => () => {
           if (ready) {
             mem.read(PC)
             val oldC = if (isCarry) 0x80 else 0
-            if ((A & 1) == 1) sec else clc
+            if ((A & 1) == 1) sec() else clc()
             A = ((A >> 1) & 0xff) | oldC
             set_nz(A)
-            Last
+            Last()
           }
         }
         // Stack group
@@ -1510,7 +1510,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           //push(A)
           /*if (!dma)*/mem.write(SP | 0x100, A)
           SP = (SP - 1) & 0xFF
-          Last
+          Last()
         }
         case O_PLA => () => {
           if (ready) {
@@ -1529,7 +1529,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             A = mem.read(SP | 0x100)
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_PHP => () => {
@@ -1541,7 +1541,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case O_PHP1 => () => {
           val sr = SR | B_FLAG
           push(sr)
-          Last
+          Last()
         }
         case O_PLP => () => {
           if (ready) {
@@ -1561,7 +1561,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(SP | 0x100)
             SR = (data & ~B_FLAG) | (SR & B_FLAG)
             //delay1CycleIRQCheck = true
-            Last
+            Last()
           }
         }
         // Jump/branch group
@@ -1576,7 +1576,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             data = mem.read(PC)
             PC = (data << 8) | ar
-            Last
+            Last()
           }
         }
         case O_JMP_I => () => {
@@ -1589,7 +1589,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             data = mem.read((ar + 1) & 0xff | ar & 0xff00)
             PC |= data << 8
-            Last
+            Last()
           }
         }
         case O_JSR => () => {
@@ -1620,7 +1620,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(PC)
             PC = (PC + 1) & 0xFFFF
             PC = ar | (data << 8)
-            Last
+            Last()
           }
         }
         case O_RTS => () => {
@@ -1658,7 +1658,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
               tracing = true
               stepType = StepIn
             }
-            Last
+            Last()
           }
         }
         case O_RTI => () => {
@@ -1694,7 +1694,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             data = mem.read(SP | 0x100)
             PC |= data << 8
-            Last
+            Last()
           }
         }
         case O_BRK => () => {
@@ -1716,7 +1716,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         }
         case O_BRK3 => () => {
           push(SR | B_FLAG)
-          sei
+          sei()
           // CHECK NMI
           if (nmiOnNegativeEdge) {
             nmiOnNegativeEdge = false
@@ -1736,7 +1736,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(if (!nmiOnNegativeEdge) 0xffff else 0xfffb)
             if (nmiOnNegativeEdge) nmiOnNegativeEdge = false
             PC |= data << 8
-            Last
+            Last()
           }
         }
         case O_BCS => () => {
@@ -1769,7 +1769,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             nmiFirstCycle += 1
             mem.read(PC)
             PC = ar
-            Last
+            Last()
           }
         }
         case O_BRANCH_BP => () => { // Page crossed, branch backwards
@@ -1783,7 +1783,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case O_BRANCH_BP1 => () => {
           if (ready) {
             mem.read((PC + 0x100) & 0xFFFF)
-            Last
+            Last()
           }
         }
         case O_BRANCH_FP => () => { // Page crossed, branch forwards
@@ -1797,66 +1797,66 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
         case O_BRANCH_FP1 => () => {
           if (ready) {
             mem.read((PC - 0x100) & 0xFFFF)
-            Last
+            Last()
           }
         }
         // Flag group
         case O_SEC => () => {
           if (ready) {
             mem.read(PC)
-            sec
-            Last
+            sec()
+            Last()
           }
         }
         case O_CLC => () => {
           if (ready) {
             mem.read(PC)
-            clc
-            Last
+            clc()
+            Last()
           }
         }
         case O_SED => () => {
           if (ready) {
             mem.read(PC)
-            sed
-            Last
+            sed()
+            Last()
           }
         }
         case O_CLD => () => {
           if (ready) {
             mem.read(PC)
-            cld
-            Last
+            cld()
+            Last()
           }
         }
         case O_SEI => () => {
           if (ready) {
             mem.read(PC)
             prevIClearedFlag = !isInterrupt
-            sei
-            Last
+            sei()
+            Last()
           }
         }
         case O_CLI => () => {
           if (ready) {
             mem.read(PC)
             if (irqLow && isInterrupt) delay1CycleIRQCheck = true
-            cli
-            Last
+            cli()
+            Last()
           }
         }
         case O_CLV => () => {
           if (ready) {
             mem.read(PC)
-            clv
-            Last
+            clv()
+            Last()
           }
         }
         // NOP group
         case O_NOP => () => {
           if (ready) {
             mem.read(PC)
-            Last
+            Last()
           }
         }
         // Undocumented
@@ -1865,13 +1865,13 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           if (ready) {
             mem.read(PC)
             PC = (PC + 1) & 0xFFFF
-            Last
+            Last()
           }
         }
         case O_NOP_A => () => {
           if (ready) {
             mem.read(ar)
-            Last
+            Last()
           }
         }
         // Load A/X group
@@ -1881,50 +1881,50 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             A = data
             X = data
             set_nz(A)
-            Last
+            Last()
           }
         }
         // Store A/X group
         case O_SAX => () => {
           /*if (!dma)*/mem.write(ar, A & X)
-          Last
+          Last()
         }
         // ASL/ORA group
         case O_SLO => () => {
-          if ((rdbuf & 0x80) > 0) sec else clc
+          if ((rdbuf & 0x80) > 0) sec() else clc()
           rdbuf = (rdbuf << 1) & 0xFF
           /*if (!dma)*/mem.write(ar, rdbuf)
           A |= rdbuf
           set_nz(A)
-          Last
+          Last()
         }
         // ROL/AND group
         case O_RLA => () => {
           val tmp = (rdbuf & 0x80) > 0
           rdbuf = if (isCarry) (rdbuf << 1) | 0x01 else rdbuf << 1
-          if (tmp) sec else clc
+          if (tmp) sec() else clc()
           /*if (!dma)*/mem.write(ar, rdbuf)
           A &= rdbuf
           set_nz(A)
-          Last
+          Last()
         }
         // LSR/EOR group
         case O_SRE => () => {
-          if ((rdbuf & 0x01) > 0) sec else clc
+          if ((rdbuf & 0x01) > 0) sec() else clc()
           rdbuf >>= 1
           /*if (!dma)*/mem.write(ar, rdbuf)
           A ^= rdbuf
           set_nz(A)
-          Last
+          Last()
         }
         // ROR/ADC group
         case O_RRA => () => {
           val tmp = (rdbuf & 0x01) > 0
           rdbuf = if (isCarry) (rdbuf >> 1) | 0x80 else rdbuf >> 1
-          if (tmp) sec else clc
+          if (tmp) sec() else clc()
           /*if (!dma)*/mem.write(ar, rdbuf)
           do_adc(rdbuf)
-          Last
+          Last()
         }
         // DEC/CMP group
         case O_DCP => () => {
@@ -1932,15 +1932,15 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           /*if (!dma)*/mem.write(ar, rdbuf)
           ar = A - rdbuf
           set_nz(ar)
-          if (ar >= 0) sec else clc
-          Last
+          if (ar >= 0) sec() else clc()
+          Last()
         }
         // INC/SBC group
         case O_ISB => () => {
           rdbuf = (rdbuf + 1) & 0xFF
           /*if (!dma)*/mem.write(ar, rdbuf)
           do_sbc(rdbuf)
-          Last
+          Last()
         }
         // Complex functions
         case O_ANC_I => () => {
@@ -1949,8 +1949,8 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             A &= data
             set_nz(A)
-            if (isNegative) sec else clc
-            Last
+            if (isNegative) sec() else clc()
+            Last()
           }
         }
         case O_ASR_I => () => {
@@ -1958,10 +1958,10 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             data = mem.read(PC)
             PC = (PC + 1) & 0xFFFF
             A &= data
-            if ((A & 0x01) > 0) sec else clc
+            if ((A & 0x01) > 0) sec() else clc()
             A >>= 1
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_ARR_I => () => {
@@ -1973,25 +1973,25 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
               var tmp_2 = tmp
               tmp_2 |= (if (isCarry) 1 << 8 else 0)
               tmp_2 >>= 1
-              if (isCarry) sen else cln
-              if (tmp_2 == 0) sez else clz
-              if (((tmp_2 ^ tmp) & 0x40) > 0) sev else clv
+              if (isCarry) sen() else cln()
+              if (tmp_2 == 0) sez() else clz()
+              if (((tmp_2 ^ tmp) & 0x40) > 0) sev() else clv()
               if (((tmp & 0xf) + (tmp & 0x1)) > 0x5) tmp_2 = (tmp_2 & 0xf0) | ((tmp_2 + 0x6) & 0xf)
               if (((tmp & 0xf0) + (tmp & 0x10)) > 0x50) {
                 tmp_2 = (tmp_2 & 0x0f) | ((tmp_2 + 0x60) & 0xf0)
-                sec
-              } else clc
+                sec()
+              } else clc()
               A = tmp_2 & 0xFF
             }
             else {
               tmp |= (if (isCarry) 1 << 8 else 0)
               tmp >>= 1
               set_nz(tmp)
-              if ((tmp & 0x40) > 0) sec else clc
-              if (((tmp & 0x40) ^ ((tmp & 0x20) << 1)) > 0) sev else clv
+              if ((tmp & 0x40) > 0) sec() else clc()
+              if (((tmp & 0x40) ^ ((tmp & 0x20) << 1)) > 0) sev() else clv()
               A = tmp & 0xFF
             }
-            Last
+            Last()
           }
         }
         case O_ANE_I => () => {
@@ -2001,7 +2001,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             PC = (PC + 1) & 0xFFFF
             A = (A | const) & X & data
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_LXA_I => () => {
@@ -2012,7 +2012,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             A = (A | const) & data
             X = A
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_SBX_I => () => {
@@ -2022,8 +2022,8 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             ar = (X & A) - data
             X = ar & 0xFF
             set_nz(X)
-            if (ar >= 0) sec else clc
-            Last
+            if (ar >= 0) sec() else clc()
+            Last()
           }
         }
         case O_LAS => () => {
@@ -2033,7 +2033,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
             SP = X
             A = X
             set_nz(A)
-            Last
+            Last()
           }
         }
         case O_SHS => () => { // ar2 contains the high byte of the operand address
@@ -2041,25 +2041,25 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
           val value = if ((readyCycles & 4) == 0) SP else (ar2 + 1) & SP
           val target = if (!pageCrossed) ar else (ar & 0x00FF) | (value << 8) & (ar & 0xFF00)
           /*if (!dma)*/mem.write(target,value)
-          Last
+          Last()
         }
         case O_SHY => () => { // ar2 contains the high byte of the operand address
           val value = if ((readyCycles & 4) == 0) Y else Y & (ar2 + 1)
           val target = if (!pageCrossed) ar else (ar & 0x00FF) | (value << 8) & (ar & 0xFF00)
           /*if (!dma)*/mem.write(target,value)
-          Last
+          Last()
         }
         case O_SHX => () => { // ar2 contains the high byte of the operand address
           val value = if ((readyCycles & 4) == 0) X else X & (ar2 + 1)
           val target = if (!pageCrossed) ar else (ar & 0x00FF) | (value << 8) & (ar & 0xFF00)
           /*if (!dma)*/mem.write(target,value)
-          Last
+          Last()
         }
         case O_SHA => () => { // ar2 contains the high byte of the operand address
           val value = if ((readyCycles & 4) == 0) A & X else A & X & (ar2 + 1)
           val target = if (!pageCrossed) ar else (ar & 0x00FF) | (value << 8) & (ar & 0xFF00)
           /*if (!dma)*/mem.write(target, value)
-          Last
+          Last()
         }
         case O_JAM => () => {
           // HALT CPU
@@ -2099,22 +2099,22 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
   @inline private[this] def do_adc(data: Int) : Unit = {
     val C = if (isCarry) 1 else 0
     var res = A + data + C
-    if ((res & 0xFF) == 0) sez else clz
+    if ((res & 0xFF) == 0) sez() else clz()
 
     if (isDecimal) {
       res = (A & 0x0f) + (data & 0x0f) + C
       if( res > 0x09 ) res += 0x06
       val c = if (res > 0x0f) 1 else 0
       res = (A & 0xf0) + (data & 0xf0) + (c << 4) + (res & 0x0f)
-      if ((res & 0x80) > 0) sen else cln
-      if ((((A ^ data) & 0x80) == 0) && (((A ^ res) & 0x80) != 0)) sev else clv
+      if ((res & 0x80) > 0) sen() else cln()
+      if ((((A ^ data) & 0x80) == 0) && (((A ^ res) & 0x80) != 0)) sev() else clv()
       if( res > 0x9f ) res += 0x60
     }
     else {
-      if ((((A ^ data) & 0x80) == 0) && (((A ^ res) & 0x80) != 0)) sev else clv
-      if ((res & 0x80) > 0) sen else cln
+      if ((((A ^ data) & 0x80) == 0) && (((A ^ res) & 0x80) != 0)) sev() else clv()
+      if ((res & 0x80) > 0) sen() else cln()
     }
-    if (res >= 0x100) sec else clc
+    if (res >= 0x100) sec() else clc()
     A = res & 0xFF
   }
 
@@ -2122,10 +2122,10 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
     val oldC = if (isCarry) 0 else -1
     val dataInv = ~data & 0xFF
     var res = A + dataInv + (if (isCarry) 1 else 0)
-    if ((res & 0xFF) == 0) sez else clz
-    if (res >= 0x100) sec else clc
-    if ((res & 0x80) > 0) sen else cln
-    if ((((A ^ dataInv) & 0x80) == 0) && (((A ^ res) & 0x80) != 0)) sev else clv
+    if ((res & 0xFF) == 0) sez() else clz()
+    if (res >= 0x100) sec() else clc()
+    if ((res & 0x80) > 0) sen() else cln()
+    if ((((A ^ dataInv) & 0x80) == 0) && (((A ^ res) & 0x80) != 0)) sev() else clv()
     if (isDecimal) {
       var AL = (A & 0x0f) - (data & 0x0f) + oldC
       if (AL < 0) AL = ((AL - 0x06) & 0x0F) - 0x10
@@ -2136,12 +2136,12 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
     A = res & 0xFF
   }
 
-  def init: Unit = {
-    initStates
-    reset
+  def init(): Unit = {
+    initStates()
+    reset()
   }
 
-  def reset  : Unit = {
+  def reset(): Unit = {
     irqLow = false
     nmiLow = false
     nmiOnNegativeEdge = false
@@ -2159,12 +2159,12 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
     Y = 0
     SR = 0
     SP = 0
-    sei
+    sei()
     Log.info(s"CPU reset! PC = ${hex4(PC)}")
 
     if (breakType != null && breakType.isBreak(ResetBreakInfo())) {
       tracing = true
-      breakCallBack(CpuStepInfo(PC, buildCpuStepInfo, formatDebug()))
+      breakCallBack(CpuStepInfo(PC, buildCpuStepInfo(), formatDebug()))
     }
   }
 
@@ -2176,7 +2176,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
   final def fetchAndExecute(cycles: Int) : Unit = {
     var c = cycles
     while (c > 0) {
-      fetchAndExecute
+      fetchAndExecute()
       c -= 1
     }
   }
@@ -2186,7 +2186,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
     if (breakType != null && state == 0 && breakType.isBreak(AddressBreakInfo(PC,ExecuteBreakAccess))) {
       tracing = true
-      breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug()))
+      breakCallBack(CpuStepInfo(PC,buildCpuStepInfo(),formatDebug()))
     }
 
     // check interrupts
@@ -2195,7 +2195,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
       state = NMI_STATE
       if (breakType != null && breakType.isBreak(NMIBreakInfo())) {
         tracing = true
-        breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug()))
+        breakCallBack(CpuStepInfo(PC,buildCpuStepInfo(),formatDebug()))
         Log.debug("NMI Break")
       }
     }
@@ -2206,7 +2206,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
       }
       if (breakType != null && breakType.isBreak(IRQBreakInfo())) {
         tracing = true
-        breakCallBack(CpuStepInfo(PC,buildCpuStepInfo,formatDebug()))
+        breakCallBack(CpuStepInfo(PC,buildCpuStepInfo(),formatDebug()))
         Log.debug("IRQ Break")
       }
     }
@@ -2224,7 +2224,7 @@ class CPU6510_CE(private var _mem: Memory, val id: ChipID.ID) extends CPU65xx {
 
       if (tracingNow) {
         val disa = formatDebug()
-        stepCallBack(CpuStepInfo(PC,buildCpuStepInfo,disa))
+        stepCallBack(CpuStepInfo(PC,buildCpuStepInfo(),disa))
         syncObject.synchronized {
           syncObject.wait()
         }

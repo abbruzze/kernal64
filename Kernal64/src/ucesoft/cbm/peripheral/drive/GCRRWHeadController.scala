@@ -8,8 +8,8 @@ class GCRRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
   private[this] var trackSteps = track << 1      
   private[this] var last10Bits = 0
   
-  override def reset : Unit = {
-    super.reset
+  override def reset() : Unit = {
+    super.reset()
     trackSteps = 2
     last10Bits = 0
   }
@@ -47,7 +47,7 @@ class GCRRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
       track = floppy.currentTrack
     }
   }
-  final protected def readNextBit : Unit = {
+  final protected def readNextBit() : Unit = {
     val bit = floppy.nextBit
     last10Bits = ((last10Bits << 1) | bit) & 0x3FF
     if (last10Bits == 0x3FF) {
@@ -62,7 +62,7 @@ class GCRRWHeadController(val name:String,_floppy:Floppy,ledListener:DriveLedLis
       byteReadySignal = 0
     }
   }
-  final protected def writeNextBit : Unit = {
+  final protected def writeNextBit() : Unit = {
     floppy.writeNextBit((lastWrite & 0x80) > 0)
     lastWrite <<= 1        
     if (bitCounter == 8) {

@@ -85,7 +85,7 @@ object REU {
     private[this] var reuBank = 0
 
 
-    override def eject  : Unit = {
+    override def eject(): Unit = {
       mem.setForwardWriteTo(None)
     }
 
@@ -106,9 +106,9 @@ object REU {
       in.close()
     }
 
-    override def init : Unit = if (size != REU_16M) ramInitPattern
+    override def init(): Unit = if (size != REU_16M) ramInitPattern()
 
-    final override def reset  : Unit = {
+    final override def reset(): Unit = {
       statusRegister = 0
       commandRegister = 0x10
       c64Address = 0
@@ -141,9 +141,9 @@ object REU {
       }
     }
 
-    override def hardReset : Unit = {
-      reset
-      if (size != REU_16M) ramInitPattern
+    override def hardReset(): Unit = {
+      reset()
+      if (size != REU_16M) ramInitPattern()
     }
 
     final override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
@@ -155,7 +155,7 @@ object REU {
       if (address == 0xFF00 && ff00 && (commandRegister & CMD_EXECUTE) > 0) {
         ff00 = false
         //println("Starting deferred operation")
-        startOperation
+        startOperation()
       }
       else
         if (currentOperation == IDLE_OP && address >= 0xDF00 && address < 0xE000) {
@@ -189,7 +189,7 @@ object REU {
       offset match {
         case 1 =>
           commandRegister = value
-          checkOperation
+          checkOperation()
         case 2 =>
           shadowC64Address &= 0xff00
           shadowC64Address |= (value & 0xff)
@@ -233,7 +233,7 @@ object REU {
           transferRegister = shadowTransferRegister
         case 9 =>
           interruptMaskRegister = value
-          checkInterrupt
+          checkInterrupt()
         case 10 => addressControlRegister = value
         case _ =>
       }
@@ -241,7 +241,7 @@ object REU {
 
     private def checkOperation()  : Unit = {
       ff00 = (commandRegister & 0x90) == 0x80
-      if ((commandRegister & 0x90) == 0x90) clk.schedule(new ClockEvent("REUStartOperation",clk.nextCycles,cycles => startOperation))
+      if ((commandRegister & 0x90) == 0x90) clk.schedule(new ClockEvent("REUStartOperation",clk.nextCycles,cycles => startOperation()))
       if (ff00) {
         //println(s"Start of operation ${currentOperation} deferred clk=${clk.currentCycles}")
         mem.setForwardWriteTo(Some(this))
@@ -257,10 +257,10 @@ object REU {
       currentOperation match {
         case C64_TO_REU_OP => transferOperation(true)
         case REU_TO_C64_OP => transferOperation(false)
-        case VERIFY_OP => verifyOperation
+        case VERIFY_OP => verifyOperation()
         case EXCHANGE_OP =>
           exchangeFirstPhase = true
-          exchangeOperation
+          exchangeOperation()
       }
     }
 
@@ -290,47 +290,47 @@ object REU {
         if (exchangeFirstPhase) {
           exchangeTmp1 = mem.read(c64Address)
           exchangeTmp2 = readFromREU
-          clk.schedule(new ClockEvent("REUExchange",clk.nextCycles,cycles => exchangeOperation))
+          clk.schedule(new ClockEvent("REUExchange",clk.nextCycles,cycles => exchangeOperation()))
         }
         else {
           mem.write(c64Address,exchangeTmp2)
           writeToREU(exchangeTmp1)
-          incrementAddresses
+          incrementAddresses()
           if (transferRegister == 0x01) {
             floatingBusValue = readFromREU
             statusRegister |= STATUS_END_OF_BLOCK
-            clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation))
+            clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation()))
           }
           else {
             transferRegister = (transferRegister - 1) & 0xFFFF
-            clk.schedule(new ClockEvent("REUExchange",clk.nextCycles,cycles => exchangeOperation))
+            clk.schedule(new ClockEvent("REUExchange",clk.nextCycles,cycles => exchangeOperation()))
           }
         }
         exchangeFirstPhase = !exchangeFirstPhase
       }
-      else clk.schedule(new ClockEvent("REUExchange",clk.nextCycles,cycles => exchangeOperation))
+      else clk.schedule(new ClockEvent("REUExchange",clk.nextCycles,cycles => exchangeOperation()))
     }
 
     private def verifyOperation()  : Unit = {
       if (!baLow) { // verify
         if (mem.read(c64Address) != readFromREU) statusRegister |= STATUS_VERIFY_ERROR
-        incrementAddresses
+        incrementAddresses()
         if (transferRegister == 0x01) {
           statusRegister |= STATUS_END_OF_BLOCK
-          clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation))
+          clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation()))
         }
         else {
           transferRegister = (transferRegister - 1) & 0xFFFF
           if ((statusRegister & STATUS_VERIFY_ERROR) > 0) {
             if (transferRegister == 0x01 && mem.read(c64Address) == readFromREU) statusRegister |= STATUS_END_OF_BLOCK
-            clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 2,_ => endOperation))
+            clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 2,_ => endOperation()))
           }
           else
-            clk.schedule(new ClockEvent("REUVerify",clk.nextCycles,cycles => verifyOperation))
+            clk.schedule(new ClockEvent("REUVerify",clk.nextCycles,cycles => verifyOperation()))
         }
       }
       else
-        clk.schedule(new ClockEvent("REUVerify",clk.nextCycles,cycles => verifyOperation))
+        clk.schedule(new ClockEvent("REUVerify",clk.nextCycles,cycles => verifyOperation()))
     }
 
     private def transferOperation(isC64Source:Boolean) : Unit = {
@@ -338,10 +338,10 @@ object REU {
       if (!baLow) { // transfer
         if (isC64Source) writeToREU(mem.read(c64Address))
         else mem.write(c64Address,readFromREU)
-        incrementAddresses
+        incrementAddresses()
         if (transferRegister == 0x01) {
           statusRegister |= STATUS_END_OF_BLOCK
-          clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation))
+          clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 1,cycles => endOperation()))
           if (!isC64Source) {
             floatingBusValue = readFromREU
           }
@@ -375,7 +375,7 @@ object REU {
       // released DMA
       setDMA(false)
       // check IRQ
-      checkInterrupt
+      checkInterrupt()
       // check autoload
       if ((commandRegister & CMD_AUTOLOAD) > 0) {
         //println(s"Autoload ${currentOperation} clk=${clk.currentCycles} c64Addr=${Integer.toHexString(c64Address)} reuAddr=${Integer.toHexString(reuAddress)} length=${Integer.toHexString(transferRegister)}")
@@ -426,7 +426,7 @@ object REU {
       shadowTransferRegister = in.readInt
       loadMemory[Int](reuMem,in)
       reuBank = in.readInt
-      checkOperation
+      checkOperation()
     }
   }
 }

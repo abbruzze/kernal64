@@ -107,7 +107,7 @@ class IECBus extends CBMComponent {
   def triggerSRQ(caller:IECBusListener) : Unit = {
     var l = listeners
 	  while (l != Nil) {
-	    if (caller.bitmap != l.head.bitmap) l.head.srqTriggered
+	    if (caller.bitmap != l.head.bitmap) l.head.srqTriggered()
 	    l = l .tail
 	  }
   }
@@ -120,8 +120,8 @@ class IECBus extends CBMComponent {
     if (clockValue == GROUND) CLK |= 1 << l.bitmap else CLK &= ~(1 << l.bitmap)
   }
   
-  def init  : Unit = {}
-  def reset  : Unit = {
+  def init(): Unit = {}
+  def reset(): Unit = {
     ATN = VOLTAGE
     CLK = VOLTAGE
     DATA = VOLTAGE

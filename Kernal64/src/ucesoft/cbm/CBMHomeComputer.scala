@@ -99,8 +99,8 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     override def mousePressed(e:MouseEvent) : Unit = {
       lightPenButtonEmulation match {
         case LIGHT_PEN_NO_BUTTON =>
-        case LIGHT_PEN_BUTTON_UP => controlPortB.emulateUp
-        case LIGHT_PEN_BUTTON_LEFT => controlPortB.emulateLeft
+        case LIGHT_PEN_BUTTON_UP => controlPortB.emulateUp()
+        case LIGHT_PEN_BUTTON_LEFT => controlPortB.emulateLeft()
         case LIGHT_GUN_BUTTON_POTY => sid.setLightGunEnabled(true,potx = false,0)
       }
     }
@@ -108,12 +108,12 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       lightPenButtonEmulation match {
         case LIGHT_PEN_NO_BUTTON =>
         case LIGHT_GUN_BUTTON_POTY => sid.setLightGunEnabled(true,potx = false)
-        case _ => controlPortB.releaseEmulated
+        case _ => controlPortB.releaseEmulated()
       }
     }
 
-    def init  : Unit = {}
-    def reset  : Unit = {}
+    def init()  : Unit = {}
+    def reset()  : Unit = {}
     // state
     protected def saveState(out:ObjectOutputStream) : Unit = {}
     protected def loadState(in:ObjectInputStream) : Unit = {}
@@ -122,13 +122,13 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   // ----------------------WiC64 ---------------------------------------------------
   protected var wic64Panel : WiC64Panel = _
   // ------------------- INITIALIZATION --------------------------------------------
-  initComputer
+  initComputer()
 
-  override protected def initComputer : Unit = {
+  override protected def initComputer() : Unit = {
     ExpansionPort.setExpansionPortStateHandler(expansionPortStateHandler _)
   }
 
-  override def afterInitHook : Unit = {
+  override def afterInitHook() : Unit = {
     inspectDialog = InspectPanel.getInspectDialog(displayFrame, this,cbmModel)
     // deactivate drives > 8
     for(d <- 1 until TOTAL_DRIVES) {
@@ -160,7 +160,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
   protected def setDMA(dma:Boolean) : Unit
 
-  override protected def paste : Unit = {
+  override protected def paste() : Unit = {
     val clipboard = Toolkit.getDefaultToolkit.getSystemClipboard
     val contents = clipboard.getContents(null)
     if (contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
@@ -202,11 +202,11 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       val disk = if (file.isDirectory) D64LocalDirectory.createDiskFromLocalDir(file) else Diskette(file.toString)
       disk.canWriteOnDisk = canWriteOnDisk
       disk.flushListener = diskFlusher
-      drives(driveID).getFloppy.close
-      if (!tracer.isTracing) clock.pause
+      drives(driveID).getFloppy.close()
+      if (!tracer.isTracing()) clock.pause()
       drives(driveID).setDriveReader(disk,emulateInserting)
       preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID),file.toString)
-      clock.play
+      clock.play()
 
       loadFileItems(driveID).setEnabled(isD64)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
@@ -261,7 +261,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       if (_reset) reset(false)
       if (autorun) {
         clock.schedule(new ClockEvent("Loading",clock.currentCycles + PRG_RUN_DELAY_CYCLES,(cycles) => { attachDevice(file,true,None,false) }))
-        clock.play
+        clock.play()
       }
       else {
         attachDevice(file,false)
@@ -285,7 +285,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     val content = prg.drop(2)
     val prgName = name.dropRight(4)
     d64.addPRG(content,prgName,startAddress)
-    d64.close
+    d64.close()
     disk8LoadedAsPRG = true
     attachDiskFile(0,disk,autorun,Some(prgName),false)
   }
@@ -327,8 +327,8 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
   protected def loadCartridgeFile(file:File,stateLoading : Boolean = false) : Option[Cartridge] = {
     try {
-      if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
-      ExpansionPort.getExpansionPort.eject
+      if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause()
+      ExpansionPort.getExpansionPort.eject()
       val ep = ExpansionPortFactory.loadExpansionPort(file.toString,irqSwitcher.setLine(Switcher.CRT,_),nmiSwitcher.setLine(Switcher.CRT,_),getRAM,mmu,() => reset(true),configuration)
       println(ep)
       cartMenu.setVisible(true)
@@ -350,7 +350,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
         showError("Cartridge loading error",t.toString)
     }
     finally {
-      if (!stateLoading) clock.play
+      if (!stateLoading) clock.play()
     }
 
     None
@@ -441,7 +441,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     tapeMenu.setEnabled(true)
     configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
     if (autorun) {
-      datassette.pressPlay
+      datassette.pressPlay()
       HomeKeyboard.insertSmallTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar,mmu,isC64Mode)
     }
   }
@@ -468,8 +468,8 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected def detachCtr()  : Unit = {
     if (ExpansionPort.getExpansionPort.isEmpty) showError("Detach error","No cartridge attached!")
     else {
-      if (Thread.currentThread != Clock.systemClock) clock.pause
-      ExpansionPort.getExpansionPort.eject
+      if (Thread.currentThread != Clock.systemClock) clock.pause()
+      ExpansionPort.getExpansionPort.eject()
       ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
       reset(true)
     }
@@ -532,12 +532,12 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
         add(drives(id))
       case Some(c) =>
         floppyComponents(id).drive = drives(id)
-        c.getFloppy.close
-        c.disconnect
+        c.getFloppy.close()
+        c.disconnect()
         drivesRunning(id) = true
-        drives(id).initComponent
+        drives(id).initComponent()
         change(c,drives(id))
-        inspectDialog.updateRoot
+        inspectDialog.updateRoot()
 
         tracer.removeDevice(Tracer.TracedDevice(c.componentID,c.getMem,c))
         /*
@@ -558,7 +558,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected def enableMouse(mouseEnabled:Boolean,display:vic.Display) : Unit = {
     controlPortA.setMouse1351Emulation(mouseEnabled)
     sid.setMouseEnabled(mouseEnabled)
-    if (mouseEnabled) MouseCage.enableMouseCageOn(display) else MouseCage.disableMouseCage
+    if (mouseEnabled) MouseCage.enableMouseCageOn(display) else MouseCage.disableMouseCage()
   }
 
   protected def setGeoRAM(enabled:Boolean,size:Int = 0): Unit = {
@@ -568,7 +568,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected def setREU(reu:Option[Int],reu16FileName:Option[String]) : Unit = {
     reu match {
       case None =>
-        ExpansionPort.getExpansionPort.eject
+        ExpansionPort.getExpansionPort.eject()
         ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
       case Some(REU.REU_16M) =>
         val reu = REU.getREU(REU.REU_16M,mmu,dmaSwitcher.setLine(Switcher.CRT,_),irqSwitcher.setLine(Switcher.CRT,_),reu16FileName map { new File(_) } )
@@ -584,9 +584,9 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
   override protected def warpMode(warpOn:Boolean,play:Boolean = true): Unit = {
     super.warpMode(warpOn, play)
-    if (play) clock.pause
+    if (play) clock.pause()
     sid.setFullSpeed(warpOn)
-    if (play) clock.play
+    if (play) clock.play()
   }
 
   protected def setLightPen(setting:Int): Unit = {
@@ -632,7 +632,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected def setRemote(source:Option[JRadioButtonMenuItem]): Unit = {
     source match {
       case Some(source) =>
-        if (remote.isDefined) remote.get.stopRemoting
+        if (remote.isDefined) remote.get.stopRemoting()
         val listeningPort = JOptionPane.showInputDialog(displayFrame,"Listening port", "Remoting port configuration",JOptionPane.QUESTION_MESSAGE,null,null,"8064")
         if (listeningPort == null) {
           source.setSelected(false)
@@ -657,7 +657,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
       case None =>
         remote match {
           case Some(rem) =>
-            rem.stopRemoting
+            rem.stopRemoting()
             display.setRemote(None)
             remote = None
           case None =>
@@ -666,7 +666,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   }
 
   protected def enableFlyer(enabled:Boolean): Unit = {
-    if (enabled != isFlyerEnabled) flyerIEC.reset
+    if (enabled != isFlyerEnabled) flyerIEC.reset()
     isFlyerEnabled = enabled
   }
 
@@ -687,7 +687,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
         case None =>
           DigiMAX.enabled(true,true)
         case Some(a) =>
-          ExpansionPort.getExpansionPort.eject
+          ExpansionPort.getExpansionPort.eject()
           ExpansionPort.setExpansionPort(new DigiMaxCart(a))
       }
     }
@@ -720,7 +720,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
   protected def enableCPMCart(enabled:Boolean): Unit = {
     import Preferences._
-    ExpansionPort.getExpansionPort.eject
+    ExpansionPort.getExpansionPort.eject()
     if (enabled) {
       ExpansionPort.setExpansionPort(new ucesoft.cbm.expansion.cpm.CPMCartridge(mmu,dmaSwitcher.setLine(Switcher.CRT,_),tracer))
       detachCtrItem.setEnabled(true)
@@ -749,18 +749,18 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
     controlPortA.controlPort = getControlPortFor(CONFIGURATION_JOY_PORT_2)
     controlPortB.controlPort = getControlPortFor(CONFIGURATION_JOY_PORT_1)
-    keyboardControlPort.updateConfiguration
+    keyboardControlPort.updateConfiguration()
   }
 
   protected def joySettings() : Unit = {
-    Clock.systemClock.pause
+    Clock.systemClock.pause()
     try {
       val dialog = new JoystickSettingDialog(displayFrame,configuration,gameControlPort)
       dialog.setVisible(true)
-      configureJoystick
+      configureJoystick()
     }
     finally {
-      Clock.systemClock.play
+      Clock.systemClock.play()
     }
   }
 
@@ -769,7 +769,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     val j2 = configuration.getProperty(CONFIGURATION_JOY_PORT_2)
     if (j2 != null) configuration.setProperty(CONFIGURATION_JOY_PORT_1,j2) else configuration.remove(CONFIGURATION_JOY_PORT_1)
     if (j1 != null) configuration.setProperty(CONFIGURATION_JOY_PORT_2,j1) else configuration.remove(CONFIGURATION_JOY_PORT_2)
-    configureJoystick
+    configureJoystick()
   }
 
   protected def setVicFullScreen(): Unit = {
@@ -803,7 +803,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   }
 
   protected def setVICModel(model:VICType.Value,preserveDisplayDim:Boolean = false,resetFlag:Boolean,play:Boolean = true) : Unit = {
-    if (play) clock.pause
+    if (play) clock.pause()
     val vicType = cbmModel match {
       case VIC20Model =>
         val vicType = model match {
@@ -831,12 +831,12 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
 
     if (resetFlag) reset(false)
-    if (play) clock.play
+    if (play) clock.play()
   }
 
   // -------------------------------------------------------------------
 
-  override protected def setGlobalCommandLineOptions : Unit = {
+  override protected def setGlobalCommandLineOptions() : Unit = {
     import Preferences._
     // non-saveable settings
     preferences.add(PREF_WARP,"Run warp mode",false) { w =>
@@ -903,7 +903,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected def setCartMenu(fileMenu:JMenu) : Unit = {
     import Preferences._
     val attachCtrItem = new JMenuItem("Attach cartridge ...")
-    attachCtrItem.addActionListener(_ => attachCtr)
+    attachCtrItem.addActionListener(_ => attachCtr())
     fileMenu.add(attachCtrItem)
     preferences.add(PREF_CART, "Attach the given cartridge", "") { cart =>
       if (cart != "") loadCartridgeFile(new File(cart))
@@ -925,54 +925,54 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     // ====================================================================================================
 
     val zipItem = new JMenuItem("Attach zip ...")
-    zipItem.addActionListener(_ => attachZip )
+    zipItem.addActionListener(_ => attachZip() )
     fileMenu.add(zipItem)
 
     val tapeItem = new JMenuItem("Load file from tape ...")
-    tapeItem.addActionListener(_ => loadFileFromTape )
+    tapeItem.addActionListener(_ => loadFileFromTape() )
     fileMenu.add(tapeItem)
 
     if (tapeAllowed) {
       val attachTapeItem = new JMenuItem("Attach tape ...")
-      attachTapeItem.addActionListener(_ => attachTape)
+      attachTapeItem.addActionListener(_ => attachTape())
       fileMenu.add(attachTapeItem)
 
       tapeMenu.setEnabled(false)
       fileMenu.add(tapeMenu)
 
       val tapePlayItem = new JMenuItem("Press play")
-      tapePlayItem.addActionListener(_ => datassette.pressPlay)
+      tapePlayItem.addActionListener(_ => datassette.pressPlay())
       tapeMenu.add(tapePlayItem)
 
       val tapeStopItem = new JMenuItem("Press stop")
-      tapeStopItem.addActionListener(_ => datassette.pressStop)
+      tapeStopItem.addActionListener(_ => datassette.pressStop())
       tapeMenu.add(tapeStopItem)
 
       val tapeRecordItem = new JMenuItem("Press record & play")
-      tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay)
+      tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay())
       tapeMenu.add(tapeRecordItem)
 
       val tapeRewindItem = new JMenuItem("Press rewind")
-      tapeRewindItem.addActionListener(_ => datassette.pressRewind)
+      tapeRewindItem.addActionListener(_ => datassette.pressRewind())
       tapeMenu.add(tapeRewindItem)
 
       val tapeForwardItem = new JMenuItem("Press forward")
-      tapeForwardItem.addActionListener(_ => datassette.pressForward)
+      tapeForwardItem.addActionListener(_ => datassette.pressForward())
       tapeMenu.add(tapeForwardItem)
 
       val tapeResetItem = new JMenuItem("Reset")
-      tapeResetItem.addActionListener(_ => datassette.resetToStart)
+      tapeResetItem.addActionListener(_ => datassette.resetToStart())
       tapeMenu.add(tapeResetItem)
 
       val tapeResetCounterItem = new JMenuItem("Reset counter")
-      tapeResetCounterItem.addActionListener(_ => datassette.resetCounter)
+      tapeResetCounterItem.addActionListener(_ => datassette.resetCounter())
       tapeMenu.add(tapeResetCounterItem)
     }
 
     fileMenu.addSeparator()
 
     val makeDiskItem = new JMenuItem("Make empty disk ...")
-    makeDiskItem.addActionListener(_ => makeDisk )
+    makeDiskItem.addActionListener(_ => makeDisk() )
     fileMenu.add(makeDiskItem)
 
     val autorunDiskItem = new JMenuItem("Autorun disk ...")
@@ -1027,11 +1027,11 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     // ====================================================================================================
     val loadPrgItem = new JMenuItem("Load PRG file from local disk ...")
     loadPrgItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    loadPrgItem.addActionListener(_ => loadPrg )
+    loadPrgItem.addActionListener(_ => loadPrg() )
     fileMenu.add(loadPrgItem)
 
     val savePrgItem = new JMenuItem("Save PRG file to local disk ...")
-    savePrgItem.addActionListener(_ => savePrg )
+    savePrgItem.addActionListener(_ => savePrg() )
     fileMenu.add(savePrgItem)
 
     // DRIVEX-ENABLED =====================================================================================
@@ -1075,7 +1075,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     // ====================================================================================================
 
     detachCtrItem.setEnabled(false)
-    detachCtrItem.addActionListener(_ => detachCtr )
+    detachCtrItem.addActionListener(_ => detachCtr() )
     fileMenu.add(detachCtrItem)
 
     fileMenu.addSeparator()
@@ -1096,7 +1096,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     fileMenu.addSeparator()
 
     val exitItem = new JMenuItem("Exit")
-    exitItem.addActionListener(_ => turnOff )
+    exitItem.addActionListener(_ => turnOff() )
     fileMenu.add(exitItem)
   }
 
@@ -1225,18 +1225,18 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected def setFullScreenSettings(parent:JMenu) : Unit = {
     val fullScreenItem = new JMenuItem("Full screen")
     fullScreenItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    fullScreenItem.addActionListener(_ => setVicFullScreen)
+    fullScreenItem.addActionListener(_ => setVicFullScreen())
     parent.add(fullScreenItem)
   }
 
   protected def setJoysticsSettings(parent:JMenu) : Unit = {
     val joyAItem = new JMenuItem("Joystick...")
     joyAItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_J, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    joyAItem.addActionListener(_ => joySettings )
+    joyAItem.addActionListener(_ => joySettings() )
     parent.add(joyAItem)
 
     val swapJoyAItem = new JCheckBoxMenuItem("Swap joysticks")
-    swapJoyAItem.addActionListener(_ => swapJoysticks )
+    swapJoyAItem.addActionListener(_ => swapJoysticks() )
     parent.add(swapJoyAItem)
   }
 
@@ -1304,7 +1304,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     import Preferences._
     // PRINTER-ENABLED =====================================================================================
     val printerPreviewItem = new JMenuItem("Printer preview ...")
-    printerPreviewItem.addActionListener(_ => showPrinterPreview )
+    printerPreviewItem.addActionListener(_ => showPrinterPreview() )
     parent.add(printerPreviewItem)
 
     val printerEnabledItem = new JCheckBoxMenuItem("Printer enabled")
@@ -1383,11 +1383,11 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     sidCycleExactItem.addActionListener(_ => preferences(PREF_SIDCYCLEEXACT) = sidCycleExactItem.isSelected )
     sidItem.add(sidCycleExactItem)
     preferences.add(PREF_SIDCYCLEEXACT,"With this option enabled the SID emulation is more accurate with a decrease of performance",false) { sce =>
-      clock.pause
+      clock.pause()
       sidCycleExact = sce
       sid.setCycleExact(sidCycleExact)
       sidCycleExactItem.setSelected(sidCycleExact)
-      clock.play
+      clock.play()
     }
     // =====================================================================================================
     // reset setting
@@ -1489,7 +1489,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     group5.add(reu8MItem)
     reuItem.add(reu8MItem)
     val reu16MItem = new JRadioButtonMenuItem("16M ...")
-    reu16MItem.addActionListener(_ => choose16MREU )
+    reu16MItem.addActionListener(_ => choose16MREU() )
     group5.add(reu16MItem)
     reuItem.add(reu16MItem)
     parent.add(reuItem)
@@ -1581,7 +1581,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     val digimaxItem = new JMenu("DigiMAX")
     parent.add(digimaxItem)
     val digiMaxSampleRateItem  = new JMenuItem("DigiMax sample rate ...")
-    digiMaxSampleRateItem.addActionListener(_ => chooseDigiMaxSampleRate )
+    digiMaxSampleRateItem.addActionListener(_ => chooseDigiMaxSampleRate() )
     digimaxItem.add(digiMaxSampleRateItem)
     val group6 = new ButtonGroup
     val digimaxDisabledItem = new JRadioButtonMenuItem("Disabled")
@@ -1645,7 +1645,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     fylerEnabledItem.addActionListener(e => enableFlyer(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
     val flyerDirectoryItem = new JMenuItem("Set disks repository ...")
     flyerItem.add(flyerDirectoryItem)
-    flyerDirectoryItem.addActionListener(_ => chooseFlyerDir )
+    flyerDirectoryItem.addActionListener(_ => chooseFlyerDir() )
     // TODO : preferences
     // reset setting
     resetSettingsActions = (() => {
@@ -1720,7 +1720,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     }
     )
     sfmNextFrameItem.setAccelerator(KeyStroke.getKeyStroke(shortKey,maskKey))
-    sfmNextFrameItem.addActionListener(_ => display.advanceOneFrame )
+    sfmNextFrameItem.addActionListener(_ => display.advanceOneFrame() )
     sfmItem.add(sfmNextFrameItem)
     parent.add(sfmItem)
   }
@@ -1730,7 +1730,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     val jumperItem = new JCheckBoxMenuItem("Easy Flash jumper on")
     jumperItem.addActionListener( _ => EasyFlash.jumper = jumperItem.isSelected )
     easyFlashMenu.add(jumperItem)
-    easyFlashWriteChangesItem.addActionListener(_ => easyFlashWriteChanges )
+    easyFlashWriteChangesItem.addActionListener(_ => easyFlashWriteChanges() )
     easyFlashWriteChangesItem.setEnabled(false)
     easyFlashMenu.add(easyFlashWriteChangesItem)
     parent.add(easyFlashMenu)
@@ -1739,18 +1739,18 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected def setGMOD3FlashSettings(parent:JMenu) : Unit = {
     val gmodMenu = new JMenu("GMOD ...")
     val gmod2Item = new JMenuItem("GMOD2 eeprom file...")
-    gmod2Item.addActionListener(_ => chooseGMod2 )
+    gmod2Item.addActionListener(_ => chooseGMod2() )
     gmodMenu.add(gmod2Item)
     GMOD3WriteChangesItem.setEnabled(false)
     gmodMenu.add(GMOD3WriteChangesItem)
-    GMOD3WriteChangesItem.addActionListener(_ => GMOD3WriteChanges )
+    GMOD3WriteChangesItem.addActionListener(_ => GMOD3WriteChanges() )
     parent.add(gmodMenu)
   }
 
   protected def easyFlashWriteChanges() : Unit = {
     ExpansionPort.getInternalExpansionPort match {
       case ef:EasyFlash =>
-        ef.createCRT
+        ef.createCRT()
       case _ =>
     }
   }
@@ -1758,12 +1758,12 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
   protected def GMOD3WriteChanges() : Unit = {
     ExpansionPort.getInternalExpansionPort match {
       case ef:GMOD3 =>
-        ef.createCRT
+        ef.createCRT()
       case _ =>
     }
   }
 
-  override protected def showCartInfo : Unit = {
+  override protected def showCartInfo() : Unit = {
     ExpansionPort.getExpansionPort.getCRT match {
       case Some(crt) =>
         val cols : Array[Object] = Array("Property","Value")

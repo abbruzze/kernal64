@@ -6,7 +6,7 @@ import java.awt.event.{KeyEvent, KeyListener}
 import javax.swing.{JFrame, JPanel}
 
 object QKeyListenerTest extends App with KeyListener {
-    Log.setDebug
+    Log.setDebug()
 //	val kb = new Keyboard
 //	val cp = ControlPort.keypadControlPort
 	

@@ -227,7 +227,7 @@ class VIC20FE3(val rom:Array[Int],
     signals.pref.update(PREF_VIC20_FE3, "")
   }
 
-  final override def reset: Unit = {
+  final override def reset(): Unit = {
     lockbit = true
     regs(0) = 0
     regs(1) = 0

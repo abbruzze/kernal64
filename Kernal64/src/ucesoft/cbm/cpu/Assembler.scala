@@ -178,7 +178,7 @@ class Assembler {
             }
           }
       }
-      s.notifyListeners
+      s.notifyListeners()
     }
   }
     
@@ -260,7 +260,7 @@ object Assembler {
             fc.showOpenDialog(textArea) match {
               case JFileChooser.APPROVE_OPTION =>
                 val src = io.Source.fromFile(fc.getSelectedFile)
-                val text = src.getLines.mkString("\n")
+                val text = src.getLines().mkString("\n")
                 src.close
                 textArea.setText(text)
               case _ =>

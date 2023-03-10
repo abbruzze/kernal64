@@ -144,7 +144,7 @@ object WiC64 extends CBMComponent with Runnable {
   def enabled : Boolean = _enabled
   def enabled_=(on:Boolean): Unit = {
     _enabled = on
-    if (!on) reset
+    if (!on) reset()
     else {
       // check firmware version
       sendHttpGET("http://sk.sx-64.de/wic64/version.txt",false)
@@ -166,7 +166,7 @@ object WiC64 extends CBMComponent with Runnable {
     MAC_ADDRESS = getMacAddress()
   }
 
-  def reset: Unit = {}
+  def reset(): Unit = {}
 
   def resetWiC64(): Unit = {
     if (telnetClient != null && telnetClient.isConnected) {
@@ -719,7 +719,7 @@ object WiC64 extends CBMComponent with Runnable {
           sendHttpGET(encodeURL(resolve(buffer.map(_.toChar).mkString)), true)
         //}
       case 99 =>
-        reset
+        reset()
       case _ =>
         log(s"Command ${recCmd.toHexString} not implemented")
     }
@@ -864,7 +864,7 @@ object WiC64 extends CBMComponent with Runnable {
     log("UPD Thread stopped")
   }
 
-  override def init: Unit = {}
+  override def init(): Unit = {}
 
   override protected def saveState(out: ObjectOutputStream): Unit = {}
 

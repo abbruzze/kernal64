@@ -5,12 +5,12 @@ class ControlPortBridge(var controlPort:ControlPort,override val componentID : S
   override def readPort: Int = controlPort.readPort
   protected def read = 0
   
-  override def emulateFire: Unit = controlPort.emulateFire
-  override def emulateUp: Unit = controlPort.emulateUp
-  override def emulateDown: Unit = controlPort.emulateDown
-  override def emulateLeft: Unit = controlPort.emulateLeft
-  override def emulateRight: Unit = controlPort.emulateRight
-  override def releaseEmulated: Unit = controlPort.releaseEmulated
+  override def emulateFire(): Unit = controlPort.emulateFire()
+  override def emulateUp(): Unit = controlPort.emulateUp()
+  override def emulateDown(): Unit = controlPort.emulateDown()
+  override def emulateLeft(): Unit = controlPort.emulateLeft()
+  override def emulateRight(): Unit = controlPort.emulateRight()
+  override def releaseEmulated(): Unit = controlPort.releaseEmulated()
 
   override def setLightPenEmulation(enabled:Boolean): Unit = controlPort.setLightPenEmulation(enabled)
   override def isLightPenEmulationEnabled: Boolean = controlPort.isLightPenEmulationEnabled

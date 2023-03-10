@@ -12,7 +12,7 @@ class KCS(crt: Cartridge,ram:Memory,nmiAction: (Boolean) => Unit) extends Cartri
     if (address < 0xDF00) { // IO1
       exrom = (address & 0x02) == 2
       game = true
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
 
       ROML.asInstanceOf[ROM].data(0x1E00 + (address & 0xFF))
     }
@@ -24,23 +24,23 @@ class KCS(crt: Cartridge,ram:Memory,nmiAction: (Boolean) => Unit) extends Cartri
     if (address < 0xDF00) { // IO1
       game = false
       exrom = (address & 0x02) == 2
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
     }
     else { // IO2
       if (address < 0xDF80) ram128(address & 0x7F) = value
     }
   }
-  override def reset: Unit = {
+  override def reset(): Unit = {
     exrom = false
     game = false
   }
 
   override def isFreezeButtonSupported = true
 
-  override def freezeButton  : Unit = {
+  override def freezeButton(): Unit = {
     exrom = true
     game = false
-    notifyMemoryConfigurationChange
+    notifyMemoryConfigurationChange()
     nmiAction(true)
     nmiAction(false)
   }

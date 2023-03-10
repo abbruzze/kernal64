@@ -19,7 +19,7 @@ class MagicDesk128(mmu:C128MMU) extends ExpansionPort {
 
   private var bank = 0
 
-  override def reset: Unit = {
+  override def reset(): Unit = {
     bank = 0
   }
 

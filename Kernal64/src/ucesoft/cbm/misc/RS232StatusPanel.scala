@@ -69,7 +69,7 @@ class RS232StatusPanel extends JPanel with RS232StatusListener {
   def connectedTo(address:String): Unit = {
     connected = Some(address)
   }
-  def disconnected: Unit = {
+  def disconnected(): Unit = {
     connected =  None
   }
   

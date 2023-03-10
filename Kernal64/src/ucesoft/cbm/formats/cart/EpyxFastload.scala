@@ -10,17 +10,17 @@ class EpyxFastload(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt
     if (address == 0xDF18) {
       game = true
       exrom = false
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
     } else if (address == 0xdf38) {
       game = true
       exrom = true
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
     }
     romlBanks(0).read((address & 0x1fff) + 0x8000)
   }
-  override def reset  : Unit = {
+  override def reset(): Unit = {
     game = true
     exrom = false
-    notifyMemoryConfigurationChange
+    notifyMemoryConfigurationChange()
   }
 }

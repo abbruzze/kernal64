@@ -82,10 +82,10 @@ abstract class IEEE488BusHandshake(val name:String, bus: IEEE488Bus) extends CBM
       }
     }
 
-    override def IFCchanged(id:Long,newValue: IEEE488Bus.LineValue.Value): Unit = reset
+    override def IFCchanged(id:Long,newValue: IEEE488Bus.LineValue.Value): Unit = reset()
   }
 
-  override def reset: Unit = {
+  override def reset(): Unit = {
     bus.releaseLine(listener,NRFD)
     bus.pullLine(listener,NDAC)
     bus.releaseLine(listener,DAV)
@@ -94,7 +94,7 @@ abstract class IEEE488BusHandshake(val name:String, bus: IEEE488Bus) extends CBM
     setRole(IDLE)
   }
 
-  override def init: Unit = {
+  override def init(): Unit = {
     bus.pullLine(listener,NDAC)
   }
 

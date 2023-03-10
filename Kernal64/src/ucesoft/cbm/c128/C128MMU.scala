@@ -139,7 +139,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
 
   final def isIOACC: Boolean = ioacc
 
-  final def init  : Unit = {
+  final def init()  : Unit = {
     if (cia_dc00 == null ||
         cia_dd00 == null ||
         vic == null ||
@@ -228,11 +228,11 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     Array.copy(internalFunctionROM,offset + 16384,internalFunctionROM_high,0,16384)
   }
 
-  override def afterInitHook  : Unit = {
-    check128_1
+  override def afterInitHook()  : Unit = {
+    check128_1()
   }
 
-  final def reset  : Unit = {
+  final def reset()  : Unit = {
     Log.info("Resetting 128 main memory ...")
     _0 = 0
     _1 = 0//read128_1
@@ -254,7 +254,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     vicBaseAddress = 0
     memLastByteRead = 0
     ioacc = false
-    check128_1
+    check128_1()
     data_out = 0
   }
 
@@ -480,8 +480,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   @inline private[this] def write128(address: Int, value: Int): Unit = {
     if (isForwardWrite) forwardWriteTo.write(address,value)
     // 0/1 ports --------------------------------------------
-    if (address == 0) { _0 = value ; check128_1 }
-    else if (address == 1) { _1 = value & 0x7F ; check128_1 }
+    if (address == 0) { _0 = value ; check128_1() }
+    else if (address == 1) { _1 = value & 0x7F ; check128_1() }
     // FF00-FF04 --------------------------------------------
     else if (address == 0xFF00) MMU_CR_write(value)
     else if (address > 0xFF00 && address < 0xFF05) MMU_FF01_4_write(address & 7) // load cr from preconfiguration registers
@@ -559,7 +559,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     if (z80enabled != oldZ80enabled) mmuChangeListener.cpuChanged(!z80enabled)
     if (!c128Mode && old128Mode/* && !z80enabled*/) {
       mmuChangeListener.c64Mode(true)
-      check64_1
+      check64_1()
     }
     Log.debug(s"Writing D505 register: z80enabled=$z80enabled c128Mode=$c128Mode fastSerialDir=${(value & 8) == 0}")
     //println(s"Writing D505 register: z80enabled=$z80enabled c128Mode=$c128Mode")
@@ -851,7 +851,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
         data_falloff_bit7 = true
       }
       ram.write(address,memLastByteRead)
-      check64_1
+      check64_1()
     }
     else if (address < 0x8000) ram.write(address,value)
     else if (address < 0xA000) { // ROML or RAM
@@ -973,7 +973,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     if (z80enabled != oldZ80enabled) mmuChangeListener.cpuChanged(!z80enabled)
     if (!c128Mode && old128Mode && !z80enabled) {
       mmuChangeListener.c64Mode(true)
-      check64_1
+      check64_1()
     }
 
     loadMemory[Int](D500_REGS,in)
@@ -1000,8 +1000,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     videoBank = in.readInt
     vicBaseAddress = in.readInt
     memLastByteRead = in.readInt
-    check128_1
-    check64_1
+    check128_1()
+    check64_1()
   }
   protected def allowsStateRestoring : Boolean = true
 }

@@ -28,8 +28,8 @@ class ActionReplay(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) exte
     val length = 0x2000
     val isActive = true
     val isRom = false
-    def init  : Unit = {}
-    def reset()  : Unit = {}
+    def init(): Unit = {}
+    def reset(): Unit = {}
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = crtRAM(address & 0x1FFF)
     override def writeROM(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {
       crtRAM(address & 0x1FFF) = value
@@ -55,7 +55,7 @@ class ActionReplay(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) exte
       exportRAM = (value & 0x20) != 0
       if ((value & 0x40) != 0) nmiAction(false)
       if ((value & 0x4) != 0) isActive = false
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
       //println(s"value=${value.toHexString} bank=$romlBankIndex game=$game exrom=$exrom ram=$exportRAM active=$isActive")
     }
   }
@@ -69,19 +69,19 @@ class ActionReplay(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) exte
 
   override def isFreezeButtonSupported = true
 
-  override def freezeButton  : Unit = {
+  override def freezeButton(): Unit = {
     nmiAction(true)
     //nmiAction(false)
     val clk = Clock.systemClock
-    clk.pause
+    clk.pause()
     clk.schedule(new ClockEvent("Freeze", clk.currentCycles + 3, cycles => {
       isActive = true
       write(0xDE00,0x23)
     }))
-    clk.play
+    clk.play()
   }
 
-  override def reset  : Unit = {
+  override def reset(): Unit = {
     game = crt.GAME
     exrom = crt.EXROM
     isActive = true

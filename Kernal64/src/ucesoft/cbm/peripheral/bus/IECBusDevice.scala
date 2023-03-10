@@ -58,15 +58,15 @@ object IECBusDevice {
     private var opened = false
     
     def clear()  : Unit = {
-      buffer.clear
-      fileName.clear
+      buffer.clear()
+      fileName.clear()
     }
     def isOpened: Boolean = opened
     def open(): Unit = opened = true
     def close(): Unit = {
       opened = false
-      buffer.clear
-      fileName.clear
+      buffer.clear()
+      fileName.clear()
     }
     def addToBuffer(value:Int) : Unit = {
       _buffer += value
@@ -172,7 +172,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
         else
         if (!atn) {
           if (role == LISTENER) setMode(IDLE)
-          else resetSignals
+          else resetSignals()
         }
       case READ =>
         if (atn && !lastAtn) {
@@ -190,7 +190,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
                   channels(channel).fileName.append(r.toChar)
                   if (byteReadLastChar) {
                     if (DEBUG) println("File name is " + channels(channel).fileName) //; readLine
-                    fileNameReceived
+                    fileNameReceived()
                   }
                 }
                 else 
@@ -208,7 +208,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
         }
         else {
           if (initNextByte) initByteToWrite(cycles)
-          if (writeByte(cycles,timeout)) resetSignals
+          if (writeByte(cycles,timeout)) resetSignals()
         }
     }
     
@@ -253,42 +253,42 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
     CMD match {
       case LISTEN =>
         if (devOrSecAddr == device) role = LISTENER
-        else resetSignals
-        listen
+        else resetSignals()
+        listen()
       case UNLISTEN =>
         set(DATA,VOLTAGE)
         set(CLK,VOLTAGE)
         role = NONE
-        unlisten//if (channel == 15) handleChannel15(true)
+        unlisten()//if (channel == 15) handleChannel15(true)
       case OPEN =>
         if (role == LISTENER) {
           channel = devOrSecAddr        
-          channels(channel).fileName.clear
+          channels(channel).fileName.clear()
           isReadingFileName = true       
-          open
+          open()
         }        
-        else resetSignals
+        else resetSignals()
       case OPEN_CHANNEL =>
         channel = devOrSecAddr
         isReadingFileName = false
         if (role == READY_TO_BE_TALKER) {
           role = TALKER
           setMode(TURNAROUND)     
-          open_channel
+          open_channel()
         }
-        if (role == LISTENER) open_channel
+        if (role == LISTENER) open_channel()
       case TALK =>
         if (devOrSecAddr == device) role = READY_TO_BE_TALKER
-        talk
+        talk()
       case UNTALK =>
         role = NONE
-        untalk
+        untalk()
       case CLOSE =>
         channel = devOrSecAddr
         if (role != NONE) {
-          close
-          channels(channel).close          
-          resetSignals
+          close()
+          channels(channel).close()
+          resetSignals()
         }
     }
   }
@@ -362,8 +362,8 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
           if (!channels(channel).dataToSend.isDefined) { // FILE NOT FOUND
             waitTimeout = 0
             if (DEBUG) println("FILE NOT FOUND DETECTED for channel " + channel)
-            channels(channel).close
-            dataNotFound//setStatus(STATUS_FILE_NOT_FOUND)
+            channels(channel).close()
+            dataNotFound()//setStatus(STATUS_FILE_NOT_FOUND)
             true
           }
           else {
@@ -438,7 +438,7 @@ abstract class IECBusDevice(bus: IECBus,device: Int = 8) extends IECBusListener 
           writeCyclesWait = cycles + EOI_TIMEOUT
           writeEOI = true
         }
-        byteToSend = ds.next
+        byteToSend = ds.next()
         if (DEBUG) println("Next byte to send: " + Integer.toHexString(byteToSend) + " " + ds.getPerc + "%")                
       case None =>
     }

@@ -335,7 +335,7 @@ final class VIC_II(mem: VIC_II_Memory,
 
     final def getPixels: Array[Int] = pixels
 
-    final def reset : Unit = {
+    final def reset() : Unit = {
       _enabled = false
       x = 0
       y = 0
@@ -358,7 +358,7 @@ final class VIC_II(mem: VIC_II_Memory,
       Array.copy(ALL_TRANSPARENT,0,pixels,0,8)
     }
 
-    def init : Unit = {}
+    def init() : Unit = {}
 
     @inline final def resetSprite() : Unit = {
       if (hasPixels) {
@@ -557,8 +557,8 @@ final class VIC_II(mem: VIC_II_Memory,
     private[this] val pixels = Array.fill(8)(PIXEL_TRANSPARENT)
     private[this] var lastBorderColor = -1
 
-    def init : Unit = {}
-    def reset : Unit = {}
+    def init() : Unit = {}
+    def reset() : Unit = {}
 
     final def getPixels : Array[Int] = if (isBlank || !drawBorderOpt) ALL_TRANSPARENT else pixels
 
@@ -569,7 +569,7 @@ final class VIC_II(mem: VIC_II_Memory,
         //var xcoord = xCoord(rasterCycleToDraw) // TODO : PIPE
         var xcoord = xCoord(rasterCycle)
 
-        checkVertical
+        checkVertical()
 
         var i = 0
         while (i < 8) {
@@ -646,8 +646,8 @@ final class VIC_II(mem: VIC_II_Memory,
 
     final def getPixels: Array[Int] = pixels
 
-    final def init : Unit = {}
-    final def reset : Unit = {
+    final def init() : Unit = {}
+    final def reset() : Unit = {
       gdata = 0
       gdataLatch = 0
     }
@@ -782,7 +782,7 @@ final class VIC_II(mem: VIC_II_Memory,
           if (counter == 0 && lastColorReg == greyReg) pixels(counter) = 0x0F
         }
 
-        if (checkLP && baseX + counter == lpx) triggerLightPen
+        if (checkLP && baseX + counter == lpx) triggerLightPen()
         counter += 1
       }
     }
@@ -801,7 +801,7 @@ final class VIC_II(mem: VIC_II_Memory,
     protected def allowsStateRestoring : Boolean = true
   }
 
-  def init : Unit = {
+  def init() : Unit = {
     add(borderShifter)
     add(gfxShifter)
     sprites foreach { add _ }
@@ -835,7 +835,7 @@ final class VIC_II(mem: VIC_II_Memory,
   }
 
   override def reset(): Unit = {
-    if (coprocessor != null) coprocessor.reset
+    if (coprocessor != null) coprocessor.reset()
     rasterLine = 0
     rasterCycle = 6
     rasterIRQTriggered = false
@@ -916,14 +916,14 @@ final class VIC_II(mem: VIC_II_Memory,
     if (cop != null) {
       if (coprocessor != null) {
         remove(coprocessor)
-        coprocessor.disinstall
+        coprocessor.disinstall()
       }
       add(cop)
-      cop.install
+      cop.install()
     }
     else if (coprocessor != null) {
       remove(coprocessor)
-      coprocessor.disinstall
+      coprocessor.disinstall()
     }
     this.coprocessor = cop
   }
@@ -951,7 +951,7 @@ final class VIC_II(mem: VIC_II_Memory,
       interruptControlRegister |= 8
       // check if we must set interrupt
       //if ((interruptControlRegister & interruptMaskRegister & 0x0f) != 0) irqRequest
-      checkAndSendIRQ
+      checkAndSendIRQ()
     }
   }
 
@@ -1027,7 +1027,7 @@ final class VIC_II(mem: VIC_II_Memory,
           controlRegister1 = value
           val prevRasterLatch = rasterLatch
           if ((controlRegister1 & 128) == 128) rasterLatch |= 0x100 else rasterLatch &= 0xFF
-          if (prevRasterLatch != rasterLatch) checkRasterIRQ
+          if (prevRasterLatch != rasterLatch) checkRasterIRQ()
 
           yscroll = controlRegister1 & 7
           rsel = (controlRegister1 & 8) >> 3
@@ -1045,7 +1045,7 @@ final class VIC_II(mem: VIC_II_Memory,
           val rst8 = rasterLatch & 0x100
           val prevRasterLatch = rasterLatch
           rasterLatch = value | rst8
-          if (prevRasterLatch != rasterLatch) checkRasterIRQ
+          if (prevRasterLatch != rasterLatch) checkRasterIRQ()
 
         //if (debug) Log.info("VIC raster latch set to %4X value=%2X".format(rasterLatch, value))
         case 19 | 20 => // light pen ignored
@@ -1080,12 +1080,12 @@ final class VIC_II(mem: VIC_II_Memory,
         //Log.info(s"VIC base pointer set to ${Integer.toBinaryString(vicBaseAddress)} video matrix=${videoMatrixAddress} char address=${characterAddress} bitmap address=${bitmapAddress} raster=${rasterLine}")
         case 25 =>
           interruptControlRegister &= (~value & 0x0F) | 0x80
-          checkAndSendIRQ
+          checkAndSendIRQ()
         // light pen ignored
         //Log.debug("VIC interrupt control register set to " + Integer.toBinaryString(interruptControlRegister))
         case 26 =>
           interruptMaskRegister = value & (if (coprocessor != null && coprocessor.isActive) ~coprocessor.interruptMaskRegisterMask & 0xFF else 0x0F)
-          checkAndSendIRQ
+          checkAndSendIRQ()
         //Log.debug("VIC interrupt mask register set to " + Integer.toBinaryString(interruptMaskRegister))
         case 27 =>
           spriteCollisionPriority = value
@@ -1149,7 +1149,7 @@ final class VIC_II(mem: VIC_II_Memory,
     if (rasterLine == rasterLatch) {
       if (!rasterIRQTriggered) {
         rasterIRQTriggered = true
-        rasterLineEqualsLatch
+        rasterLineEqualsLatch()
       }
     }
     else rasterIRQTriggered = false
@@ -1182,7 +1182,7 @@ final class VIC_II(mem: VIC_II_Memory,
     if (rasterCycle == model.RASTER_CYCLES) {
       rasterCycle = 0
       updateRasterLine()
-      gfxShifter.reset
+      gfxShifter.reset()
     }
 
     rasterCycle += 1
@@ -1399,12 +1399,12 @@ final class VIC_II(mem: VIC_II_Memory,
     if (almostOneSprite)
       while (s < 8) {
         if (sprites(s).displayable) {
-          sprites(s).producePixels
+          sprites(s).producePixels()
         }
         s += 1
       }
     // ------------------- Border ------------------------
-    borderShifter.producePixels
+    borderShifter.producePixels()
     // ************************** RENDERING ************************************
 
     val gfxPixels = gfxShifter.getPixels
@@ -1439,7 +1439,7 @@ final class VIC_II(mem: VIC_II_Memory,
     s = 0
     if (almostOneSprite)
       while (s < 8) {
-        sprites(s).resetSprite
+        sprites(s).resetSprite()
         s += 1
       }
     // *************************************************************************
@@ -1463,7 +1463,7 @@ final class VIC_II(mem: VIC_II_Memory,
   @inline private def rasterLineEqualsLatch() : Unit = {
     if ((interruptControlRegister & 1) == 0) {
       interruptControlRegister |= 1
-      checkAndSendIRQ
+      checkAndSendIRQ()
     }
   }
 
@@ -1473,7 +1473,7 @@ final class VIC_II(mem: VIC_II_Memory,
     spriteSpriteCollision |= mask
     if (ssCollision == 0) {
       interruptControlRegister |= 4
-      checkAndSendIRQ
+      checkAndSendIRQ()
     }
   }
   @inline private def spriteDataCollision(i: Int) : Unit = {
@@ -1481,7 +1481,7 @@ final class VIC_II(mem: VIC_II_Memory,
     spriteBackgroundCollision |= (1 << i)
     if (sbc == 0) {
       interruptControlRegister |= 2
-      checkAndSendIRQ
+      checkAndSendIRQ()
     }
   }
 
@@ -1681,7 +1681,7 @@ final class VIC_II(mem: VIC_II_Memory,
   // COPROCESSOR ============================================================================================
   override def turnOnInterruptControlRegisterBits(value:Int) : Unit = {
     interruptControlRegister |= value
-    checkAndSendIRQ
+    checkAndSendIRQ()
   }
 
   override def isAECAvailable: Boolean = {

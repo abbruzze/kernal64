@@ -46,11 +46,11 @@ class CIATimerA2(ciaName: String,
   def isStartedAndInContinousMode: Boolean = started && !oneShot
   def isStarted: Boolean = started
   
-  def init : Unit = {}
+  def init(): Unit = {}
   
   import Clock.systemClock
 
-  def reset : Unit = {
+  def reset(): Unit = {
     latch = 0xFFFF
     counter = 0xFFFF
     cr = 0
@@ -125,7 +125,7 @@ class CIATimerA2(ciaName: String,
     countSystemClock = newCountSystemClock
     // bit 1,2 and 5 ignored
     val currentCountExternal = countExternal
-    handleCR567
+    handleCR567()
     enableTimer(startTimer,reload,currentCountExternal,startedWithCountSystemClock)
 /*
     if (reload) {
@@ -238,7 +238,7 @@ class CIATimerA2(ciaName: String,
     timerToNotify match {
       case None =>
       case Some(tm) =>
-        tm.externalUnderflow
+        tm.externalUnderflow()
     }
 
     irqAction(id)
@@ -288,7 +288,7 @@ class CIATimerA2(ciaName: String,
 
 class CIATimerB2(ciaName: String, id: Int, irqAction: (Int) => Unit,autoClock:Boolean = true) extends CIATimerA2(ciaName, id, irqAction,autoClock) {
   override val componentID: String = ciaName + "_TB"
-  override protected def handleCR567 : Unit = {
+  override protected def handleCR567(): Unit = {
     val bit56 = (cr >> 5) & 0x3
     setCountExternal(bit56 == 2)
     countSystemClock = bit56 == 2 || // Timer counts underflow of timer A, TODO can be removed

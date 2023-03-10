@@ -119,11 +119,11 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
       nmiLow = low
     }
 
-  def init : Unit = {
-    reset
+  def init() : Unit = {
+    reset()
   }
 
-  def reset : Unit = {
+  def reset() : Unit = {
     // TODO
     remaining_cpu_cycle_count = 0
     cpu_cycle_count = 0
@@ -144,7 +144,7 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
     }
   }
 
-  def setOverflowFlag : Unit = {}
+  def setOverflowFlag() : Unit = {}
 
   def isFetchingInstruction: Boolean = true // TODO
 
@@ -194,7 +194,7 @@ class CPU65816(private var mem:Memory) extends CPU65xx {
     nmiLow = in.readBoolean
     irqFirstCycle = in.readLong
     nmiFirstCycle = in.readLong
-    CPU_modeSwitch
+    CPU_modeSwitch()
   }
 
   protected def allowsStateRestoring : Boolean = true

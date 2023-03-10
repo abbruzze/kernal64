@@ -24,10 +24,10 @@ class C64VICMemory(mem: Memory,charROM:Memory,cpu:CPU65xx) extends VIC_II_Memory
   
   def getBank: Int = bank
   
-  def init  : Unit = {
+  def init()  : Unit = {
     Log.info("Initialaizing banked memory ...")
   }
-  def reset  : Unit = {
+  def reset()  : Unit = {
     bank = 0
     baseAddress = 0
     memLastByteRead = 0

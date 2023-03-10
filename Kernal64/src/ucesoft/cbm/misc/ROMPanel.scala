@@ -217,7 +217,7 @@ object ROMPanel {
     val cancelB = new JButton("Cancel")
     cancelB.addActionListener(_ => f.dispose() )
     okB.addActionListener(_ => {
-      if (romPanel.applyUpdates) {
+      if (romPanel.applyUpdates()) {
         f.dispose()
         applyCallBack()
       }

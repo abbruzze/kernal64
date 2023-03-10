@@ -142,7 +142,7 @@ class CBM2MMU extends RAMComponent {
 
   def setModel(model:CBM2Model): Unit = {
     this.model = model
-    init
+    init()
   }
 
   def getModel(): CBM2Model = model

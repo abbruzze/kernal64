@@ -20,16 +20,16 @@ class GeoRAM(size:Int) extends ExpansionPort {
   private[this] var rampage : Array[Int] = ram(0)(0)
   private[this] var dfff,dffe = 0
 
-  final override def init: Unit = {
-    reset
+  final override def init(): Unit = {
+    reset()
   }
-  final override def reset: Unit = {
+  final override def reset(): Unit = {
     dfff = 0
     dffe = 0
     rampage = ram(0)(0)
   }
-  override def hardReset : Unit = {
-    reset
+  override def hardReset(): Unit = {
+    reset()
     for(i <- 0 until ram.length;j <- 0 until ram(i).length) {
       java.util.Arrays.fill(ram(i)(j),0)
     }

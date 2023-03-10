@@ -24,7 +24,7 @@ class DualSID(sid:SID,sidAddress:Int) extends ExpansionPort {
     if (address >= sidAddress && address < endAddress) sid.write(address,value)
   }
   
-  final override def eject  : Unit = {
+  final override def eject(): Unit = {
     sid.setStereo(false)
   }
 
@@ -53,26 +53,26 @@ object DualSID {
   }
 
   def setDualSID(address:Option[Int],sid:SID): Unit = {
-    Clock.systemClock.pause
+    Clock.systemClock.pause()
     address match {
       case None =>
         if (isOnExp(lastAddress)) {
-          ExpansionPort.getExpansionPort.eject
+          ExpansionPort.getExpansionPort.eject()
           ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
         }
         sid.setStereo(false,None)
         lastAddress = 0
       case Some(adr) =>
         val sid2 = new SID(adr,2,Some(sid.getDriver))
-        sid2.init
+        sid2.init()
         sid.setStereo(true,Some(sid2))
 
         if (isOnExp(adr)) {
-          ExpansionPort.getExpansionPort.eject
+          ExpansionPort.getExpansionPort.eject()
           ExpansionPort.setExpansionPort(new DualSID(sid,adr))
         }
         lastAddress = adr
     }
-    Clock.systemClock.play
+    Clock.systemClock.play()
   }
 }

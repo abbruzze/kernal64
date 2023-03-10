@@ -15,7 +15,7 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
   //bus.registerListener(this)
   
   def isDeviceReady = true
-  def init : Unit = {}
+  def init(): Unit = {}
   def setDriveReader(driveReader: Floppy,emulateInserting:Boolean) : Unit = {}
   def getFloppy: Floppy = EmptyFloppy
   
@@ -25,8 +25,8 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
     channels(15).dataToSend = Some(new StringDataIterator("%02d,%s,00,00".format(status, ERROR_CODES(status)) + 13.toChar))
   }
   
-  override def resetSignals : Unit = {
-    super.resetSignals
+  override def resetSignals() : Unit = {
+    super.resetSignals()
   }
   
   protected def getDirectoryEntries(path:String) : List[DirEntry]
@@ -108,14 +108,14 @@ abstract class AbstractDrive(bus: IECBus, device: Int = 9) extends IECBusDevice(
     new ArrayIntDataIterator(out.toArray)
   }
   
-  override protected def untalk : Unit = {
-    resetSignals
+  override protected def untalk() : Unit = {
+    resetSignals()
   }
   
-  override def unlisten : Unit = {
-    super.unlisten
-    if (channel == 15) handleChannel15
-    resetSignals
+  override def unlisten() : Unit = {
+    super.unlisten()
+    if (channel == 15) handleChannel15()
+    resetSignals()
   }
   
   // state

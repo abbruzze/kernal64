@@ -107,7 +107,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   def maximumSpeed_=(maximumSpeed:Boolean) : Unit = {
     if (!maximumSpeed) {
       skipThrottle = true
-      setupNextMeasurement
+      setupNextMeasurement()
     }
     _maximumSpeed = maximumSpeed
   }
@@ -117,9 +117,9 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
     properties
   }
 
-  def init  : Unit = {}
+  def init()  : Unit = {}
 
-  def reset  : Unit = {
+  def reset()  : Unit = {
     events = null
     lastCorrectionTime = System.currentTimeMillis
     lastCorrectionCycles = cycles
@@ -151,7 +151,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
 
         cycles += 1
         if (limitCycles > 0 && cycles > limitCycles) TestCart.exit(0x01)
-        throttle
+        throttle()
       }
       catch {
         case t:Throwable => errorHandler match {
@@ -183,7 +183,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
       skipThrottle = false
       val executed = cycles - throttleStartedAt
       lastPerformance = math.round(100.0 * executed / C64_CLOCK_HZ / (PERFORMANCE_MEASUREMENT_INTERVAL_SECONDS / 1000)).toInt
-      setupNextMeasurement
+      setupNextMeasurement()
     }
   }
 

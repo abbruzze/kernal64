@@ -18,7 +18,7 @@ class MagicDesk(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ra
       reg = value
       romlBankIndex = value & 0x3F
       exrom = (value & 0x80) > 0
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
     }
   }
   override def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = reg

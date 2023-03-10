@@ -82,20 +82,20 @@ class VIC20 extends CBMHomeComputer {
 
   override protected def warpMode(warpOn: Boolean, play: Boolean = true): Unit = {
     super.warpMode(warpOn, play)
-    if (play) clock.pause
+    if (play) clock.pause()
     audioDriver.setSoundOn(!warpOn)
-    if (play) clock.play
+    if (play) clock.play()
   }
 
-  def reset: Unit = {
+  def reset(): Unit = {
     clock.maximumSpeed = false
     maxSpeedItem.setSelected(false)
-    ProgramLoader.reset
-    audioDriver.reset
+    ProgramLoader.reset()
+    audioDriver.reset()
   }
 
-  def init: Unit = {
-    Log.setInfo
+  def init(): Unit = {
+    Log.setInfo()
 
     clock.setClockHz(vic.VIC_I_PAL.CPU_FREQ)
 
@@ -152,7 +152,7 @@ class VIC20 extends CBMHomeComputer {
     val lightPen = new LightPenButtonListener
     add(lightPen)
     display.addMouseListener(lightPen)
-    configureJoystick
+    configureJoystick()
     // tracing
     if (headless) Log.setOutput(null)
 
@@ -187,8 +187,8 @@ class VIC20 extends CBMHomeComputer {
     })
   }
 
-  override def afterInitHook : Unit = {
-    super.afterInitHook
+  override def afterInitHook() : Unit = {
+    super.afterInitHook()
     mmu.setCharROM(VIC20MMU.CHAR_ROM.getROMBytes())
     mmu.setKernelPALROM(VIC20MMU.KERNAL_PAL_ROM.getROMBytes())
     mmu.setKernelNTSCROM(VIC20MMU.KERNAL_NTSC_ROM.getROMBytes())
@@ -235,7 +235,7 @@ class VIC20 extends CBMHomeComputer {
   // ======================================== Settings ==============================================
   override protected def enableDrive(id: Int, enabled: Boolean, updateFrame: Boolean): Unit = {
     super.enableDrive(id, enabled, updateFrame)
-    if (updateFrame) adjustRatio
+    if (updateFrame) adjustRatio()
   }
 
   private def adjustRatio(): Unit = {
@@ -271,7 +271,7 @@ class VIC20 extends CBMHomeComputer {
   override protected def setCartMenu(fileMenu: JMenu): Unit = {
     import Preferences._
     val attachCtrItem = new JMenuItem("Attach cartridge ...")
-    attachCtrItem.addActionListener(_ => attachCtr)
+    attachCtrItem.addActionListener(_ => attachCtr())
     fileMenu.add(attachCtrItem)
     preferences.add(PREF_CART, "Attach the given cartridge", "") { cart =>
       if (cart != "") loadCartridgeFile(new File(cart))
@@ -285,7 +285,7 @@ class VIC20 extends CBMHomeComputer {
   }
 
   override def detachCtr(): Unit = {
-    if (Thread.currentThread != Clock.systemClock) clock.pause
+    if (Thread.currentThread != Clock.systemClock) clock.pause()
     mmu.detachAllCarts()
     reset(true)
     detachCtrItem.setEnabled(false)
@@ -305,7 +305,7 @@ class VIC20 extends CBMHomeComputer {
 
   protected def loadRawCartridgeFile(file:File, stateLoading: Boolean = false): Option[Cartridge] = {
     try {
-      if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
+      if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause()
       val crt = new Cartridge(file.toString,true)
       if (!mmu.attachCart(crt)) {
         showError("Cartridge error", s"Cannot attach cartridge: address not valid or conflict with another cartridge")
@@ -328,13 +328,13 @@ class VIC20 extends CBMHomeComputer {
         None
     }
     finally {
-      if (!stateLoading) clock.play
+      if (!stateLoading) clock.play()
     }
   }
 
   override protected def loadCartridgeFile(file: File, stateLoading: Boolean = false): Option[Cartridge] = {
     try {
-      if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause
+      if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause()
       val crt = new Cartridge(file.toString)
       if (crt.cbmType != Cartridge.CBMType.VIC20) throw new IllegalArgumentException(s"Unsupported cartridge signature '${crt.cbmType}'")
       if (!mmu.attachCart(crt)) {
@@ -357,11 +357,11 @@ class VIC20 extends CBMHomeComputer {
         None
     }
     finally {
-      if (!stateLoading) clock.play
+      if (!stateLoading) clock.play()
     }
   }
 
-  override protected def showCartInfo: Unit = {
+  override protected def showCartInfo(): Unit = {
     val cols: Array[Object] = Array("Name","Type", "Addresses")
     val data : Array[Array[Object]] = for(cart <- mmu.getAttachedCarts().toArray) yield {
       Array(cart.name,cart.ctrType.toString,cart.chips.map(_.startingLoadAddress.toHexString).mkString(","))
@@ -561,14 +561,14 @@ class VIC20 extends CBMHomeComputer {
   }
 
   override protected def joySettings(): Unit = {
-    Clock.systemClock.pause
+    Clock.systemClock.pause()
     try {
       val dialog = new JoystickSettingDialog(displayFrame, configuration, gameControlPort,Array("Control Port","User Port"))
       dialog.setVisible(true)
-      configureJoystick
+      configureJoystick()
     }
     finally {
-      Clock.systemClock.play
+      Clock.systemClock.play()
     }
   }
 
@@ -778,7 +778,7 @@ class VIC20 extends CBMHomeComputer {
 
     val adjustRatioItem = new JMenuItem("Adjust display ratio")
     adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    adjustRatioItem.addActionListener(_ => adjustRatio)
+    adjustRatioItem.addActionListener(_ => adjustRatio())
     optionMenu.add(adjustRatioItem)
 
     val vicItem = new JMenu("VIC")
@@ -804,12 +804,12 @@ class VIC20 extends CBMHomeComputer {
 
     val snapshotItem = new JMenuItem("Take a snapshot...")
     snapshotItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    snapshotItem.addActionListener(_ => takeSnapshot)
+    snapshotItem.addActionListener(_ => takeSnapshot())
     optionMenu.add(snapshotItem)
 
     val gifRecorderItem = new JMenuItem("GIF recorder...")
     gifRecorderItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    gifRecorderItem.addActionListener(_ => openGIFRecorder)
+    gifRecorderItem.addActionListener(_ => openGIFRecorder())
     optionMenu.add(gifRecorderItem)
 
     optionMenu.addSeparator()
@@ -822,7 +822,7 @@ class VIC20 extends CBMHomeComputer {
 
     optionMenu.addSeparator()
 
-    setDrivesSettings
+    setDrivesSettings()
 
     setRemotingSettings(optionMenu)
 
@@ -834,7 +834,7 @@ class VIC20 extends CBMHomeComputer {
     optionMenu.addSeparator()
 
     val rs232Item = new JMenuItem("RS-232 ...")
-    rs232Item.addActionListener(_ => manageRS232)
+    rs232Item.addActionListener(_ => manageRS232())
     IOItem.add(rs232Item)
 
     setGEORamSettings(IOItem)
@@ -848,16 +848,16 @@ class VIC20 extends CBMHomeComputer {
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
     romItem.addActionListener(_ => {
-      clock.pause
+      clock.pause()
       ROMPanel.showROMPanel(displayFrame, configuration, cbmModel, false, () => {
         saveSettings(false)
         reset(false)
       })
-      clock.play
+      clock.play()
     })
   }
 
-  override protected def setGlobalCommandLineOptions: Unit = {
+  override protected def setGlobalCommandLineOptions(): Unit = {
     import Preferences._
     // non-saveable settings
     preferences.add(PREF_WARP, "Run warp mode", false) { w =>
@@ -954,7 +954,7 @@ class VIC20 extends CBMHomeComputer {
         preferences.save(configuration)
         println("Settings saved")
       }
-      saveConfigurationFile
+      saveConfigurationFile()
     }
   }
 
@@ -973,7 +973,7 @@ class VIC20 extends CBMHomeComputer {
     out.writeBoolean(drivesEnabled(0))
     out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
-    out.writeObject(vicChip.getVICModel.VIC_TYPE.toString)
+    out.writeObject(vicChip.getVICModel().VIC_TYPE.toString)
 
     // Special carts
     mmu.getAttachedSpecialCart() match {
@@ -1039,7 +1039,7 @@ class VIC20 extends CBMHomeComputer {
 
   def turnOn(args: Array[String]): Unit = {
     swing {
-      setMenu
+      setMenu()
     }
     // check help
     if (preferences.checkForHelp(args)) {
@@ -1052,7 +1052,7 @@ class VIC20 extends CBMHomeComputer {
     // --ignore-config-file handling
     if (args.exists(_ == "--ignore-config-file")) configuration.clear()
     swing {
-      initComponent
+      initComponent()
     }
     // VIC
     swing {
@@ -1082,10 +1082,10 @@ class VIC20 extends CBMHomeComputer {
     // VIEW
     swing {
       displayFrame.setVisible(!headless)
-      if (fullScreenAtBoot) setVicFullScreen
+      if (fullScreenAtBoot) setVicFullScreen()
     }
     // PLAY
-    clock.play
+    clock.play()
     // KEYBOARD LAYOUT
     swing {
       checkKeyboardLayout()

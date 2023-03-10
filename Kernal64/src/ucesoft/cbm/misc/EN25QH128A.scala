@@ -122,30 +122,30 @@ class EN25QH128A(size:Int,mem:Memory) {
               state = STATE_READ_UNIQUE_ID_1
             case _ =>
               println(s"Command ${data.toHexString} not supported")
-              ready
+              ready()
               rsten = false
           }
         }
       case STATE_RST_1 => // wait CS HIGH
         if (!cs) rsten = true
-        ready
+        ready()
       case STATE_RST_2 => // wait CS HIGH
-        if (!cs) rst
-        ready
+        if (!cs) rst()
+        ready()
       case STATE_WRDI => // wait CS HIGH
-        if (!cs) wrdi
-        ready
+        if (!cs) wrdi()
+        ready()
       case STATE_WRDEN => // wait CS HIGH
-        if (!cs) wrden
-        ready
+        if (!cs) wrden()
+        ready()
       case STATE_RDSR =>
-        if (!cs) ready
+        if (!cs) ready()
         else if (shiftBitOut(clk)) data = status
       case STATE_WRSR_1 => // waiting status byte
         if (shiftBitIn(cs,clk,flashDin)) state = STATE_WRSR_2
       case STATE_WRSR_2 => // wait CS HIGH
-        if (!cs) wrsr
-        ready
+        if (!cs) wrsr()
+        ready()
       case STATE_READ_1 => // wait address
         if (shiftBitIn(cs,clk,flashDin,24)) {
           address = data
@@ -154,7 +154,7 @@ class EN25QH128A(size:Int,mem:Memory) {
           //println(s"READ $address")
         }
       case STATE_READ_2 =>
-        if (!cs) ready
+        if (!cs) ready()
         else if (shiftBitOut(clk)) {
           address = (address + 1) & 0xFFFFFF
           data = mem.read(address)
@@ -165,7 +165,7 @@ class EN25QH128A(size:Int,mem:Memory) {
           state = STATE_WRITE_2
         }
       case STATE_WRITE_2 => // wait data to write
-        if (!cs) writeData
+        if (!cs) writeData()
         else if (shiftBitIn(cs,clk,flashDin)) {
           if (writeBuffer.size == 256) writeBuffer.drop(1)
           writeBuffer += data
@@ -176,11 +176,11 @@ class EN25QH128A(size:Int,mem:Memory) {
           state = STATE_BLOCK_ERASE_2
         }
       case STATE_BLOCK_ERASE_2 =>
-        if (!cs) blockErase
-        else ready
+        if (!cs) blockErase()
+        else ready()
       case STATE_CHIP_ERASE_1 =>
-        if (!cs) chipErase
-        else ready
+        if (!cs) chipErase()
+        else ready()
       case STATE_READ_MAN_DEV_ID_1 =>
         if (shiftBitIn(cs,clk,flashDin,24)) {
           address = data
@@ -188,16 +188,16 @@ class EN25QH128A(size:Int,mem:Memory) {
           if (address == 0) data = MANUFACTURER_ID << 8 | DEVICE_ID else data = DEVICE_ID << 8 | MANUFACTURER_ID
         }
       case STATE_READ_MAN_DEV_ID_2 =>
-        if (!cs) ready
-        else if (shiftBitOut(clk,16)) ready
+        if (!cs) ready()
+        else if (shiftBitOut(clk,16)) ready()
       case STATE_READ_ID_1 => // read 3 dummy bytes ???
-        if (!cs) ready
+        if (!cs) ready()
         if (shiftBitIn(cs,clk,flashDin,24)) {
           state = STATE_READ_ID_2
           data = RDID
         }
       case STATE_READ_ID_2 =>
-        if (!cs) ready
+        if (!cs) ready()
         shiftBitOut(clk,24)
       case STATE_READ_UNIQUE_ID_1 => // read 3 bytes of address and a dummy byte
         if (shiftBitIn(cs,clk,flashDin,32)) {
@@ -205,7 +205,7 @@ class EN25QH128A(size:Int,mem:Memory) {
             state = STATE_READ_UNIQUE_ID_2
             data = UNIQUE_ID_NUMBER
           }
-          else ready
+          else ready()
         }
       case STATE_READ_UNIQUE_ID_2 =>
         if (shiftBitOut(clk,32)) {
@@ -218,7 +218,7 @@ class EN25QH128A(size:Int,mem:Memory) {
           data = UNIQUE_ID_NUMBER
         }
       case STATE_READ_UNIQUE_ID_4 =>
-        if (shiftBitOut(clk,32)) ready
+        if (shiftBitOut(clk,32)) ready()
     }
 
     flashCs = cs
@@ -235,7 +235,7 @@ class EN25QH128A(size:Int,mem:Memory) {
     //println(s"Chip erase from 0 to ${(size - 1).toHexString}")
     for(a <- 0 to size - 1) mem.write(a,0xFF)
     waitForAndDisableWIP(60000000) // 60s
-    ready
+    ready()
   }
 
   private def blockErase() : Unit = {
@@ -250,7 +250,7 @@ class EN25QH128A(size:Int,mem:Memory) {
       case 65536 => 300000  // typical 0.3s
     }
     waitForAndDisableWIP(waitFor)
-    ready
+    ready()
   }
 
   private def writeData() : Unit = {
@@ -260,16 +260,16 @@ class EN25QH128A(size:Int,mem:Memory) {
     var a = address & 0xFF
     val it = writeBuffer.iterator
     while (it.hasNext) {
-      mem.write(msb | a,it.next)
+      mem.write(msb | a,it.next())
       a = (a + 1) & 0xFF
     }
     waitForAndDisableWIP(500) // typical 0.5ms
-    ready
+    ready()
   }
 
   private def rst() : Unit = {
     //println("RST")
-    ready
+    ready()
     status = 0
   }
 
@@ -280,7 +280,7 @@ class EN25QH128A(size:Int,mem:Memory) {
   private def wrsr() : Unit = {
     status |= STATUS_WIP
     waitForAndDisableWIP(10000) // typical 10ms
-    ready
+    ready()
     // TODO
     //println(s"WRSR: $data")
   }

@@ -137,14 +137,14 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
       case "CANCEL" =>
         dispose()
       case "GAMEPAD" =>
-        gamePadConfig
+        gamePadConfig()
       case "FIRE_CANCEL" =>
         joyButtonSelected = ""
         joystickDialog.dispose()
       case "FIRE_OK" =>
         joystickDialog.dispose()
       case "KEYB" =>
-        keyboardConfig
+        keyboardConfig()
       // key buttons
       case CONFIGURATION_UD_JOYSTICK_UP => listenKey(e.getActionCommand,0)
       case CONFIGURATION_UD_JOYSTICK_DOWN => listenKey(e.getActionCommand,1)
@@ -231,7 +231,7 @@ class JoystickSettingDialog(parent: JFrame, configuration: Properties,gamepad:Ga
         if (joyButtonSelected != "") {
           configuration.setProperty(CONFIG_CONTROLLER_NAME,controller.getName)
           configuration.setProperty(CONFIG_CONTROLLER_FIRE_BUTTON,joyButtonSelected)
-          gamepad.findController
+          gamepad.findController()
         }
       }
     }

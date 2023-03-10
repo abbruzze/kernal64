@@ -17,8 +17,8 @@ object RS232ConfigPanel {
       connectedToLabel.setText(address)
     }
 
-    override def disconnected: Unit = {
-      super.disconnected
+    override def disconnected(): Unit = {
+      super.disconnected()
       connectedToLabel.setText("")
     }
   }
@@ -103,7 +103,7 @@ object RS232ConfigPanel {
           case Some(ars232) =>
             ars232.setEnabled(false)
             activeRs232 = None
-            BridgeRS232.unsetRS232
+            BridgeRS232.unsetRS232()
             JOptionPane.showMessageDialog(parent,"RS-232 disabled", "RS-232 configuration",JOptionPane.INFORMATION_MESSAGE)
           case None =>
         }

@@ -5,7 +5,7 @@ class Timer_B(ciaName: String,
               irqAction: (Int) => Unit,
               idleAction : (Boolean) => Unit) extends Timer(ciaName,id,irqAction,idleAction) {
   override val componentID: String = ciaName + "_TB"
-  final protected def underflow : Unit = {
+  final protected def underflow() : Unit = {
     irqAction(id)
   }
 

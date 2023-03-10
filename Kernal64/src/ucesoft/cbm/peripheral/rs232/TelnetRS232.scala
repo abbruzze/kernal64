@@ -71,21 +71,21 @@ class TelnetRS232 extends StreamRS232 {
         catch {
           case io:IOException =>
             Log.info(s"Telnet: Cannot connect to $host:$port. " + io)
-            disconnect
+            disconnect()
         }
       }
     }
     else {
-      disconnect
+      disconnect()
       Log.info(s"Disconnected from $host")
     }
     
     super.setEnabled(enabled)
   }
 
-  override def disconnect : Unit = {
+  override def disconnect() : Unit = {
     try { client.disconnect() } catch { case _:Throwable => }
-    super.disconnect
+    super.disconnect()
   }
   
   override def toString: String = componentID + (if (isEnabled) "(enabled)" else "")

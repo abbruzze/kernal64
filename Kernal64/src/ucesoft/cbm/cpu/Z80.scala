@@ -1602,44 +1602,44 @@ object Z80 {
   // ======================================= Exchange ========================================================
   // *** EXX
   // **************
-  private val EXX = Opcode(0xD9,4,1,"EXX") { ctx => ctx.EXX }
+  private val EXX = Opcode(0xD9,4,1,"EXX") { ctx => ctx.EXX() }
   // *** EX DE,HL
   // **************
-  private val EX_DE_HL = Opcode(0xEB,4,1,"EX DE,HL") { ctx => ctx.EX_DE_HL }
+  private val EX_DE_HL = Opcode(0xEB,4,1,"EX DE,HL") { ctx => ctx.EX_DE_HL() }
   // *** EX AF,AF'
   // **************
-  private val EX_AF_AF1 = Opcode(0x08,4,1,"EX AF,AF'") { ctx => ctx.EX_AF }
+  private val EX_AF_AF1 = Opcode(0x08,4,1,"EX AF,AF'") { ctx => ctx.EX_AF() }
   // *** EX (SP),HL
   // **************
-  private val EX_$SP$_HL = Opcode(0xE3,19,1,"EX (SP),HL") { ctx => ctx.EX_SP_HL }
+  private val EX_$SP$_HL = Opcode(0xE3,19,1,"EX (SP),HL") { ctx => ctx.EX_SP_HL() }
   // *** EX (SP),IX
   // **************
-  private val EX_$SP$_IX = Opcode((0xDD,0xE3),23,2,"EX (SP),IX") { ctx => ctx.EX_SP_IX }
+  private val EX_$SP$_IX = Opcode((0xDD,0xE3),23,2,"EX (SP),IX") { ctx => ctx.EX_SP_IX() }
   // ======================================= Block Transfer ==================================================
   // *** LDI
   // **************
-  private val LDI = Opcode((0xED,0xA0),16,2,"LDI") { ctx => ctx.ldi }
+  private val LDI = Opcode((0xED,0xA0),16,2,"LDI") { ctx => ctx.ldi() }
   // *** LDIR
   // **************
-  private val LDIR = Opcode((0xED,0xB0),21,2,"LDIR",modifyPC = true) { ctx => ctx.ldir }
+  private val LDIR = Opcode((0xED,0xB0),21,2,"LDIR",modifyPC = true) { ctx => ctx.ldir() }
   // *** LDD
   // **************
-  private val LDD = Opcode((0xED,0xA8),16,2,"LDD") { ctx => ctx.ldd }
+  private val LDD = Opcode((0xED,0xA8),16,2,"LDD") { ctx => ctx.ldd() }
   // *** LDDR
   // **************
-  private val LDDR = Opcode((0xED,0xB8),21,2,"LDDR",modifyPC = true) { ctx => ctx.lddr }
+  private val LDDR = Opcode((0xED,0xB8),21,2,"LDDR",modifyPC = true) { ctx => ctx.lddr() }
   // *** CPI
   // **************
-  private val CPI = Opcode((0xED,0xA1),16,2,"CPI") { ctx => ctx.cpi }
+  private val CPI = Opcode((0xED,0xA1),16,2,"CPI") { ctx => ctx.cpi() }
   // *** CPIR
   // **************
-  private val CPIR = Opcode((0xED,0xB1),21,2,"CPIR",modifyPC = true) { ctx => ctx.cpir }
+  private val CPIR = Opcode((0xED,0xB1),21,2,"CPIR",modifyPC = true) { ctx => ctx.cpir() }
   // *** CPDR
   // **************
-  private val CPDR = Opcode((0xED,0xB9),21,2,"CPDR",modifyPC = true) { ctx => ctx.cpdr }
+  private val CPDR = Opcode((0xED,0xB9),21,2,"CPDR",modifyPC = true) { ctx => ctx.cpdr() }
   // *** CPD
   // **************
-  private val CPD = Opcode((0xED,0xA9),16,2,"CPD") { ctx => ctx.cpd }
+  private val CPD = Opcode((0xED,0xA9),16,2,"CPD") { ctx => ctx.cpd() }
   // ===================================== 8 bit arithmetic ==================================================
   // *** ADD A,r
   // **************
@@ -1923,14 +1923,14 @@ object Z80 {
   // ==================================== 16 bit arithmetic ==================================================
   // *** ADD HL,rr
   // **************
-  private val ADD_HL_BC = Opcode(0x09,11,1,"ADD HL,BC") { ctx => ctx.addHLBC }
-  private val ADD_HL_DE = Opcode(0x19,11,1,"ADD HL,DE") { ctx => ctx.addHLDE }
-  private val ADD_HL_HL = Opcode(0x29,11,1,"ADD HL,HL") { ctx => ctx.addHLHL }
-  private val ADD_HL_SP = Opcode(0x39,11,1,"ADD HL,SP") { ctx => ctx.addHLSP }
-  private val ADD_IX_BC = Opcode((0xDD,0x09),15,2,"ADD IX,BC") { ctx => ctx.addIXBC }
-  private val ADD_IX_DE = Opcode((0xDD,0x19),15,2,"ADD IX,DE") { ctx => ctx.addIXDE }
-  private val ADD_IX_SP = Opcode((0xDD,0x39),15,2,"ADD IX,SP") { ctx => ctx.addIXSP }
-  private val ADD_IX_IX = Opcode((0xDD,0x29),15,2,"ADD IX,IX") { ctx => ctx.addIXIX }
+  private val ADD_HL_BC = Opcode(0x09,11,1,"ADD HL,BC") { ctx => ctx.addHLBC() }
+  private val ADD_HL_DE = Opcode(0x19,11,1,"ADD HL,DE") { ctx => ctx.addHLDE() }
+  private val ADD_HL_HL = Opcode(0x29,11,1,"ADD HL,HL") { ctx => ctx.addHLHL() }
+  private val ADD_HL_SP = Opcode(0x39,11,1,"ADD HL,SP") { ctx => ctx.addHLSP() }
+  private val ADD_IX_BC = Opcode((0xDD,0x09),15,2,"ADD IX,BC") { ctx => ctx.addIXBC() }
+  private val ADD_IX_DE = Opcode((0xDD,0x19),15,2,"ADD IX,DE") { ctx => ctx.addIXDE() }
+  private val ADD_IX_SP = Opcode((0xDD,0x39),15,2,"ADD IX,SP") { ctx => ctx.addIXSP() }
+  private val ADD_IX_IX = Opcode((0xDD,0x29),15,2,"ADD IX,IX") { ctx => ctx.addIXIX() }
   // *** ADC HL,rr
   // **************
   private val ADC_HL_BC = Opcode((0xED,0x4A),15,2,"ADC HL,BC") { ctx => ctx.adcHL(ctx.BC) }
@@ -1977,19 +1977,19 @@ object Z80 {
   private val IM_2 = Opcode((0xED,0x5E),8,2,"IM 2",false,Array(0x7E)) { ctx => ctx.im = 2 }
   // *** CPL
   // **************
-  private val CPL = Opcode(0x2F,4,1,"CPL") { ctx => ctx.cpl }
+  private val CPL = Opcode(0x2F,4,1,"CPL") { ctx => ctx.cpl() }
   // *** NEG
   // **************
-  private val NEG = Opcode((0xED,0x44),8,2,"NEG",false,Array(0x54,0x64,0x74,0x4C,0x5C,0x6C,0x7C)) { ctx => ctx.neg }
+  private val NEG = Opcode((0xED,0x44),8,2,"NEG",false,Array(0x54,0x64,0x74,0x4C,0x5C,0x6C,0x7C)) { ctx => ctx.neg() }
   // *** CCF
   // **************
-  private val CCF = Opcode(0x3F,4,1,"CCF") { ctx => ctx.ccf }
+  private val CCF = Opcode(0x3F,4,1,"CCF") { ctx => ctx.ccf() }
   // *** SCF
   // **************
-  private val SCF = Opcode(0x37,4,1,"SCF") { ctx => ctx.scf }
+  private val SCF = Opcode(0x37,4,1,"SCF") { ctx => ctx.scf() }
   // *** DAA
   // **************
-  private val DAA = Opcode(0x27,4,1,"DAA") { ctx => ctx.daa }
+  private val DAA = Opcode(0x27,4,1,"DAA") { ctx => ctx.daa() }
   // ==================================== Rotate and Shift Group =============================================
   // *** RLC r
   // **************
@@ -2208,10 +2208,10 @@ object Z80 {
   private val RRA = Opcode(0x1F,4,1,"RRA") { ctx => ctx.rra() }
   // *** RLD
   // **************
-  private val RLD = Opcode((0xED,0x6F),18,2,"RLD") { ctx => ctx.rld }
+  private val RLD = Opcode((0xED,0x6F),18,2,"RLD") { ctx => ctx.rld() }
   // *** RRD
   // **************
-  private val RRD = Opcode((0xED,0x67),18,2,"RRD") { ctx => ctx.rrd }
+  private val RRD = Opcode((0xED,0x67),18,2,"RRD") { ctx => ctx.rrd() }
   // ==================================== Bit manipulation ===================================================
   // *** BIT b,r
   // **************
@@ -2524,7 +2524,7 @@ object Z80 {
   // *** JR e
   // **************
   @inline private def MNEMONIC_jr(pattern:String) = (m:Memory,PC:Int) => pattern.format(hex4(PC + 2 + m.read(PC + 1).asInstanceOf[Byte]))
-  private val JR_e = Opcode(0x18,12,2,MNEMONIC_jr("JR %s"),modifyPC = true) { ctx => ctx.jre_e }
+  private val JR_e = Opcode(0x18,12,2,MNEMONIC_jr("JR %s"),modifyPC = true) { ctx => ctx.jre_e() }
   // *** JR cc,e
   // **************
   private val JR_C_e = Opcode(0x38,12,2,MNEMONIC_jr("JR C,%s"),modifyPC = true) { ctx => ctx.jr_cond_e(ctx.carry > 0) }
@@ -2556,7 +2556,7 @@ object Z80 {
   private val CALL_M_nn = Opcode(0xFC,10,3,MNEMONIC_nn("CALL M,%s"),modifyPC = true) { ctx => ctx.call_cond_nn(ctx.sign > 0) }
   // *** DJNZ e
   // **************
-  private val DJNZ_e = Opcode(0x10,8,2,MNEMONIC_jr("DJNZ %s"),modifyPC = true) { ctx => ctx.djnz }
+  private val DJNZ_e = Opcode(0x10,8,2,MNEMONIC_jr("DJNZ %s"),modifyPC = true) { ctx => ctx.djnz() }
   // *** RET
   // **************
   private val RET = Opcode(0xC9,10,1,"RET",modifyPC = true) { ctx =>
@@ -2593,7 +2593,7 @@ object Z80 {
   // ====================================== Input Group ======================================================
   // *** IN A,n
   // **************
-  private val IN_A_n = Opcode(0xDB,11,2,MNEMONIC_n("IN A,%s")) { ctx => ctx.in_a_n }
+  private val IN_A_n = Opcode(0xDB,11,2,MNEMONIC_n("IN A,%s")) { ctx => ctx.in_a_n() }
   // *** IN r,(C)
   // **************
   private val IN_A_$C$ = Opcode((0xED,0x78),12,2,"IN A,(C)") { ctx => ctx.A = ctx.in_r_c() }
@@ -2884,12 +2884,12 @@ class Z80(mem:Memory,
 
   def pins : Int = (if (M1Fetch) M1FETCH_PIN else 0) | (if (refresh) REFRESH_PIN else 0) | (if (dummyRead) DUMMY_READ_PIN else 0)
 
-  def init  : Unit = {
+  def init()  : Unit = {
     Log.info("Z80 initializing opcodes...")
-    Z80.initOpcodes
+    Z80.initOpcodes()
   }
-  def reset  : Unit = {
-    ctx.reset
+  def reset()  : Unit = {
+    ctx.reset()
     irqLow = false
     nmiLow = false
     nmiOnNegativeEdge = false
@@ -2899,7 +2899,7 @@ class Z80(mem:Memory,
 
     if (breakType != null && breakType.isBreak(ResetBreakInfo())) {
       tracing = true
-      breakCallBack(CpuStepInfo(ctx.PC, ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
+      breakCallBack(CpuStepInfo(ctx.PC, ctx.buildCpuStepInfo(),disassemble(ctx.PC).dis))
     }
   }
 
@@ -2909,14 +2909,14 @@ class Z80(mem:Memory,
       val pc = if (addr == null) ctx.PC else addr(0)
       val op = mem.read(pc)
       if (addr == null) ctx.incR(1)
-      refreshCycle
+      refreshCycle()
       // single opcode
       val opcode = opcodes_1(op)
       if (opcode != null) return opcode
       // extended
       val op1 = mem.read((pc + 1) & 0xFFFF)
       if (addr == null) ctx.incR(1)
-      refreshCycle
+      refreshCycle()
       // ED
       if (op == 0xED) {
         val op2 = opcodes_ed(op1)
@@ -2990,7 +2990,7 @@ class Z80(mem:Memory,
   final def clock : Int = {
     if (breakType != null && breakType.isBreak(AddressBreakInfo(ctx.PC,ExecuteBreakAccess))) {
       tracing = true
-      breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
+      breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo(),disassemble(ctx.PC).dis))
     }
 
     if ((irqLow || nmiOnNegativeEdge) && !ctx.mustDelayInt) { // any interrupt pending ?
@@ -3003,10 +3003,10 @@ class Z80(mem:Memory,
         ctx.io.internalOperation(5)
         ctx.push(ctx.PC)
         ctx.incR(1)
-        refreshCycle
+        refreshCycle()
         if (breakType != null && breakType.isBreak(NMIBreakInfo())) {
           tracing = true
-          breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
+          breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo(),disassemble(ctx.PC).dis))
           Log.debug("NMI Break")
         }
         nmiOnNegativeEdge = false
@@ -3032,7 +3032,7 @@ class Z80(mem:Memory,
           ctx.incR(1)
           if (breakType != null && breakType.isBreak(IRQBreakInfo())) {
             tracing = true
-            breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo,disassemble(ctx.PC).dis))
+            breakCallBack(CpuStepInfo(ctx.PC,ctx.buildCpuStepInfo(),disassemble(ctx.PC).dis))
             Log.debug("IRQ Break")
           }
 
@@ -3040,13 +3040,13 @@ class Z80(mem:Memory,
           ctx.IFF2 = 0
           ctx.im match {
             case 0 =>
-              interruptMode0Handling
+              interruptMode0Handling()
               return 12
             case 1 =>
               ctx.PC = 0x38
               return 13
             case 2 =>
-              interruptMode2Handling
+              interruptMode2Handling()
               return 19
           }
           return 0
@@ -3070,7 +3070,7 @@ class Z80(mem:Memory,
         dummyRead = true
         //Log.debug("[Z80] " + opcode.disassemble(mem, ctx.PC))
         val disa = opcode.disassemble(mem, ctx.PC)
-        stepCallBack(CpuStepInfo(ctx.PC, ctx.buildCpuStepInfo,disa))
+        stepCallBack(CpuStepInfo(ctx.PC, ctx.buildCpuStepInfo(),disa))
         syncObject.synchronized {
           syncObject.wait()
         }
@@ -3093,7 +3093,7 @@ class Z80(mem:Memory,
     }
     // execute
     lastPC = ctx.PC
-    ctx.copyQ
+    ctx.copyQ()
     opcode.executeFunction(ctx)
 
     val clocks = opcode.cycles + ctx.getAdditionalClockSycles

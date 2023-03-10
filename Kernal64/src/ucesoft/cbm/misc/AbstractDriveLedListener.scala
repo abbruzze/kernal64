@@ -19,13 +19,13 @@ abstract class AbstractDriveLedListener(led:DriveLed,id:Int) extends DriveLedLis
     }
   }
 
-  override def turnOn  : Unit = {
+  override def turnOn(): Unit = {
     if (!led.driveLedOn) {
       led.driveLedOn = true
       led.repaint()
     }
   }
-  override def turnOff  : Unit = {
+  override def turnOff(): Unit = {
     if (led.driveLedOn) {
       led.driveLedOn = false
       led.repaint()

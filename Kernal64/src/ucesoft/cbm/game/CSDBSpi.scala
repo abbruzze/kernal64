@@ -113,7 +113,7 @@ class CSDBSpi extends GameProvider {
         future flatMap { x => x }
     }
   }
-  def interrupt  : Unit = {
+  def interrupt(): Unit = {
     interrupted = true
   }
   val syncConstraints : List[SyncConstraint] = List(Last10Constraint,Last100Constraint,Last1000Constraint)

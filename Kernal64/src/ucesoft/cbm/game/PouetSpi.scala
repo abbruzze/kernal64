@@ -33,7 +33,7 @@ abstract class PouetSpi(genre:String,platform:String) extends GameProvider {
   private def openURL[T](url:String)(action: Iterator[String] => T) : T = {
     val src = io.Source.fromURL(url,"UTF-8")
     try {
-      action(src.getLines)
+      action(src.getLines())
     }
     finally {
       src.close
@@ -44,14 +44,14 @@ abstract class PouetSpi(genre:String,platform:String) extends GameProvider {
     val OPTION_BEGIN = """.*<select name='page'>.*""".r
     openURL(makeUrl(1)) { lines =>
       while (lines.hasNext) {
-        var line = lines.next
+        var line = lines.next()
         line match {
           case OPTION_BEGIN() =>
             var optionCount = 0
-              line = lines.next
+              line = lines.next()
               while (line.indexOf("<option value=") != -1) {
                 optionCount += 1
-                line = lines.next
+                line = lines.next()
               }
             return optionCount
           case _ =>
@@ -70,7 +70,7 @@ abstract class PouetSpi(genre:String,platform:String) extends GameProvider {
       var downloadURL : Option[URL] = None
       
       while (lines.hasNext && !found && !interrupted) {
-        lines.next match {
+        lines.next() match {
           case IMAGE(imageUrl) => imageURL = Some(new URL(imageUrl))
           case GAME_LINK(gameLink) =>
             found = true
@@ -92,18 +92,18 @@ abstract class PouetSpi(genre:String,platform:String) extends GameProvider {
     try {
       openURL(makeUrl(page)) { lines =>
         while (lines.hasNext && !interrupted) {
-          val line = lines.next
+          val line = lines.next()
           line match {
             case BEGIN_GAME() =>
               var found = false
               while (lines.hasNext && !interrupted && !found) {
-                lines.next match {
+                lines.next() match {
                   case GAME_LOC(location,name) =>
                     var innerFound = false
                     var group = "N/A"
                     var date = ""
                     while (lines.hasNext && !innerFound && !interrupted) {
-                      lines.next match {
+                      lines.next() match {
                         case GROUP(g) => group = g
                         case DATE(d) =>
                           date = d
@@ -166,7 +166,7 @@ abstract class PouetSpi(genre:String,platform:String) extends GameProvider {
         future flatMap { x => x }
     }
   }
-  def interrupt  : Unit = {
+  def interrupt(): Unit = {
     interrupted = true
   }
   val syncConstraints : List[SyncConstraint] = constraints

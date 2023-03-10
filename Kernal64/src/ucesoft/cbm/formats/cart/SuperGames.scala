@@ -18,17 +18,17 @@ class SuperGames(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,r
       latch = (value & 8) > 0
       game = invGame
       exrom = invGame
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
     }
   }
 
-  override def reset: Unit = {
+  override def reset(): Unit = {
     latch = false
     romlBankIndex = 0
     romhBankIndex = 0
     game = false
     exrom = false
-    notifyMemoryConfigurationChange
+    notifyMemoryConfigurationChange()
   }
 
   override def saveState(out: ObjectOutputStream): Unit = {

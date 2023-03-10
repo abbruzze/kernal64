@@ -55,10 +55,10 @@ class GameBaseSpi extends GameProvider {
   private def getVersion : Option[String] = {
     val VERSION = """.*Database Version[^<]+<b>([^<]+)</b>.*""".r
     val src = Source.fromURL(gamebaseVersionUrl)
-    val lines = src.getLines
+    val lines = src.getLines()
     try {
       while (lines.hasNext) {
-        lines.next match {
+        lines.next() match {
           case VERSION(ver) => return Some(ver)
           case _ =>
         }
@@ -72,9 +72,9 @@ class GameBaseSpi extends GameProvider {
   private def getFiles(index:String) : Int = {
   	val FOUND = """.*Found[^\d]+(\d+).*""".r
   	val src = Source.fromURL(url(index,0))
-  	val lines = src.getLines
+  	val lines = src.getLines()
   	while (lines.hasNext) {
-  		val line = lines.next
+  		val line = lines.next()
   		line match {
   			case FOUND(pages) =>
   				src.close
@@ -90,14 +90,14 @@ class GameBaseSpi extends GameProvider {
     val FILE = """.*GB64-Filename:.*<b>(.+)</b>.*""".r
     val GENRE = """.*Genre:.*<b>(.+)""".r
     val src = Source.fromURL(downloadUrl)
-    val lines = src.getLines
+    val lines = src.getLines()
     var year : Option[String] = None
     var file : Option[URL] = None
     var genre : Option[String] = None
     var softwareHouse : Option[String] = None
     var found = false
     while (lines.hasNext && !found && !interrupted) {
-      val line = lines.next
+      val line = lines.next()
       line match {
         case PUBLISHED_SH(y,sh) => 
           year = Some(y)
@@ -122,20 +122,20 @@ class GameBaseSpi extends GameProvider {
     	val NO_IMAGE = """.*<img src="images/game/nosssmall.gif".*""".r
     	val NAME = """.*<a href="(.*)"><b>(.*)</b>.*""".r
     	val src = Source.fromURL(url(index,page))
-    	val lines = src.getLines  	
+    	val lines = src.getLines()
     	val list = new collection.mutable.ListBuffer[Game]
     	while (lines.hasNext && !interrupted) {
-    		val line = lines.next
+    		val line = lines.next()
     		line match {
     			case IMAGE(imageUrl) =>
-    				val nameLine = lines.next
+    				val nameLine = lines.next()
     				nameLine match {
     					case NAME(url,name) =>
     						list += makeGame(name,Some(new URL(imageUrl)),gamebaseUrl + "/" + url)
     					case _ =>
     				}
     			case NO_IMAGE() =>
-    			  val nameLine = lines.next
+    			  val nameLine = lines.next()
     				nameLine match {
     					case NAME(url,name) =>
     						list += makeGame(name,None,gamebaseUrl + "/" + url)
@@ -192,7 +192,7 @@ class GameBaseSpi extends GameProvider {
         future.flatMap { x => x }
     }
   }
-  def interrupt  : Unit = {
+  def interrupt(): Unit = {
     interrupted = true
   }  
   def syncConstraints : List[SyncConstraint] = constraints

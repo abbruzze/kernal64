@@ -30,8 +30,8 @@ object ParallelCable extends CBMComponent {
   var ca2Callback : () => Unit = _
   var enabled = false
   
-  def init : Unit = {}
-  def reset : Unit = { cableValue = 0 }
+  def init() : Unit = {}
+  def reset() : Unit = { cableValue = 0 }
   
   def read: Int = cableValue
   def write(value:Int) : Unit = cableValue = value

@@ -14,7 +14,7 @@ class FinalCartridgeI(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(
       game = true
       exrom = true
     }
-    notifyMemoryConfigurationChange
+    notifyMemoryConfigurationChange()
     romlBanks(0).read((address & 0x1fff) + 0x8000)
   }
   override def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU) : Unit = {
@@ -25,6 +25,6 @@ class FinalCartridgeI(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(
       game = true
       exrom = true
     }
-    notifyMemoryConfigurationChange
+    notifyMemoryConfigurationChange()
   }
 }

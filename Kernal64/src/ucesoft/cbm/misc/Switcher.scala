@@ -25,9 +25,9 @@ class Switcher(name:String,handler: (Boolean) => Unit) extends CBMComponent {
     properties
   }
 
-  def init  : Unit = {}
+  def init(): Unit = {}
 
-  def reset  : Unit = {
+  def reset(): Unit = {
     bus = 0
   }
 

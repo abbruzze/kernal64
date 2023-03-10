@@ -34,7 +34,7 @@ class GamePadControlPort(configuration:Properties) extends ControlPort {
   private[this] val dirThreshold = 0.5f
 
   GamePadControlPort.discoverControllers()
-  findController
+  findController()
   
   def findController() : Unit = {
     controllerName = configuration.getProperty(CONFIG_CONTROLLER_NAME)
@@ -55,7 +55,7 @@ class GamePadControlPort(configuration:Properties) extends ControlPort {
     var mask = 0
     controller match {
       case None =>
-        if (controllerName != null) findController
+        if (controllerName != null) findController()
       case Some(c) if c.poll =>
         for(x <- xAxisComponent;
         	y <- yAxisComponent;

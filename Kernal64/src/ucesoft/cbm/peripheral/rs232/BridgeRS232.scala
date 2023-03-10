@@ -13,8 +13,8 @@ object BridgeRS232 extends RS232 {
   private[this] var bitReceivedListener : () => Unit = _
   private[this] var statusListener : RS232StatusListener = _
   
-  def init : Unit = {}
-  def reset : Unit = if (rs232 != null) rs232.reset
+  def init() : Unit = {}
+  def reset() : Unit = if (rs232 != null) rs232.reset()
   
   def setRS232Listener(l:RS232StatusListener): Unit = statusListener = l
   

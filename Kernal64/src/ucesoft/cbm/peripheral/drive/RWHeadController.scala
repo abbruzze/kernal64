@@ -50,9 +50,9 @@ abstract class RWHeadController(protected var floppy:Floppy,
   protected var lastByteReady = false
   private[this] var lastNotifiedTrack,lastNotifiedSector = 0
   
-  def init : Unit = {}
+  def init() : Unit = {}
   
-  def reset : Unit = {
+  def reset() : Unit = {
     byteReadySignal = 1
     isWriting = false
     motorOn = false
@@ -97,7 +97,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
   }
   final def setNextToWrite(b:Int) : Unit = {
     nextWrite = b
-    resetByteReadySignal
+    resetByteReadySignal()
   }
   final def setCurrentFileName(fn:String) : Unit = currentFilename = fn
   def getTrack : Int = track
@@ -136,14 +136,14 @@ abstract class RWHeadController(protected var floppy:Floppy,
     if (rotationCycleCounter >= 1) {
       bitCounter += 1
       rotationCycleCounter -= 1
-      if (isWriting) writeNextBit
-      else readNextBit      
+      if (isWriting) writeNextBit()
+      else readNextBit()
     }
   }
   
   final def rotate : Boolean = {
     lastByteReady = if (motorOn) {
-      rotateDisk
+      rotateDisk()
       if (byteReady && canSetByteReady) {
         byteReadySignal = 0
         byteReady = false

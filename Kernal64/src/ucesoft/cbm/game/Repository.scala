@@ -25,7 +25,7 @@ class Repository(provider:GameProvider) {
   private var iconImage : Option[ImageIcon] = None
   private var versionID = ""
   
-  init
+  init()
   
   private def init()  : Unit = {
     if (!home.exists) {
@@ -46,10 +46,10 @@ class Repository(provider:GameProvider) {
       case t:Throwable =>
         t.printStackTrace()
     }
-    if (!version.exists) writeVersion 
+    if (!version.exists) writeVersion()
     else versionID = {
       val src = io.Source.fromFile(version)
-      val v = src.getLines.next
+      val v = src.getLines().next()
       src.close
       v
     }
@@ -76,7 +76,7 @@ class Repository(provider:GameProvider) {
     if (!exists) return Nil
     
     val in = io.Source.fromInputStream(new GZIPInputStream(new FileInputStream(repository)))
-    val lines = in.getLines
+    val lines = in.getLines()
     try {
       val games = for(l <- lines) yield {
         l.split(UN_SEP) match {
@@ -194,7 +194,7 @@ class Repository(provider:GameProvider) {
       val copied = Files.copy(in,gameid(game).toPath)
       in.close()
       Files.write(fileNameid(game).toPath,java.util.Arrays.asList(fileName))
-      writeVersion
+      writeVersion()
     }
     saveGameIconInCache(game)
   }
@@ -219,7 +219,7 @@ class Repository(provider:GameProvider) {
             entries
           case Failure(t) =>
             val in = io.Source.fromFile(fileNameid(game))
-            val fileName = in.getLines.mkString
+            val fileName = in.getLines().mkString
             in.close
             if (fileName.isEmpty) return Nil
             

@@ -71,8 +71,8 @@ class IEEE488Drive(override val name:String,
     bus.unregisterListener(listener)
   }
 
-  override def reset: Unit = {
-    super.reset
+  override def reset(): Unit = {
+    super.reset()
     driveLedListener.turnOff()
     ledBlinking = false
   }

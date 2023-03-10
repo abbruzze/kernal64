@@ -24,8 +24,8 @@ abstract class Connector extends CBMComponent {
   }
   def ddr : Int = dir
   
-  def init  : Unit = {}
-  def reset  : Unit = {
+  def init(): Unit = {}
+  def reset(): Unit = {
     dir = 0
     latch = 0
   }

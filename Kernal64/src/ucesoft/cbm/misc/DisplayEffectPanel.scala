@@ -59,7 +59,7 @@ object DisplayEffectPanel {
         val dialog = new JDialog(parent, s"$name's display effects", false)
         val dep = new DisplayEffectPanel(display)
 
-        dep.init
+        dep.init()
         dialog.getContentPane.add("Center", dep)
         dialog.pack()
         mapDialog += name -> dialog

@@ -17,7 +17,7 @@ class PageFox(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram)
     val length = 8192
     val isRom = true
     def isActive = true
-    def init  : Unit = {}
+    def init(): Unit = {}
 
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (chipselect == 2) cart_ram((address & 0x3FFF) + (bankSelect << 14))
@@ -44,18 +44,18 @@ class PageFox(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram)
       romhBankIndex = bank
       game = !enabled
       exrom = !enabled
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
       //println(s"bankSelect=$bankSelect bank=$bank chipSelect=$chipselect enabled=$enabled")
     }
   }
-  override def reset: Unit = {
+  override def reset(): Unit = {
     exrom = false
     game = false
     bankSelect = 0
     chipselect = 0
     romlBankIndex = 0
     romhBankIndex = 0
-    notifyMemoryConfigurationChange
+    notifyMemoryConfigurationChange()
   }
 
   override def ROML: Memory = roml

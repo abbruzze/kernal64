@@ -38,7 +38,7 @@ trait CBMComponent {
   def reset() : Unit
   def init() : Unit
   def shutdown()  : Unit = {}
-  def hardReset() : Unit = reset
+  def hardReset() : Unit = reset()
   
   final def change(oldComponent:CBMComponent,newComponent:CBMComponent) : Unit = {
     _components indexOf (oldComponent) match {
@@ -55,32 +55,32 @@ trait CBMComponent {
   
   final def shutdownComponent()  : Unit = {
     _components foreach { c =>      
-      c.shutdownComponent 
+      c.shutdownComponent()
     }
-    shutdown
+    shutdown()
   }
   
   final def resetComponent() : Unit = {
     Log.info(s"Resetting $componentID")
     _components foreach { c =>      
-      c.resetComponent 
+      c.resetComponent()
     }
-    reset
+    reset()
   }
   final def hardResetComponent() : Unit = {
     Log.info(s"Hard Resetting $componentID")
     _components foreach { c =>
-      c.hardResetComponent
+      c.hardResetComponent()
     }
-    hardReset
+    hardReset()
   }
   def initComponent() : Unit = {
     Log.info(s"Initializing $componentID")
-    init
+    init()
     _components foreach { c =>      
-      c.initComponent 
+      c.initComponent()
     }
-    afterInitHook
+    afterInitHook()
   }
   final def components: List[CBMComponent] = _components.toList
   final def printComponentsTree()  : Unit = {

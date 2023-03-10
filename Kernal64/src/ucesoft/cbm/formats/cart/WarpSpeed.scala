@@ -19,12 +19,12 @@ class WarpSpeed(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ra
       game = false
       exrom = false
     }
-    notifyMemoryConfigurationChange
+    notifyMemoryConfigurationChange()
   }
 
-  override def reset: Unit = {
+  override def reset(): Unit = {
     game = false
     exrom = false
-    notifyMemoryConfigurationChange
+    notifyMemoryConfigurationChange()
   }
 }

@@ -23,7 +23,7 @@ object ExpansionPortFactory {
     class ROM(val name: String, val startAddress: Int, val length: Int, val data: Array[Int]) extends ROMMemory {
       val isRom = true
       def isActive = true
-      def init  : Unit = {}
+      def init(): Unit = {}
       def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = data(address & 0x1FFF)
 
       override def toString = s"ROM($name)[startAddress=${Integer.toHexString(startAddress)} length=$length]"
@@ -109,7 +109,7 @@ object ExpansionPortFactory {
       romhBankIndex = in.readInt
       game = in.readBoolean
       exrom = in.readBoolean
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
     }
   }
 

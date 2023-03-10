@@ -49,12 +49,12 @@ object C64MMU {
     private[C64MMU] var lastByteReadMemory : LastByteReadMemory = _
     
     final val isActive = true
-    def init  : Unit = {
+    def init()  : Unit = {
       Log.info("Initializing RAM memory ...")
       MemoryInitPattern.initRAM(mem)
     }
-    def reset  : Unit = {}
-    override def hardReset : Unit = init
+    def reset()  : Unit = {}
+    override def hardReset() : Unit = init()
     
     final def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (ULTIMAX && chipID == ChipID.CPU) {
@@ -94,8 +94,8 @@ object C64MMU {
     final val isActive = true
     private[this] var lastByteReadMemory : LastByteReadMemory = _
 
-    def init  : Unit = {}
-    def reset  : Unit = {
+    def init()  : Unit = {}
+    def reset()  : Unit = {
       for(i <- 0 until mem.length) mem(i) = 0xFF
     }
     def setLastByteReadMemory(lastByteReadMemory:LastByteReadMemory): Unit = {
@@ -233,7 +233,7 @@ object C64MMU {
       ram.ULTIMAX = ULTIMAX
     }
     
-    def init  : Unit = {
+    def init()  : Unit = {
       Log.info("Initializing main memory ...")
       
       add(ram)
@@ -250,11 +250,11 @@ object C64MMU {
       add(COLOR_RAM)
     }
     
-    override def afterInitHook  : Unit = {
-      check0001
+    override def afterInitHook()  : Unit = {
+      check0001()
     }
     
-    def reset  : Unit = {
+    def reset()  : Unit = {
       Log.info("Resetting main memory...")
       ddr = 0
       data = 0
@@ -266,7 +266,7 @@ object C64MMU {
       memConfig = -1
       ULTIMAX = false
       ram.ULTIMAX = false
-      check0001
+      check0001()
     }
 
     final def read(_address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
@@ -338,7 +338,7 @@ object C64MMU {
           data_falloff_bit7 = true
         }
 
-        check0001
+        check0001()
       }
       else if (address < 0x8000) ram.write(address,value)
       else if (address < 0xA000) { // ROML or RAM
@@ -383,7 +383,7 @@ object C64MMU {
       exrom = in.readBoolean
       game = in.readBoolean
       memConfig = in.readInt
-      check0001
+      check0001()
     }
     protected def allowsStateRestoring : Boolean = true
   }

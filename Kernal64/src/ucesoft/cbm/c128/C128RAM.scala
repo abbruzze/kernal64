@@ -46,7 +46,7 @@ private[c128] class C128RAM extends RAMComponent {
     val startAddress = 0
     val name = "RAM_bank0"
 
-    def init  : Unit = {}
+    def init()  : Unit = {}
     def isActive = true
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(0)(address)
     def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = mem(0)(address) = value
@@ -77,7 +77,7 @@ private[c128] class C128RAM extends RAMComponent {
     properties
   }
 
-  final def init  : Unit = {
+  final def init()  : Unit = {
     Log.info("Initializing C128 RAM memory ...")
     // only the first two banks are initialized
     mem(0) = Array.ofDim[Int](0x10000)
@@ -86,7 +86,7 @@ private[c128] class C128RAM extends RAMComponent {
     MemoryInitPattern.initRAM(mem(1))
   }
 
-  final def reset  : Unit = {
+  final def reset()  : Unit = {
     processorBank = 0
     VICbank = 0
     commonAreaSize = 0
@@ -99,9 +99,9 @@ private[c128] class C128RAM extends RAMComponent {
     page_1_bank = 0
   }
 
-  override def hardReset : Unit = {
-    init
-    reset
+  override def hardReset() : Unit = {
+    init()
+    reset()
   }
 
   final def getBanksNumber : Int = if (expanded) 4 else 2

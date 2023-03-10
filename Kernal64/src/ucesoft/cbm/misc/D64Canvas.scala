@@ -111,7 +111,7 @@ class D64Canvas(fc:JFileChooser,
 	    val blocksFree = bam.freeSectors
 	    add(if (blocksFree < 0) "0" else blocksFree.toString)
 	    add(" BLOCKS FREE.")
-	    d64.close
+	    d64.close()
     }
     catch {
       case t:Throwable =>

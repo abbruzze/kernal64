@@ -103,7 +103,7 @@ class M93C86(x16:Boolean) {
     if (cs && !oldClk && clk) { // rising edge
       state match {
         case IDLE =>
-          serialIn
+          serialIn()
           if (bitCounter == 1) out = 1 // READY
           else
           if (bitCounter == 3) {
@@ -124,7 +124,7 @@ class M93C86(x16:Boolean) {
             }
           }
         case ERASE_ADDRESS =>
-          serialIn
+          serialIn()
           if (bitCounter == ADDRESS_BIT_SIZE) {
             state = IDLE
             bitCounter = 0
@@ -133,7 +133,7 @@ class M93C86(x16:Boolean) {
             //println(s"ERASE ADDRESS = $address")            
           }
         case WRAL_DATA =>
-          serialIn
+          serialIn()
           if (bitCounter == DATA_BIT_SIZE - 1) {
             out = 0 // simulate write beginning => BUSY
           }
@@ -145,7 +145,7 @@ class M93C86(x16:Boolean) {
             out = 1 // READY
           }
         case WRITE_DATA =>
-          serialIn
+          serialIn()
           //println("WRITE DATA BIT" + bitCounter)
           if (bitCounter == DATA_BIT_SIZE - 1) {
             out = 0 // simulate write beginning => BUSY
@@ -158,7 +158,7 @@ class M93C86(x16:Boolean) {
             out = 1 // READY
           }
         case WRITE_ADDRESS =>
-          serialIn
+          serialIn()
           if (bitCounter == ADDRESS_BIT_SIZE) {
             state = WRITE_DATA
             bitCounter = 0
@@ -166,7 +166,7 @@ class M93C86(x16:Boolean) {
             //println(s"WRITE ADDRESS = $address")            
           }
         case WRITE_OR_ERASE =>
-          serialIn
+          serialIn()
           if (bitCounter == ADDRESS_BIT_SIZE) {
             val adr = (serialBus >> 8) & 3
             adr match {
@@ -190,7 +190,7 @@ class M93C86(x16:Boolean) {
             bitCounter = 0            
           }
         case READ_ADDRESS =>
-          serialIn
+          serialIn()
           if (bitCounter == ADDRESS_BIT_SIZE) {
             state = READ_OUT
             bitCounter = 0

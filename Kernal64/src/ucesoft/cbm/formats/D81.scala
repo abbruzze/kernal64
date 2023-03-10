@@ -73,10 +73,10 @@ private[formats] class D81(val file: String) extends Diskette {
   
   // ================================= CONSTRUCTOR =======================================
   if (disk.length != D81_DISK_SIZE_80_TRACKS && disk.length != D81_DISK_SIZE_80_TRACKS_WITH_ERRORS) {
-    close
+    close()
     throw new IllegalArgumentException("Invalid D81 format")
   }
-  init
+  init()
   // ======================================================================================
   
   /**
@@ -214,14 +214,14 @@ private[formats] class D81(val file: String) extends Diskette {
     }
     sectorHeader = false
     //println(s"New track is $track")
-    notifyTrackSectorChangeListener
+    notifyTrackSectorChangeListener()
   }
   final def setTrackChangeListener(l:TrackListener): Unit = trackChangeListener = l
-  final def notifyTrackSectorChangeListener: Unit = if (trackChangeListener != null) trackChangeListener(track,false,sector)
+  final def notifyTrackSectorChangeListener(): Unit = if (trackChangeListener != null) trackChangeListener(track,false,sector)
   
   override def defaultZoneFor(track:Int) = 4 // 250.0000 bit/sec
   
-  override def flush  : Unit = {
+  override def flush(): Unit = {
     if (trackModified && canWriteOnDisk) {
       trackModified = false
       flushListener.flushing(file,{
@@ -243,11 +243,11 @@ private[formats] class D81(val file: String) extends Diskette {
     }
   }
   
-  final def close  : Unit = {
-    flush
+  final def close(): Unit = {
+    flush()
     disk.close()
   }
-  final def reset  : Unit = {
+  final def reset(): Unit = {
     _side = 0
     track = 1
     trackOffset = 0

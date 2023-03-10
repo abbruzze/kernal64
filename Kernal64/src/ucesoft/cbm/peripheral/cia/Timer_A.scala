@@ -6,10 +6,10 @@ class Timer_A(ciaName: String,
               timerB : Timer,
               idleAction : (Boolean) => Unit) extends Timer(ciaName,id,irqAction,idleAction) {
   override val componentID: String = ciaName + "_TA"
-  final protected def underflow : Unit = {
+  final protected def underflow() : Unit = {
     irqAction(id)
     if ((timerB.readCR & 0x41) == 0x41) {
-      if ((timerB.getState & CIAT_CR_START) != 0) timerB.setStep
+      if ((timerB.getState & CIAT_CR_START) != 0) timerB.setStep()
     }
   }
 }

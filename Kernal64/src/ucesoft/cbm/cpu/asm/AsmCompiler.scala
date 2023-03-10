@@ -227,8 +227,8 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
     }
     
     def clearVars(): Unit = {
-      vars.clear
-      structs.clear
+      vars.clear()
+      structs.clear()
       stackCounter = 0
     }
     
@@ -264,7 +264,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
     def linking_=(l:Boolean) : Unit = {
       require(isTop)
       _linking = true
-      if (l) top.asInstanceOf[Context].clearVars
+      if (l) top.asInstanceOf[Context].clearVars()
     }
     
     def isTop : Boolean = stack.size == 1
@@ -276,14 +276,14 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
       ns
     }
     def peek : EvaluationContext = stack.head
-    def pop : EvaluationContext = stack.pop
+    def pop : EvaluationContext = stack.pop()
     
     private[AsmCompiler] def ctx : Context = stack.head
     
     private def find[T](find:Context => Option[T]) : Option[T] = {
       val it = stack.iterator
       while (it.hasNext) {
-        val s = it.next
+        val s = it.next()
         find(s) match {
           case s@Some(_) => return s
           case None =>
@@ -732,7 +732,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
   
   private def init()  : Unit = {
     byteCodeBlock = new ByteCodeBlock(0,Some("default"))
-    byteCodeBlocks.clear
+    byteCodeBlocks.clear()
     byteCodeBlocks += byteCodeBlock
     // constants
     ctx.defineVar("true",None,NumberVal(1),true,false)
@@ -746,7 +746,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
     if (!includeFile.exists) throw new CompilerException("Cannot find include file " + includeStmt.file + " in " + importDir,Some(includeStmt))
     val source = io.Source.fromFile(includeFile)
     try {
-      val txt = source.getLines.mkString("\n") + "\n"
+      val txt = source.getLines().mkString("\n") + "\n"
       val in = new java.io.StringReader(txt)
       //println("Including \n" + txt)
       val parser = new AsmParser(includeStmt.file)
@@ -769,7 +769,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
   }
   
   def compile(sts:List[Statement]) : List[ByteCodeBlock] = {
-    init
+    init()
     // include includes
     var stillContainsInclude = true
     var included = sts
@@ -816,7 +816,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
     ctx.defineLabel("__",byteCodeBlock.pc)
     console.println(s"========= 1st pass completed ============== [${ctx.level}]")
     ctx.linking = true
-    init
+    init()
     
     for(s <- filteredSts) s match {
       case MODULE(module,stats) =>

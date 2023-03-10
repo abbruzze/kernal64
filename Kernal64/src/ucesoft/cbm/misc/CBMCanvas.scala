@@ -29,7 +29,7 @@ class CBMCanvas(charRom: Memory,romCharBytes:Int,romCharHeight:Int) extends JCom
   def linesCount : Int = lines.length
 
   def clear: CBMCanvas = {
-    lines.clear
+    lines.clear()
     currentLine = new ListBuffer[Char]
     this
   }
@@ -91,9 +91,9 @@ class CBMCanvas(charRom: Memory,romCharBytes:Int,romCharHeight:Int) extends JCom
     currentLine += Char(foregroundColor, withModifiers(convertCode(code)),doubleWidth)
     this
   }
-  def end: CBMCanvas = { !!; checkSize; this }
-  def dropFirst: CBMCanvas = { lines.remove(0); checkSize; this }
-  def dropLast: CBMCanvas = { lines.remove(lines.length - 1); checkSize; this }
+  def end: CBMCanvas = { !!; checkSize(); this }
+  def dropFirst: CBMCanvas = { lines.remove(0); checkSize(); this }
+  def dropLast: CBMCanvas = { lines.remove(lines.length - 1); checkSize(); this }
   
   def center(s:String,width:Int): String = {
     val delta = width - (if (doubleWidth) s.length * 2 else s.length)

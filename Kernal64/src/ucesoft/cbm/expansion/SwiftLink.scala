@@ -69,11 +69,11 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   val ROMH: Memory = null
 
   // Modem interface
-  def hangUp : Unit = {
+  def hangUp() : Unit = {
     Log.info("SwiftLink hanged up")
     connected = DATA_SET_READY
-    disconnect
-    nmi
+    disconnect()
+    nmi()
   }
   def commandMode(on:Boolean): Unit = {}
   def connectTo(address:String): Unit = {
@@ -106,14 +106,14 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   def isEnabled: Boolean = connected == 0
   
   def setEnabled(enabled:Boolean) : Unit = {
-    eject
+    eject()
     if (enabled) {      
-      if (host != "") connect
+      if (host != "") connect()
       connected = 0
-      clk.pause
+      clk.pause()
       clk.schedule(new ClockEvent(RX_EVENT,clk.currentCycles + clockTicks,readCycle _))
-      clk.play
-      nmi
+      clk.play()
+      nmi()
       ExpansionPort.setExpansionPort(this)
     }
   }
@@ -129,7 +129,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     catch {
       case io:IOException =>
         Log.info("SwiftLink connection error: " + io)
-        disconnect
+        disconnect()
     }
   }
   
@@ -159,8 +159,8 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   override def toString: String = componentID + (if (isEnabled) "(enabled)" else "") + (if (reu.isDefined) " $DE00 + REU" else " $DF00")
   // ----------------
   
-  override def reset  : Unit = {
-    disconnect
+  override def reset(): Unit = {
+    disconnect()
     ctrl = 8
     cmd = 0xE0 // found into desterm 128 
     status = TRANSMITTER_DATA_REGISTER_EMPTY
@@ -168,13 +168,13 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     clk.cancel(RX_EVENT)
     clk.cancel(TX_EVENT)
     reu match {
-      case Some(r) => r.reset
+      case Some(r) => r.reset()
       case _ =>
     }
   }
   
-  override def eject  : Unit = {
-    disconnect
+  override def eject(): Unit = {
+    disconnect()
     clk.cancel(RX_EVENT)
     clk.cancel(TX_EVENT)
     ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)    
@@ -196,7 +196,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
         byteReceived = modem.inputStream.read
         if (receiverDataRegister == RECEIVER_DATA_REGISTER_FULL) overrun = OVERRUN else overrun = 0
         receiverDataRegister = RECEIVER_DATA_REGISTER_FULL
-        if (isReceiverInterruptEnabled) nmi
+        if (isReceiverInterruptEnabled) nmi()
         //println(s"RECEIVED $byteReceived ${byteReceived.toChar}")
       }
       else statusListener.update(RS232.RXD,0)
@@ -211,7 +211,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
   private def socketError(t:Throwable) : Unit = {
     Log.info("Error while reading/writing byte from/to SwiftLink: " + t)
     t.printStackTrace()
-    hangUp
+    hangUp()
   }
   
   override def read(_address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
@@ -242,16 +242,16 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
     
     address match {  
       case STATUS =>
-        reset
+        reset()
       case CTRL =>
         ctrl = value
-        updateClockTicks
+        updateClockTicks()
       case CMD =>
         cmd = value
         statusListener.update(RS232.DTR,if (isDataTerminalReady) 1 else 0)
         statusListener.update(RS232.RTS,if (((cmd >> 2) & 3) != 0) 1 else 0)
         //println(s"CMD= $cmd DTR=${isDataTerminalReady} RX_IRQ=${isReceiverInterruptEnabled} TX_IRQ=${isTransmitterInterruptEnabled}")
-        updateClockTicks
+        updateClockTicks()
       case DATA =>      
         statusListener.update(RS232.RTS,value & TRANSMITTER_INTERRUPT_CONTROL)
         if (transmitterDataRegister == TRANSMITTER_DATA_REGISTER_EMPTY) {
@@ -272,7 +272,7 @@ private class SwiftLink(nmiHandler: (Boolean) => Unit,reu:Option[ExpansionPort])
             }          
             finally {
               transmitterDataRegister = TRANSMITTER_DATA_REGISTER_EMPTY
-              if (isTransmitterInterruptEnabled) nmi
+              if (isTransmitterInterruptEnabled) nmi()
             }
           }))
         }      

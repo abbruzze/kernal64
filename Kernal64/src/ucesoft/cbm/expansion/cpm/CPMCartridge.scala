@@ -27,7 +27,7 @@ class CPMCartridge(mem:Memory,
     val startAddress = 0
     val name = "Z80 Memory"
     
-    def init  : Unit = {}
+    def init(): Unit = {}
     val isActive = true
     @inline private def z80Address(address:Int) = (address + 0x1000) & 0xFFFF
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem.read(z80Address(address),chipID)
@@ -36,10 +36,10 @@ class CPMCartridge(mem:Memory,
   
   private[this] val z80 = new Z80(z80Memory)
 
-  z80.init
+  z80.init()
   tracer.addDevice(TracedDevice("CP/M Z80",z80Memory,z80,false))
   
-  override def eject  : Unit = {
+  override def eject(): Unit = {
     Log.debug("Ejecting CP/M cartridge...")
     turnZ80(false)
     tracer.removeDevice(TracedDevice("CP/M Z80",z80Memory,z80,false))
@@ -57,8 +57,8 @@ class CPMCartridge(mem:Memory,
     }
   }
   
-  override def reset  : Unit = {
-    z80.reset
+  override def reset(): Unit = {
+    z80.reset()
     z80Active = false
   }
   

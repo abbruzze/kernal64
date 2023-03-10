@@ -18,7 +18,7 @@ class SuperSnapshot5(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) ex
     val length = 0x8000
     val isActive = true
     val isRom = false
-    def init  : Unit = {}
+    def init(): Unit = {}
     def reset()  : Unit = {}
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = {
       if (ramEnabled) internalRam(address & 0x1FFF)
@@ -46,7 +46,7 @@ class SuperSnapshot5(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) ex
       ramEnabled = exrom
       game = (value & 0x1) == 1
       if (game) nmiAction(false)
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
     }
   }
 
@@ -54,14 +54,14 @@ class SuperSnapshot5(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory) ex
 
   override def isFreezeButtonSupported = true
 
-  override def freezeButton  : Unit = {
+  override def freezeButton(): Unit = {
     exrom = true
     game = false
-    notifyMemoryConfigurationChange
+    notifyMemoryConfigurationChange()
     nmiAction(true)
   }
 
-  override def reset  : Unit = {
+  override def reset(): Unit = {
     ramEnabled = false
     enabled = true
     romlBankIndex = 0

@@ -33,13 +33,13 @@ class GMOD2(crt: Cartridge,ram:Memory,config:Properties) extends CartridgeExpans
       }
     }
   }
-  override def reset  : Unit = {
+  override def reset(): Unit = {
     romlBankIndex = 0
     romhBankIndex = 0
   }
-  override def eject: Unit = saveEeprom
-  override def shutdown: Unit = saveEeprom
-  override def init  : Unit = {
+  override def eject(): Unit = saveEeprom()
+  override def shutdown(): Unit = saveEeprom()
+  override def init(): Unit = {
     Option(config.getProperty(CONFIGURATION_GMOD2_FILE)) match {
       case None =>
       case Some(eeprom) =>

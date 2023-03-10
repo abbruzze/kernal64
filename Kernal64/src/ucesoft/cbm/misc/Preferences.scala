@@ -151,7 +151,7 @@ object Preferences {
         value = prevValue
         throw new PreferenceIllegalArgumentException(s"Bad value '$badValue' for option '$cmdLine'. Expected: ${enumerated.mkString(",")}")
       }
-      if (prevValue != value && notify) notifyListeners
+      if (prevValue != value && notify) notifyListeners()
     }
 
     def save(p:Properties) : Unit = {

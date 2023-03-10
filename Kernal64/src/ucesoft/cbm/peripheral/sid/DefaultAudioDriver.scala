@@ -4,7 +4,7 @@ import javax.sound.sampled._
 
 class DefaultAudioDriver(override val sampleRate:Int,bufferSizeInMillis:Int,isStereo:Boolean = false) extends AudioDriverDevice {
   private[this] val dataLine = {
-    val af = new AudioFormat(sampleRate, 16,if (isStereo) 2 else 1, true, false)
+    val af = new AudioFormat(sampleRate.toFloat, 16,if (isStereo) 2 else 1, true, false)
     val dli = new DataLine.Info(classOf[SourceDataLine], af)
     val dataLine = try {
       AudioSystem.getLine(dli).asInstanceOf[SourceDataLine]
@@ -49,12 +49,12 @@ class DefaultAudioDriver(override val sampleRate:Int,bufferSizeInMillis:Int,isSt
       dataLine.write(buffer, 0, bsize)
     }
   }
-  final def reset : Unit = {
+  final def reset() : Unit = {
     pos = 0
     if (dataLine != null) dataLine.flush()
     setSoundOn(true)
   }
-  def discard : Unit = {
+  def discard() : Unit = {
     if (dataLine != null) {
       dataLine.stop()
       dataLine.flush()
@@ -62,7 +62,7 @@ class DefaultAudioDriver(override val sampleRate:Int,bufferSizeInMillis:Int,isSt
   }
   def setSoundOn(on:Boolean) : Unit = {
     soundOn = on
-    updateLine
+    updateLine()
   }
 
   private def updateLine() : Unit = {
@@ -78,7 +78,7 @@ class DefaultAudioDriver(override val sampleRate:Int,bufferSizeInMillis:Int,isSt
 
   override def setMuted(muted: Boolean): Unit = {
     this.muted = muted
-    updateLine
+    updateLine()
   }
 
   override def isMuted: Boolean = muted

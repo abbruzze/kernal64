@@ -15,18 +15,18 @@ class Mach5(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram) {
       if (!(!exrom && game)) {
         exrom = false
         game = true
-        notifyMemoryConfigurationChange
+        notifyMemoryConfigurationChange()
       }
     }
     else {
       if (!(exrom && game)) {
         exrom = true
         game = true
-        notifyMemoryConfigurationChange
+        notifyMemoryConfigurationChange()
       }
     }
   }
-  override def reset: Unit = {
+  override def reset(): Unit = {
     exrom = false
     game = true
   }

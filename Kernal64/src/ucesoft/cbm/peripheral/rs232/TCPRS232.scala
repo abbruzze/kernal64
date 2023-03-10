@@ -55,7 +55,7 @@ class TCPRS232 extends StreamRS232 {
       } catch {
         case _: Throwable =>
       }
-      disconnect
+      disconnect()
       super.setEnabled(false)
     }
     if (enabled && host != "") {
@@ -68,7 +68,7 @@ class TCPRS232 extends StreamRS232 {
       catch {
         case io:IOException =>
           Log.info(s"Cannot connect to $host:$port. " + io)
-          disconnect
+          disconnect()
       }
     }
   }

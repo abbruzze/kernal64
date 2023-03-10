@@ -4,20 +4,20 @@ import java.io.{InputStream, OutputStream}
 
 abstract class StreamRS232 extends AbstractRS232 {
 
-  override def hangUp : Unit = {
-    disconnect
+  override def hangUp() : Unit = {
+    disconnect()
   }
 
-  override protected def disconnect: Unit = {
+  override protected def disconnect(): Unit = {
     setStreams(null,null,null)
-    super.disconnect
+    super.disconnect()
   }
 
   def setStreams(in:InputStream,out:OutputStream,address:String) : Unit = {
     modem.setStreams(in,out)
     if (in == null) {
       dcd = RS232.DCD
-      super.disconnect
+      super.disconnect()
     }
     else {
       dcd = 0

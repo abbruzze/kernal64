@@ -112,8 +112,8 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
   }
   def play() : Unit = {
     //if (clk != Clock.systemClock) clk.play
-    pause
-    reschedule
+    pause()
+    reschedule()
   }
   @inline private def reschedule() : Unit = {
     cycles_per_line_accu += cycles_per_line
@@ -122,17 +122,17 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     clk.schedule(new ClockEvent("CRTC_TICK",clk.currentCycles + next_clk,drawLine _))
   }
   def setOwnThread(freq:Int,_play:Boolean = true) : Unit = {
-    pause
+    pause()
     clk = Clock.makeClock("CRTCClock",Some(errorHandler _))((cycles) => {})
     clk.setClockHz(freq)
-    clk.play
-    if (_play) play
+    clk.play()
+    if (_play) play()
   }
   def stopOwnThread() : Unit = {
     if (clk != Clock.systemClock) {
-      clk.halt
+      clk.halt()
       clk = Clock.systemClock
-      play
+      play()
     }
   }
 
@@ -167,12 +167,12 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     bitmap = display.displayMem
   }
 
-  final def init : Unit = {
+  final def init(): Unit = {
     regs(0) = 126
     regs(1) = 102
     xchars_total = regs(0) + 1
     cycles_per_line = 0
-    recalculate_xsync
+    recalculate_xsync()
     regs(4) = 39
     regs(5) = 0
     regs(6) = 25
@@ -188,14 +188,14 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     setScanLines(SCREEN_HEIGHT)
   }
 
-  final def reset : Unit = {
-    init
+  final def reset(): Unit = {
+    init()
     play()
   }
 
   override def hardReset(): Unit = {
     java.util.Arrays.fill(regs,0)
-    reset
+    reset()
   }
 
   final def read(address: Int, chipID: ChipID.ID = ChipID.CPU) : Int = {
@@ -239,8 +239,8 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
       case 0 => // REG 0 Horizontal Total
         xchars_total = value + 1
         if (debug) println(s"VDC: REG 0 Horizontal Total: $xchars_total")
-        recalculate_xsync
-        updateGeometry
+        recalculate_xsync()
+        updateGeometry()
       case 1 => // REG 1 Horizontal Displayed
         if (debug) println(s"VDC: REG 1 Horizontal Displayed: $value")
         updateGeometryOnNextFrame = true
@@ -255,7 +255,7 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
         if (debug) println(s"VDC: REG 5 Vertical Total Fine Adjust :$value")
       case 6 => // REG 6 Vertical Displayed
         if (debug) println(s"VDC: REG 6 Vertical Displayed: $value")
-        updateGeometry
+        updateGeometry()
       case 7 => // REG 7 Vertical Sync Position
         if (debug) println(s"VDC: REG 7 Vertical Sync Position: $value")
       case 8 => // REG 8 Interlace
@@ -263,7 +263,7 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
         val newInterlaceMode = (value & 3) == 3
         if (newInterlaceMode != interlaceMode) {
           setInterlaceMode(newInterlaceMode)
-          recalculate_xsync
+          recalculate_xsync()
         }
       case 9 => // REG 9 Character Total Vertical
         ychars_total = value & 0x1F
@@ -320,18 +320,18 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
 
   @inline private def vsync() : Unit = {
     rasterLine = 0
-    nextFrame
+    nextFrame()
   }
 
   private def drawLine(cycles:Long) : Unit = {
     clkStartLine = cycles
-    reschedule
+    reschedule()
 
     if (rowCounter == visibleTextRows) {
       vblank = true
       if (retraceListener != null) retraceListener(true)
     }
-    if (rowCounter == visibleTextRows && currentCharScanLine == 0) latch_addresses
+    if (rowCounter == visibleTextRows && currentCharScanLine == 0) latch_addresses()
 
     if (rowCounter > regs(4)) {
       if (verticalAdjFlag == 2 || (regs(5) & 0x1F) == 0) {
@@ -342,11 +342,11 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
         vblank = false
         if (retraceListener != null) retraceListener(false)
         ypos = 0
-        latch_addresses
+        latch_addresses()
       }
       else verticalAdjFlag = 1
     }
-    if (rowCounter == regs(7) && rowCounterY == 0) vsync
+    if (rowCounter == regs(7) && rowCounterY == 0) vsync()
 
     val interlacing = !deinterlaceMode && interlaceMode
     val skipLineForInterlace = interlacing && ((rasterLine & 1) != frameBit)
@@ -371,7 +371,7 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     rasterLine += 1
     if (regs(7) > regs(4) && rasterLine >= screenHeight) {
       // hack used to force vsync when no vsync has been reached at the end of raster path
-      if (!(regs(7) == regs(4) + 1 && regs(5) > 0)) vsync
+      if (!(regs(7) == regs(4) + 1 && regs(5) > 0)) vsync()
     }
 
     val screenWidth = regs(1)
@@ -449,7 +449,7 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
 
     if (updateGeometryOnNextFrame) {
       updateGeometryOnNextFrame = false
-      updateGeometry
+      updateGeometry()
     }
     // check new screen's height
     var newScreenHeight = (regs(4) + 1) * (ychars_total + 1) + (regs(5) & 0x1F)
@@ -484,7 +484,7 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     var colPix = 0
     var char_col = 0
     val firstRowLine = currentCharScanLine == 0
-    if (!vsync && firstRowLine) fetchGFX
+    if (!vsync && firstRowLine) fetchGFX()
 
     while (col < xchars_total) {
       val outRow = colPix < borderWidth || colPix >= rightBorderPix
@@ -628,7 +628,7 @@ class CRTC6845(ram:Array[Int],var charRom:Array[Int],bytes_per_char:Int,retraceL
     display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
     display.setNewResolution(currentScreenHeight,screenWidth)
     bitmap = display.displayMem
-    play
+    play()
   }
   protected def allowsStateRestoring = true
 }

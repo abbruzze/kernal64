@@ -40,7 +40,7 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
     add(0,3,frameCheckbox,GridBagConstraints.LINE_END)
     add(1,3,new JLabel("Frame recorded:"),GridBagConstraints.LINE_END)
     add(2,3,frameRecordedLabel,GridBagConstraints.LINE_START)
-    startStopButton.addActionListener(_ => startStop)
+    startStopButton.addActionListener(_ => startStop())
     add(1,4,startStopButton)
   }
 
@@ -77,11 +77,11 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
         out = new FileOutputStream(fileName)
         val thread = new Thread(this,"GIFRecorder")
         recording = true
-        checkDelay
+        checkDelay()
         startStopButton.setText("Stop recording")
         thread.start()
       }
-      else stopRecording
+      else stopRecording()
     }
     catch {
       case t:Throwable =>
@@ -143,7 +143,7 @@ class GIFPanel(display:Array[Display],displayName:Array[String]) extends JPanel 
     }
     writer.finishWrite(out)
     out.close()
-    stopRecording
+    stopRecording()
   }
 
   def stopRecording() : Unit = {
@@ -158,10 +158,10 @@ object GIFPanel {
     val gifPanel = new GIFPanel(display,displayName)
 
     f.addWindowListener(new WindowAdapter {
-      override def windowClosing(e:WindowEvent) : Unit = gifPanel.stopRecording
+      override def windowClosing(e:WindowEvent) : Unit = gifPanel.stopRecording()
     })
 
-    gifPanel.init
+    gifPanel.init()
     f.getContentPane.add("Center",gifPanel)
     f.pack()
     f

@@ -20,7 +20,7 @@ class FontPanel(mem:Memory) extends JPanel with ActionListener {
   private val addressTextField = new JTextField("0",10)
   private val matrix = Array.fill(8,8)(new JLabel(" "))
   
-  init
+  init()
   
   private def init() : Unit = {
     setLayout(new BorderLayout)
@@ -60,12 +60,12 @@ class FontPanel(mem:Memory) extends JPanel with ActionListener {
     e.getActionCommand match {
       case "UP" =>
         addressTextField.setText((addressTextField.getText.toInt + 8).toString)
-        updateMatrix
+        updateMatrix()
       case "DOWN" =>
         addressTextField.setText((addressTextField.getText.toInt - 8).toString)
-        updateMatrix
+        updateMatrix()
       case "ADDRESS" =>
-        updateMatrix
+        updateMatrix()
     }
   }
 }

@@ -197,7 +197,7 @@ class CIA(val name:String,
       properties
     }
     
-    def init : Unit = {
+    def init(): Unit = {
       clk.addChangeFrequencyListener(f => {
         f match {
           case clk.PAL_CLOCK_HZ =>
@@ -208,23 +208,23 @@ class CIA(val name:String,
             TICK_CYCLES = (f / 10).toInt
         }
       })
-      reset
+      reset()
     }
     
-    def reset  : Unit = {
+    def reset(): Unit = {
       actualTime.reset(1,0,0,0,true,true)
       latchTime.reset(1,0,0,0,true,false)
       alarmTime.reset(0,0,0,0,true,false)
       resetSync = false
-      reschedule
+      reschedule()
     }
     
     def tick(cycles:Long) : Unit = { // every 1/10 seconds
       // increment actual time if not freezed
-      if (!actualTime.freezed) actualTime.tick
+      if (!actualTime.freezed) actualTime.tick()
       if (!actualTime.freezed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
       // reschedule tick
-      reschedule
+      reschedule()
     }
     
     private[this] val tickCallback = tick _
@@ -318,7 +318,7 @@ class CIA(val name:String,
         //println("Actual time "+actualTime + "  alarm " + alarmTime + " IRQ " + (actualTime == alarmTime))
       }
       if (resetSync) {
-        reschedule
+        reschedule()
         resetSync = false
       }
       if (changed && actualTime == alarmTime) irqHandling(IRQ_SRC_ALARM)
@@ -354,22 +354,22 @@ class CIA(val name:String,
       irqOnNextClock = false
       setIRQ(irqSrcOnNextClock)
     }
-    if (timerABRunning(1)) timerB.clock
-    if (timerABRunning(0)) timerA.clock
+    if (timerABRunning(1)) timerB.clock()
+    if (timerABRunning(0)) timerA.clock()
     if (updateTOD) tod.tick(0)
     ackCycle = false
 
     if (!timerABRunning(0) && !timerABRunning(1)) idleAction(true)
   }
       
-  def init  : Unit = {
+  def init(): Unit = {
     timerA.setSerialCallBack(Some(sendSerial _))
     add(timerB)
     add(timerA)
     add(tod)
   }
   
-  def reset  : Unit = {
+  def reset(): Unit = {
     icr = 0
     sdr = 0
     icrMask = 0
@@ -529,7 +529,7 @@ class CIA(val name:String,
   
   private def sendSerial()  : Unit = {
     if ((timerA.readCR & 0x40) == 0x40) { // serial out
-      if (sdrIndex == 0 && sdrLoaded) loadShiftRegister
+      if (sdrIndex == 0 && sdrLoaded) loadShiftRegister()
       if (sdrOut) {
         sdrIndex += 1
         if ((sdrIndex & 1) == 0) {

@@ -161,7 +161,7 @@ class VDC extends RAMComponent {
   // ============ Constructor ============================
   clk.addChangeFrequencyListener(f => {
     CPU_CLOCK_HZ = f
-    recalculate_xsync
+    recalculate_xsync()
   })
   // Clock management ====================================
   def pause() : Unit = {
@@ -170,8 +170,8 @@ class VDC extends RAMComponent {
   }
   def play() : Unit = {
     //if (clk != Clock.systemClock) clk.play
-    pause
-    reschedule
+    pause()
+    reschedule()
   }
   @inline private def reschedule() : Unit = {
     cycles_per_line_accu += cycles_per_line
@@ -180,16 +180,16 @@ class VDC extends RAMComponent {
     clk.schedule(new ClockEvent("VDC_TICK",clk.currentCycles + next_clk,drawLine _))
   }
   def setOwnThread() : Unit = {
-    pause
+    pause()
     clk = Clock.makeClock("VDCClock",Some(errorHandler _))((cycles) => {})
-    clk.play
-    play
+    clk.play()
+    play()
   }
   def stopOwnThread() : Unit = {
     if (clk != Clock.systemClock) {
-      clk.halt
+      clk.halt()
       clk = Clock.systemClock
-      play
+      play()
     }
   }
 
@@ -213,8 +213,8 @@ class VDC extends RAMComponent {
     bitmap = display.displayMem
   }
 
-  final def init : Unit = {
-    reset
+  final def init() : Unit = {
+    reset()
     var v = 0xFF
     for(i <- 0 until ram.length) {
       ram(i) = v
@@ -222,7 +222,7 @@ class VDC extends RAMComponent {
     }
   }
 
-  final def reset : Unit = {
+  final def reset() : Unit = {
     busyFlagClearCycle = 0
     charVisibleWidth = 8
     regs(22) = 0x78
@@ -232,7 +232,7 @@ class VDC extends RAMComponent {
     regs(1) = 102
     xchars_total = regs(0) + 1
     cycles_per_line = 0
-    recalculate_xsync
+    recalculate_xsync()
     regs(4) = 39
     regs(5) = 0
     regs(6) = 25
@@ -244,12 +244,12 @@ class VDC extends RAMComponent {
     bitmap = display.displayMem
     currentScreenHeight = SCREEN_HEIGHT
     setScanLines(SCREEN_HEIGHT)
-    play
+    play()
   }
 
-  override def hardReset: Unit = {
+  override def hardReset(): Unit = {
     java.util.Arrays.fill(regs,0)
-    init
+    init()
   }
 
   @inline private def ram_adr(address:Int) : Int = {
@@ -300,7 +300,7 @@ class VDC extends RAMComponent {
       case 31 =>
         if (busyFlagClearCycle < clk.currentCycles) {
           val adr = currentMemoryAddress
-          incCurrentMemoryAddress
+          incCurrentMemoryAddress()
           busyFlagClearCycle = clk.currentCycles + 37
           ram(ram_adr(adr))
         }
@@ -322,8 +322,8 @@ class VDC extends RAMComponent {
       case 0 => // REG 0 Horizontal Total
         xchars_total = value + 1
         if (debug) println(s"VDC: REG 0 Horizontal Total: $xchars_total")
-        recalculate_xsync
-        updateGeometry
+        recalculate_xsync()
+        updateGeometry()
         //updateGeometryOnNextFrame = true
       case 1 => // REG 1 Horizontal Displayed
         if (debug) println(s"VDC: REG 1 Horizontal Displayed: $value")
@@ -344,7 +344,7 @@ class VDC extends RAMComponent {
       case 6 => // REG 6 Vertical Displayed
         if (debug) println(s"VDC: REG 6 Vertical Displayed: $value")
         //updateGeometryOnNextFrame = true
-        updateGeometry
+        updateGeometry()
       //updateVertical
       case 7 => // REG 7 Vertical Sync Position
         if (debug) println(s"VDC: REG 7 Vertical Sync Position: $value")
@@ -354,7 +354,7 @@ class VDC extends RAMComponent {
         val newInterlaceMode = (value & 3) == 3
         if (newInterlaceMode != interlaceMode) {
           setInterlaceMode(newInterlaceMode)
-          recalculate_xsync
+          recalculate_xsync()
         }
       case 9 => // REG 9 Character Total Vertical
         ychars_total = value & 0x1F
@@ -366,7 +366,7 @@ class VDC extends RAMComponent {
           }
           //else attr_offset = 3
 
-          updateGeometry
+          updateGeometry()
         }
         else {
           ram_base_offset = 0
@@ -395,7 +395,7 @@ class VDC extends RAMComponent {
           charVisibleWidth = value & 0x0F
           if (debug) println(s"VCD: REG 22 char visible width: $charVisibleWidth total char width: " + (1 + (regs(22) >> 4)))
           updateGeometryOnNextFrame = true
-          if ((value >> 4) != (oldValue >> 4)) recalculate_xsync
+          if ((value >> 4) != (oldValue >> 4)) recalculate_xsync()
         }
       case 23 => // REG 23 Vert. Character Pxl Spc
         ychars_visible = value & 0x1F
@@ -407,8 +407,8 @@ class VDC extends RAMComponent {
           if (vdc_revision == VDC_REVISION_0) xsmooth = ((regs(22) >> 4) - (value & 0x0F)) & 0x0F
           else xsmooth = value & 0x0F
         }
-        if ((value & 0x80) != (oldValue & 0x80) || (value & 0x10) != (oldValue & 0x10)) updateGeometry // bitmap & double mode
-        if ((value & 0x90) != (oldValue & 0x90)) recalculate_xsync
+        if ((value & 0x80) != (oldValue & 0x80) || (value & 0x10) != (oldValue & 0x10)) updateGeometry() // bitmap & double mode
+        if ((value & 0x90) != (oldValue & 0x90)) recalculate_xsync()
         if (debug) println(s"VDC: REG 25 xsmooth=$xsmooth Video Mode = ${if ((value & 0x80) > 0) "bitmap" else "text"} Color source ${if ((value & 0x40) > 0) "attribute space" else "REG 26"} Semigraph-mode ${if ((value & 0x20) > 0) "on" else "off"} Double pixel mode ${if ((value & 0x10) > 0) "on" else "off"} rasterLine=$rasterLine vblank=$vblank")
       case 26 => // REG 26 background, foregorund colors
       //if (debug) println(s"VCD: REG 26 background color ${value & 0xF} foreground color ${(value >> 4) & 0xF}")
@@ -420,11 +420,11 @@ class VDC extends RAMComponent {
       case 29 => // REG 29 Underline scal-line control
         if (debug) println(s"VDC: REG 29 Underline scal-line control $value")
       case 30 =>
-        copyorfill
+        copyorfill()
       case 31 =>
         if (busyFlagClearCycle < clk.currentCycles) {
           val addr = currentMemoryAddress
-          incCurrentMemoryAddress
+          incCurrentMemoryAddress()
           ram(ram_adr(addr)) = value
           busyFlagClearCycle = clk.currentCycles + 26 // 15
         }
@@ -524,15 +524,15 @@ class VDC extends RAMComponent {
 
   @inline private def vsync() : Unit = {
     rasterLine = 0
-    nextFrame
+    nextFrame()
   }
 
   final def drawLine(cycles:Long) : Unit = {
     clkStartLine = cycles
-    reschedule
+    reschedule()
 
     if (rowCounter == visibleTextRows) vblank = true
-    if (rowCounter == visibleTextRows && currentCharScanLine == 0) latch_addresses
+    if (rowCounter == visibleTextRows && currentCharScanLine == 0) latch_addresses()
 
     if (rowCounter > regs(4)) {
       if (verticalAdjFlag == 2 || (regs(5) & 0x1F) == 0) {
@@ -543,11 +543,11 @@ class VDC extends RAMComponent {
         if (currentCharScanLine > ychars_total) currentCharScanLine = 0 // ?? maybe
         vblank = false
         ypos = 0
-        latch_addresses
+        latch_addresses()
       }
       else verticalAdjFlag = 1
     }
-    if (rowCounter == regs(7) && rowCounterY == 0) vsync
+    if (rowCounter == regs(7) && rowCounterY == 0) vsync()
 
     val interlacing = !deinterlaceMode && interlaceMode
     val skipLineForInterlace = interlacing && ((rasterLine & 1) != frameBit)
@@ -580,14 +580,14 @@ class VDC extends RAMComponent {
       }
       else {
         videoMode = VideoMode.BITMAP
-        drawBitmapLine
+        drawBitmapLine()
       }
     }
     // NEXT RASTER LINE =====================================================
     rasterLine += 1
     if (regs(7) > regs(4) && rasterLine >= screenHeight) {
       // hack used to force vsync when no vsync has been reached at the end of raster path
-      if (!(regs(7) == regs(4) + 1 && regs(5) > 0)) vsync
+      if (!(regs(7) == regs(4) + 1 && regs(5) > 0)) vsync()
     }
     //else if (rasterLine >= screenHeight) rasterLine = 0
 
@@ -695,7 +695,7 @@ class VDC extends RAMComponent {
 
     if (updateGeometryOnNextFrame) {
       updateGeometryOnNextFrame = false
-      updateGeometry
+      updateGeometry()
     }
     // check new screen's height
     var newScreenHeight = (regs(4) + 1) * (ychars_total + 1) + (regs(5) & 0x1F)
@@ -750,7 +750,7 @@ class VDC extends RAMComponent {
     val useAttributes = (regs(25) & 0x40) > 0
     val semigraphicMode = (regs(25) & 0x20) > 0
     val firstRowLine = (rowCounter == 0 && currentCharScanLine == (regs(24) & 0x1F)) || currentCharScanLine == 0
-    if (!vsync && firstRowLine) fetchGFXAndAttrs
+    if (!vsync && firstRowLine) fetchGFXAndAttrs()
 
     while (col < xchars_total) {
       if (blankColRight < xchars_total && colPix / charWidth == blankColLeft) blankMode = true
@@ -1057,7 +1057,7 @@ class VDC extends RAMComponent {
     display.setClipArea(X_LEFT_CLIP_COLS,Y_TOP_CLIP_ROWS,screenWidth - X_RIGHT_CLIP_COLS,screenHeight - Y_BOTTOM_CLIP_ROWS)
     display.setNewResolution(currentScreenHeight,screenWidth)
     bitmap = display.displayMem
-    play
+    play()
   }
   protected def allowsStateRestoring = true
 }

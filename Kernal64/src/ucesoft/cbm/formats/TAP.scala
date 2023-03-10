@@ -14,7 +14,7 @@ class TAP(file:String) extends Iterator[Int] {
   private[this] val tape = new RandomAccessFile(file, "rw")
   private[this] var _version = 0
   
-  loadHeader
+  loadHeader()
   
   private def read = tape.read & 0xFF
   
@@ -24,7 +24,7 @@ class TAP(file:String) extends Iterator[Int] {
     }
     _version = read
     // ignore length
-    rewind
+    rewind()
   }
   
   def getFilename: String = file
@@ -36,7 +36,7 @@ class TAP(file:String) extends Iterator[Int] {
   def goTo(pos:Long) : Boolean = if (pos > tape.length()) false else { tape.seek(pos) ; true }
   
   def hasNext: Boolean = tape.getFilePointer < tape.length
-  def next: Int = {
+  def next(): Int = {
     val gap = read
     if (gap == 0) {
       if (version == 0) UNDEFINED_GAP

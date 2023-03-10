@@ -50,7 +50,7 @@ object Diskette {
       new BusDataIterator {
         private[this] var index = 0
         override def hasNext: Boolean = index < buffer.length
-        override def next: Int = {
+        override def next(): Int = {
           val value = buffer(index)
           index += 1
           value

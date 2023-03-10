@@ -56,7 +56,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
   private[this] val vdcDisplayFrame = {
     val f = new JFrame("Kernal128 " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
-      override def windowClosing(e:WindowEvent) : Unit = turnOff
+      override def windowClosing(e:WindowEvent) : Unit = turnOff()
     })
     f.setIconImage(new ImageIcon(getClass.getResource("/resources/commodore.png")).getImage)    
     f
@@ -70,20 +70,20 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
 
   override protected def isC64Mode : Boolean = c64Mode
 
-  def reset  : Unit = {
+  def reset()  : Unit = {
     dma = false
     z80Active = true
     clockSpeed = 1
     clock.maximumSpeed = false
     maxSpeedItem.setSelected(false)
-    ProgramLoader.reset
+    ProgramLoader.reset()
     cia12Running(0) = true
     cia12Running(1) = true
     FSDIRasInput = true
   }
 
-  def init  : Unit = {
-    Log.setInfo
+  def init()  : Unit = {
+    Log.setInfo()
     
     Log.info("Building the system ...")
     RS232ConfigPanel.registerAvailableRS232Drivers(displayFrame,AVAILABLE_RS232)
@@ -113,7 +113,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     import cia._
     // control ports
     val cia1CP1 = new CIA1Connectors.PortAConnector(keyb,controlPortA)
-    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb,controlPortB,() => { vicChip.triggerLightPen ; vdc.triggerLightPen })
+    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb,controlPortB,() => { vicChip.triggerLightPen() ; vdc.triggerLightPen() })
     add(cia1CP1)
     add(cia1CP2)    
     
@@ -200,11 +200,11 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
         e.getKeyCode match {
           // mouse
           case java.awt.event.KeyEvent.VK_P if e.isAltDown => 
-            if (Clock.systemClock.isPaused) Clock.systemClock.play
+            if (Clock.systemClock.isPaused) Clock.systemClock.play()
             else {
-              Clock.systemClock.pause
-              display.setPaused
-              vdcDisplay.setPaused
+              Clock.systemClock.pause()
+              display.setPaused()
+              vdcDisplay.setPaused()
             }
           case java.awt.event.KeyEvent.VK_M if e.isAltDown =>
             mouseEnabled ^= true
@@ -226,9 +226,9 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
           case java.awt.event.KeyEvent.VK_2 if e.isAltDown && e.isShiftDown =>
             adjustRatio(false,false,true)
           case java.awt.event.KeyEvent.VK_ENTER if e.isAltDown =>
-            setVDCFullScreen
+            setVDCFullScreen()
           case java.awt.event.KeyEvent.VK_N if e.isAltDown && e.isShiftDown =>
-            vdcDisplay.advanceOneFrame
+            vdcDisplay.advanceOneFrame()
           case _ =>
         }
       }
@@ -238,7 +238,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     val lightPen = new LightPenButtonListener    
     add(lightPen)
     display.addMouseListener(lightPen)
-    configureJoystick
+    configureJoystick()
     // tracing
     if (headless) Log.setOutput(null)
     // tape
@@ -271,15 +271,15 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     })
   }
   
-  override def afterInitHook  : Unit = {
-	  super.afterInitHook
+  override def afterInitHook()  : Unit = {
+	  super.afterInitHook()
     // set the correct CPU configuration
     cpuChanged(false)
   }
   
   protected def mainLoop(cycles:Long) : Unit = {
     // VIC PHI1
-    vicChip.clock
+    vicChip.clock()
     // CIAs
     if (cia12Running(0)) cia1.clock(false)
     if (cia12Running(1)) cia2.clock(false)
@@ -299,7 +299,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     // check cart freezing button
     if (cartButtonRequested && cpu.isFetchingInstruction) {
       cartButtonRequested = false
-      ExpansionPort.getExpansionPort.freezeButton
+      ExpansionPort.getExpansionPort.freezeButton()
     }
     if (z80Active) z80.clock(cycles,z80ScaleFactor) // 2Mhz / 985248 = 2.0299
     else {
@@ -308,7 +308,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
       if (cpuFrequency == 2 && !mmu.isIOACC && !vicChip.asInstanceOf[vic.VIC_II].isRefreshCycle) cpu.fetchAndExecute(1)
     }
     // SID
-    if (sidCycleExact) sid.clock
+    if (sidCycleExact) sid.clock()
   }
 
   private def irqRequest(low:Boolean) : Unit = {
@@ -376,7 +376,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     keyb.asInstanceOf[HomeKeyboard].set4080Pressed(enabled)
   }
   private def enableVDC(enabled:Boolean) : Unit = {
-    if (enabled) vdc.play else vdc.pause
+    if (enabled) vdc.play() else vdc.pause()
     vdcDisplayFrame.setVisible(enabled)
   }
   private def enableMMUPanel(enabled:Boolean) : Unit = {
@@ -538,7 +538,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
 
     val vdcSeparateThreadItem = new JCheckBoxMenuItem("VDC on its own thread")
     vdcSeparateThreadItem.setSelected(false)
-    vdcSeparateThreadItem.addActionListener(e => if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) vdc.setOwnThread else vdc.stopOwnThread )
+    vdcSeparateThreadItem.addActionListener(e => if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) vdc.setOwnThread() else vdc.stopOwnThread() )
     vdcMenu.add(vdcSeparateThreadItem)
 
     // MMU-PANEL-ENABLED ==================================================================================
@@ -684,7 +684,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
 
     val gifRecorderItem = new JMenuItem("GIF recorder...")
     gifRecorderItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    gifRecorderItem.addActionListener(_ => openGIFRecorder )
+    gifRecorderItem.addActionListener(_ => openGIFRecorder() )
     optionMenu.add(gifRecorderItem)
     
     optionMenu.addSeparator()
@@ -700,7 +700,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
 
     setSIDSettings(optionMenu)
 
-    setDrivesSettings
+    setDrivesSettings()
     
     optionMenu.addSeparator()
 
@@ -714,7 +714,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     optionMenu.addSeparator()
 
     val rs232Item = new JMenuItem("RS-232 ...")
-    rs232Item.addActionListener(_ => manageRS232 )
+    rs232Item.addActionListener(_ => manageRS232() )
     IOItem.add(rs232Item)
     
     IOItem.addSeparator()
@@ -753,13 +753,13 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
     romItem.addActionListener( _ => {
-      clock.pause
+      clock.pause()
       ROMPanel.showROMPanel(displayFrame,configuration,cbmModel,false,() => {
         saveSettings(false)
-        checkFunctionROMS
+        checkFunctionROMS()
         reset(false)
       })
-      clock.play
+      clock.play()
     } )
   }
 
@@ -774,9 +774,9 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
       keyboardControlPort)
   }
 
-  override protected def setGlobalCommandLineOptions : Unit = {
+  override protected def setGlobalCommandLineOptions() : Unit = {
     import Preferences._
-    super.setGlobalCommandLineOptions
+    super.setGlobalCommandLineOptions()
 
     // VDCSCREENSHOT ======================================================================================
     preferences.add(PREF_VDCSCREENSHOT,"Take a screenshot of VDC screen and save it on the given file path. Used with --testcart only.","") { file =>
@@ -786,15 +786,15 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     // EXT-ROM ============================================================================================
     preferences.add(PREF_128EXTROM,"External function ROM path","") { extRom =>
       configuration.setProperty(ROM.C128_EXTERNAL_ROM_PROP, extRom)
-      checkFunctionROMS
+      checkFunctionROMS()
     }
     // INT-ROM ============================================================================================
     preferences.add(PREF_128INTROM,"Internal function ROM (<rom path>,NORMAL|MEGABIT)","") { intRom =>
       configuration.setProperty(ROM.C128_INTERNAL_ROM_PROP, intRom)
-      checkFunctionROMS
+      checkFunctionROMS()
     }
     // GO-64 ==============================================================================================
-    preferences.add(PREF_128GO64,"Run in 64 mode",false) { go64 => if (go64) mmu.go64 }
+    preferences.add(PREF_128GO64,"Run in 64 mode",false) { go64 => if (go64) mmu.go64() }
     // VDC-FULLSCREEN =====================================================================================
     preferences.add(PREF_VDCFULLSCREEN,"Starts the emulator with VDC in full screen mode",false) { vdcFullScreenAtBoot = _ }
     // KERNEL128 ==========================================================================================
@@ -822,7 +822,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
         preferences.save(configuration)
         println("Settings saved")
       }
-      saveConfigurationFile
+      saveConfigurationFile()
     }
   }
   
@@ -836,7 +836,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     out.writeBoolean(FSDIRasInput)
     out.writeBoolean(c64Mode)
     out.writeInt(cpuFrequency)
-    out.writeObject(vicChip.getVICModel.VIC_TYPE.toString)
+    out.writeObject(vicChip.getVICModel().VIC_TYPE.toString)
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     drivesEnabled(0) = in.readBoolean
@@ -862,7 +862,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
   }
 
   def turnOn(args:Array[String]) : Unit = {
-    swing { setMenu }
+    swing { setMenu() }
     // check help
     if (preferences.checkForHelp(args)) {
       println(s"Kernal64, Commodore 128 emulator ver. ${ucesoft.cbm.Version.VERSION} (${ucesoft.cbm.Version.BUILD_DATE})")
@@ -873,8 +873,8 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     if (args.exists(_ == "--headless")) headless = true
     // --ignore-config-file handling
     if (args.exists(_ == "--ignore-config-file")) configuration.clear()
-    swing{ initComponent }
-    checkFunctionROMS
+    swing{ initComponent() }
+    checkFunctionROMS()
     // screen's dimension and size restoration
     // VDC
     swing { vdcDisplayFrame.pack() }
@@ -908,13 +908,13 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     }
     // FULL SCREEN
     swing {
-      if (fullScreenAtBoot) setVicFullScreen
+      if (fullScreenAtBoot) setVicFullScreen()
       else
-      if (vdcFullScreenAtBoot) setVDCFullScreen
+      if (vdcFullScreenAtBoot) setVDCFullScreen()
     }
     // PLAY    
-    vdc.play
-    clock.play
+    vdc.play()
+    clock.play()
     // KEYBOARD LAYOUT
     swing {
       checkKeyboardLayout()

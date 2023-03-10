@@ -26,7 +26,7 @@ class GMOD3(crt: Cartridge,ram:Memory,forwardRam:Memory) extends CartridgeExpans
     override val length = 0
     override val startAddress = 0
     override val name = "FlashROM"
-    override def init: Unit = {}
+    override def init(): Unit = {}
     override def isActive = true
 
     override def read(address: Int, chipID: ID): Int = {
@@ -53,7 +53,7 @@ class GMOD3(crt: Cartridge,ram:Memory,forwardRam:Memory) extends CartridgeExpans
     override val length = 0
     override val startAddress = 0
     override val name = "IRQHackVectorRAM"
-    override def init: Unit = {}
+    override def init(): Unit = {}
     override def isActive = true
 
     override def read(address: Int, chipID: ID): Int = if (irqVector && address >= 0xFFF8 && address <= 0xFFFF) IRQS(address & 7) else -1
@@ -90,10 +90,10 @@ class GMOD3(crt: Cartridge,ram:Memory,forwardRam:Memory) extends CartridgeExpans
       irqVector = (value & 0x20) > 0
       //println(s"EXROM=$exrom irqVector=$irqVector bitBangMode=$bitBangMode")
 
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
     }
   }
-  override def reset  : Unit = {
+  override def reset(): Unit = {
     romlBankIndex = 0
     romhBankIndex = 0
     bankConfig = 0
@@ -101,14 +101,14 @@ class GMOD3(crt: Cartridge,ram:Memory,forwardRam:Memory) extends CartridgeExpans
     exrom = false
     irqVector = false
     bitBangMode = false
-    notifyMemoryConfigurationChange
+    notifyMemoryConfigurationChange()
   }
 
-  override def eject : Unit = {
+  override def eject(): Unit = {
     ram.setForwardReadTo(None)
   }
 
-  override def init : Unit = {
+  override def init(): Unit = {
     forwardRam.setForwardReadTo(Some(IRQHackVectorRAM))
   }
 
@@ -116,6 +116,6 @@ class GMOD3(crt: Cartridge,ram:Memory,forwardRam:Memory) extends CartridgeExpans
     val builder = new CartridgeBuilder(crt.file,"KERNAL64 GMOD3",62,false,true)
     for((b,rom:ROM) <- romlBanks) builder.addChip(0x8000,2,b,rom.data)
 
-    builder.finish
+    builder.finish()
   }
 }

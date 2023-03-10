@@ -51,7 +51,7 @@ class BKeyboard(_km:KeyboardMapper,override protected val model:CBMComputerModel
     if (keysPressed.size > 0) {
       val keys = keysPressed.iterator
       while (keys.hasNext) {
-        val k = keys.next
+        val k = keys.next()
         val (r, c) = CKey.getRowCol(k)
         if ((colAddress & (1 << c)) > 0) byte &= ~(1 << r)
       }

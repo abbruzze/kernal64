@@ -280,7 +280,7 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
       }
   }
   // ===================== STATEMENT =================================       
-  private def enum: Parser[Statement] = ("enum" ~ "{") ~> nl ~> repsep(label ~ opt("=" ~> number), "," <~ nl) <~ nl <~ "}" ^^ {
+  private def _enum: Parser[Statement] = ("enum" ~ "{") ~> nl ~> repsep(label ~ opt("=" ~> number), "," <~ nl) <~ nl <~ "}" ^^ {
     case l => ENUM(l map { case e ~ n => (e, n map { _.toInt }) })
   }
   private def struct: Parser[Statement] = opt("private") ~ ("struct" ~> label) ~ ("{" ~> repsep(label, ",") <~ "}") ^^ {
@@ -357,7 +357,7 @@ class AsmParser(fileName:String) extends JavaTokenParsers {
   
   private def asmStatement: Parser[Statement] = positioned { asm | org | bytes | words | text | fill }
   private def statement: Parser[Statement] = positioned {
-    include | error | align | dup | break | const | variable | print | eval | ifStmt | struct | enum | whileStmt | forStmt | macroCall | declareLabel | assignment | exprStmt
+    include | error | align | dup | break | const | variable | print | eval | ifStmt | struct | _enum | whileStmt | forStmt | macroCall | declareLabel | assignment | exprStmt
   }
   
   private def statements(macroMode:Boolean, asmNotAllowed:Boolean, top:Boolean, module:Boolean): Parser[List[Statement]] = allStatements(macroMode,asmNotAllowed,top,module) ^^ { _.flatten }

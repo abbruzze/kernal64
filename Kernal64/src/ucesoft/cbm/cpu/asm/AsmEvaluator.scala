@@ -423,8 +423,8 @@ object AsmEvaluator {
       ("lsb",1) -> lohi(true),
       ("msb",1) -> lohi(false),
       ("if",3) -> ifFun,
-      ("time",0) -> (_ => NumberVal(System.currentTimeMillis)),
-      ("rnd",0) -> (_ => NumberVal(rnd.nextDouble)),
+      ("time",0) -> (_ => NumberVal(System.currentTimeMillis.toDouble)),
+      ("rnd",0) -> (_ => NumberVal(rnd.nextDouble())),
       ("rnd",1) -> (args => NumberVal(rnd.nextInt(args2Numbers(args)(0).n.toInt))),
       ("cons",1) -> (args => ListVal(Array(args.head).toBuffer)),
       ("cons",2) -> (args => {
@@ -460,7 +460,7 @@ object AsmEvaluator {
             throw new EvaluationException(s"Import file $fileName not found in directory $importDir")
           
           val from = if (args.size == 2) NumberVal(0) else args(2)
-          val size = if (args.size == 3 || args.size == 2) NumberVal(sourceFile.length) else args(3)
+          val size = if (args.size == 3 || args.size == 2) NumberVal(sourceFile.length.toDouble) else args(3)
           
           from match {
             case NumberVal(start) =>

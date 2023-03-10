@@ -29,7 +29,7 @@ class DigiMaxCart(digiAddress:Int) extends ExpansionPort {
       DigiMAX.write(value)      
     }
   }
-  override def eject  : Unit = {
+  override def eject()  : Unit = {
     DigiMAX.enabled(false,false)
   }  
 }
@@ -46,7 +46,7 @@ object DigiMAX {
   
   private def createLines(fHz:Int) = {
     (for(i <- 0 to 3) yield {
-      val af = new AudioFormat(fHz,8,1,false, false)
+      val af = new AudioFormat(fHz.toFloat,8,1,false, false)
       val dli = new DataLine.Info(classOf[SourceDataLine], af, fHz * 2)
       val dataLine = try {
         AudioSystem.getLine(dli).asInstanceOf[SourceDataLine] 

@@ -27,7 +27,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
 
   protected val modem = new Modem(this)
 
-  def hangUp : Unit = {}
+  def hangUp() : Unit = {}
   def commandMode(on:Boolean): Unit = {}
   def connectTo(address:String): Unit = {
     Log.info(s"RS232 - Connecting to $address")
@@ -44,28 +44,28 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
   def setEnabled(enabled:Boolean): Unit = {
     this.enabled = enabled
     if (enabled) {
-      clk.schedule(new ClockEvent("RS232-readCycle",clk.currentCycles + baudCycles,_ => readCycle))
+      clk.schedule(new ClockEvent("RS232-readCycle",clk.currentCycles + baudCycles,_ => readCycle()))
       dcd = RS232.DCD
     }
     else {
       clk.cancel("RS232-readCycle")
       dcd = 0
-      disconnect
+      disconnect()
     }
 
   }
   def setRS232Listener(l:RS232StatusListener): Unit = statusListener = l
   
-  def init : Unit = {}
+  def init() : Unit = {}
   
-  def reset : Unit = {
-    disconnect
+  def reset() : Unit = {
+    disconnect()
     bitreceived = 0
     outbuffer = 0
     byteToSend = -1
     dcd = 0
     sendState = 0
-    modem.reset
+    modem.reset()
   }
   
   override def getProperties: Properties = {
@@ -118,7 +118,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
       case t:Throwable =>
         Log.info(s"I/O error while writing from rs-232 ($componentID): " + t)
         t.printStackTrace()
-        disconnect
+        disconnect()
     }
   }
   
@@ -134,7 +134,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     rts = (others & RTS) > 0
     dtr = (others & DTR) > 0
 
-    checkCTS
+    checkCTS()
     //println(s"RTS=$rts DTR=$dtr DCD=$dcd CTS=$cts")
     
     if (statusListener != null) {
@@ -192,7 +192,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
   protected def disconnect() : Unit = {
     if (statusListener != null) {
       statusListener.setRS232Enabled(false)
-      statusListener.disconnected
+      statusListener.disconnected()
     }
     modem.commandModeMessage(HayesResultCode.NO_CARRIER)
   }
@@ -207,14 +207,14 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
       if (isByteAvailable && canSend) {
         sendInByte(getByte)
       }
-      else clk.schedule(new ClockEvent("RS232-readCycle",clk.currentCycles + baudCycles,_ => readCycle))
+      else clk.schedule(new ClockEvent("RS232-readCycle",clk.currentCycles + baudCycles,_ => readCycle()))
     }
     catch {
       case e:Exception =>
         Log.info(s"RS232 - Error while reading from stream: $e")
         e.printStackTrace()
-        disconnect
-        clk.schedule(new ClockEvent("RS232-readCycle",clk.currentCycles + baudCycles,_ => readCycle))
+        disconnect()
+        clk.schedule(new ClockEvent("RS232-readCycle",clk.currentCycles + baudCycles,_ => readCycle()))
     }
   }
 
@@ -229,7 +229,7 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
     bitsent = 1
     tmpParity = 0
     //println(s"Sent start bit ($byteToSend) ${byteToSend.toChar}")
-    clk.schedule(new ClockEvent("RS232-in",clk.currentCycles + baudCycles,_ => sendBit))
+    clk.schedule(new ClockEvent("RS232-in",clk.currentCycles + baudCycles,_ => sendBit()))
     if (statusListener != null) statusListener.update(RXD,1)
   }
 
@@ -282,8 +282,8 @@ abstract class AbstractRS232 extends RS232 with ModemCommandListener {
         if (statusListener != null) statusListener.update(RXD,0)
         false
     }
-    if (scheduleNextBit) clk.schedule(new ClockEvent("RS232-in",clk.currentCycles + baudCycles,_ => sendBit))
-    else clk.schedule(new ClockEvent("RS232-readCycle",clk.currentCycles + baudCycles,_ => readCycle))
+    if (scheduleNextBit) clk.schedule(new ClockEvent("RS232-in",clk.currentCycles + baudCycles,_ => sendBit()))
+    else clk.schedule(new ClockEvent("RS232-readCycle",clk.currentCycles + baudCycles,_ => readCycle()))
   }
 
   def connectionInfo: String = getConfiguration

@@ -36,7 +36,7 @@ object D64LocalDirectory {
     }
     d64.setFileMap(fileMap.toMap)
     d64.rename(s"/${dir.getName.toUpperCase}","  ")
-    d64.reloadGCR
+    d64.reloadGCR()
     d64
   }
 }
@@ -61,9 +61,9 @@ class D64LocalDirectory(override val file:String,val dir:File) extends D64_D71(f
     diskModified = true
   }
 
-  override def close: Unit = {
-    flush
-    if (diskModified) syncWithLocalDir
+  override def close(): Unit = {
+    flush()
+    if (diskModified) syncWithLocalDir()
     disk.close()
   }
 

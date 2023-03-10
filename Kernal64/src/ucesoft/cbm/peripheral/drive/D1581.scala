@@ -18,7 +18,7 @@ object D1581 {
     var offset = 0
     override def changeTrack(trackSteps:Int) : Unit = {
       if (trackSteps > 0) track +=1 else track -= 1
-      notifyTrackSectorChangeListener
+      notifyTrackSectorChangeListener()
     }
     override def nextByte: Int = {
       offset = (offset + 1) % MFM.TRACK_SIZE
@@ -107,7 +107,7 @@ class D1581(val driveID: Int,
         RW_HEAD.setMotor(motorOn)
       }
       RW_HEAD.changeSide(side0)      
-      if (led) ledListener.turnOn else ledListener.turnOff
+      if (led) ledListener.turnOn() else ledListener.turnOff()
       ledListener.turnPower(powerLed)
     }
   }
@@ -130,13 +130,13 @@ class D1581(val driveID: Int,
       bus.setLine(this,IECBusLine.CLK,clock_out)
       busDataDirection = (data & 0x20) >> 5
       if (busDataDirection == 0) releaseFSLine()
-      autoacknwoledgeData
+      autoacknwoledgeData()
     }
     
     override def atnChanged(oldValue:Int,newValue:Int) : Unit = {
       if (driveEnabled) {
-        if (newValue == GROUND) awake        
-        autoacknwoledgeData
+        if (newValue == GROUND) awake()
+        autoacknwoledgeData()
       }
     }
     
@@ -158,12 +158,12 @@ class D1581(val driveID: Int,
     val busid: String = name
     setCIAModel(ucesoft.cbm.peripheral.cia.CIA.CIA_MODEL_8521)
     
-    override def srqTriggered: Unit = {
+    override def srqTriggered(): Unit = {
       if (busDataDirection == 0) serialIN(bus.data == IECBus.GROUND)
     }
     override def atnChanged(oldValue:Int,newValue:Int) : Unit = {
       if (driveEnabled) {
-        if (newValue == IECBus.GROUND) setFlagLow        
+        if (newValue == IECBus.GROUND) setFlagLow()
       }
     }
     
@@ -204,7 +204,7 @@ class D1581(val driveID: Int,
     if (address < 0x2000) ram(address)
     else
     if (address >= 0x6000 && address < 0x6004) {
-      floppy.notifyTrackSectorChangeListener
+      floppy.notifyTrackSectorChangeListener()
       WD1770.read(address)
     }
     else
@@ -228,7 +228,7 @@ class D1581(val driveID: Int,
   override def getMem: Memory = this
   // ===============================================================
   
-  override def disconnect : Unit = {
+  override def disconnect() : Unit = {
     bus.unregisterListener(CIAPortBConnector)
     bus.unregisterListener(CIA)
   }
@@ -251,7 +251,7 @@ class D1581(val driveID: Int,
     RW_HEAD.setWriteProtected(floppy.isReadOnly)
     diskChanged = true
     
-    awake   
+    awake()
   }
   override def isRunning: Boolean = running
   override def setActive(active: Boolean) : Unit = {
@@ -262,26 +262,26 @@ class D1581(val driveID: Int,
   override def canGoSleeping: Boolean = this.canSleep
   override def setCanSleep(canSleep: Boolean) : Unit = {
     this.canSleep = canSleep
-    awake
+    awake()
   }
 
   override def isReadOnly: Boolean = RW_HEAD.isWriteProtected
   override def setReadOnly(readOnly:Boolean): Unit = RW_HEAD.setWriteProtected(readOnly)
   
-  def init : Unit = {
+  def init() : Unit = {
     Log.info("Initializing D1581...")
     add(cpu)
     add(DISK_KERNEL)
     add(CIA)    
     add(RW_HEAD)
     add(WD1770)
-    if (ledListener != null) ledListener.turnOn
+    if (ledListener != null) ledListener.turnOn()
     
     RW_HEAD.setSpeedZone(4)
     java.util.Arrays.fill(ram,0)
   }
   
-  def reset : Unit = {
+  def reset() : Unit = {
     tracing = false
     busDataDirection = 0
     activeHead = 0
@@ -291,7 +291,7 @@ class D1581(val driveID: Int,
     cycleFrac = 0.0
     diskChanged = false
     if (ledListener != null) {
-      ledListener.turnOn
+      ledListener.turnOn()
       ledListener.turnPower(false)
     }
 
@@ -299,8 +299,8 @@ class D1581(val driveID: Int,
     ciaRunning = true
   }
 
-  override def hardReset: Unit = {
-    reset
+  override def hardReset(): Unit = {
+    reset()
     java.util.Arrays.fill(ram,0)
   }
   
@@ -332,7 +332,7 @@ class D1581(val driveID: Int,
       while (n_cycles > 0) { // 2Mhz stuff
         cpu.fetchAndExecute(1)
         if (ciaRunning) CIA.clock(WD1772)
-        WD1770.clock
+        WD1770.clock()
         n_cycles -= 1
       }
       
@@ -354,7 +354,7 @@ class D1581(val driveID: Int,
   override def setTraceOnFile(out:PrintWriter,enabled:Boolean) : Unit = {/* ignored */}
   override def setTrace(traceOn: Boolean) : Unit = {
     tracing = traceOn
-    if (tracing) awake
+    if (tracing) awake()
     cpu.setTrace(traceOn)
   }
   override def step(updateRegisters: CpuStepInfo => Unit,stepType: StepType): Unit = cpu.step(updateRegisters,stepType)
@@ -374,7 +374,7 @@ class D1581(val driveID: Int,
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     if (ledListener != null) {
-      if (in.readBoolean) ledListener.turnOn else ledListener.turnOff
+      if (in.readBoolean) ledListener.turnOn() else ledListener.turnOff()
     }
     loadMemory[Int](ram,in)
     busDataDirection = in.readInt

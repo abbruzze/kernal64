@@ -24,7 +24,7 @@ class FinalCartridgeIII(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory)
       romhBankIndex = value & 3
       game = (value & 0x20) != 0
       exrom = (value & 0x10) != 0
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
       nmiAction((value & 0x40) == 0)
       if ((value & 0x80) != 0) controlRegister = false
     }
@@ -32,20 +32,20 @@ class FinalCartridgeIII(crt: Cartridge, nmiAction: (Boolean) => Unit,ram:Memory)
 
   override def isFreezeButtonSupported = true
 
-  override def freezeButton  : Unit = {
+  override def freezeButton(): Unit = {
     val clk = Clock.systemClock
-    clk.pause
+    clk.pause()
     clk.schedule(new ClockEvent("Freeze", clk.currentCycles + 3, cycles => {
       //exrom = true
       game = false
-      notifyMemoryConfigurationChange
+      notifyMemoryConfigurationChange()
       nmiAction(true)
       controlRegister = true
     }))
-    clk.play
+    clk.play()
   }
 
-  override def reset  : Unit = {
+  override def reset(): Unit = {
     controlRegister = true
     romlBankIndex = 0
     romhBankIndex = 0

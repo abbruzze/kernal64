@@ -147,7 +147,7 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
       var res = 0
       val keys = keysPressed.iterator
       while (keys.hasNext) {
-        val k = keys.next
+        val k = keys.next()
         val (r, c) = CKey.getRowCol(k)
         val row = if (isRowSel) r else c
         val col = if (!isRowSel) r else c

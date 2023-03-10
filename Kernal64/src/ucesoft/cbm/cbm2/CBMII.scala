@@ -78,7 +78,7 @@ class CBMII extends CBMComputer {
     // --ignore-config-file handling
     if (args.exists(_ == "--ignore-config-file")) configuration.clear()
     swing {
-      initComponent
+      initComponent()
     }
     // CRT
     swing {
@@ -107,11 +107,11 @@ class CBMII extends CBMComputer {
       if (fullScreenAtBoot) setCRTFullScreen()
     }
     // PLAY
-    clock.play
+    clock.play()
     crt.play()
   }
 
-  override protected def setGlobalCommandLineOptions: Unit = {
+  override protected def setGlobalCommandLineOptions(): Unit = {
     import Preferences._
     // non-saveable settings
     preferences.add(PREF_WARP, "Run warp mode", false) { w =>
@@ -300,11 +300,11 @@ class CBMII extends CBMComputer {
       val disk = Diskette(file.toString)
       disk.canWriteOnDisk = canWriteOnDisk
       disk.flushListener = diskFlusher
-      drives(driveID).getFloppy.close
-      if (!tracer.isTracing) clock.pause
+      drives(driveID).getFloppy.close()
+      if (!tracer.isTracing()) clock.pause()
       drives(driveID).setDriveReader(disk, emulateInserting)
       preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID), file.toString)
-      clock.play
+      clock.play()
 
       loadFileItems(driveID).setEnabled(false)
       configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
@@ -334,7 +334,7 @@ class CBMII extends CBMComputer {
     tapeMenu.setEnabled(true)
     configuration.setProperty(CONFIGURATION_LASTDISKDIR, file.getParentFile.toString)
     if (autorun) {
-      datassette.pressPlay
+      datassette.pressPlay()
       BKeyboard.insertTextIntoKeyboardBuffer("LOAD" + 13.toChar + "RUN" + 13.toChar, mmu)
     }
   }
@@ -383,45 +383,45 @@ class CBMII extends CBMComputer {
 
     if (tapeAllowed) {
       val attachTapeItem = new JMenuItem("Attach tape ...")
-      attachTapeItem.addActionListener(_ => attachTape)
+      attachTapeItem.addActionListener(_ => attachTape())
       fileMenu.add(attachTapeItem)
 
       tapeMenu.setEnabled(false)
       fileMenu.add(tapeMenu)
 
       val tapePlayItem = new JMenuItem("Press play")
-      tapePlayItem.addActionListener(_ => datassette.pressPlay)
+      tapePlayItem.addActionListener(_ => datassette.pressPlay())
       tapeMenu.add(tapePlayItem)
 
       val tapeStopItem = new JMenuItem("Press stop")
-      tapeStopItem.addActionListener(_ => datassette.pressStop)
+      tapeStopItem.addActionListener(_ => datassette.pressStop())
       tapeMenu.add(tapeStopItem)
 
       val tapeRecordItem = new JMenuItem("Press record & play")
-      tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay)
+      tapeRecordItem.addActionListener(_ => datassette.pressRecordAndPlay())
       tapeMenu.add(tapeRecordItem)
 
       val tapeRewindItem = new JMenuItem("Press rewind")
-      tapeRewindItem.addActionListener(_ => datassette.pressRewind)
+      tapeRewindItem.addActionListener(_ => datassette.pressRewind())
       tapeMenu.add(tapeRewindItem)
 
       val tapeForwardItem = new JMenuItem("Press forward")
-      tapeForwardItem.addActionListener(_ => datassette.pressForward)
+      tapeForwardItem.addActionListener(_ => datassette.pressForward())
       tapeMenu.add(tapeForwardItem)
 
       val tapeResetItem = new JMenuItem("Reset")
-      tapeResetItem.addActionListener(_ => datassette.resetToStart)
+      tapeResetItem.addActionListener(_ => datassette.resetToStart())
       tapeMenu.add(tapeResetItem)
 
       val tapeResetCounterItem = new JMenuItem("Reset counter")
-      tapeResetCounterItem.addActionListener(_ => datassette.resetCounter)
+      tapeResetCounterItem.addActionListener(_ => datassette.resetCounter())
       tapeMenu.add(tapeResetCounterItem)
     }
 
     fileMenu.addSeparator()
 
     val makeDiskItem = new JMenuItem("Make empty disk ...")
-    makeDiskItem.addActionListener(_ => makeDisk)
+    makeDiskItem.addActionListener(_ => makeDisk())
     fileMenu.add(makeDiskItem)
 
     val autorunDiskItem = new JMenuItem("Autorun disk ...")
@@ -453,7 +453,7 @@ class CBMII extends CBMComputer {
     // ====================================================================================================
     val loadPrgItem = new JMenuItem("Load PRG file from local disk ...")
     loadPrgItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    loadPrgItem.addActionListener(_ => loadPrg)
+    loadPrgItem.addActionListener(_ => loadPrg())
     fileMenu.add(loadPrgItem)
 
     // DRIVEX-ENABLED =====================================================================================
@@ -509,7 +509,7 @@ class CBMII extends CBMComputer {
     fileMenu.addSeparator()
 
     val exitItem = new JMenuItem("Exit")
-    exitItem.addActionListener(_ => turnOff)
+    exitItem.addActionListener(_ => turnOff())
     fileMenu.add(exitItem)
   }
 
@@ -521,7 +521,7 @@ class CBMII extends CBMComputer {
     if (_reset) reset(false)
     if (autorun) {
       clock.schedule(new ClockEvent("Loading", clock.currentCycles + PRG_RUN_DELAY_CYCLES, _ => attachDevice(file, true, None, false)))
-      clock.play
+      clock.play()
     }
     else {
       attachDevice(file, false)
@@ -548,7 +548,7 @@ class CBMII extends CBMComputer {
         preferences.save(configuration)
         println("Settings saved")
       }
-      saveConfigurationFile
+      saveConfigurationFile()
     }
   }
 
@@ -627,12 +627,12 @@ class CBMII extends CBMComputer {
 
     val snapshotItem = new JMenuItem("Take a snapshot...")
     snapshotItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    snapshotItem.addActionListener(_ => takeSnapshot)
+    snapshotItem.addActionListener(_ => takeSnapshot())
     optionMenu.add(snapshotItem)
 
     val gifRecorderItem = new JMenuItem("GIF recorder...")
     gifRecorderItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    gifRecorderItem.addActionListener(_ => openGIFRecorder)
+    gifRecorderItem.addActionListener(_ => openGIFRecorder())
     optionMenu.add(gifRecorderItem)
 
     setPauseSettings(optionMenu)
@@ -653,12 +653,12 @@ class CBMII extends CBMComputer {
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
     romItem.addActionListener(_ => {
-      clock.pause
+      clock.pause()
       ROMPanel.showROMPanel(displayFrame, configuration, cbmModel, false, () => {
         saveSettings(false)
         reset(false)
       })
-      clock.play
+      clock.play()
     })
   }
 
@@ -702,12 +702,12 @@ class CBMII extends CBMComputer {
         add(drives(id))
       case Some(c) =>
         floppyComponents(id).drive = drives(id)
-        c.getFloppy.close
-        c.disconnect
+        c.getFloppy.close()
+        c.disconnect()
         drivesRunning(id) = true
-        drives(id).initComponent
+        drives(id).initComponent()
         change(c, drives(id))
-        inspectDialog.updateRoot
+        inspectDialog.updateRoot()
         /*
         if (id == 0) {
           diskTraceDialog.mem = drives(id).getMem
@@ -734,7 +734,7 @@ class CBMII extends CBMComputer {
   }
 
   override def init(): Unit = {
-    Log.setInfo
+    Log.setInfo()
 
     Log.info("Building the system ...")
 
@@ -851,7 +851,7 @@ class CBMII extends CBMComputer {
     // trace
     tracer.addDevice(Tracer.TracedDevice("Main 6509 CPU", mmu, cpu, true))
     tracer.setDisplay(new TracedDisplay {
-      override def getRasterLineAndCycle(): (Int, Int) = (crt.getRasterLine, crt.getRasterCycle)
+      override def getRasterLineAndCycle(): (Int, Int) = (crt.getRasterLine(), crt.getRasterCycle())
       override def setDisplayRasterLine(line: Int): Unit = display.setRasterLineAt(line)
       override def enableDisplayRasterLine(enabled: Boolean): Unit = display.setDrawRasterLine(enabled)
     })
@@ -912,7 +912,7 @@ class CBMII extends CBMComputer {
   protected def setPrinterSettings(parent: JMenu): Unit = {
     // PRINTER-ENABLED =====================================================================================
     val printerPreviewItem = new JMenuItem("Printer preview ...")
-    printerPreviewItem.addActionListener(_ => showPrinterPreview)
+    printerPreviewItem.addActionListener(_ => showPrinterPreview())
     parent.add(printerPreviewItem)
 
     val printerEnabledItem = new JCheckBoxMenuItem("Printer enabled")

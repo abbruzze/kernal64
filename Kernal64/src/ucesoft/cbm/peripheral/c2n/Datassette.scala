@@ -27,26 +27,26 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
 
   def setTapeListener(tapeListener:DatassetteListener): Unit = this.tapeListener = Some(tapeListener)
 
-  def init  : Unit = {}
-  def reset  : Unit = {
+  def init(): Unit = {}
+  def reset(): Unit = {
     motorOn = false
     playPressed = false
     recordPressed = false
     lastWriteLineChangeClock = 0
     lastWriteLine = false
-    if (tap.isDefined) pressStop
+    if (tap.isDefined) pressStop()
   }
   def setTAP(tap:Option[TAP],pos:Option[Int]) : Unit = {
-    if (this.tap.isDefined) this.tap.get.close
+    if (this.tap.isDefined) this.tap.get.close()
     notifyStateChangedTo(DatassetteState.STOPPED)
     this.tap = tap
     counterMap = TAP.anaylize(new File(tap.get.getFilename)).counterMap
-    resetToStart
+    resetToStart()
     pos match {
       case Some(p) =>
         tap.get.goTo(p)
         counter = counterMap.findCounter(p)
-        update
+        update()
       case None =>
     }
   }
@@ -56,14 +56,14 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
       playPressed = true
       notifyStateChangedTo(DatassetteState.PLAYING)
       if (motorOn) { // in case of end of tape
-        clk.pause
+        clk.pause()
         clk.schedule(new ClockEvent(componentID, clk.currentCycles + 1, clockPlay _))
-        clk.play
+        clk.play()
       }
     }
   }
   def pressForward() : Unit = {
-    pressStop
+    pressStop()
     notifyStateChangedTo(DatassetteState.FORWARD)
     clk.schedule(new ClockEvent(componentID, clk.nextCycles, clockForward(true) _))
   }
@@ -86,16 +86,16 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
     recordPressed = false
     tap match {
       case None =>
-      case Some(tape) => tape.rewind
+      case Some(tape) => tape.rewind()
     }
     counterOffset = 0
     counter = 0
     notifyStateChangedTo(DatassetteState.STOPPED)
-    update
+    update()
   }
 
   def pressRewind() : Unit = {
-    pressStop
+    pressStop()
     notifyStateChangedTo(DatassetteState.REWIND)
     clk.schedule(new ClockEvent(componentID, clk.nextCycles, clockForward(false) _))
   }
@@ -119,7 +119,7 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
             case Some(t) =>
               t.write(cycles.toInt >> 3)
               counter = counterMap.findCounter(tap.get.getOffset.toInt) % 1000
-              update
+              update()
             case None =>
           }
         }
@@ -175,12 +175,12 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
           else ciaFlagLow()
 
           if (tape.hasNext) {
-            val gap = tape.next
+            val gap = tape.next()
             counter = counterMap.findCounter(tap.get.getOffset.toInt) % 1000
-            update
+            update()
             clk.schedule(new ClockEvent(componentID,cycles + gap,clockPlay _))
           }
-          else pressStop
+          else pressStop()
       }
     }
   }
@@ -193,11 +193,11 @@ class Datassette(ciaFlagLow : () => Unit) extends CBMComponent {
         counter += (if (forward) 1 else -1)
         val pos = counterMap.map.getOrElse(counter,tape.getOffset.toInt)
         if (counter <= counterMap.maxCounter && tape.goTo(pos)) {
-          update
+          update()
           if (counter > 0) clk.schedule(new ClockEvent(componentID, cycles + FAST_FORWARD_PERIOD, clockForward(forward) _))
-          else pressStop
+          else pressStop()
         }
-        else pressStop
+        else pressStop()
       case None =>
     }
   }

@@ -76,7 +76,7 @@ abstract class CBMComputer extends CBMComponent {
   protected lazy val displayFrame: JFrame = {
     val f = new JFrame(s"$APPLICATION_NAME " + ucesoft.cbm.Version.VERSION)
     f.addWindowListener(new WindowAdapter {
-      override def windowClosing(e:WindowEvent) : Unit = turnOff
+      override def windowClosing(e:WindowEvent) : Unit = turnOff()
     })
     f.setIconImage(new ImageIcon(getClass.getResource("/resources/commodore.png")).getImage)
     f.setFocusTraversalKeysEnabled(false) // to enable TAB key
@@ -127,14 +127,14 @@ abstract class CBMComputer extends CBMComponent {
     val sp = new JScrollPane(printerGraphicsDriver)
     sp.getViewport.setBackground(Color.BLACK)
     dialog.getContentPane.add("Center",sp)
-    printerGraphicsDriver.checkSize
+    printerGraphicsDriver.checkSize()
     val buttonPanel = new JPanel
     val exportPNGBUtton = new JButton("Export as PNG")
     buttonPanel.add(exportPNGBUtton)
-    exportPNGBUtton.addActionListener(_ => printerSaveImage )
+    exportPNGBUtton.addActionListener(_ => printerSaveImage() )
     val clearButton = new JButton("Clear")
     buttonPanel.add(clearButton)
-    clearButton.addActionListener(_ => printerGraphicsDriver.clearPages )
+    clearButton.addActionListener(_ => printerGraphicsDriver.clearPages() )
     dialog.getContentPane.add("South",buttonPanel)
     dialog.pack()
     dialog
@@ -180,28 +180,28 @@ abstract class CBMComputer extends CBMComponent {
   def turnOff() : Unit = {
     if (!headless) saveSettings(preferences[Boolean](Preferences.PREF_PREFAUTOSAVE).getOrElse(false))
     for (d <- drives)
-      d.getFloppy.close
-    shutdownComponent
+      d.getFloppy.close()
+    shutdownComponent()
     sys.exit(0)
   }
 
   protected def reset(play:Boolean,loadAndRunLastPrg:Boolean = false) : Unit = {
     tracer.enableTracing(false)
-    if (Thread.currentThread != Clock.systemClock) clock.pause
-    resetComponent
+    if (Thread.currentThread != Clock.systemClock) clock.pause()
+    resetComponent()
     if (loadAndRunLastPrg) lastLoadedPrg.foreach( f =>
       clock.schedule(new ClockEvent("RESET_PRG",clock.currentCycles + PRG_RUN_DELAY_CYCLES,_ => loadPRGFile(f,true)))
     )
 
-    if (play) clock.play
+    if (play) clock.play()
   }
 
   protected def hardReset(play:Boolean=true) : Unit = {
     tracer.enableTracing(false)
-    if (Thread.currentThread != Clock.systemClock) clock.pause
-    hardResetComponent
+    if (Thread.currentThread != Clock.systemClock) clock.pause()
+    hardResetComponent()
 
-    if (play) clock.play
+    if (play) clock.play()
   }
 
   protected def errorHandler(t:Throwable) : Unit = {
@@ -325,14 +325,14 @@ abstract class CBMComputer extends CBMComponent {
   }
 
   protected def ejectDisk(driveID:Int) : Unit = {
-    drives(driveID).getFloppy.close
+    drives(driveID).getFloppy.close()
     driveLeds(driveID).setToolTipText("")
-    if (!tracer.isTracing()) clock.pause
+    if (!tracer.isTracing()) clock.pause()
     if (drives(driveID).driveType == DriveType._1581) drives(driveID).setDriveReader(D1581.MFMEmptyFloppy,true)
     else drives(driveID).setDriveReader(EmptyFloppy,true)
     loadFileItems(driveID).setEnabled(false)
     preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_FILE(driveID),"")
-    clock.play
+    clock.play()
   }
 
   protected def enablePrinter(enable:Boolean) : Unit = {
@@ -341,7 +341,7 @@ abstract class CBMComputer extends CBMComponent {
   }
 
   protected def showPrinterPreview() : Unit = {
-    printerGraphicsDriver.checkSize
+    printerGraphicsDriver.checkSize()
     printerDialog.setVisible(true)
   }
 
@@ -402,9 +402,9 @@ abstract class CBMComputer extends CBMComponent {
     pauseItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_P, java.awt.event.InputEvent.ALT_DOWN_MASK))
     pauseItem.addActionListener(e =>
       if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) {
-        clock.pause
-        display.setPaused
-      } else clock.play)
+        clock.pause()
+        display.setPaused()
+      } else clock.play())
     parent.add(pauseItem)
   }
 
@@ -425,11 +425,11 @@ abstract class CBMComputer extends CBMComponent {
   }
 
   protected def setDriveType(drive:Int,dt:DriveType.Value,dontPlay:Boolean = false) : Unit = {
-    clock.pause
+    clock.pause()
     initDrive(drive,dt)
     val driveType = if (dt == DriveType.LOCAL) s"$dt=${DrivesConfigPanel.getLocalPathFor(drive)}" else dt.toString
     preferences.updateWithoutNotify(Preferences.PREF_DRIVE_X_TYPE(drive),driveType)
-    if (!dontPlay) clock.play
+    if (!dontPlay) clock.play()
   }
 
   protected def enableDrive(id: Int, enabled: Boolean, updateFrame: Boolean): Unit = {
@@ -535,7 +535,7 @@ abstract class CBMComputer extends CBMComponent {
 
     if (enableCarts) {
       val cartInfoItem = new JMenuItem("Cart info ...")
-      cartInfoItem.addActionListener(_ => showCartInfo)
+      cartInfoItem.addActionListener(_ => showCartInfo())
       cartMenu.add(cartInfoItem)
       val cartButtonItem = new JMenuItem("Press cartridge button...")
       cartButtonItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Z, java.awt.event.InputEvent.ALT_DOWN_MASK))
@@ -545,7 +545,7 @@ abstract class CBMComputer extends CBMComponent {
 
     displayFrame.setJMenuBar(menuBar)
 
-    setGlobalCommandLineOptions
+    setGlobalCommandLineOptions()
 
   }
 
@@ -558,7 +558,7 @@ abstract class CBMComputer extends CBMComponent {
   protected def setEditMenu(editMenu: JMenu): Unit = {
     val pasteItem = new JMenuItem("Paste text")
     pasteItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V, java.awt.Event.CTRL_MASK))
-    pasteItem.addActionListener(_ => paste)
+    pasteItem.addActionListener(_ => paste())
     editMenu.add(pasteItem)
     val listItem = new JMenuItem("List BASIC to editor")
     listItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_I, java.awt.Event.ALT_MASK))
@@ -594,10 +594,10 @@ abstract class CBMComputer extends CBMComponent {
 
   protected def setHelpMenu(helpMenu: JMenu): Unit = {
     val aboutItem = new JMenuItem("About")
-    aboutItem.addActionListener(_ => showAbout)
+    aboutItem.addActionListener(_ => showAbout())
     helpMenu.add(aboutItem)
     val settingsItem = new JMenuItem("Settings")
-    settingsItem.addActionListener(_ => showSettings)
+    settingsItem.addActionListener(_ => showSettings())
     helpMenu.add(settingsItem)
   }
   protected def showCartInfo() : Unit = {}
@@ -691,7 +691,7 @@ abstract class CBMComputer extends CBMComponent {
   }
 
   protected def loadState(fileName:Option[String]) : Unit = {
-    clock.pause
+    clock.pause()
     var in : ObjectInputStream = null
 
     try {
@@ -735,7 +735,7 @@ abstract class CBMComputer extends CBMComponent {
           JOptionPane.showConfirmDialog(displayFrame, msg, "State loading confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) match {
             case JOptionPane.YES_OPTION =>
               asked = true
-              resetSettings
+              resetSettings()
               reset(false)
               load(in)
               loaded = true
@@ -768,12 +768,12 @@ abstract class CBMComputer extends CBMComponent {
     }
     finally {
       if (in != null) in.close()
-      clock.play
+      clock.play()
     }
   }
 
   protected def saveState() : Unit = {
-    clock.pause
+    clock.pause()
     var out : ObjectOutputStream = null
     try {
       val canSave = allowsState
@@ -810,7 +810,7 @@ abstract class CBMComputer extends CBMComponent {
     }
     finally {
       if (out != null) out.close()
-      clock.play
+      clock.play()
     }
   }
 

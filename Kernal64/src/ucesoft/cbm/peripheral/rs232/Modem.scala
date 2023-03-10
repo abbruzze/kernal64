@@ -85,7 +85,7 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
     HayesResult(true,cmd.substring(p1.length))
   })
   private object ATH extends FastHayesCommand("(H0?).*", (cmd,p1) => {
-    mcl.hangUp
+    mcl.hangUp()
     HayesResult(true,cmd.substring(p1.length))
   })
   private object ATO extends FastHayesCommand("(O)", (_,_) => {
@@ -114,7 +114,7 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
     HayesResult(true,cmd.substring(p1.length))
   })
   private object Z extends FastHayesCommand("(Z).*", (cmd,p1) => {
-    reset
+    reset()
     HayesResult(true,cmd.substring(p1.length))
   })
   private object Select extends FastHayesCommand("(S\\d{1,3}).*", (cmd,p1) => {
@@ -177,11 +177,11 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
                            lastThree.charAt(0) == s2 &&
                            lastThree.charAt(1) == s2 &&
                            lastThree.charAt(2) == s2
-      if (commandModeReq) lastThree.clear
+      if (commandModeReq) lastThree.clear()
       commandModeReq
     }
 
-    def reset(): Unit = lastThree.clear
+    def reset(): Unit = lastThree.clear()
   }
 
   private[this] class ModemCommandStream(welcomeMessage:String = "") extends InputStream {
@@ -233,7 +233,7 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
             processCommand(commandOutBuffer)
           }
           finally {
-            commandOutBuffer.clear
+            commandOutBuffer.clear()
           }
         }
         else
@@ -294,7 +294,7 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
   private[this] val S = Array.ofDim[Int](256)
   @volatile private[this] var ringing,answerCall = false
 
-  reset
+  reset()
 
   def setBaud(baud:Int): Unit = {
     currentBaud = baud
@@ -343,9 +343,9 @@ class Modem(mcl:ModemCommandListener,welcomeMessage:String = null) extends Runna
 
   def reset(): Unit = {
     commandMode = true
-    commandOutBuffer.clear
-    inCommandDetector.reset
-    outCommandDetector.reset
+    commandOutBuffer.clear()
+    inCommandDetector.reset()
+    outCommandDetector.reset()
     allowListening(false)
     quiteMode = false
     englishResultCodes = true

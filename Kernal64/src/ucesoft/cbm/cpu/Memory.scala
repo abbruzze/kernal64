@@ -114,7 +114,7 @@ object Memory {
     val startAddress: Int = 0
     val name = "DUMMY"
 
-    def init: Unit = {}
+    def init(): Unit = {}
     val isActive = true
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = 0
     def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = {}
@@ -127,7 +127,7 @@ object Memory {
     val startAddress: Int = address
     val name = "DUMMY"
     
-    def init  : Unit = {}
+    def init(): Unit = {}
     val isActive = true
     def read(address: Int, chipID: ChipID.ID = ChipID.CPU): Int = mem(address - startAddress)
     def write(address: Int, value: Int, chipID: ChipID.ID = ChipID.CPU): Unit = mem(address - startAddress) = value

@@ -51,8 +51,8 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     def setMasterVolume(v:Int): Unit = driver.setMasterVolume(v)
     def setSoundOn(on:Boolean): Unit = driver.setSoundOn(on)
     def addSample(sample:Int): Unit = driver.addSample(sample)
-    def reset: Unit = driver.reset
-    def discard: Unit = driver.discard
+    def reset(): Unit = driver.reset()
+    def discard(): Unit = driver.discard()
     def setMuted(muted: Boolean): Unit = driver.setMuted(muted)
     def isMuted : Boolean = driver.isMuted
 
@@ -71,40 +71,40 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
 
     cycleExact = ce
     if (sid2 != null) sid2.setCycleExact(ce)
-    if (!fullSpeed) start
+    if (!fullSpeed) start()
   }
 
   def setStereo(isStereo:Boolean,sid2:Option[SID] = None) : Unit = {
-    if (this.sid2 != null) this.sid2.stop
+    if (this.sid2 != null) this.sid2.stop()
 
     this.sid2 = sid2.getOrElse(null)
     if (this.sid2 != null) this.sid2.setCycleExact(cycleExact)
     externalDriver match {
       case None =>
         val volume = driver.getMasterVolume
-        driver.discard
+        driver.discard()
         driver = new DefaultAudioDriver(SAMPLE_RATE, audioBuffer,isStereo)
         driver.setMasterVolume(volume)
       case Some(_) =>
     }
 
     Clock.systemClock.cancel(componentID)
-    start
+    start()
   }
   
   def getDriver: AudioDriverDevice = driverProxy
-  def init: Unit = start
-  def reset: Unit = {
-    if (sid2 != null) sid2.reset
+  def init(): Unit = reset()
+  def reset(): Unit = {
+    if (sid2 != null) sid2.reset()
 
     externalDriver match {
       case None =>
-        driver.reset
+        driver.reset()
       case _ =>
     }
     sid.reset()
     Clock.systemClock.cancel(componentID)
-    start
+    start()
   }
   
   def setModel(is6581:Boolean) : Unit = {
@@ -181,9 +181,9 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     if (!removeSample) Clock.systemClock.schedule(new ClockEvent(componentID,nextSample,sidEventCallBack))
   }
 
-  def clock: Unit = {
+  def clock(): Unit = {
     sid.clock()
-    if (sid2 != null) sid2.clock
+    if (sid2 != null) sid2.clock()
 
     if (!removeSample) {
       nextSample += 1
@@ -200,7 +200,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     }
   }
   
-  def stop: Unit = {
+  def stop(): Unit = {
     removeSample = true
     externalDriver match {
       case None =>
@@ -208,20 +208,20 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
       case _ =>
     }
   }
-  def start : Unit = {
+  def start() : Unit = {
     if (!driver.isMuted) {
       driver.setSoundOn(true)
       nextRest = 0
       nextSample = 0
       removeSample = false
-      driver.reset
+      driver.reset()
     }
     if (!cycleExact) Clock.systemClock.schedule(new ClockEvent(componentID,Clock.systemClock.currentCycles + 5,sidEventCallBack))
     lastCycles = Clock.systemClock.currentCycles
   }
   def setFullSpeed(full:Boolean) : Unit ={
     fullSpeed = full
-    if (full) stop else start
+    if (full) stop() else start()
   }
   // state
   protected def saveState(out:ObjectOutputStream) : Unit = {
@@ -232,7 +232,7 @@ class SID(override val startAddress:Int = 0xd400,sidID:Int = 1,externalDriver:Op
     sid.loadState(in)
     cycleExact = in.readBoolean
     Clock.systemClock.cancel(componentID)
-    start
+    start()
   }
   protected def allowsStateRestoring : Boolean = true
 }

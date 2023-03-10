@@ -59,7 +59,7 @@ object CIA2Connectors {
     final def read: Int = {
       if (WiC64.enabled) WiC64.read()
       else if (ParallelCable.enabled) {
-        ParallelCable.onPC
+        ParallelCable.onPC()
         ParallelCable.read
       }
       else if (rs232.isEnabled) rs232.getOthers else (latch | ~ddr) & 0xFF
@@ -69,7 +69,7 @@ object CIA2Connectors {
         WiC64.write(data)
       }
       if (ParallelCable.enabled) {
-        ParallelCable.onPC
+        ParallelCable.onPC()
         ParallelCable.write(data)
       }
       else rs232.setOthers(data/* | ~ddr*/)

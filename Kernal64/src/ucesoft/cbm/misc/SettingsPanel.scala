@@ -6,7 +6,7 @@ import javax.swing.{JPanel, JScrollPane, JTable}
 
 class SettingsPanel(settings:Preferences) extends JPanel {
 
-  init
+  init()
 
   private def init() : Unit = {
     setLayout(new BorderLayout)

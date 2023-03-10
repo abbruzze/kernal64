@@ -159,8 +159,8 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
   }
   private class WaitIndexPulses(qt:Int,nextStep:Step,setDataMark:Boolean = true) extends CountIndexPulses("WaitIndexPulses") {
     if (DEBUG) println(s"Begin waiting $qt pulses")
-    override def apply : Unit = {
-      super.apply
+    override def apply() : Unit = {
+      super.apply()
       if (indexPulses == qt) {
         if (setDataMark) sf(DATA_MARK_FLAG)
         step = nextStep
@@ -190,8 +190,8 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     }
   }
   private class WaitMotorOff extends CountIndexPulses("WaitMotorOff") {
-    override def apply : Unit = {
-      super.apply
+    override def apply() : Unit = {
+      super.apply()
       if (indexPulses == 10) {
         step = NoStep
         cmd = IdleCommand
@@ -206,8 +206,8 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
     private var crc = 45616 // 45616 = crc of A1 x 3, FE x 1
     private var crcToCheck = 0
     
-    override def apply : Unit = {
-      super.apply
+    override def apply() : Unit = {
+      super.apply()
       if (indexPulses >= maxIndexPulses) {
         sf(RECORD_NOT_FOUND_FLAG)
         step = CommandCompleted
@@ -244,12 +244,12 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
             if (trackToVerify != -1) {
               if (trackToVerify == idfield(0)) {
                 if (sectorToVerify != -1) {
-                  if (sectorToVerify == idfield(2)) verifyCrc                                        
+                  if (sectorToVerify == idfield(2)) verifyCrc()
                 }
-                else verifyCrc
+                else verifyCrc()
               }
             }
-            else verifyCrc
+            else verifyCrc()
           }          
         }
       }
@@ -311,9 +311,9 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
       def apply() : Unit = {
         val command = cmd.cmd
         if (command == STEP_CMD || command == STEP_IN_CMD || command == STEP_OUT_CMD) {
-          if (command == STEP_IN_CMD) setDirection
+          if (command == STEP_IN_CMD) setDirection()
           else
-          if (command == STEP_OUT_CMD) clearDirection
+          if (command == STEP_OUT_CMD) clearDirection()
           
           if (cmd.is(CMD_U)) {
             if (direction == 1) track += 1 else track -= 1
@@ -348,7 +348,7 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
           step = if (cmd.cmd == RESTORE_CMD) new WaitCycles(100,step_2) else step_2
         }
         else {
-          if (dr > track) setDirection else clearDirection
+          if (dr > track) setDirection() else clearDirection()
           if (direction == 1) track += 1 else track -= 1
           track &= 0xFF
           
@@ -458,7 +458,7 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
           else sf(DRQ_FLAG)
           byteCounter -= 1
           if (byteCounter == 0) {
-            if (DEBUG) println
+            if (DEBUG) println()
             step_6.dataCrc = 0
             step_6.crcCount = 0
             step = step_6          
@@ -696,7 +696,7 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
         if (rwh.isOnIndexHole) step = CommandCompleted // on next index hole exit
         else
         if (rwh.getByteReadySignal == 0) { // ok, byte ready
-          rwh.resetByteReadySignal
+          rwh.resetByteReadySignal()
           val byte = rwh.getLastRead
           if (isf(DRQ_FLAG)) sf(LOSTDATA_TRACK0_FLAG)
           else {
@@ -711,7 +711,7 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
       var byteCount = 0
       def apply() : Unit = {
         if (rwh.getByteReadySignal == 0) { // ok, byte ready
-          rwh.resetByteReadySignal
+          rwh.resetByteReadySignal()
           byteCount += 1
           if (byteCount == 3) {
             byteCount = 0
@@ -750,7 +750,7 @@ class WD1770(rwh:RWHeadController,override val startAddress:Int,wd1772:Boolean =
       var crcWriting,lastWritten = 0
       def apply() : Unit = {
         if (rwh.getByteReadySignal == 0) { // ok, byte written
-          rwh.resetByteReadySignal
+          rwh.resetByteReadySignal()
           if (rwh.isOnIndexHole) step = CommandCompleted
           else
           if (crcWriting == 2) {

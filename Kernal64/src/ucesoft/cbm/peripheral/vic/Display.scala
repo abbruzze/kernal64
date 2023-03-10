@@ -66,7 +66,7 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
   def setSingleFrameMode(sfm:Boolean) : Unit = {
     singleFrameMode = sfm
     singleFrameCounter = 0
-    if (!singleFrameMode) advanceOneFrame
+    if (!singleFrameMode) advanceOneFrame()
   }
 
   def advanceOneFrame() : Unit = singleFrameModeMonitor.synchronized {
@@ -118,8 +118,8 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     }
   }
   
-  def init : Unit = {}
-  def reset : Unit = {}
+  def init() : Unit = {}
+  def reset() : Unit = {}
   
   @inline private def isZoomEvent(e:MouseEvent) : Boolean = {
     import java.awt.event.InputEvent._

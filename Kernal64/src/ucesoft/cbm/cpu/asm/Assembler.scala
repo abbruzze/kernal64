@@ -39,7 +39,7 @@ object Assembler {
     val dialog = new JDialog(parent,"Assembler") {
       override def setVisible(b: Boolean): Unit = {
         super.setVisible(b)
-        if (b) assembler.reqFocus
+        if (b) assembler.reqFocus()
       }
     }
     assembler.setParent(dialog)
@@ -47,7 +47,7 @@ object Assembler {
     dialog.setJMenuBar(assembler.getMenuBar)
     dialog.pack()
     dialog.addWindowListener(new WindowAdapter {
-      override def windowClosing(e: WindowEvent): Unit = assembler.close
+      override def windowClosing(e: WindowEvent): Unit = assembler.close()
     })
 
     dialog
@@ -63,7 +63,7 @@ object Assembler {
     in match {
       case Some((in,from)) =>
         val src = Source.fromInputStream(in)
-        val sw = new StringReader(src.getLines.mkString("\n"))
+        val sw = new StringReader(src.getLines().mkString("\n"))
 
         log(s"Loading autoimport.asm from $from ...\n")
         val parser = new AsmParser("autoimport.asm")
@@ -253,7 +253,7 @@ private class SymbolPanel(map:collection.mutable.LinkedHashMap[String,String]) e
   private val table = new JTable(model)
   private val addButton = new JButton("New symbol")
   private val delButton = new JButton("Delete")
-  init
+  init()
 
   def init() : Unit = {
     setLayout(new BorderLayout())
@@ -264,8 +264,8 @@ private class SymbolPanel(map:collection.mutable.LinkedHashMap[String,String]) e
     val buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
     buttonPanel.add(addButton)
     buttonPanel.add(delButton)
-    addButton.addActionListener( _ => addSymbol )
-    delButton.addActionListener( _ => delSymbols )
+    addButton.addActionListener( _ => addSymbol() )
+    delButton.addActionListener( _ => delSymbols() )
 
     add("North",buttonPanel)
     table.getSelectionModel.addListSelectionListener(e => delButton.setEnabled(table.getSelectedRowCount > 0))
@@ -321,7 +321,7 @@ private class AssemblerPanel(mem:Memory, tracer:Tracer) extends JPanel with Trac
 
   def setParent(parent:JDialog) : Unit = this.parentDialog = parent
 
-  init
+  init()
 
   def close() : Unit = tracer.removeListener(this)
 
@@ -341,7 +341,7 @@ private class AssemblerPanel(mem:Memory, tracer:Tracer) extends JPanel with Trac
 
     val load = new JMenuItem("Load")
     load.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    load.addActionListener( _ => this.load )
+    load.addActionListener( _ => this.load() )
     val save = new JMenuItem("Save")
     save.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S,java.awt.event.InputEvent.ALT_DOWN_MASK))
     save.addActionListener( _ => this.save(false) )
@@ -360,7 +360,7 @@ private class AssemblerPanel(mem:Memory, tracer:Tracer) extends JPanel with Trac
     file.add(saveAsBINItem)
 
     val gotoItem = new JMenuItem("Go to line ...")
-    gotoItem.addActionListener( _ => gotoLine )
+    gotoItem.addActionListener( _ => gotoLine() )
     gotoItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G,java.awt.event.InputEvent.CTRL_DOWN_MASK))
 
     edit.add(gotoItem)
@@ -376,18 +376,18 @@ private class AssemblerPanel(mem:Memory, tracer:Tracer) extends JPanel with Trac
     search.add(searchBackward)
 
     compileItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_C,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    compileItem.addActionListener( _ => this.compile )
+    compileItem.addActionListener( _ => this.compile() )
     uploadInMemoryItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_U,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    uploadInMemoryItem.addActionListener( _ => uploadInMemory )
+    uploadInMemoryItem.addActionListener( _ => uploadInMemory() )
     uploadInMemoryItem.setEnabled(false)
     val includeItem = new JMenuItem("Set include directory")
-    includeItem.addActionListener( _ => setImportDir )
+    includeItem.addActionListener( _ => setImportDir() )
     val symbolsItem = new JMenuItem("Symbols ...")
     symbolsItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Y,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    symbolsItem.addActionListener( _ => openSymbolDialog )
+    symbolsItem.addActionListener( _ => openSymbolDialog() )
     val breakItem = new JMenuItem("Break on current line")
     breakItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_B,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    breakItem.addActionListener( _ => setBreak )
+    breakItem.addActionListener( _ => setBreak() )
     breakItem.setEnabled(false)
 
 
@@ -408,7 +408,7 @@ private class AssemblerPanel(mem:Memory, tracer:Tracer) extends JPanel with Trac
       debuggerItem.setSelected(true)
       attachToDebugger(true)
       breakItem.setEnabled(true)
-      findCommentedCode
+      findCommentedCode()
     })
 
     debugger.add(debuggerItem)
@@ -451,7 +451,7 @@ private class AssemblerPanel(mem:Memory, tracer:Tracer) extends JPanel with Trac
       context.setSearchForward(forward)
 
       if (!SearchEngine.find(textArea, context).wasFound()) JOptionPane.showMessageDialog(this, "Text not found")
-      reqFocus
+      reqFocus()
     }
   }
 
@@ -485,7 +485,7 @@ private class AssemblerPanel(mem:Memory, tracer:Tracer) extends JPanel with Trac
     searchField.addActionListener( _ => search(true) )
     findNextButton.addActionListener( _ => search(true) )
     findPrevButton.addActionListener( _ => search(false) )
-    clearFoundButton.addActionListener( _ => clearSearch )
+    clearFoundButton.addActionListener( _ => clearSearch() )
     searchPanel.setBorder(BorderFactory.createTitledBorder("Search"))
     northPane.add("South",searchPanel)
 
@@ -579,7 +579,7 @@ private class AssemblerPanel(mem:Memory, tracer:Tracer) extends JPanel with Trac
   }
 
   override def stepInto(pc: Int): Unit = {
-    removeLastHighlight
+    removeLastHighlight()
     val found = (lastByteCodeBlocks.view map { _.asmStatements } flatten) find { asm =>
       pc == asm.pc && asm.asm.fileName.getOrElse("") == currentFileName.getOrElse("noname.asm")
     }
@@ -597,7 +597,7 @@ private class AssemblerPanel(mem:Memory, tracer:Tracer) extends JPanel with Trac
     }
     else {
       tracer.removeListener(this)
-      removeLastHighlight
+      removeLastHighlight()
       textArea.setHighlightCurrentLine(true)
       val title = parentDialog.getTitle
       parentDialog.setTitle(title.dropRight(" attached to debugger".length))
@@ -611,7 +611,7 @@ private class AssemblerPanel(mem:Memory, tracer:Tracer) extends JPanel with Trac
     dialog.setLocationRelativeTo(parentDialog)
     dialog.pack()
     dialog.setVisible(true)
-    panel.updateSymbols
+    panel.updateSymbols()
   }
 
   private def save(saveAs:Boolean) : Boolean = {

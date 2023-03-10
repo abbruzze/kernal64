@@ -23,8 +23,8 @@ class FloppyComponent(device:Int,var drive:Drive,driveLed:DriveLed) extends CBMC
       properties
     }
     
-    def init  : Unit = {}
-    def reset: Unit = drive.getFloppy.reset
+    def init(): Unit = {}
+    def reset(): Unit = drive.getFloppy.reset()
     
     // state
     protected def saveState(out:ObjectOutputStream) : Unit = {
@@ -33,7 +33,7 @@ class FloppyComponent(device:Int,var drive:Drive,driveLed:DriveLed) extends CBMC
     protected def loadState(in:ObjectInputStream) : Unit = {
       Floppy.load(in) match {
         case Some(floppy) =>
-          drive.getFloppy.close
+          drive.getFloppy.close()
           drive.setDriveReader(floppy,false)
           driveLed.setToolTipText(floppy.file)
         case None =>

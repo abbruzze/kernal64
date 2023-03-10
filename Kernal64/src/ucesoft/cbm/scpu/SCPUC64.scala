@@ -45,23 +45,23 @@ class SCPUC64 extends CBMHomeComputer {
 
   override protected val tapeAllowed = false
 
-  def reset : Unit = {
+  def reset() : Unit = {
     dma = false
     clock.maximumSpeed = false
     maxSpeedItem.setSelected(false)
-    ProgramLoader.reset
+    ProgramLoader.reset()
     cia12Running(0) = true
     cia12Running(1) = true
     cpuClocks = 1
   }
 
-  def init : Unit = {
-    Log.setInfo
+  def init() : Unit = {
+    Log.setInfo()
 
     Log.info("Building the system ...")
     cpu.setInterruptVectorMapper(mmu.interruptVectorMapper _)
     cpu.setNativeModeListener(cpuNativeMode _)
-    mmu.setClockStretchingRequestListener(cpu.requestClockStretching _)
+    mmu.setClockStretchingRequestListener(() => cpu.requestClockStretching)
     mmu.setCacheWriteWaitListener(cpu.setBaLow _)
     RS232ConfigPanel.registerAvailableRS232Drivers(displayFrame, AVAILABLE_RS232)
     ExpansionPort.addConfigurationListener(mmu)
@@ -87,7 +87,7 @@ class SCPUC64 extends CBMHomeComputer {
     import cia._
     // control ports
     val cia1CP1 = new CIA1Connectors.PortAConnector(keyb, controlPortA)
-    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb, controlPortB, () => vicChip.triggerLightPen)
+    val cia1CP2 = new CIA1Connectors.PortBConnector(keyb, controlPortB, () => vicChip.triggerLightPen())
     add(cia1CP1)
     add(cia1CP2)
     add(irqSwitcher)
@@ -131,7 +131,7 @@ class SCPUC64 extends CBMHomeComputer {
     val lightPen = new LightPenButtonListener
     add(lightPen)
     display.addMouseListener(lightPen)
-    configureJoystick
+    configureJoystick()
     // tracing
     if (headless) Log.setOutput(null)
     // tape
@@ -162,7 +162,7 @@ class SCPUC64 extends CBMHomeComputer {
 
   protected def mainLoop(cycles: Long) : Unit = {
     // VIC PHI1
-    vicChip.clock
+    vicChip.clock()
     // CIAs
     if (cia12Running(0)) cia1.clock(false)
     if (cia12Running(1)) cia2.clock(false)
@@ -182,13 +182,13 @@ class SCPUC64 extends CBMHomeComputer {
     // check cart freezing button
     if (cartButtonRequested && cpu.isFetchingInstruction) {
       cartButtonRequested = false
-      ExpansionPort.getExpansionPort.freezeButton
+      ExpansionPort.getExpansionPort.freezeButton()
     }
     // CPU PHI2
     ProgramLoader.checkLoadingInWarpMode(cbmModel,true)
     cpu.fetchAndExecute(cpuClocks)
     // SID
-    if (sidCycleExact) sid.clock
+    if (sidCycleExact) sid.clock()
   }
 
   protected def setDMA(dma: Boolean): Unit = {
@@ -219,7 +219,7 @@ class SCPUC64 extends CBMHomeComputer {
   // ======================================== Settings ==============================================
   override protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
     super.enableDrive(id,enabled,updateFrame)
-    if (updateFrame) adjustRatio
+    if (updateFrame) adjustRatio()
   }
 
   private def adjustRatio() : Unit = {
@@ -273,7 +273,7 @@ class SCPUC64 extends CBMHomeComputer {
 
     val adjustRatioItem = new JMenuItem("Adjust display ratio")
     adjustRatioItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    adjustRatioItem.addActionListener(_ => adjustRatio)
+    adjustRatioItem.addActionListener(_ => adjustRatio())
     optionMenu.add(adjustRatioItem)
 
     val zoomItem = new JMenu("Zoom")
@@ -313,12 +313,12 @@ class SCPUC64 extends CBMHomeComputer {
 
     val snapshotItem = new JMenuItem("Take a snapshot...")
     snapshotItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    snapshotItem.addActionListener(_ => takeSnapshot)
+    snapshotItem.addActionListener(_ => takeSnapshot())
     optionMenu.add(snapshotItem)
 
     val gifRecorderItem = new JMenuItem("GIF recorder...")
     gifRecorderItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F,java.awt.event.InputEvent.ALT_DOWN_MASK))
-    gifRecorderItem.addActionListener(_ => openGIFRecorder )
+    gifRecorderItem.addActionListener(_ => openGIFRecorder() )
     optionMenu.add(gifRecorderItem)
 
     optionMenu.addSeparator()
@@ -335,7 +335,7 @@ class SCPUC64 extends CBMHomeComputer {
     // -----------------------------------
     optionMenu.addSeparator()
 
-    setDrivesSettings
+    setDrivesSettings()
 
     val busSnooperActiveItem = new JCheckBoxMenuItem("Bus snoop active")
     busSnooperActiveItem.setSelected(false)
@@ -354,7 +354,7 @@ class SCPUC64 extends CBMHomeComputer {
     optionMenu.addSeparator()
 
     val rs232Item = new JMenuItem("RS-232 ...")
-    rs232Item.addActionListener(_ => manageRS232)
+    rs232Item.addActionListener(_ => manageRS232())
     IOItem.add(rs232Item)
 
     IOItem.addSeparator()
@@ -386,12 +386,12 @@ class SCPUC64 extends CBMHomeComputer {
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)
     romItem.addActionListener(_ => {
-      clock.pause
+      clock.pause()
       ROMPanel.showROMPanel(displayFrame, configuration, cbmModel,true, () => {
         saveSettings(false)
         reset(false)
       })
-      clock.play
+      clock.play()
     })
 
     // SCPU-RAM ===========================================================================================
@@ -446,7 +446,7 @@ class SCPUC64 extends CBMHomeComputer {
         preferences.save(configuration)
         println("Settings saved")
       }
-      saveConfigurationFile
+      saveConfigurationFile()
     }
   }
 
@@ -460,7 +460,7 @@ class SCPUC64 extends CBMHomeComputer {
     out.writeBoolean(drivesEnabled(1))
     out.writeBoolean(printerEnabled)
     out.writeInt(cpuClocks)
-    out.writeObject(vicChip.getVICModel.VIC_TYPE.toString)
+    out.writeObject(vicChip.getVICModel().VIC_TYPE.toString)
   }
 
   protected def loadState(in: ObjectInputStream) : Unit = {
@@ -474,9 +474,9 @@ class SCPUC64 extends CBMHomeComputer {
 
   protected def allowsStateRestoring: Boolean = true
 
-  override protected def setGlobalCommandLineOptions : Unit = {
+  override protected def setGlobalCommandLineOptions() : Unit = {
     import Preferences._
-    super.setGlobalCommandLineOptions
+    super.setGlobalCommandLineOptions()
 
     preferences.remove("kernel")
     preferences.add(PREF_KERNEL,"Set scpu kernel rom path","") { kp =>
@@ -488,7 +488,7 @@ class SCPUC64 extends CBMHomeComputer {
 
   def turnOn(args: Array[String]) : Unit = {
     swing {
-      setMenu
+      setMenu()
     }
     // check help
     if (preferences.checkForHelp(args)) {
@@ -500,7 +500,7 @@ class SCPUC64 extends CBMHomeComputer {
     if (args.exists(_ == "--headless")) headless = true
     // --ignore-config-file handling
     if (args.exists(_ == "--ignore-config-file")) configuration.clear()
-    swing { initComponent }
+    swing { initComponent() }
     // VIC
     swing { displayFrame.pack() }
 
@@ -524,10 +524,10 @@ class SCPUC64 extends CBMHomeComputer {
     // VIEW
     swing {
       displayFrame.setVisible(!headless)
-      if (fullScreenAtBoot) setVicFullScreen
+      if (fullScreenAtBoot) setVicFullScreen()
     }
     // PLAY
-    clock.play
+    clock.play()
     // KEYBOARD LAYOUT
     swing {
       checkKeyboardLayout()

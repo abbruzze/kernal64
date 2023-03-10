@@ -193,8 +193,8 @@ abstract class IEEE488BusCommand(override val name:String,val deviceID:Int,bus: 
   protected def closeChannel(channel:Int): Unit = {}
   protected def checkData(data:Int): Boolean = true
 
-  override def reset: Unit = {
-    super.reset
+  override def reset(): Unit = {
+    super.reset()
     for(c <- channels) c.reset()
   }
 

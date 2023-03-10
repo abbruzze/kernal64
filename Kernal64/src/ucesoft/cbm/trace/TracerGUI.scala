@@ -739,8 +739,8 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       if (col == 16) {
         col = 0
         write(s"$sb  $ascii")
-        sb.clear
-        ascii.clear
+        sb.clear()
+        ascii.clear()
       }
       a = (a + 1) & 0xFFFF
     }

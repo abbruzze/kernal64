@@ -18,7 +18,7 @@ object RemoteC64Client extends App {
     video.setVisible(true)
     
     val server = new RemoteC64Client(args(0),args(1).toInt,video)
-    server.listen
+    server.listen()
   }
   catch {
     case t:Throwable =>

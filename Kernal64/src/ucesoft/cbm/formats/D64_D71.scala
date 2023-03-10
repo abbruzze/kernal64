@@ -121,7 +121,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   def bam: BamInfo = _bam
   
   // CONSTRUCTOR
-  if (loadImage) loadGCRImage
+  if (loadImage) loadGCRImage()
   
   private def gcrImageOf(t:Int,s:Int) = if (t == 0 || t > GCRImage.length) GCR.EMPTY_GCR_SECTOR else GCRImage(t - 1)(s)
   
@@ -149,7 +149,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     	s <- 0 until TRACK_ALLOCATION(t)) GCRImage(t - 1)(s) = GCR.sector2GCR(s,t,readBlock(t,s),bam.diskID,getSectorError(t,s),s == TRACK_ALLOCATION(t) - 1)
   }
   
-  override def flush  : Unit = {
+  override def flush(): Unit = {
     if (sectorModified && canWriteOnDisk) {
       sectorModified = false
       flushListener.flushing(file,{
@@ -157,7 +157,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
         val tracks = TOTAL_TRACKS
         for(t <- 1 to tracks) {
           if (isTrackModified(t)) {
-            gcrTrack.clear
+            gcrTrack.clear()
             val ss = TRACK_ALLOCATION(t)        
             for(s <- 0 until ss) {
               gcrTrack.appendAll(gcrImageOf(t, s))
@@ -176,13 +176,13 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
           }
           flushListener.update((t * 100.0 / tracks).toInt)
         }
-        clearModification
+        clearModification()
       })
     }
   }
   
-  def close: Unit = {
-    flush    
+  def close(): Unit = {
+    flush()
     disk.close()
   }
   
@@ -266,7 +266,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     _side = newSide
   }
   
-  def reset  : Unit = {
+  def reset(): Unit = {
     _side = 0
     track = 1
     sector = 0
@@ -279,7 +279,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
   
   final def nextBit: Int = {
     val b = (gcrSector(gcrIndex) >> (8 - bit)) & 1
-    if (bit == 8) rotate else bit += 1
+    if (bit == 8) rotate() else bit += 1
     b
   }
   def writeNextBit(value:Boolean) : Unit = {
@@ -287,7 +287,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     trackSectorModified(track,sector)
     val mask = 1 << (8 - bit)
     if (value) gcrSector(gcrIndex) |= mask else gcrSector(gcrIndex) &= ~mask
-    if (bit == 8) rotate else bit += 1
+    if (bit == 8) rotate() else bit += 1
   }
   final def nextByte : Int = gcrSector(gcrIndex)
   def writeNextByte(b:Int): Unit = {
@@ -305,7 +305,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     }
   }
   
-  def notifyTrackSectorChangeListener: Unit = if (trackChangeListener != null) trackChangeListener(track,false,Some(sector))
+  def notifyTrackSectorChangeListener(): Unit = if (trackChangeListener != null) trackChangeListener(track,false,Some(sector))
   def currentTrack: Int = track
   def currentSector: Option[Int] = Some(sector)
 
@@ -322,7 +322,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
       bit = 1
       gcrSector = gcrImageOf(track, sector)
       gcrIndex = gcrIndex % gcrSector.length
-      notifyTrackSectorChangeListener
+      notifyTrackSectorChangeListener()
     }
   }
   
@@ -596,7 +596,7 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
     throw new IllegalArgumentException(s"Error while getting BAM for track $t")
   }
 
-  def reloadGCR() : Unit = loadGCRImage
+  def reloadGCR() : Unit = loadGCRImage()
 
   /*
     0 = OK
@@ -674,8 +674,8 @@ class D64_D71(val file: String,loadImage:Boolean = true) extends Diskette {
 object TestD64Editor extends App {
   val d64 = new D80("/Users/ealeame/Desktop/empty.d80",false)
 
-  d64.rename("PIPPO","XY") ; d64.close ; sys.exit(0)
-  d64.directories foreach { d64.deleteFile } ; d64.close ; sys.exit(0)
+  d64.rename("PIPPO","XY") ; d64.close() ; sys.exit(0)
+  d64.directories foreach { d64.deleteFile } ; d64.close() ; sys.exit(0)
 
   val in = new java.io.FileInputStream("/Users/ealeame/Desktop/bruce.prg")
   val file = in.readAllBytes()
@@ -690,6 +690,6 @@ object TestD64Editor extends App {
 
   //d64.directories find { e =>e.fileName == "BRUCE LEE2" } foreach { d64.deleteFile }
   //d64.rename("AUTOSTART")
-  d64.reloadGCR
-  d64.close
+  d64.reloadGCR()
+  d64.close()
 }

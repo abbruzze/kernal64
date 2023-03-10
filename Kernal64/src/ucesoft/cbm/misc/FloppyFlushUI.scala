@@ -30,7 +30,7 @@ class FloppyFlushUI(parentWindow:JFrame) extends FloppyFlushListener {
     dialog.setLocation(pos)
     val t = new Thread {
       override def run()  : Unit = {
-        Clock.systemClock.pause        
+        Clock.systemClock.pause()
         try {
           f
         }
@@ -41,7 +41,7 @@ class FloppyFlushUI(parentWindow:JFrame) extends FloppyFlushListener {
         while (!dialog.isVisible) Thread.sleep(10)
         dialog.setVisible(false)
         dialog.dispose()
-        Clock.systemClock.play
+        Clock.systemClock.play()
       }
     }
     t.start()

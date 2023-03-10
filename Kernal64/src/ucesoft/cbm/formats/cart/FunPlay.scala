@@ -14,11 +14,11 @@ class FunPlay(crt: Cartridge,ram:Memory) extends CartridgeExpansionPort(crt,ram)
       if ((value & 0xc6) == 0x00) {
         exrom = false
         game = true
-        notifyMemoryConfigurationChange
+        notifyMemoryConfigurationChange()
       } else if ((value & 0xc6) == 0x86) {
         exrom = true
         game = true
-        notifyMemoryConfigurationChange
+        notifyMemoryConfigurationChange()
       }
     }
   }
