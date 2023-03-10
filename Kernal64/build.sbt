@@ -21,6 +21,7 @@ libraryDependencies += "commons-net" % "commons-net" % "3.3"
 
 Compile / scalaSource := baseDirectory.value / "src"
 Compile / resourceDirectory := baseDirectory.value / "resources"
+// Generate sources for Version and CPU65816.scala
 Compile / sourceGenerators += Def.task {
 	import scala.sys.process._
     s"java -cp ${baseDirectory.value / "lib" / "anarres-cpp.jar"} CPP ${baseDirectory.value/"src/ucesoft/cbm/cpu/wd65816/CPU65816.template"} ${baseDirectory.value/"src/ucesoft/cbm/cpu/wd65816/CPU65816.scala"}" !
