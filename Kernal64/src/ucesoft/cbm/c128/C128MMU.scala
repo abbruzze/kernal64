@@ -105,7 +105,6 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // VIC stuff ================================================================================
   private[this] var videoBank = 0
   private[this] var vicBaseAddress = 0
-  private[this] var memLastByteRead = 0
   // Internal & External function ROM =========================================================
   private[this] var internalFunctionROM,internalFunctionROM_mid,internalFunctionROM_high,externalFunctionROM_mid,externalFunctionROM_high : Array[Int] = _
   private[this] var internalROMType : FunctionROMType.Value = FunctionROMType.NORMAL
@@ -252,10 +251,10 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     vicBank = 0
     videoBank = 0
     vicBaseAddress = 0
-    memLastByteRead = 0
     ioacc = false
     check128_1()
     data_out = 0
+    lastByteOnBUS = 0
   }
 
   final def setIO(cia_dc00:CIA, cia_dd00:CIA, vic:VIC_II, sid:SID, vdc:VDC) : Unit = {
@@ -399,7 +398,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       return ram.read(address)
     }
     if (address < 0x1400) {
-      if (cr_reg == 0x3E || cr_reg == 0x7E/* || !c128Mode*/) return COLOR_RAM.read(address & 0x3FF) | lastByteRead & 0xF0
+      if (cr_reg == 0x3E || cr_reg == 0x7E/* || !c128Mode*/) return COLOR_RAM.read(address & 0x3FF) | lastByteOnBUS & 0xF0
       else return ram.read(address)
     }
     // FF00-FF04 --------------------------------------------
@@ -631,7 +630,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     if (address < 0xD500) return sid.read(address)
     // MMU REGS ----------------------------------------------------------
     if (address < 0xD600) {
-      if (!c128Mode) return lastByteRead // in c64 mode these registers are not visible
+      if (!c128Mode) return lastByteOnBUS // in c64 mode these registers are not visible
 
       if (address == MMU_CR1) return cr_reg
       if (address == 0xD505) return MMU_D505_read
@@ -642,9 +641,9 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     // VDC ---------------------------------------------------------------
     if (address < 0xD700) return vdc.read(address)
     // Unused I/O --------------------------------------------------------
-    if (address < 0xD800) return lastByteRead
+    if (address < 0xD800) return lastByteOnBUS
     // Color RAM ---------------------------------------------------------
-    if (address < 0xDC00) return COLOR_RAM.read(address) & 0x0F | lastByteRead & 0xF0
+    if (address < 0xDC00) return COLOR_RAM.read(address) & 0x0F | lastByteOnBUS & 0xF0
     // CIA 1 -------------------------------------------------------------
     if (address < 0xDD00) return cia_dc00.read(address)
     // CIA 2 -------------------------------------------------------------
@@ -769,7 +768,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
        */
       if (address >= 0xD600 && address < 0xD700) return vdc.read(address)
       if (address < 0xD800) return sid.read(address)
-      if (address < 0xDC00) return COLOR_RAM.read(address) | lastByteRead & 0xF0
+      if (address < 0xDC00) return COLOR_RAM.read(address) | lastByteOnBUS & 0xF0
       if (address < 0xDD00) return cia_dc00.read(address)
       if (address < 0xDE00) return cia_dd00.read(address)
 
@@ -780,7 +779,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   }
   @inline private[this] def read64(address: Int): Int = {
     if (ULTIMAX) {
-      if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return lastByteRead
+      if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return lastByteOnBUS
     }
     if (isForwardRead) {
       val read = forwardReadTo.read(address)
@@ -850,7 +849,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
         data_set_bit7 = _1 & 0x80
         data_falloff_bit7 = true
       }
-      ram.write(address,memLastByteRead)
+      ram.write(address,lastByteOnBUS)
       check64_1()
     }
     else if (address < 0x8000) ram.write(address,value)
@@ -910,7 +909,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     videoBank = ~bank & 3
     vicBaseAddress = videoBank << 14
   }
-  final def lastByteRead: Int = memLastByteRead
+  final def lastByteRead: Int = lastByteOnBUS
 
   override def readPCOpcode: Int = ram.read(cpu.getPC)
 
@@ -940,8 +939,8 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     }
   }
   @inline private[this] def vicRead(address:Int) : Int = {
-    memLastByteRead = vicReadPhi1(address)
-    memLastByteRead
+    lastByteOnBUS = vicReadPhi1(address)
+    lastByteOnBUS
   }
   final def readPhi2(address:Int) : Int = vicReadPhi1(address)
   // state
@@ -963,7 +962,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     out.writeBoolean(ULTIMAX)
     out.writeInt(videoBank)
     out.writeInt(vicBaseAddress)
-    out.writeInt(memLastByteRead)
+    out.writeInt(lastByteOnBUS)
   }
   protected def loadState(in:ObjectInputStream) : Unit = {
     val old128Mode = c128Mode
@@ -999,7 +998,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     ULTIMAX = in.readBoolean
     videoBank = in.readInt
     vicBaseAddress = in.readInt
-    memLastByteRead = in.readInt
+    lastByteOnBUS = in.readInt
     check128_1()
     check64_1()
   }
