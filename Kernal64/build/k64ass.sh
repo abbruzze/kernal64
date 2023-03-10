@@ -3,7 +3,7 @@
 HOME=`dirname "$0"`
 HOME=`cd "$HOME"; pwd -P`
 LIB=$HOME/lib
-CP=$LIB/kernal64.jar:$LIB/scala-library.jar:$LIB/scala-parser-combinators_2.13-1.1.2.jar
+CP=
 if [ ! -x $JAVA_HOME/bin/java ]; then
         JAVA=java
 else

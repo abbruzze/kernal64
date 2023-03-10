@@ -1,12 +1,9 @@
-dist: xenial
+dist: trusty
+language: scala
+scala:
+  - 2.13.10
+jdk: oraclejdk17
 
-language: java
-addons:
-  apt:
-    packages:
-      - ant
-
-jdk:
-  - openjdk11
-
-script: ant -DBUILD_NUMBER=$TRAVIS_BUILD_NUMBER -f Kernal64/build/build.xml
+script:
+  - sbt compile
+  - sbt buildK64Dist
