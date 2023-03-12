@@ -196,14 +196,14 @@ M			= M
 # =====================================
 SPACE		= SPACE
 # Special keys ========================
-VK_CAPS_LOCK    = CAPS_LOCK
-VK_SCROLL_LOCK  = NO_SCROLL
-VK_PAUSE        = LINE_FEED
-VK_F9           = _40_80
-VK_F11          = TAB
-VK_F12          = HELP
-VK_INSERT       = ALT
-VK_F10          = ESC
+CAPS_LOCK    = CAPS_LOCK
+SCROLL_LOCK  = NO_SCROLL
+PAUSE        = LINE_FEED
+F9           = _40_80
+F11          = TAB
+F12          = HELP
+INSERT       = ALT
+PAGE_UP      = ESC
 [keypad_map]
 NUMPAD5 	= KEYPAD_N_5
 ENTER 		= KEYPAD_ENTER
