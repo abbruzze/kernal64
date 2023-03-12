@@ -64,6 +64,9 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
   private[this] var _40_80_KEY : Int = findCKey(_40_80,KeyEvent.VK_F9)
   private[this] var CAPS_LOCK_KEY : Int = findCKey(CAPS_LOCK,KeyEvent.VK_CAPS_LOCK)
   private final val c128 = model == C128Model
+  private var capsLockListener : () => Unit = _
+
+  def setCapsLockListener(listener:() => Unit): Unit = capsLockListener = listener
 
   override def setKeyboardMapper(km:KeyboardMapper): Unit = {
     super.setKeyboardMapper(km)
@@ -90,7 +93,8 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
 
   final def keyPressed(e: KeyEvent) : Unit = synchronized {
     if (c128 && e.getKeyCode == CAPS_LOCK_KEY) {
-      c128_CapsLockPressed = !c128_CapsLockPressed      
+      c128_CapsLockPressed = !c128_CapsLockPressed
+      if (capsLockListener != null) capsLockListener()
       return
     }
     if (c128 && e.getKeyCode == _40_80_KEY) {

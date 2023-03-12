@@ -11,7 +11,7 @@ class ROM(ram: Memory,
           val startAddress: Int,
           val length: Int,
           var resourceName: String,
-          initialOffset:Int = 0,
+          var initialOffset:Int = 0,
           validLengths:List[Int] = Nil) extends RAMComponent {
   val componentID: String = "ROM " + name
   val componentType: Type = CBMComponentType.MEMORY
@@ -140,22 +140,27 @@ object ROM {
   )
 
   var props : Properties = new Properties()
-  private val registeredROMMap = new collection.mutable.HashMap[String,ROM]
+  private val registeredROMMap = new collection.mutable.HashMap[String,List[ROM]]
   private var reloadListeners : List[String => Unit] = Nil
 
   def addReloadListener(l: String => Unit): Unit = reloadListeners ::= l
 
   def reload(resource:String) : Unit = {
     registeredROMMap get resource match {
-      case Some(rom) =>
-        rom.reload()
+      case Some(roms) =>
+        for(rom <- roms) rom.reload()
       case None =>
     }
     reloadListeners.foreach(_(resource))
   }
 
   def getROMInputStream(rom:ROM,resource:String) : InputStream = {
-    if (!registeredROMMap.contains(resource)) registeredROMMap += resource -> rom
+    registeredROMMap.get(resource) match {
+      case Some(roms) =>
+        if (!roms.exists(_.name == rom.name)) registeredROMMap += resource -> (rom :: roms)
+      case None =>
+        registeredROMMap += resource -> List(rom)
+    }
     val prop = props.getProperty(resource)
     if (prop != null && prop != "") {
       val file = new File(prop)

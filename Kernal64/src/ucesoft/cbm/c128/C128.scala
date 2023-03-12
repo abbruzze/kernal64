@@ -565,6 +565,14 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     val keybEditorItem = new JMenuItem("Keyboard settings ...")
     keybEditorItem.addActionListener(_ => showKeyboardEditor() )
     keybMenu.add(keybEditorItem)
+
+    val asciiDinSelItem = new JCheckBoxMenuItem("Caps lock as ASCII/DIN")
+    keybMenu.add(asciiDinSelItem)
+    asciiDinSelItem.addActionListener(_ => preferences.update(PREF_ASCIIDIN_ENABLED,asciiDinSelItem.isSelected))
+    preferences.add(PREF_ASCIIDIN_ENABLED,"set caps lock key as C128D ascii/din",false) { asciidin =>
+      mmu.setCapsLockAsASCIIDIN(asciidin)
+      asciiDinSelItem.setSelected(asciidin)
+    }
     
     optionMenu.addSeparator()
 

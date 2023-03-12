@@ -66,6 +66,7 @@ object Preferences {
   val PREF_WIC64_ENABLED      = "wic64-enabled"
   val PREF_MOUSE_DELAY_MILLIS = "mouse-delay-millis"
   val PREF_IEEE488_ROM        = "ieee488rom"
+  val PREF_ASCIIDIN_ENABLED   = "capslock-as-asciidin"
   // ================== CBM II ===================================
   val PREF_CBM2_MODEL         = "model"
   val PREF_CBM2_BASIC128      = "basic128"

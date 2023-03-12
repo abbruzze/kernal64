@@ -111,7 +111,24 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   // Banked MagicDesk128 stuff ================================================================
   private var internalBankedROM : Array[Array[Int]] = _
   // ==========================================================================================
+  // used on C128D to switch between charsets =================================================
+  private var capsLockAsASCIIDIN = false
+  private var asciiDINState = 1
   private[this] var cpu : CPU65xx = _
+
+  def setCapsLockAsASCIIDIN(enabled:Boolean): Unit = {
+    capsLockAsASCIIDIN = enabled
+    if (enabled) {
+      asciiDINState = 1
+      capsLockPressed()
+    }
+    else {
+      CHARACTERS128_ROM.initialOffset = 0x1000
+      CHARACTERS128_ROM.reload()
+      CHARACTERS64_ROM.initialOffset = 0x0000
+      CHARACTERS64_ROM.reload()
+    }
+  }
 
   def setCPU(cpu:CPU65xx) : Unit = this.cpu = cpu
 
@@ -134,6 +151,17 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
 
   def setKeyboard(keyboard:HomeKeyboard) : Unit = {
     this.keyboard = keyboard
+    keyboard.setCapsLockListener(capsLockPressed _)
+  }
+
+  private def capsLockPressed(): Unit = {
+    if (c128Mode && capsLockAsASCIIDIN) {
+      asciiDINState = (asciiDINState + 1) & 1
+      CHARACTERS128_ROM.initialOffset = if (asciiDINState == 0) 0x0000 else 0x1000
+      CHARACTERS128_ROM.reload()
+      CHARACTERS64_ROM.initialOffset = CHARACTERS128_ROM.initialOffset
+      CHARACTERS64_ROM.reload()
+    }
   }
 
   final def isIOACC: Boolean = ioacc
@@ -231,7 +259,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     check128_1()
   }
 
-  final def reset()  : Unit = {
+  override final def reset()  : Unit = {
     Log.info("Resetting 128 main memory ...")
     _0 = 0
     _1 = 0//read128_1
@@ -255,6 +283,12 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     check128_1()
     data_out = 0
     lastByteOnBUS = 0
+  }
+
+  override def hardReset(): Unit = {
+    reset()
+    asciiDINState = 0
+    capsLockPressed()
   }
 
   final def setIO(cia_dc00:CIA, cia_dd00:CIA, vic:VIC_II, sid:SID, vdc:VDC) : Unit = {

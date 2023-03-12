@@ -73,7 +73,7 @@ class ROMPanel(prop:Properties, model:CBMComputerModel, scpu:Boolean = false) ex
         if (scpu) (r.romType & SCPU) == SCPU || r.romType == DRIVE
         else r.romType == C64 || r.romType == DRIVE
       case C128Model =>
-        true
+        r.romType == C128 || r.romType == DRIVE || r.romType == C128_I_F_ROM || r.romType == C128_E_F_ROM
       case VIC20Model =>
         r.romType == VIC20 || r.romType == DRIVE
       case CBMIIModel =>
