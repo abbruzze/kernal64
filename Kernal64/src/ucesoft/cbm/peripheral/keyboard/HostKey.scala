@@ -16,11 +16,16 @@ case class HostKey(code:Int,shifted:Boolean,altG:Boolean) {
 
   def flags : String = {
     val sb = new StringBuilder()
+    if (noshift) sb.append("-")
     if (shifted) sb.append("+")
     if (altG) sb.append("^")
-    if (noshift) sb.append("-")
     if (numberCode) sb.append("!")
     sb.toString()
+  }
+
+  override def toString: String = {
+    val keyText = if (!numberCode) java.awt.event.KeyEvent.getKeyText(code) else code.toString
+    s"$flags$keyText"
   }
 }
 

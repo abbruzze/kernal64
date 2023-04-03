@@ -13,12 +13,27 @@ trait KeyboardMapper {
   val content: String
 	val map : Map[HostKey,List[CKey.Key]]
 	val keypad_map : Map[HostKey,List[CKey.Key]]
+
+  def findHostKeys(key:CKey.Key): List[(HostKey,List[CKey.Key])] = (map.filter(kv => kv._2.contains(key)) ++ keypad_map.filter(kv => kv._2.contains(key))).toList
+}
+
+object KeyboardMapper {
+  def makeInternal(_map:Map[HostKey,List[CKey.Key]], _keypad_map:Map[HostKey,List[CKey.Key]]): KeyboardMapper = new KeyboardMapper {
+    override val configuration = None
+    override val locale = None
+    override val defaultConfigurationNotFound = false
+    override val content: String = "# internal generated"
+    override val map = _map
+    override val keypad_map = _keypad_map
+  }
 }
 
 object KeyboardMapperStore {
   val envKeyboardLayout = System.getProperty("keyboard.layout")
   private val KEY_EVENT_MAP = getKeyEventMap
   private val KEY_EVENT_REV_MAP = getKeyEventMap map { kv => (kv._2,kv._1) }
+
+  def parseHostKey(k:String): Option[HostKey] = HostKey.parse(k,s => KEY_EVENT_REV_MAP.get(if (!s.startsWith("VK_")) "VK_" + s else s))
 
   def getLocaleLang(): Option[String] = Option(java.awt.im.InputContext.getInstance().getLocale).map(_.getLanguage)
 
@@ -42,8 +57,9 @@ object KeyboardMapperStore {
           km.keypad_map
       }
       for (kv <- map) {
-        val VK = if (kv._1.isNumberCode()) s"!${kv._1.code.toString}" else KEY_EVENT_MAP.getOrElse(kv._1.code, "??")
-        out.println(s"$VK\t\t\t=${kv._2.map(k => CKey.getKeyWithoutPrefix(k,model)).mkString(",")}")
+        val modifiers = kv._1.flags
+        val VK = if (kv._1.isNumberCode()) s"${kv._1.code.toString}" else KEY_EVENT_MAP.getOrElse(kv._1.code, "VK_??").substring(3) // drop VK_
+        out.println(s"$modifiers$VK\t\t\t=${kv._2.map(k => CKey.getKeyWithoutPrefix(k,model)).mkString(",")}")
       }
     }
   }
@@ -66,7 +82,7 @@ object KeyboardMapperStore {
     }
   }
 
-  private def load(in:BufferedReader,model:CBMComputerModel,file:Option[String],_locale:Option[String],_defaultConfigurationNotFound:Boolean = false) : KeyboardMapper = {
+  def load(in:BufferedReader,model:CBMComputerModel,file:Option[String],_locale:Option[String],_defaultConfigurationNotFound:Boolean = false) : KeyboardMapper = {
     val e_map = new collection.mutable.HashMap[HostKey,List[CKey.Key]]
     val e_keypad_map = new collection.mutable.HashMap[HostKey,List[CKey.Key]]
     
@@ -95,11 +111,12 @@ object KeyboardMapperStore {
           val lineComment = v.indexOf("#")
           val emulatedKeys = if (lineComment == -1) v else v.substring(0,lineComment)
           val ckeys = emulatedKeys.split(",").map(k => CKey.getKey(k.trim,model)).toList
-          HostKey.parse(k,s => KEY_EVENT_REV_MAP.get(if (!s.startsWith("VK_")) "VK_" + s else s)) match {
+          parseHostKey(k) match {
             case Some(hk) =>
               if (!hk.mustBeFilteredByOS()) { // check if the key must not be configured for this OS
                 map += hk -> ckeys
-                if (!hk.isNoShift() && !hk.shifted) map += hk.copy(shifted = true) -> (VIRTUAL_SHIFT :: ckeys)
+                val ckeysContainsShift = ckeys.exists(CKey.isShift)
+                if (!hk.isNoShift() && !hk.shifted && !ckeysContainsShift) map += hk.copy(shifted = true) -> (VIRTUAL_SHIFT :: ckeys)
               }
             case None =>
               throw new IllegalArgumentException

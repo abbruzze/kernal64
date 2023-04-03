@@ -21,7 +21,8 @@ import javax.swing.filechooser.FileFilter
 
 object CBMComputer {
   def turnOn(computer : => CBMComputer, args:Array[String]) : Unit = {
-    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName)
+    if (System.getProperty("nativeLF") == null) UIManager.setLookAndFeel(new com.formdev.flatlaf.FlatIntelliJLaf())
+    else UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName)
 
     val cbm = computer
     try {
@@ -309,10 +310,12 @@ abstract class CBMComputer extends CBMComponent {
     }
   }
 
-  protected def showKeyboardEditor(): Unit = {
+  protected def showKeyboardSettings(): Unit = {
     val editor = KeyboardConfigEditor.getEditor(displayFrame,keyb.getKeyboardMapper,configuration,CONFIGURATION_KEYB_MAP_FILE)
     editor.setVisible(true)
   }
+
+  protected def showKeyboardEditor(keybEditor:JMenuItem): Unit = KeybEditor.getDialog(displayFrame,keyb,cbmModel,() => keybEditor.setEnabled(true)).setVisible(true)
 
   protected def showAbout()  : Unit = {
     val about = new AboutCanvas(getCharROM,ucesoft.cbm.Version.VERSION.toUpperCase + " (" + ucesoft.cbm.Version.BUILD_DATE.toUpperCase + ")")

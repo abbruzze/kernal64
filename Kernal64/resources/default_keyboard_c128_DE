@@ -136,7 +136,6 @@ F8 			            = F7,L_SHIFT
 PLUS 		            = PLUS
 MINUS 		            = MINUS
 HOME 		            = CLR_HOME
-+HOME 		            = CLR_HOME,L_SHIFT
 # ä
 [w]!16777412            = LIRA
 # ß

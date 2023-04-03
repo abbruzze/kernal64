@@ -91,6 +91,14 @@ class HomeKeyboard(_keyMapper: KeyboardMapper, nmiAction: Boolean => Unit = _ =>
     properties
   }
 
+  override def pressKey(key: CKey.Value): Unit = {
+    if (key == RESTORE || key == VIC20_RESTORE) {
+      nmiAction(true)
+      nmiAction(false) // clears immediately NMI
+    }
+    else super.pressKey(key)
+  }
+
   final def keyPressed(e: KeyEvent) : Unit = synchronized {
     if (c128 && e.getKeyCode == CAPS_LOCK_KEY) {
       c128_CapsLockPressed = !c128_CapsLockPressed

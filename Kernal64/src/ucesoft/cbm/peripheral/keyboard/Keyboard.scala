@@ -18,6 +18,9 @@ abstract class Keyboard(protected var km:KeyboardMapper,protected val model:CBMC
 
   protected case class PressedKeys(hideShift:Boolean,keys:List[CKey.Value])
 
+  def pressKey(key:CKey.Value): Unit = keysPressed += key
+  def releaseKey(key:CKey.Value): Unit = keysPressed -= key
+
   final def setEnabled(enabled: Boolean): Unit = {
     this.enabled = enabled
   }

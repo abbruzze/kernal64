@@ -2,8 +2,8 @@ package ucesoft.cbm.misc
 
 import java.awt.datatransfer.StringSelection
 import java.awt.{BorderLayout, Color, Dimension, FlowLayout, Font, Toolkit}
-import java.awt.event.{KeyEvent, KeyListener}
-import javax.swing.{BorderFactory, JButton, JDialog, JFrame, JLabel, JPanel, WindowConstants}
+import java.awt.event.{KeyAdapter, KeyEvent, KeyListener}
+import javax.swing.{BorderFactory, JButton, JDialog, JFrame, JLabel, JPanel, JToggleButton, WindowConstants}
 
 object KeyboardHelper {
   def getDialog(frame:JFrame,closeAction: () => Unit): JDialog = {
@@ -14,8 +14,13 @@ object KeyboardHelper {
     dialog.setLocationRelativeTo(frame)
     dialog
   }
+
+  final val APPLY = 0
+  final val APPLY_UNSHIFTED_SHIFTED = 1
+  final val APPLY_SHIFTED_ONLY = 2
+  case class ApplyAction(key:String,applyType:Int,isNumPad:Boolean)
 }
-class KeyboardHelper(closeEvent: () => Unit) extends JPanel with KeyListener {
+class KeyboardHelper(closeEvent: () => Unit,applyAction:Option[KeyboardHelper.ApplyAction => Unit] = None) extends JPanel with KeyListener {
   private val VK_MAP = getKeyEventMap()
   private val vkName = new JLabel()
   private val vkCode = new JLabel()
@@ -93,13 +98,44 @@ class KeyboardHelper(closeEvent: () => Unit) extends JPanel with KeyListener {
     modifiers.setForeground(Color.BLUE)
 
     val closePanel = new JPanel()
-    val close = new JButton("Close")
-    close.addActionListener(_ => closeEvent() )
-    val copyClip = new JButton("Copy into clipboard")
-    copyClip.addActionListener(_ => Toolkit.getDefaultToolkit.getSystemClipboard().setContents(new StringSelection(key.getText),null))
-    copyClip.setFocusable(false)
-    closePanel.add(close)
-    closePanel.add(copyClip)
+    applyAction match {
+      case Some(applyA) =>
+        val applyUnShiftedAndShifted = new JToggleButton("Apply shifted & unshifted")
+        applyUnShiftedAndShifted.setToolTipText("Create a shifted and a normal binding")
+        val applyShiftedOnly = new JToggleButton("Apply shifted only")
+        applyShiftedOnly.setToolTipText("Create a shifted only binding")
+        applyUnShiftedAndShifted.addActionListener(_ => if (applyUnShiftedAndShifted.isSelected && applyShiftedOnly.isSelected) applyUnShiftedAndShifted.setSelected(false))
+        applyShiftedOnly.addActionListener(_ => if (applyUnShiftedAndShifted.isSelected && applyShiftedOnly.isSelected) applyShiftedOnly.setSelected(false))
+        applyUnShiftedAndShifted.setFocusable(false)
+        applyShiftedOnly.setFocusable(false)
+        val apply = new JButton("Apply")
+        apply.setEnabled(false)
+        apply.addActionListener(_ => {
+          var applyMode = 0
+          if (applyUnShiftedAndShifted.isSelected) applyMode += 1
+          else if (applyShiftedOnly.isSelected) applyMode += 2
+          applyA(KeyboardHelper.ApplyAction(key.getText,applyMode,position.getText == "NUM PAD"))
+          closeEvent()
+        })
+        addKeyListener(new KeyAdapter {
+          override def keyPressed(e: KeyEvent): Unit = apply.setEnabled(true)
+        })
+        val cancel = new JButton("Cancel")
+        cancel.addActionListener(_ => closeEvent())
+        closePanel.add(apply)
+        closePanel.add(cancel)
+        closePanel.add(applyUnShiftedAndShifted)
+        closePanel.add(applyShiftedOnly)
+      case None =>
+        val close = new JButton("Close")
+        close.addActionListener(_ => closeEvent())
+        val copyClip = new JButton("Copy into clipboard")
+        copyClip.addActionListener(_ => Toolkit.getDefaultToolkit.getSystemClipboard().setContents(new StringSelection(key.getText), null))
+        copyClip.setFocusable(false)
+        closePanel.add(close)
+        closePanel.add(copyClip)
+    }
+
     add("South",closePanel)
 
     setFocusable(true)

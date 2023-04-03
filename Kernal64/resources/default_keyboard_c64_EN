@@ -125,7 +125,6 @@ BACK_QUOTE 	= L_ARROW
 +EQUALS		= PLUS
 MINUS 		= MINUS
 HOME 		= CLR_HOME
-+HOME 		= CLR_HOME,L_SHIFT
 BACK_SPACE 	= INST_DEL
 # QWERTY row
 # =====================================

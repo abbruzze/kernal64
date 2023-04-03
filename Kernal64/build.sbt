@@ -18,6 +18,7 @@ libraryDependencies += "com.fifesoft" % "rsyntaxtextarea" % "3.3.1"
 libraryDependencies += "org.jsoup" % "jsoup" % "1.15.4"
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.2.0"
 libraryDependencies += "commons-net" % "commons-net" % "3.3"
+libraryDependencies += "com.formdev" % "flatlaf" % "3.0"
 
 Compile / scalaSource := baseDirectory.value / "src"
 Compile / resourceDirectory := baseDirectory.value / "resources"
