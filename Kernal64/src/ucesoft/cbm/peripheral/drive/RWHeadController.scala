@@ -92,6 +92,7 @@ abstract class RWHeadController(protected var floppy:Floppy,
     }
   }
   def setFloppy(newFloppy:Floppy) : Unit = {
+    reset()
     floppy = newFloppy
     floppy.setTrackChangeListener(updateTrackSectorLabelProgress _)
   }
