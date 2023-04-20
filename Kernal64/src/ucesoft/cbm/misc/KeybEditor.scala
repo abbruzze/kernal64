@@ -511,7 +511,7 @@ class KeybEditor(keyb:Keyboard,dialog:JDialog,model:CBMComputerModel) extends JP
         if (azAuto) {
           for(k <- keys) {
             if (CKey.isLetterKey(k.key,model)) {
-              KeyboardMapperStore.parseHostKey(k.key.toString) match {
+              KeyboardMapperStore.parseHostKey(CKey.getKeyWithoutPrefix(k.key,model)) match {
                 case Some(hk) =>
                   currentEditMap += hk -> List(k.key)
                   currentEditMap += hk.copy(shifted = true) -> List(VIRTUAL_SHIFT,k.key)
@@ -646,5 +646,15 @@ class KeybEditor(keyb:Keyboard,dialog:JDialog,model:CBMComputerModel) extends JP
   override def mouseEntered(e: MouseEvent): Unit = {}
   override def mouseExited(e: MouseEvent): Unit = {}
 
-  def close(): Boolean = true
+  def close(): Boolean = {
+    if (currentMapModified) {
+      JOptionPane.showConfirmDialog(this, "Do you want to discard changes ?", "Confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) match {
+        case JOptionPane.YES_OPTION =>
+          true
+        case _ =>
+          false
+      }
+    }
+    else true
+  }
 }
