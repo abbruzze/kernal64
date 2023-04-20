@@ -102,6 +102,14 @@ function kernal64c128c128_get_options
                 exitoptions="--cia-model 8521"
                 new_cia_enabled=1
             ;;
+        "c128fullbanks")
+                exitoptions="--256k"
+                fullbanks_enabled=1
+            ;;
+        "ramcart128k")
+                exitoptions="--ram-cart 128"
+                ramcart_enabled=1
+            ;;
         *)
                 exitoptions=""
                 if [ "${1:0:9}" == "mountd64:" ]; then

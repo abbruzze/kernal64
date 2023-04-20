@@ -741,6 +741,8 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
 
     setGEORamSettings(IOItem)
 
+    setRAMCartSettings(IOItem)
+
     // -----------------------------------
     
     IOItem.addSeparator()
@@ -762,7 +764,11 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     val _256RamEnabledItem = new JCheckBoxMenuItem("256K")
     _256RamEnabledItem.setSelected(false)
     ramItem.add(_256RamEnabledItem)
-    _256RamEnabledItem.addActionListener(e => mmu.RAM.setExpansionBanks(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) )
+    _256RamEnabledItem.addActionListener(_ => preferences.update(PREF_128FULLRAM,_256RamEnabledItem.isSelected))
+    preferences.add(PREF_128FULLRAM,"Set 256K ram",false) { _256k =>
+      _256RamEnabledItem.setEnabled(_256k)
+      mmu.RAM.setExpansionBanks(_256k)
+    }
 
     val romItem = new JMenuItem("ROMs ...")
     optionMenu.add(romItem)

@@ -260,6 +260,12 @@ class SCPUC64 extends CBMHomeComputer {
     val keybEditorItem = new JMenuItem("Keyboard settings ...")
     keybEditorItem.addActionListener(_ => showKeyboardSettings())
     optionMenu.add(keybEditorItem)
+    val keybEditor = new JMenuItem("Keyboard editor/virtual keyboard ...")
+    optionMenu.add(keybEditor)
+    keybEditor.addActionListener(_ => {
+      keybEditor.setEnabled(false)
+      showKeyboardEditor(keybEditor)
+    })
 
     optionMenu.addSeparator()
 
@@ -366,6 +372,8 @@ class SCPUC64 extends CBMHomeComputer {
     setREUSettings(IOItem)
 
     setGEORamSettings(IOItem)
+
+    setRAMCartSettings(IOItem)
 
     // -----------------------------------
 

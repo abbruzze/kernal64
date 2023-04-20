@@ -355,6 +355,10 @@ class C64 extends CBMHomeComputer {
 
     setGEORamSettings(IOItem)
 
+    setRAMCartSettings(IOItem)
+
+    setIsepicSettings(IOItem)
+
     setBeamRacerSettings(IOItem)
 
     // -----------------------------------
@@ -420,6 +424,7 @@ class C64 extends CBMHomeComputer {
   }
 
   protected def getRAM: Memory = mmu.getRAM
+
   protected def getCharROM: Memory = mmu.CHAR_ROM
   
   // state

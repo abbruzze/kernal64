@@ -250,6 +250,10 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
         preferences(PREF_REUTYPE) = in.readInt.toString
       case DUALSID =>
         preferences(PREF_DUALSID) = in.readInt.toString
+      case RAMCART =>
+        preferences(PREF_RAMCART) = in.readInt.toString
+      case ISEPIC =>
+        preferences(PREF_ISEPIC) = true
       case _ =>
     }
   }
@@ -563,6 +567,19 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
   protected def setGeoRAM(enabled:Boolean,size:Int = 0): Unit = {
     if (enabled) ExpansionPort.setExpansionPort(new GeoRAM(size)) else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+  }
+
+  protected def setRAMCart(enabled:Boolean, size:Int): Unit = {
+    if (enabled) ExpansionPort.setExpansionPort(new RAMCart(size,getRAM))
+    else ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+  }
+
+  protected def setIsepic(enabled:Boolean): Unit = {
+    if (enabled) ExpansionPort.setExpansionPort(new Isepic(nmiSwitcher.setLine(Switcher.CRT,_)))
+    else {
+      ExpansionPort.getExpansionPort.eject()
+      ExpansionPort.setExpansionPort(ExpansionPort.emptyExpansionPort)
+    }
   }
 
   protected def setREU(reu:Option[Int],reu16FileName:Option[String]) : Unit = {
@@ -1036,7 +1053,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
 
     // DRIVEX-ENABLED =====================================================================================
     for(d <- 1 until TOTAL_DRIVES) {
-      preferences.add(PREF_DRIVE_X_ENABLED(d),s"Enabled/disable driver ${8 + d}",false) { enableDrive(d, _, false) }
+      preferences.add(PREF_DRIVE_X_ENABLED(d),s"Enabled/disable drive ${8 + d}",false) { enableDrive(d, _, false) }
     }
     // ====================================================================================================
 
@@ -1067,6 +1084,11 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     reset2Item.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R,java.awt.event.InputEvent.ALT_DOWN_MASK | java.awt.event.InputEvent.CTRL_DOWN_MASK))
     reset2Item.addActionListener(_ => reset(true,true) )
     resetMenu.add(reset2Item)
+    for(d <- 0 until TOTAL_DRIVES) {
+      val resetDrive = new JMenuItem(s"Reset drive ${8 + d}")
+      resetMenu.add(resetDrive)
+      resetDrive.addActionListener(_ => drives(d).resetComponent() )
+    }
 
     fileMenu.addSeparator()
 
@@ -1530,6 +1552,84 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
     resetSettingsActions = (() => {
       noReuItem.setSelected(true)
       setREU(None,None)
+    }) :: resetSettingsActions
+  }
+
+  protected def setIsepicSettings(parent: JMenu): Unit = {
+    import Preferences._
+
+    val isepicItem = new JMenu("Isepic")
+    val enabled = new JCheckBoxMenuItem("Enabled")
+    isepicItem.add(enabled)
+    val switch = new JCheckBoxMenuItem("Switch enabled")
+    isepicItem.add(switch)
+    parent.add(isepicItem)
+    enabled.addActionListener(_ => {
+      preferences(PREF_ISEPIC) = enabled.isSelected
+      switch.setSelected(enabled.isSelected)
+    })
+    switch.addActionListener(_ => {
+      ExpansionPort.getExpansionPort.TYPE match {
+        case ExpansionPortType.ISEPIC =>
+          clock.pause()
+          ExpansionPort.getInternalExpansionPort.asInstanceOf[Isepic].setSwitch(switch.isSelected)
+          clock.play()
+        case _ =>
+      }
+    })
+
+    preferences.add(PREF_ISEPIC,"Enable isepic cart",false) { isepicEnabled =>
+      enabled.setSelected(isepicEnabled)
+      setIsepic(isepicEnabled)
+    }
+  }
+
+  protected def setRAMCartSettings(parent: JMenu): Unit = {
+    import Preferences._
+
+    val rcItem = new JMenu("Ram cart")
+    val grouprc = new ButtonGroup
+    val noRcItem = new JRadioButtonMenuItem("None")
+    noRcItem.setSelected(true)
+    noRcItem.addActionListener(_ => preferences(PREF_RAMCART) = "none")
+    grouprc.add(noRcItem)
+    rcItem.add(noRcItem)
+    val _64kRcItem = new JRadioButtonMenuItem("64K")
+    _64kRcItem.addActionListener(_ => preferences(PREF_RAMCART) = "64")
+    grouprc.add(_64kRcItem)
+    rcItem.add(_64kRcItem)
+    val _128kRcItem = new JRadioButtonMenuItem("128K")
+    _128kRcItem.addActionListener(_ => preferences(PREF_RAMCART) = "128")
+    grouprc.add(_128kRcItem)
+    rcItem.add(_128kRcItem)
+    val readOnlyRC = new JCheckBoxMenuItem("Read only switch")
+    rcItem.add(readOnlyRC)
+    readOnlyRC.addActionListener(_ => {
+      ExpansionPort.getExpansionPort.TYPE match {
+        case ExpansionPortType.RAMCART =>
+          ExpansionPort.getInternalExpansionPort.asInstanceOf[RAMCart].setReadOnly(readOnlyRC.isSelected)
+        case _ =>
+      }
+    })
+
+    preferences.add(PREF_RAMCART, "Enable ram-cart with the given size (none,64,128)", "none", Set("none", "64", "128")) {
+      case "64" =>
+        _64kRcItem.setSelected(true)
+        setRAMCart(enabled = true,64)
+      case "128" =>
+        _128kRcItem.setSelected(true)
+        setRAMCart(enabled = true,128)
+      case "none" =>
+        noRcItem.setSelected(true)
+        setRAMCart(enabled = false,0)
+    }
+
+    parent.add(rcItem)
+
+    // reset setting
+    resetSettingsActions = (() => {
+      noRcItem.setSelected(true)
+      setRAMCart(enabled = false,0)
     }) :: resetSettingsActions
   }
 

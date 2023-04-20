@@ -9,14 +9,16 @@ import java.io.{ObjectInputStream, ObjectOutputStream}
 import java.util.Properties
 
 object ExpansionPortType extends Enumeration {
-  val EMPTY: ExpansionPortType.Value = Value
-  val CRT: ExpansionPortType.Value = Value
-  val REU: ExpansionPortType.Value = Value
-  val DIGIMAX: ExpansionPortType.Value = Value
-  val SWIFTLINK: ExpansionPortType.Value = Value
-  val DUALSID: ExpansionPortType.Value = Value
-  val CPM: ExpansionPortType.Value = Value
-  val GEORAM: ExpansionPortType.Value = Value
+  val EMPTY     = Value
+  val CRT       = Value
+  val REU       = Value
+  val DIGIMAX   = Value
+  val SWIFTLINK = Value
+  val DUALSID   = Value
+  val CPM       = Value
+  val GEORAM    = Value
+  val RAMCART   = Value
+  val ISEPIC    = Value
 }
 
 abstract class ExpansionPort extends RAMComponent {
