@@ -188,7 +188,8 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
   - Added Super Explode cartridge
   - Added RAM Cart cartridge
   - Added Isepic cartridge
-  
+- VIC20
+  - Added support for WiC64
 
 ### What's new 1.8.1b1 (Feb 2nd 2023)
 - Added support for Magnum Light Phaser light gun. Duck Hunt can be played now (https://csdb.dk/release/?id=226342)
