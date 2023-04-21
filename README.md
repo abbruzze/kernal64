@@ -7,7 +7,7 @@
 
 # A Scala Commodore 64, 128, VIC20 and CBM 610/620/710/720 cycle-exact emulator
 
-Kernal64 ver 1.8.1b1 (Feb 2nd, 2023)
+Kernal64 ver 1.8.2b1 (Apr 21th, 2023)
 ========
 ▶️<a href="#wn-latest">Go to latest release</a>
 
@@ -69,6 +69,9 @@ Kernal64 ver 1.8.1b1 (Feb 2nd, 2023)
 	- Mach 5
 	- Page Fox
 	- CP/M
+	- Super Explode
+	- RAM Cart
+	- Isepic
 - [x] RS-232 and Internet connection
 - [x] Flyer internet modem
 - [x] State saving
@@ -167,6 +170,25 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
 ## What's new history
 <p id="wn-latest"></p>
+
+### What's new 1.8.2b1 (Apr 21th 2023)
+- General
+  - New keyboard layout handling: now it is possible to use a more natural layout assigning different host keys to the same emulated key. The layout configuration is stored inside a configuration file, depending on the emulated machine. Each configuration file can contain different layout for different operating system. See Wiki for details.
+  ![](https://github.com/abbruzze/kernal64/blob/master/images/keyboard_editor.PNG)<br>
+  - New virtual keyboard and keyboard editor: it's possible to enter key using a virtual keyboard. It's possible to edit the keyboard configuration or create a new one from scratch.
+  - New look and feel Flatlaf (thanks to https://www.formdev.com/flatlaf/)
+  - Added support for palette configuration loading from file (vpl) for both VIC (I,II) and VDC
+  - Fixed disk issues when user change disk
+- C128
+  - Improvements for 2Mhz emulation
+  - Improved MMU (https://sourceforge.net/p/vice-emu/bugs/1835/?page=1)
+  - Minimal modifications to D030 registry: still partially supported
+  - Added ASCII/DIN handling for multilingual char rom set. Fixed 128/64 char rom reloading
+- C64/C128
+  - Added Super Explode cartridge
+  - Added RAM Cart cartridge
+  - Added Isepic cartridge
+  
 
 ### What's new 1.8.1b1 (Feb 2nd 2023)
 - Added support for Magnum Light Phaser light gun. Duck Hunt can be played now (https://csdb.dk/release/?id=226342)
