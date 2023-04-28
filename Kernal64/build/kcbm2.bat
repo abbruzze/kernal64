@@ -1,6 +1,6 @@
 @echo off
 set HOME=%~dp0
-set LIB=%HOME%lib"
+set LIB="%HOME%lib"
 set CP=
 set CLASS=ucesoft.cbm.cbm2.CBMII
 if "%1" == "--shell" goto shift_shell

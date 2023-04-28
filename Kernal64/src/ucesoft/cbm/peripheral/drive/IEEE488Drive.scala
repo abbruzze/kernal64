@@ -210,7 +210,7 @@ class IEEE488Drive(override val name:String,
       }
     }
     else if (secondaryAddress == 0) {
-      println(s"Loading $name")
+      //println(s"Loading $name")
       Diskette.parseFileName(name.toUpperCase()) match {
         case Some(fn) =>
           println(s"Loading $name")
@@ -278,7 +278,7 @@ class IEEE488Drive(override val name:String,
           false
         }
         else {
-          val startData = if (secondaryAddress == 0 && data.fileType == FileType.PRG) {//if (data.fileType == FileType.PRG) {
+          val startData = if (/*secondaryAddress == 0 &&*/ data.fileType == FileType.PRG) {//if (data.fileType == FileType.PRG) {
             val buffer = Array.ofDim[Int](data.data.length + 2)
             buffer(0) = data.startAddress & 0xFF
             buffer(1) = data.startAddress >> 8

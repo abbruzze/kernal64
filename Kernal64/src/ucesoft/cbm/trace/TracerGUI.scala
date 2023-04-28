@@ -493,6 +493,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
       }
       frame.getContentPane.validate()
       frame.pack()
+      setVisible(true)
     }
     for(r <- cpuStepInfo.registers) registers(r.name).setValue(r.value)
     clockRegister.setValue("%10d".format(Clock.systemClock.currentCycles))
@@ -730,7 +731,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
     val sb = new StringBuilder
     val ascii = new StringBuilder
     var col = 0
-    while (a <= target) {
+    while (a <= target && a < 0x10000) {
       if (col == 0) sb.append("%04X: ".format(a))
       val c = currentDevice.mem.read(a)
       if (c > 32) ascii.append(c.toChar) else ascii.append('.')
@@ -742,7 +743,7 @@ class TracerGUI(openCloseAction: Boolean => Unit) extends Tracer {
         sb.clear()
         ascii.clear()
       }
-      a = (a + 1) & 0xFFFF
+      a += 1
     }
     if (sb.length > 0) write(sb.toString)
   }

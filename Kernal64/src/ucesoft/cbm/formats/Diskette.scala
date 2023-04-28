@@ -19,7 +19,7 @@ object Diskette {
         case "P"|"PRG" => PRG
         case "D"|"DEL" => DEL
         case "S"|"SEQ" => SEQ
-        case "R"|"REL" => REL
+        case "L"       => REL
         case "U"|"USR" => USR
       })
     }
@@ -74,13 +74,15 @@ object Diskette {
     override val isDirectory: Boolean = true
   }
 
-  private val FILENAME_RE = """(@?\d:)?([^,]+)(,(s|seq|S|SEQ|p|prg|P|PRG|u|usr|U|USR|r|rel|R|REL))?(,(r|w|a|R|W|A))?""".r
+  private val FILENAME_RE = """(@?\d:)?([^,]+)(,(s|seq|S|SEQ|p|prg|P|PRG|u|usr|U|USR|l|L))?(,(r|w|a|R|W|A))?""".r
   private val DIRECTORY_RE = """\$(\d)?(:([^=]+)(=([s|S|r|R|p|P|u|U]))?)?""".r
 
   def parseFileName(fn:String): Option[FileName] = {
     fn match {
       case DIRECTORY_RE(drive,_,pattern,_,ftype) =>
         Some(DirectoryFileName(Option(drive).getOrElse("0").toInt,Option(pattern),FileType.fromString(ftype)))
+      case FILENAME_RE(ovr, pattern, _,null, _, mode) =>
+        Some(StandardFileName(pattern, Some(FileType.PRG), FileMode.fromString(mode), ovr != null && ovr.startsWith("@")))
       case FILENAME_RE(ovr,pattern,_,ftype,_,mode) =>
         Some(StandardFileName(pattern,FileType.fromString(ftype),FileMode.fromString(mode),ovr != null && ovr.startsWith("@")))
       case _ =>
@@ -316,7 +318,7 @@ abstract class Diskette extends Floppy {
           fileType.getOrElse(e.fileType) match {
             case FileType.PRG => loadPRG(e)
             case FileType.SEQ => loadSEQ(e)
-            case _ => throw new IOException("Bad file type: " + e.fileType)
+            case err => throw new IOException(s"Unsupported file type: $err [${e.fileType}]")
           }
         }
       case d@DirectoryFileName(_,_,_) =>

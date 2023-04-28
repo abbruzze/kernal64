@@ -12,6 +12,7 @@ import ucesoft.cbm.peripheral.mos6551.ACIA6551
 import ucesoft.cbm.peripheral.sid.SID
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Properties
 
 object CBM2MMU {
   val KERNAL_ROM = new ROM(null,"Kernal",0,8192,ROM.CBM2_KERNAL_ROM_PROP)
@@ -67,6 +68,13 @@ class CBM2MMU extends RAMComponent {
   private var tpi_kb,tpi_ieee488 : MOS6525 = _
   private var sid : SID = _
   private var acia : ACIA6551 = _
+
+  override def getProperties: Properties = {
+    val p = super.getProperties
+    p.setProperty("Code bank",codeBank.toString)
+    p.setProperty("Data bank",dataBank.toString)
+    p
+  }
 
   override def reset(): Unit = {
     codeBank = 15
