@@ -7,7 +7,7 @@
 
 # A Scala Commodore 64, 128, VIC20 and CBM 610/620/710/720 cycle-exact emulator
 
-Kernal64 ver 1.8.2b1 (Apr 21th, 2023)
+Kernal64 ver 1.8.2b2 (Apr 21th, 2023)
 ========
 ▶️<a href="#wn-latest">Go to latest release</a>
 
@@ -171,7 +171,7 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 ## What's new history
 <p id="wn-latest"></p>
 
-### What's new 1.8.2b1 (Apr 21th 2023)
+### What's new 1.8.2b2 (Apr 21th 2023)
 - General
   - New keyboard layout handling: now it is possible to use a more natural layout assigning different host keys to the same emulated key. The layout configuration is stored inside a configuration file, depending on the emulated machine. Each configuration file can contain different layout for different operating system. See Wiki for details.
   ![](https://github.com/abbruzze/kernal64/blob/master/images/keyboard_editor.PNG)<br>
@@ -190,6 +190,8 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
   - Added Isepic cartridge
 - VIC20
   - Added support for WiC64
+- CBMII
+  - Fixed 8050 DOS emulation
 
 ### What's new 1.8.1b1 (Feb 2nd 2023)
 - Added support for Magnum Light Phaser light gun. Duck Hunt can be played now (https://csdb.dk/release/?id=226342)
