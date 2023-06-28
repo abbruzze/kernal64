@@ -16,7 +16,7 @@ Kernal64 ver 1.8.2b2 (Apr 21th, 2023)
 #### Commodore 64
 ![](https://github.com/abbruzze/kernal64/blob/master/images/c64.jpg)<br>
 ##### Main features
-- [x] 6502 CPU cycle-exact
+- [x] 6510 CPU cycle-exact
 - [x] True drive emulation of 1541, 1571, 1581. Supported disk images:
 	- D64
 	- D71
