@@ -513,8 +513,16 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
   @inline private[this] def write128(address: Int, value: Int): Unit = {
     if (isForwardWrite) forwardWriteTo.write(address,value)
     // 0/1 ports --------------------------------------------
-    if (address == 0) { _0 = value ; check128_1() }
-    else if (address == 1) { _1 = value & 0x7F ; check128_1() }
+    if (address == 0) {
+      _0 = value
+      check128_1()
+      ram.write(0,lastByteOnBUS)
+    }
+    else if (address == 1) {
+      _1 = value & 0x7F
+      check128_1()
+      ram.write(1,lastByteOnBUS)
+    }
     // FF00-FF04 --------------------------------------------
     else if (address == 0xFF00) MMU_CR_write(value)
     else if (address > 0xFF00 && address < 0xFF05) MMU_FF01_4_write(address & 7) // load cr from preconfiguration registers
