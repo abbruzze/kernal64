@@ -188,9 +188,9 @@ class MPS803GFXDriver(charRom: Memory) extends JComponent with PrinterDriver {
     var bitmapMode = false
     var interLinePixels = INTER_LINE_PIXEL
 
-    val opIterator = operations.iterator
-    while (opIterator.hasNext) {
-      opIterator.next() match {
+    val ops = operations.toList
+    for(op <- ops) {
+      op match {
         case Print(ch) =>
           if (bitmapMode) {
             val byte = ch & 0x7F // clear 8th bit
