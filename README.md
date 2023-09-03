@@ -171,6 +171,10 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 ## What's new history
 <p id="wn-latest"></p>
 
+### What's new 1.8.4b1 (Sep 3rd 2023)
+- Fixed joystick emulation with keyboard: fast direction changing (left<->right or up<->down) didn't work properly.
+- Added fast save/load states.
+
 ### What's new 1.8.3b1 (July 20th 2023)
 - Fixed bug introduced in previous releases that affects drives (specifically 1541) when user change a floppy. Some demos stop to recognize the change of floppy  when requested.
 
