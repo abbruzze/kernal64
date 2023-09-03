@@ -66,7 +66,7 @@ object ControlPort {
   private abstract class AbstractControlPort extends ControlPort with MouseListener with KeyListener {
     protected var mask = 0
 
-    protected def getKeyMask(e:KeyEvent) : Int
+    protected def applyKey(e:KeyEvent,keyPressed:Boolean) : Unit
     def mouseClicked(e:MouseEvent) : Unit = {}
     def mouseEntered(e:MouseEvent) : Unit = {}
     def mouseExited(e:MouseEvent) : Unit = {}
@@ -86,18 +86,50 @@ object ControlPort {
       else
       if (!isLightPenEmulationEnabled) mask &= ~16
     }
-    
-    def keyPressed(e: KeyEvent): Unit = mask |= getKeyMask(e)
-    
-    def keyReleased(e: KeyEvent): Unit = mask &= ~getKeyMask(e)
+
+    def keyPressed(e: KeyEvent): Unit = applyKey(e,keyPressed = true)
+
+    def keyReleased(e: KeyEvent): Unit = applyKey(e,keyPressed = false)
     def keyTyped(e: KeyEvent) : Unit = {}
-   
+
     protected def read: Int = ~mask & 0xFF
+
+    protected def up(pressed:Boolean): Unit = {
+      if (pressed) {
+        mask |= 1
+        mask &= ~2
+      }
+      else mask &= ~1
+    }
+    protected def down(pressed: Boolean): Unit = {
+      if (pressed) {
+        mask &= ~1
+        mask |= 2
+      }
+      else mask &= ~2
+    }
+    protected def right(pressed: Boolean): Unit = {
+      if (pressed) {
+        mask &= ~4
+        mask |= 8
+      }
+      else mask &= ~8
+    }
+    protected def left(pressed: Boolean): Unit = {
+      if (pressed) {
+        mask &= ~8
+        mask |= 4
+      }
+      else mask &= ~4
+    }
+    protected def fire(pressed: Boolean): Unit = {
+      if (pressed) mask |= 16 else mask &= ~16
+    }
   }
-  
+
   val emptyControlPort : ControlPort with MouseListener = new AbstractControlPort {
     override val isConnected = false
-    protected def getKeyMask(e:KeyEvent) : Int = 0
+    protected def applyKey(e:KeyEvent,keyPressed:Boolean) : Unit = {}
     override def mousePressed(e:MouseEvent): Unit = {
       if (isMouse1351EmulationEnabled) super.mousePressed(e)
     }
@@ -119,25 +151,25 @@ object ControlPort {
       }
       else false
     }
-    protected def getKeyMask(e:KeyEvent): Int = {
+    protected def applyKey(e:KeyEvent,keyPressed:Boolean): Unit = {
       import KeyEvent._
-      if (e.getKeyLocation == KEY_LOCATION_NUMPAD) {
+      if (e.getKeyCode == VK_CONTROL) fire(keyPressed)
+      else if (e.getKeyLocation == KEY_LOCATION_NUMPAD) {
         e.getKeyCode match {
-          case VK_NUMPAD8|VK_UP if (mask & 2) == 0 => 1 // up
-          case VK_NUMPAD2|VK_DOWN if (mask & 1) == 0 => 2 // down
-          case VK_NUMPAD4|VK_LEFT if (mask & 8) == 0 => 4 // left
-          case VK_NUMPAD6|VK_RIGHT if (mask & 4) == 0 => 8 // right
-          case VK_NUMPAD9 => 9 // up+right
-          case VK_NUMPAD3 => 10// down+right
-          case VK_NUMPAD7 => 5 // up+left
-          case VK_NUMPAD1 => 6 // down+left
-          case VK_NUMPAD0|VK_INSERT => 16	// fire
-          case _ => 0
+          case VK_NUMPAD8|VK_UP     => up(keyPressed)
+          case VK_NUMPAD2|VK_DOWN   => down(keyPressed)
+          case VK_NUMPAD4|VK_LEFT   => left(keyPressed)
+          case VK_NUMPAD6|VK_RIGHT  => right(keyPressed)
+          case VK_NUMPAD9           => up(keyPressed) ; right(keyPressed)
+          case VK_NUMPAD3           => down(keyPressed) ; right(keyPressed)
+          case VK_NUMPAD7           => up(keyPressed) ; left(keyPressed)
+          case VK_NUMPAD1           => down(keyPressed) ; left(keyPressed)
+          case VK_NUMPAD0|VK_INSERT => fire(keyPressed)
+          case _ =>
         }
       }
-      else 0
-    }    
-  }  
+    }
+  }
   /**
    * Joystick emulation via user defined keys
    */
@@ -163,22 +195,32 @@ object ControlPort {
       else false
     }
 
-    protected def getKeyMask(e:KeyEvent): Int = {
+    protected def applyKey(e:KeyEvent,keyPressed:Boolean): Unit = {
       import KeyEvent._
       if (e.getKeyLocation != KEY_LOCATION_NUMPAD) {
         val keyCode = e.getKeyCode
-        if (keyCode == upKey && (mask & 2) == 0)             1 // up
-        else if (keyCode == downKey && (mask & 1) == 0)      2 // down
-        else if (keyCode == leftKey && (mask & 8) == 0)      4 // left
-        else if (keyCode == rightKey && (mask & 4) == 0)     8 // right
-        else if (keyCode == upRightKey)                      9 // up+right
-        else if (keyCode == downRightKey)                    10// down+right
-        else if (keyCode == upLeftKey)                       5 // up+left
-        else if (keyCode == downLeftKey)                     6 // down+left
-        else if (keyCode == fireKey)                         16// fire
-        else 0
+        if (keyCode == upKey) up(keyPressed)
+        else if (keyCode == downKey) down(keyPressed)
+        else if (keyCode == leftKey) left(keyPressed)
+        else if (keyCode == rightKey) right(keyPressed)
+        else if (keyCode == upRightKey) {
+          up(keyPressed)
+          right(keyPressed)
+        }
+        else if (keyCode == downRightKey) {
+          down(keyPressed)
+          right(keyPressed)
+        }
+        else if (keyCode == upLeftKey) {
+          up(keyPressed)
+          left(keyPressed)
+        }
+        else if (keyCode == downLeftKey) {
+          down(keyPressed)
+          left(keyPressed)
+        }
+        else if (keyCode == fireKey) fire(keyPressed)
       }
-      else 0
     }
 
     override def updateConfiguration() : Unit = {

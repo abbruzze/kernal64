@@ -65,6 +65,8 @@ abstract class CBMComputer extends CBMComponent {
   protected var fullScreenAtBoot = false // used with --fullscreen
   protected var ignoreConfig = false // used with --ignore-config-file
 
+  protected var lastSavedSnapshotFile = ""
+
   protected val cartMenu = new JMenu("Cartridge")
   protected var cartButtonRequested = false
 
@@ -572,12 +574,21 @@ abstract class CBMComputer extends CBMComponent {
   protected def listBASIC(): Unit
 
   protected def setStateMenu(stateMenu: JMenu): Unit = {
+    import java.awt.event.InputEvent._
     val saveStateItem = new JMenuItem("Save state ...")
     saveStateItem.addActionListener(_ => saveState())
     stateMenu.add(saveStateItem)
+    val saveLastStateItem = new JMenuItem("Save on last state")
+    saveLastStateItem.addActionListener(_ => saveState(saveOnLast = true))
+    saveLastStateItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, ALT_DOWN_MASK | SHIFT_DOWN_MASK))
+    stateMenu.add(saveLastStateItem)
     val loadStateItem = new JMenuItem("Load state ...")
     loadStateItem.addActionListener(_ => loadState(None))
     stateMenu.add(loadStateItem)
+    val loadLastStateItem = new JMenuItem("Load from last state")
+    loadLastStateItem.addActionListener(_ => loadState(if (lastSavedSnapshotFile.isEmpty) None else Some(lastSavedSnapshotFile) ))
+    loadLastStateItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L, ALT_DOWN_MASK | SHIFT_DOWN_MASK))
+    stateMenu.add(loadLastStateItem)
   }
 
   protected def setTraceMenu(traceMenu: JMenu): Unit = {
@@ -700,7 +711,6 @@ abstract class CBMComputer extends CBMComponent {
     try {
       val canLoad = allowsState
       if (!canLoad) {
-
         showError("State saving error","Can't load state")
         return
       }
@@ -733,7 +743,7 @@ abstract class CBMComputer extends CBMComponent {
         if (model != cbmModel) throw new IOException(s"Invalid state file. Found state saved for model ${model.modelName}, expected ${cbmModel.modelName}")
         val ver = in.readObject.asInstanceOf[String]
         val ts = in.readLong
-        if (!loadStateFromOptions && !asked) {
+        if (!loadStateFromOptions && !asked && fileName.isEmpty) {
           val msg = s"<html><b>Version:</b> $ver<br><b>Date:</b> ${new java.util.Date(ts)}</html>"
           JOptionPane.showConfirmDialog(displayFrame, msg, "State loading confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) match {
             case JOptionPane.YES_OPTION =>
@@ -775,34 +785,39 @@ abstract class CBMComputer extends CBMComponent {
     }
   }
 
-  protected def saveState() : Unit = {
+  protected def saveState(saveOnLast:Boolean = false) : Unit = {
     clock.pause()
     var out : ObjectOutputStream = null
     try {
       val canSave = allowsState
       if (!canSave) {
-
         showError("State saving error","Can't save state")
         return
       }
-      val fc = new JFileChooser
-      fc.setDialogTitle("Choose where to save current state")
-      fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR,"./")))
-      fc.setFileFilter(new FileFilter {
-        def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
-        def getDescription = "Kernal64 state files"
-      })
-      val fn = fc.showSaveDialog(getActiveFrame.get) match {
-        case JFileChooser.APPROVE_OPTION =>
-          if (fc.getSelectedFile.getName.toUpperCase.endsWith(".K64")) fc.getSelectedFile.toString else fc.getSelectedFile.toString + ".k64"
-        case _ =>
-          return
+      val fn = if (saveOnLast && lastSavedSnapshotFile.nonEmpty) lastSavedSnapshotFile
+      else {
+        val fc = new JFileChooser
+        fc.setDialogTitle("Choose where to save current state")
+        fc.setCurrentDirectory(new File(configuration.getProperty(CONFIGURATION_LASTDISKDIR, "./")))
+        fc.setFileFilter(new FileFilter {
+          def accept(f: File): Boolean = f.isDirectory || f.getName.toUpperCase.endsWith(".K64")
+
+          def getDescription = "Kernal64 state files"
+        })
+        fc.showSaveDialog(getActiveFrame.get) match {
+          case JFileChooser.APPROVE_OPTION =>
+            if (fc.getSelectedFile.getName.toUpperCase.endsWith(".K64")) fc.getSelectedFile.toString else fc.getSelectedFile.toString + ".k64"
+          case _ =>
+            return
+        }
       }
+
       out = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(fn)))
       out.writeObject(cbmModel)
       out.writeObject(ucesoft.cbm.Version.VERSION)
       out.writeLong(System.currentTimeMillis)
       save(out)
+      lastSavedSnapshotFile = fn
       out.close()
     }
     catch {
