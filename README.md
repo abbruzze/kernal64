@@ -171,6 +171,12 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 ## What's new history
 <p id="wn-latest"></p>
 
+### What's new 1.8.5b1 (Jul 16th 2024)
+- Commodore 64
+  - Fixed REU read/write from/to 0/1 locations: must read/write ram
+- Games
+  - Fixed loading of GameBase games (they changed urls): download of PRG/D64 seems to be no longer available  
+
 ### What's new 1.8.4b1 (Sep 3rd 2023)
 - Fixed joystick emulation with keyboard: fast direction changing (left<->right or up<->down) didn't work properly.
 - Added fast save/load states.
