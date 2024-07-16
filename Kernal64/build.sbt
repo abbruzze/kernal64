@@ -33,7 +33,8 @@ Compile / sourceGenerators += Def.task {
 	val dfTime = new java.text.SimpleDateFormat("HHmm")
 	val now = new java.util.Date
 	val buildNumber = if (System.getProperty("kbuild") != null) s" b${System.getProperty("kbuild")}" else ""
-    IO.write(versionFile,s"""package ucesoft.cbm
+	println(s"Generating Version object with build number $buildNumber")
+	IO.write(versionFile,s"""package ucesoft.cbm
 object Version {
     val VERSION = "${version.value}$buildNumber"
 	val BUILD_DATE = "${dfBuildDate.format(now)}"

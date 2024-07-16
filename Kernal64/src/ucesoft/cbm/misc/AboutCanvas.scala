@@ -37,7 +37,7 @@ class AboutCanvas(charRom:Memory,version:String,romCharBytes:Int = 8,romCharHeig
   newLine
   add(center("WRITTEN IN SCALA BY ALESSANDRO ABBRUZZETTI",WIDTH)).newLine
   newLine
-  add(center("2013-2023",WIDTH)).newLine
+  add(center("2013-2024",WIDTH)).newLine
   newLine
   yellow
   add(center("VISIT",WIDTH)).newLine
