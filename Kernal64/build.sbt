@@ -1,7 +1,7 @@
 
 name := "kernal64"
 
-version := "1.8.4"
+version := "1.8.5"
 
 scalaVersion := "2.13.10"
 

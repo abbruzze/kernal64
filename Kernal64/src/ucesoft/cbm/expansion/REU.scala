@@ -288,12 +288,12 @@ object REU {
     private def exchangeOperation()  : Unit = {
       if (!baLow) { // exchange
         if (exchangeFirstPhase) {
-          exchangeTmp1 = mem.read(c64Address)
+          exchangeTmp1 = mem.read(c64Address,ChipID.REU)
           exchangeTmp2 = readFromREU
           clk.schedule(new ClockEvent("REUExchange",clk.nextCycles,cycles => exchangeOperation()))
         }
         else {
-          mem.write(c64Address,exchangeTmp2)
+          mem.write(c64Address,exchangeTmp2,ChipID.REU)
           writeToREU(exchangeTmp1)
           incrementAddresses()
           if (transferRegister == 0x01) {
@@ -313,7 +313,7 @@ object REU {
 
     private def verifyOperation()  : Unit = {
       if (!baLow) { // verify
-        if (mem.read(c64Address) != readFromREU) statusRegister |= STATUS_VERIFY_ERROR
+        if (mem.read(c64Address,ChipID.REU) != readFromREU) statusRegister |= STATUS_VERIFY_ERROR
         incrementAddresses()
         if (transferRegister == 0x01) {
           statusRegister |= STATUS_END_OF_BLOCK
@@ -322,7 +322,7 @@ object REU {
         else {
           transferRegister = (transferRegister - 1) & 0xFFFF
           if ((statusRegister & STATUS_VERIFY_ERROR) > 0) {
-            if (transferRegister == 0x01 && mem.read(c64Address) == readFromREU) statusRegister |= STATUS_END_OF_BLOCK
+            if (transferRegister == 0x01 && mem.read(c64Address,ChipID.REU) == readFromREU) statusRegister |= STATUS_END_OF_BLOCK
             clk.schedule(new ClockEvent("REUEndOperation",clk.currentCycles + 2,_ => endOperation()))
           }
           else
@@ -336,8 +336,8 @@ object REU {
     private def transferOperation(isC64Source:Boolean) : Unit = {
       //println(s"Transfer balow=$baLow op=${currentOperation} clk=${clk.currentCycles} c64Addr=${Integer.toHexString(c64Address)} reuAddr=${Integer.toHexString(reuAddress)} length=${Integer.toHexString(transferRegister)}")
       if (!baLow) { // transfer
-        if (isC64Source) writeToREU(mem.read(c64Address))
-        else mem.write(c64Address,readFromREU)
+        if (isC64Source) writeToREU(mem.read(c64Address,ChipID.REU))
+        else mem.write(c64Address,readFromREU,ChipID.REU)
         incrementAddresses()
         if (transferRegister == 0x01) {
           statusRegister |= STATUS_END_OF_BLOCK

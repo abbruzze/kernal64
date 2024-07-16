@@ -285,8 +285,12 @@ object C64MMU {
         }
       }
       if (chipID == ChipID.VIC) return ram.read(address, chipID)
-      if (address == 0) return ddr
-      if (address == 1) return read0001
+      if (address == 0) {
+        if (chipID == ChipID.REU) return ram.read(0) else return ddr
+      }
+      if (address == 1) {
+        if (chipID == ChipID.REU) return ram.read(1) else return read0001
+      }
       if (address < 0x8000) return ram.read(address)
       val c64MC = MEM_CONFIG(memConfig)
       if (address < 0xA000) { // ROML or RAM
@@ -322,23 +326,26 @@ object C64MMU {
       val c64MC = MEM_CONFIG(memConfig)
 
       if (address < 2) {
-        ram.write(address,lastByteReadMemory.lastByteRead)
-        if (address == 0) ddr = value else data = value
+        if (chipID == ChipID.REU) ram.write(address,value)
+        else {
+          ram.write(address,lastByteReadMemory.lastByteRead)
+          if (address == 0) ddr = value else data = value
 
-        val clk = Clock.systemClock.currentCycles
+          val clk = Clock.systemClock.currentCycles
 
-        if ((ddr & 0x40) > 0) {
-          data_set_clk_bit6 = clk + CAPACITOR_FADE_CYCLES
-          data_set_bit6 = data & 0x40
-          data_falloff_bit6 = true
+          if ((ddr & 0x40) > 0) {
+            data_set_clk_bit6 = clk + CAPACITOR_FADE_CYCLES
+            data_set_bit6 = data & 0x40
+            data_falloff_bit6 = true
+          }
+          if ((ddr & 0x80) > 0) {
+            data_set_clk_bit7 = clk + CAPACITOR_FADE_CYCLES
+            data_set_bit7 = data & 0x80
+            data_falloff_bit7 = true
+          }
+
+          check0001()
         }
-        if ((ddr & 0x80) > 0) {
-          data_set_clk_bit7 = clk + CAPACITOR_FADE_CYCLES
-          data_set_bit7 = data & 0x80
-          data_falloff_bit7 = true
-        }
-
-        check0001()
       }
       else if (address < 0x8000) ram.write(address,value)
       else if (address < 0xA000) { // ROML or RAM
