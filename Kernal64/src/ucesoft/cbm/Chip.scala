@@ -18,4 +18,5 @@ object ChipID extends Enumeration {
   val CPU_1571: ChipID.Value = Value("CPU_1571")
   val CPU_1581: ChipID.Value = Value("CPU_1581")
   val VIC_COP: ChipID.Value = Value("VIC_COP")
+  val REU : ChipID.Value = Value("REU")
 }

@@ -1,6 +1,7 @@
 package ucesoft.cbm.game
 
 import java.awt.Dimension
+import java.io.IOException
 import java.net.URL
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -13,13 +14,13 @@ class GameBaseSpi extends GameProvider {
     override def toString = s"Group $letter"
   }
   
-  val url: Option[URL] = Some(new URL("http://www.gb64.com"))
-  val iconURL: Option[URL] = Some(new URL("http://www.gb64.com/images/c64top/gamebase64.jpg"))
+  val url: Option[URL] = Some(new URL("https://www.gb64.com"))
+  val iconURL: Option[URL] = Some(new URL("https://www.gb64.com/images/c64top/gamebase64.jpg"))
   val name = "GameBase"   
   val gameIconPreferredSize = new Dimension(320,200)
   private val MAX_PER_PAGE = 45
-  private val gamebaseVersionUrl = "http://www.gb64.com/search.php"
-  private val gamebaseUrl = "http://www.gb64.com"
+  private val gamebaseVersionUrl = "https://www.gb64.com/search.php"
+  private val gamebaseUrl = "https://www.gb64.com"
   private val gamebaseDownloadUrl = "ftp://8bitfiles.net/gamebase_64/Games"
   private val pages = (65 to 90).toList ++ List(48)
   private val constraints : List[SyncConstraint] = SyncAll :: (pages map { l => LetterConstraint(l.toChar) })
@@ -85,40 +86,48 @@ class GameBaseSpi extends GameProvider {
   	src.close
   	0
   }
-  private def makeGame(name:String,imageUrl:Option[URL],downloadUrl:String) : Game = {
+  private def makeGame(name:String,imageUrl:Option[URL],downloadUrl:String) : Option[Game] = {
     val PUBLISHED_SH = """.*Published:.*<b>(.+)</b>.*<b>(.+)""".r
     val FILE = """.*GB64-Filename:.*<b>(.+)</b>.*""".r
     val GENRE = """.*Genre:.*<b>(.+)""".r
-    val src = Source.fromURL(downloadUrl)
-    val lines = src.getLines()
-    var year : Option[String] = None
-    var file : Option[URL] = None
-    var genre : Option[String] = None
-    var softwareHouse : Option[String] = None
-    var found = false
-    while (lines.hasNext && !found && !interrupted) {
-      val line = lines.next()
-      line match {
-        case PUBLISHED_SH(y,sh) => 
-          year = Some(y)
-          softwareHouse = Some(sh)
-        case FILE(f) if f != "None" => 
-          file = Some(new URL(s"$gamebaseDownloadUrl/$f"))
-          found = true
-        case FILE(f) =>
-          found = true
-        case GENRE(g) => 
-          genre = Some(g)                    
-        case _ =>
+    try {
+      println(s"$name : $downloadUrl")
+      val src = Source.fromURL(downloadUrl)
+      val lines = src.getLines()
+      var year: Option[String] = None
+      var file: Option[URL] = None
+      var genre: Option[String] = None
+      var softwareHouse: Option[String] = None
+      var found = false
+      while (lines.hasNext && !found && !interrupted) {
+        val line = lines.next()
+        line match {
+          case PUBLISHED_SH(y, sh) =>
+            year = Some(y)
+            softwareHouse = Some(sh)
+          case FILE(f) if f != "None" =>
+            file = Some(new URL(s"$gamebaseDownloadUrl/$f"))
+            found = true
+          case FILE(f) =>
+            found = true
+          case GENRE(g) =>
+            genre = Some(g)
+          case _ =>
+        }
       }
-    }    
-    src.close
-    Game(name,imageUrl,file,year.getOrElse("??"),genre.getOrElse("??"),softwareHouse.getOrElse("??"))        
+      src.close
+      Some(Game(name, imageUrl, file, year.getOrElse("??"), genre.getOrElse("??"), softwareHouse.getOrElse("??")))
+    }
+    catch {
+      case io: IOException =>
+        println(s"Cannot download game info for $name: $io")
+        None
+    }
   }
   private def getContent(index:String,page:Int) : List[Game] = {
   	//println(s"Getting ${index.toInt.toChar}/$page ...")
     try {
-    	val IMAGE = """.*<img src="(http://www.gb64.com/Screenshots/.*\.png).*""".r
+    	val IMAGE = """.*<img src="(/Screenshots/.*\.png).*""".r
     	val NO_IMAGE = """.*<img src="images/game/nosssmall.gif".*""".r
     	val NAME = """.*<a href="(.*)"><b>(.*)</b>.*""".r
     	val src = Source.fromURL(url(index,page))
@@ -131,14 +140,22 @@ class GameBaseSpi extends GameProvider {
     				val nameLine = lines.next()
     				nameLine match {
     					case NAME(url,name) =>
-    						list += makeGame(name,Some(new URL(imageUrl)),gamebaseUrl + "/" + url)
+    						makeGame(name,Some(new URL(s"https://www.gb64.com$imageUrl")),gamebaseUrl + "/" + url) match {
+                  case Some(g) =>
+                    list += g
+                  case None =>
+                }
     					case _ =>
     				}
     			case NO_IMAGE() =>
     			  val nameLine = lines.next()
     				nameLine match {
     					case NAME(url,name) =>
-    						list += makeGame(name,None,gamebaseUrl + "/" + url)
+    						makeGame(name,None,gamebaseUrl + "/" + url) match {
+                  case Some(g) =>
+                    list += g
+                  case None =>
+                }
     					case _ =>
     				}
     			case _ =>

@@ -424,6 +424,9 @@ object GameUI {
       } onComplete {
         case Failure(t) => swing {
           endDownload()
+          val row = table.getRowSorter.convertRowIndexToModel(table.getSelectedRow)
+          val gameNow = tableModel.getGame(row)
+          if (game == gameNow) updateGameInfo(game)
           JOptionPane.showMessageDialog(this,t.toString,s"Error while loading game ${game.name}",JOptionPane.ERROR_MESSAGE)
         }          
         case Success(_) =>

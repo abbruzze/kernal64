@@ -189,6 +189,7 @@ class Repository(provider:GameProvider) {
     (connection.getInputStream,fileName)
   }
   def saveInCache(game:Game) : Unit = {
+    saveGameIconInCache(game)
     if (game.downloadPageURL.isDefined) {    
       val (in,fileName) = openDownloadURL(game)
       val copied = Files.copy(in,gameid(game).toPath)
@@ -196,7 +197,6 @@ class Repository(provider:GameProvider) {
       Files.write(fileNameid(game).toPath,java.util.Arrays.asList(fileName))
       writeVersion()
     }
-    saveGameIconInCache(game)
   }
   def saveGameIconInCache(game:Game) : Unit = {
     if (game.imageURL.isDefined) {
