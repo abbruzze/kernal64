@@ -7,7 +7,7 @@
 
 # A Scala Commodore 64, 128, VIC20 and CBM 610/620/710/720 cycle-exact emulator
 
-Kernal64 ver 1.8.4b1 (Sep 3rd, 2023)
+Kernal64 ver 1.8.5b1 (Jul 16th, 2024)
 ========
 ▶️<a href="#wn-latest">Go to latest release</a>
 
