@@ -322,7 +322,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     ioacc = false
     lastByteOnBUS = if (z80enabled) readZ80(address)
     else if (c128Mode) read128(address)
-    else read64(address)
+    else read64(address,chipID)
 
     lastByteOnBUS
   }
@@ -331,7 +331,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     ioacc = false
     if (z80enabled) writeZ80(address,value)
     else if (c128Mode) write128(address,value)
-    else write64(address,value)
+    else write64(address,value,chipID)
 
     lastByteOnBUS = value
   }
@@ -387,7 +387,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       mem_read_0xD000_0xDFFF(address)
     }
     else if (c128Mode) read128(address)
-    else read64(address)
+    else read64(address,ChipID.CPU)
   }
   final def out(addressHI:Int,addressLO:Int,value:Int) : Unit = {
     val address = addressHI << 8 | addressLO
@@ -409,7 +409,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       else mem_write_0xD000_0xDFFF(address,value)
     }
     else if (c128Mode) write128(address,value)
-    else write64(address,value)
+    else write64(address,value,ChipID.CPU)
   }
   // Z80 ========================================================================
   /**
@@ -819,7 +819,7 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     if (c64MC.char) return CHARACTERS64_ROM.read(address)
     ram.read(address)
   }
-  @inline private[this] def read64(address: Int): Int = {
+  @inline private[this] def read64(address: Int, chipID: ChipID.ID): Int = {
     if (ULTIMAX) {
       if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return lastByteOnBUS
     }
@@ -827,8 +827,12 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
       val read = forwardReadTo.read(address)
       if (read > 0) return read
     }
-    if (address == 0) return _0
-    if (address == 1) return read64_1
+    if (address == 0) {
+      if (chipID == ChipID.REU) return ram.read(0) else return _0
+    }
+    if (address == 1) {
+      if (chipID == ChipID.REU) return ram.read(1) else return read64_1
+    }
     if (address < 0x8000) return ram.read(address)
     if (address < 0xA000) { // ROML or RAM
       if (c64MC.roml) return ROML.read(address) else return ram.read(address)
@@ -876,23 +880,26 @@ class C128MMU(mmuChangeListener : MMUChangeListener) extends RAMComponent with E
     }
     else ram.write(address, value)
   }
-  private[this] def write64(address: Int,value:Int) : Unit = {
+  private[this] def write64(address: Int,value:Int, chipID: ChipID.ID) : Unit = {
     if (ULTIMAX) {
         if ((address >= 0x1000 && address < 0x8000) || (address >= 0xA000 && address < 0xD000)) return
       }
     if (isForwardWrite) forwardWriteTo.write(address,value)
 
     if (address < 2) {
-      if (address == 0) _0 = value & 0xFF else _1 = value
-      val clk = this.clk.currentCycles
+      if (chipID == ChipID.REU) ram.write(address,value)
+      else {
+        if (address == 0) _0 = value & 0xFF else _1 = value
+        val clk = this.clk.currentCycles
 
-      if ((_0 & 0x80) > 0) {
-        data_set_clk_bit7 = clk + CAPACITOR_FADE_CYCLES
-        data_set_bit7 = _1 & 0x80
-        data_falloff_bit7 = true
+        if ((_0 & 0x80) > 0) {
+          data_set_clk_bit7 = clk + CAPACITOR_FADE_CYCLES
+          data_set_bit7 = _1 & 0x80
+          data_falloff_bit7 = true
+        }
+        ram.write(address, lastByteRead)
+        check64_1()
       }
-      ram.write(address,lastByteOnBUS)
-      check64_1()
     }
     else if (address < 0x8000) ram.write(address,value)
     else if (address < 0xA000) { // ROML or RAM
