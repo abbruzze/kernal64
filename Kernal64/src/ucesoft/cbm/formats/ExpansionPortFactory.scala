@@ -147,6 +147,7 @@ object ExpansionPortFactory {
       case 51 => new Mach5(crt,ram)
       case 53 => new PageFox(crt,ram)
       case 48 => new SuperExplode(crt,ram,reset)
+      case 85 => new MagicDesk16K(crt,ram)
       case _ =>
         throw new IllegalArgumentException(s"Unsupported cartridge type ${crt.ctrType} for ${crt.name}")
     }
