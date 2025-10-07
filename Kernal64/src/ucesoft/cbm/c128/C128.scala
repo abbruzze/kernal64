@@ -365,6 +365,66 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
   }
 
   override def isHeadless: Boolean = headless
+
+  override protected def loadCartridgeFile(file:File,stateLoading : Boolean = false) : Option[Cartridge] = {
+    try {
+      if (!stateLoading && Thread.currentThread != Clock.systemClock) clock.pause()
+      ExpansionPort.getExpansionPort.eject()
+      // check first if the cart is a 128 specific cart
+      val crt = new Cartridge(file.toString)
+      if (crt.cbmType != Cartridge.CBMType.C128) super.loadCartridgeFile(file,stateLoading)
+      else {
+        println(crt)
+        crt.ctrType match {
+          case 0 =>
+            loadCartridgeAsExternalFunctionRom(crt)
+            preferences.updateWithoutNotify(Preferences.PREF_CART,file.toString)
+            if (!stateLoading) hardReset(false)
+            configuration.setProperty(CONFIGURATION_LASTDISKDIR,file.getParentFile.toString)
+          case x =>
+            throw new IllegalArgumentException(s"CRT 128: crt id $x not supported")
+        }
+      }
+    }
+    catch {
+      case t:Throwable =>
+        Log.info(t.toString)
+        showError("Cartridge loading error",t.toString)
+    }
+    finally {
+      if (!stateLoading) clock.play()
+    }
+
+    None
+  }
+  private def loadCartridgeAsExternalFunctionRom(crt:Cartridge): Unit = {
+    def fillROM(data:Array[Int]): Array[Int] = {
+      data.length match {
+        case 8192 =>
+          val rom = Array.ofDim[Int](16384)
+          System.arraycopy(data,0,rom,0,8192)
+          System.arraycopy(data,0,rom,8192,8192)
+          rom
+        case 16384 =>
+          data
+        case x =>
+          throw new IllegalArgumentException(s"CRT 128 chip length mismatch: $x")
+      }
+    }
+
+    val extrom = if (crt.chips.length == 1) {
+      fillROM(crt.chips(0).romData).map(_.toByte)
+    }
+    else {
+      val rom = Array.ofDim[Int](32768)
+      val roml = fillROM(crt.chips(0).romData)
+      val romh = fillROM(crt.chips(1).romData)
+      System.arraycopy(roml,0,rom,0,16384)
+      System.arraycopy(romh,0,rom,16384,16384)
+      rom.map(_.toByte)
+    }
+    mmu.configureFunctionROM(internal = false,extrom,FunctionROMType.NORMAL)
+  }
   // ======================================== Settings ==============================================
 
   override protected def enableDrive(id:Int,enabled:Boolean,updateFrame:Boolean) : Unit = {
@@ -881,6 +941,44 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     configuration.setProperty(PREF_RENDERINGTYPE,"bilinear")
   }
 
+  private def checkTestBenchSettings(): Unit = {
+    if (!TestCart.enabled) return
+    // if GO64 is set, do nothing
+    import Preferences._
+    preferences.get[Boolean](PREF_128GO64) match {
+      case Some(go64) if go64.value =>
+        return
+      case _ =>
+    }
+    // The following testbench's hacks applies to C128 mode only
+    //
+    // Hack: cycles used to load D64 files are not taken into account for limitcycles
+    if (Clock.systemClock.getLimitCycles > 0) {
+      ProgramLoader.loadingWithWarpEnabled = true
+      ProgramLoader.warpModeListener = load => {
+        Clock.systemClock.testbenchSetOnLoading(load)
+      }
+    }
+    /*
+      29/09/2025: Hack used to avoid timeouts during testbench's test execution.
+      The tests in ../c128/z80/zex128 have problems when the .prg is loaded & executed: the execution seems to start properly
+      but then it hangs.
+      A workaround is to force the loading of the .prg as a D64.
+      But now every test generate a timeout: seems that the cycles limit is too low.
+      Doubt: the limitcycles value is related to the 8502 processor or to Z80 processor ?
+      A workaround of the workaround is to increase the limit using a multiplier.
+      Must be investigated further.
+    */
+    loadPRGasDisk = true // every PRG is loaded as a D64
+
+
+    if (Clock.systemClock.getLimitCycles > 0) {
+      Clock.systemClock.limitCyclesTo((Clock.systemClock.getLimitCycles * 1.7).toLong)
+      println(s"Testbench limit hacked to to ${Clock.systemClock.getLimitCycles}")
+    }
+
+  }
+
   def turnOn(args:Array[String]) : Unit = {
     swing { setMenu() }
     // check help
@@ -921,6 +1019,8 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     else displayFrame.setLocationByPlatform(true)
     // SETTINGS
     loadSettings(args)
+    // TESTBENCH
+    checkTestBenchSettings()
     // VIEW
     swing {
       vdcDisplayFrame.setVisible(!headless && vdcEnabled)

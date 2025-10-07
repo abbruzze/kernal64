@@ -74,10 +74,24 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
   private[this] var lastPerformance = 0
   private[this] var throttleStartedAt = 0L
   private[this] var skipThrottle = false
+  // testbench
+  private[this] var onLoading = false
+  private[this] var loadingCycles = 0L
   // -------------------------------------------
   private[this] var limitCycles = -1L
 
+  def testbenchSetOnLoading(set:Boolean): Unit = {
+    if (set)
+      loadingCycles = cycles
+    else {
+      limitCycles += cycles - loadingCycles
+    }
+
+    onLoading = set
+  }
+
   def limitCyclesTo(cycles:Long) : Unit = limitCycles = cycles
+  def getLimitCycles : Long = limitCycles
 
   def setDefaultClockHz() : Unit = setClockHz(DEFAULT_CLOCK_HZ)
 
@@ -150,7 +164,7 @@ class Clock private (errorHandler:Option[(Throwable) => Unit],name:String = "Clo
         }
 
         cycles += 1
-        if (limitCycles > 0 && cycles > limitCycles) TestCart.exit(0x01)
+        if (limitCycles > 0 && !onLoading && cycles > limitCycles) TestCart.exit(0x01)
         throttle()
       }
       catch {
