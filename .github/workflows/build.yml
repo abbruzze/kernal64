@@ -29,6 +29,8 @@ jobs:
         cache: 'sbt'
     - name: Setup sbt launcher
       uses: sbt/setup-sbt@v1    
+    - name: changing dir
+      run: cd Kernal64
     - name: Compile
       run: sbt compile  
     - name: Deploy
