@@ -679,7 +679,7 @@ abstract class CBMComputer extends CBMComponent {
             delayedAutorun(fn)
           case _ =>
         }
-      case Some(f) =>
+      case Some(f) if f.nonEmpty =>
         preferences[String](Preferences.PREF_DRIVE_X_FILE(0)) match {
           case None =>
             if (!new File(f).exists()) throw new FileNotFoundException(f)
@@ -691,6 +691,7 @@ abstract class CBMComputer extends CBMComponent {
             val cbmFile = if (dot > 0) fn.substring(0, dot) else f
             delayedAutorun(cbmFile)
         }
+      case _ =>
     }
     DrivesConfigPanel.registerDrives(displayFrame, drives, setDriveType(_, _, false), enableDrive(_, _, true), attachDisk(_, _, isC64Mode), attachDiskFile(_, _, _, None), drivesEnabled,ALLOWED_DRIVE_TYPES)
   }
