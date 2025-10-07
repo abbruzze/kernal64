@@ -1,5 +1,4 @@
-[![Build Status](https://app.travis-ci.com/abbruzze/kernal64.svg?branch=master)](https://app.travis-ci.com/abbruzze/kernal64)
-[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=abbruzze_kernal64&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=abbruzze_kernal64)
+![workflow status](https://github.com/abbruzze/kernal64/actions/workflows/build.yml/badge.svg)
 [![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=abbruzze_kernal64&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=abbruzze_kernal64)
 [![Release](https://img.shields.io/github/v/release/abbruzze/kernal64)](https://github.com/abbruzze/kernal64/releases)
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
@@ -7,7 +6,7 @@
 
 # A Scala Commodore 64, 128, VIC20 and CBM 610/620/710/720 cycle-exact emulator
 
-Kernal64 ver 1.8.5b1 (Jul 16th, 2024)
+Kernal64 ver 1.8.6b1 (Oct 07th, 2025)
 ========
 ▶️<a href="#wn-latest">Go to latest release</a>
 
@@ -91,6 +90,8 @@ Kernal64 ver 1.8.5b1 (Jul 16th, 2024)
 - [x] 128 Cartridges:
 	- Megabit
 	- Magic Desk 128
+ 	- Generic 128
+    - Magic Desk 16K
 #### VIC 20
 ![](https://github.com/abbruzze/kernal64/blob/master/images/vic20.png)<br>
 ##### Main features
@@ -170,6 +171,11 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
 ## What's new history
 <p id="wn-latest"></p>
+
+### What's new 1.8.6b1 (Oct 07th 2025)
+- Commodore 128
+  - Added support for Magic Desk 16K cartridge: now [SNK vs CAPCOM for C64/C128](https://retrogl79.itch.io/snk-vs-capcom-for-c64c128-stronger-edition) can be run in 128 mode
+  - Fixed loading of zex128 tests in testbench
 
 ### What's new 1.8.5b1 (Jul 16th 2024)
 - Commodore 64
