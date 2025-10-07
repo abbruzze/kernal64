@@ -1,5 +1,4 @@
 ![workflow status](https://github.com/abbruzze/kernal64/actions/workflows/build.yml/badge.svg)
-[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=abbruzze_kernal64&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=abbruzze_kernal64)
 [![Release](https://img.shields.io/github/v/release/abbruzze/kernal64)](https://github.com/abbruzze/kernal64/releases)
 [![Language](https://img.shields.io/github/languages/top/abbruzze/kernal64)]()
 [![Downloads](https://img.shields.io/github/downloads/abbruzze/kernal64/total)](https://github.com/abbruzze/kernal64/releases/latest)
