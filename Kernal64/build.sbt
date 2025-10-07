@@ -1,9 +1,9 @@
 
 name := "kernal64"
 
-version := "1.8.5"
+version := "1.8.6"
 
-scalaVersion := "2.13.10"
+scalaVersion := "2.13.16"
 
 scalacOptions ++= Seq(
   "-language:postfixOps",
@@ -14,11 +14,11 @@ scalacOptions ++= Seq(
 
 javacOptions ++= Seq("--release", "11")
 
-libraryDependencies += "com.fifesoft" % "rsyntaxtextarea" % "3.3.1"
-libraryDependencies += "org.jsoup" % "jsoup" % "1.15.4"
-libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.2.0"
-libraryDependencies += "commons-net" % "commons-net" % "3.3"
-libraryDependencies += "com.formdev" % "flatlaf" % "3.0"
+libraryDependencies += "com.fifesoft" % "rsyntaxtextarea" % "3.6.0"
+libraryDependencies += "org.jsoup" % "jsoup" % "1.21.2"
+libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0"
+libraryDependencies += "commons-net" % "commons-net" % "3.12.0"
+libraryDependencies += "com.formdev" % "flatlaf" % "3.6.1"
 
 Compile / scalaSource := baseDirectory.value / "src"
 Compile / resourceDirectory := baseDirectory.value / "resources"
