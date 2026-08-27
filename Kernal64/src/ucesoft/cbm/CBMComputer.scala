@@ -675,7 +675,7 @@ abstract class CBMComputer extends CBMComponent {
         // run the given file name
         preferences[String](Preferences.PREF_RUNFILE) match {
           case Some(fn) if fn != null && fn != "" =>
-            if (!new File(fn).exists()) throw new FileNotFoundException(fn)
+            //if (!new File(fn).exists()) throw new FileNotFoundException(fn)
             delayedAutorun(fn)
           case _ =>
         }
