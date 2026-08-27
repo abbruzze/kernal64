@@ -38,3 +38,9 @@ jobs:
       run: |
         cd Kernal64
         sbt buildK64Dist
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernal64-dist
+        path: Kernal64/dist/
+        retention-days: 30
