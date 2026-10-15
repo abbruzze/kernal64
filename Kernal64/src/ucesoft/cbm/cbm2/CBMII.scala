@@ -4,6 +4,7 @@ import ucesoft.cbm._
 import ucesoft.cbm.cbm2.IEEE488Connectors.{CIAIEEE488ConnectorA, CIAIEEE488ConnectorB, IEEE488InterfaceA, IEEE488InterfaceB}
 import ucesoft.cbm.cpu.{CPU6510_CE, Memory, ROM}
 import ucesoft.cbm.formats.{Diskette, ProgramLoader, TAP}
+import ucesoft.cbm.mcp.{CPUInfo, DisplayInfo, MCPRESTServer}
 import ucesoft.cbm.misc.Preferences._
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral.EmptyConnector
@@ -12,7 +13,7 @@ import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.cia.CIA
 import ucesoft.cbm.peripheral.crtc.CRTC6845
 import ucesoft.cbm.peripheral.drive.{DriveType, IEEE488Drive}
-import ucesoft.cbm.peripheral.keyboard.{BKeyboard, KeyboardMapper, KeyboardMapperStore}
+import ucesoft.cbm.peripheral.keyboard.{BKeyboard, HomeKeyboard, KeyboardMapper, KeyboardMapperStore}
 import ucesoft.cbm.peripheral.mos6525.MOS6525
 import ucesoft.cbm.peripheral.mos6551.ACIA6551
 import ucesoft.cbm.peripheral.printer.{IEEE488MPS803, Printer}
@@ -63,6 +64,17 @@ class CBMII extends CBMComputer {
   override protected def PRG_LOAD_ADDRESS() = 0x3
   override protected def PRG_RUN_DELAY_CYCLES = mmu.getModel().prgDelayCycles
 
+  override protected def startMCPServer(host:String, port:Int): Unit = {
+    val server = MCPRESTServer.start(clock,Array(new DisplayInfo("VIC","CBMII display",display)),Array(new CPUInfo("6509","Commodore CBMII CPU",cpu)),mmu,host,port)
+    server.configurePause(() => clock.isPaused, setPause)
+    server.configureKeyboard(text =>  BKeyboard.insertTextIntoKeyboardBuffer(text, mmu))
+    server.configureLoadPRG(file => loadPRGFile(new File(file), autorun = false))
+    server.configureReset(hard => {
+      if (hard) hardReset(play = true) else reset(play = true)
+    })
+    server.configureSystemDesc(() => s"emulated system is a 'CBMII' $model model, version of emulator is ${ucesoft.cbm.Version.VERSION}")
+  }
+
   def turnOn(args: Array[String]): Unit = {
     swing {
       setMenu(false,false)
@@ -99,6 +111,8 @@ class CBMII extends CBMComputer {
       }
     }
     else displayFrame.setLocationByPlatform(true)
+    // MCP
+    configureMCPServer()
     // SETTINGS
     loadSettings(args)
     // VIEW

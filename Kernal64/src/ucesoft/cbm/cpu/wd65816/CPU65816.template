@@ -13,7 +13,7 @@ import ucesoft.cbm.trace.TraceListener._
 
 class CPU65816(private var mem:Memory) extends CPU65xx {
   val id = ChipID.CPU
-  override lazy val componentID = "6510_CE"
+  override lazy val componentID = "65816"
   private[this] var baLow = false
   private[this] var dma = false
   private[this] var ready = true

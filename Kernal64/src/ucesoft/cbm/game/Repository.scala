@@ -48,7 +48,7 @@ class Repository(provider:GameProvider) {
     }
     if (!version.exists) writeVersion()
     else versionID = {
-      val src = io.Source.fromFile(version)
+      val src = scala.io.Source.fromFile(version)
       val v = src.getLines().next()
       src.close
       v
@@ -75,7 +75,7 @@ class Repository(provider:GameProvider) {
   final def load : List[Game] = {
     if (!exists) return Nil
     
-    val in = io.Source.fromInputStream(new GZIPInputStream(new FileInputStream(repository)))
+    val in = scala.io.Source.fromInputStream(new GZIPInputStream(new FileInputStream(repository)))
     val lines = in.getLines()
     try {
       val games = for(l <- lines) yield {
@@ -218,7 +218,7 @@ class Repository(provider:GameProvider) {
           case Success(entries) =>
             entries
           case Failure(t) =>
-            val in = io.Source.fromFile(fileNameid(game))
+            val in = scala.io.Source.fromFile(fileNameid(game))
             val fileName = in.getLines().mkString
             in.close
             if (fileName.isEmpty) return Nil

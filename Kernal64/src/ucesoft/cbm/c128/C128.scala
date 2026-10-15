@@ -6,6 +6,7 @@ import ucesoft.cbm.cpu._
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.formats._
 import ucesoft.cbm.formats.cart.MagicDesk128
+import ucesoft.cbm.mcp.{CPUInfo, DisplayInfo, MCPRESTServer}
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
 import ucesoft.cbm.peripheral.bus.{IECBus, IECBusLine, IECBusListener}
@@ -61,6 +62,7 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
     f.setIconImage(new ImageIcon(getClass.getResource("/resources/commodore.png")).getImage)    
     f
   }
+
   // ------------- MMU Status Panel ------------
   private[this] val mmuStatusPanel = new MMUStatusPanel
   // -------------------------------------------
@@ -979,6 +981,24 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
 
   }
 
+  override protected def startMCPServer(host: String, port: Int): Unit = {
+    val server = MCPRESTServer.start(clock,
+      Array(
+        new DisplayInfo("VIC","Commodore 128 40 columns display",display),
+        new DisplayInfo("VDC","Commodore 128 80 columns display",vdcDisplay)),
+      Array(
+        new CPUInfo("8502","Commodore 128 main CPU",cpu),
+        new CPUInfo("Z80","Commodore 128 CP/M CPU",z80))
+      ,mmu)
+    server.configurePause(() => clock.isPaused, setPause)
+    server.configureKeyboard(text => HomeKeyboard.insertTextIntoKeyboardBuffer(text, mmu, c64Mode = isC64Mode))
+    server.configureLoadPRG(file => loadPRGFile(new File(file), autorun = false))
+    server.configureReset(hard => {
+      if (hard) hardReset(play = true) else reset(play = true)
+    })
+    server.configureSystemDesc(() => s"emulated system is a 'Commodore 128', version of emulator is ${ucesoft.cbm.Version.VERSION}, VIC type is ${vicChip.getVICModel().VIC_TYPE}")
+  }
+
   def turnOn(args:Array[String]) : Unit = {
     swing { setMenu() }
     // check help
@@ -1017,6 +1037,8 @@ class C128 extends CBMHomeComputer with MMUChangeListener {
       swing { displayFrame.setLocation(xy(0),xy(1)) }
     }
     else displayFrame.setLocationByPlatform(true)
+    // MCP
+    configureMCPServer()
     // SETTINGS
     loadSettings(args)
     // TESTBENCH

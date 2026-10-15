@@ -6,7 +6,7 @@ import ucesoft.cbm.{CBMComponent, CBMComponentType, Clock, Log}
 import java.awt._
 import java.awt.event.{MouseEvent, MouseListener, MouseMotionListener}
 import java.awt.image.{BufferedImage, MemoryImageSource}
-import java.io.{File, ObjectInputStream, ObjectOutputStream}
+import java.io.{ByteArrayOutputStream, File, ObjectInputStream, ObjectOutputStream}
 import javax.imageio.ImageIO
 import javax.swing._
 
@@ -314,6 +314,14 @@ class Display(width: Int,height: Int, title: String, frame: JFrame,clk:Clock = C
     val snap = createImage(getSize().width, getSize().height).asInstanceOf[BufferedImage]
     paint(snap.getGraphics)
     ImageIO.write(snap, "png", file)
+  }
+
+  def getSnapshot : Array[Byte] = {
+    val snap = createImage(getSize().width, getSize().height).asInstanceOf[BufferedImage]
+    paint(snap.getGraphics)
+    val buffer = new ByteArrayOutputStream
+    ImageIO.write(snap, "png", buffer)
+    buffer.toByteArray
   }
 
   def waitFrameSaveSnapshot(file:File, callback:() => Unit) : Unit = {

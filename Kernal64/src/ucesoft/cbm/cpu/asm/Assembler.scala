@@ -209,7 +209,7 @@ object Assembler {
       case None =>
     }
 
-    val source = io.Source.fromInputStream(in).getLines().mkString("\n")
+    val source = scala.io.Source.fromInputStream(in).getLines().mkString("\n")
     compileSource(source,fileName,symbols)(log,s => println(s)) match {
       case Some(CompilationResult(_,enc)) =>
         out match {

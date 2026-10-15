@@ -5,7 +5,7 @@
 
 # A Scala Commodore 64, 128, VIC20 and CBM 610/620/710/720 cycle-exact emulator
 
-Kernal64 ver 1.8.7 (Aug 30th, 2026)
+Kernal64 ver 1.9.0 (Oct 15th, 2026)
 ========
 ▶️<a href="#wn-latest">Go to latest release</a>
 
@@ -170,6 +170,10 @@ Wiki pages are available here: https://github.com/abbruzze/kernal64/wiki
 
 ## What's new history
 <p id="wn-latest"></p>
+
+### What's new 1.9.0 (Oct 15th 2026)
+- Added MCP (Model Context Protocol) server to expose the running emulator to an AI agent 
+- see [MCP.md](https://github.com/abbruzze/kernal64/blob/master/MCP.md)
 
 ### What's new 1.8.7 (Aug 30th 2026)
 - fixed Windows bat files

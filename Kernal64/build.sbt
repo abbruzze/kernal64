@@ -1,9 +1,9 @@
 
 name := "kernal64"
 
-version := "1.8.7"
+version := "1.9.0"
 
-scalaVersion := "2.13.16"
+scalaVersion := "2.13.18"
 
 scalacOptions ++= Seq(
   "-language:postfixOps",
@@ -14,11 +14,12 @@ scalacOptions ++= Seq(
 
 javacOptions ++= Seq("--release", "11")
 
-libraryDependencies += "com.fifesoft" % "rsyntaxtextarea" % "3.6.0"
+libraryDependencies += "com.fifesoft" % "rsyntaxtextarea" % "4.0.1"
 libraryDependencies += "org.jsoup" % "jsoup" % "1.21.2"
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0"
 libraryDependencies += "commons-net" % "commons-net" % "3.12.0"
-libraryDependencies += "com.formdev" % "flatlaf" % "3.6.1"
+libraryDependencies += "com.formdev" % "flatlaf" % "3.7.2"
+libraryDependencies += "com.lihaoyi" %% "cask" % "0.11.3"
 
 Compile / scalaSource := baseDirectory.value / "src"
 Compile / resourceDirectory := baseDirectory.value / "resources"
@@ -46,6 +47,31 @@ object Version {
 	Seq(baseDirectory.value/"src/ucesoft/cbm/cpu/wd65816/CPU65816.scala",versionFile)
 }
 
+// MCP fat jar: include only project classes + the libraries strictly needed at
+// runtime by MCPServer, i.e. the Scala standard library and the ujson JSON chain
+// (ujson -> upickle-core -> geny). All HTTP is done via the JDK, so no other deps.
+assembly / assemblyJarName := "kernal64-mcp-server.jar"
+assembly / mainClass := Some("ucesoft.cbm.mcp.MCPServer")
+assembly / assemblyExcludedJars := {
+	val cp = (assembly / fullClasspath).value
+	// jar name prefixes of the libraries required at runtime
+	val includePrefixes = Seq(
+		"scala-library",
+		"ujson",
+		"upickle-core",
+		"geny"
+	)
+	cp filter { f =>
+		val name = f.data.getName
+		// exclude every library jar that is not in the include whitelist
+		!includePrefixes.exists(name.startsWith)
+	}
+}
+assembly / assemblyMergeStrategy := {
+	case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+	case x => MergeStrategy.first
+}
+
 val buildK64Dist = taskKey[Unit]("build distribution zip file for Kernal64")
 
 buildK64Dist := {
@@ -64,7 +90,12 @@ buildK64Dist := {
 	val packLib = packDir / "lib"
 	val packRom = packDir / "rom"
 	val packKeyb = packDir / "keyboard"
-	IO.createDirectories(Seq(packLib,packRom,packKeyb))
+	val packMcp = packDir / "mcp"
+	IO.createDirectories(Seq(packLib,packRom,packKeyb,packMcp))
+
+	// build & copy MCP server fat jar
+	val mcpServerJar = assembly.value
+	IO.copyFile(mcpServerJar,packMcp / mcpServerJar.getName)
 	
 	// copy roms & images
 	val romsDir = (Compile / classDirectory).value / "roms"

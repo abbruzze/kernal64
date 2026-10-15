@@ -744,7 +744,7 @@ class AsmCompiler(console:PrintWriter,importDir:String) {
     console.println("Including file " + includeStmt.file)
     val includeFile = new File(new File(importDir),includeStmt.file)
     if (!includeFile.exists) throw new CompilerException("Cannot find include file " + includeStmt.file + " in " + importDir,Some(includeStmt))
-    val source = io.Source.fromFile(includeFile)
+    val source = scala.io.Source.fromFile(includeFile)
     try {
       val txt = source.getLines().mkString("\n") + "\n"
       val in = new java.io.StringReader(txt)

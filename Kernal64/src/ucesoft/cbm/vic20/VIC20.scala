@@ -6,6 +6,7 @@ import ucesoft.cbm.cpu.{Memory, ROM}
 import ucesoft.cbm.expansion._
 import ucesoft.cbm.expansion.vic20.{VIC201112IEEE488, VIC20ExpansionPort, VIC20FE3, VIC20GeoRAM, VIC20Ultimem}
 import ucesoft.cbm.formats._
+import ucesoft.cbm.mcp.{CPUInfo, DisplayInfo, MCPRESTServer}
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral._
 import ucesoft.cbm.peripheral.bus.IEEE488Bus
@@ -1041,6 +1042,17 @@ class VIC20 extends CBMHomeComputer {
   }
 
   protected def allowsStateRestoring: Boolean = true
+
+  override protected def startMCPServer(host: String, port: Int): Unit = {
+    val server = MCPRESTServer.start(clock,Array(new DisplayInfo("VIC","Commodore VIC20 display",display)),Array(new CPUInfo("6502","Commodore VIC20 CPU",cpu)),mmu,host,port)
+    server.configurePause(() => clock.isPaused, setPause)
+    server.configureKeyboard(text => HomeKeyboard.insertTextIntoKeyboardBuffer(text, mmu, c64Mode = true))
+    server.configureLoadPRG(file => loadPRGFile(new File(file), autorun = false))
+    server.configureReset(hard => {
+      if (hard) hardReset(play = true) else reset(play = true)
+    })
+    server.configureSystemDesc(() => s"emulated system is a 'Commodore VIC20', version of emulator is ${ucesoft.cbm.Version.VERSION}, VIC type is ${vicChip.getVICModel().VIC_TYPE}")
+  }
   // -----------------------------------------------------------------------------------------
 
   def turnOn(args: Array[String]): Unit = {
@@ -1083,6 +1095,8 @@ class VIC20 extends CBMHomeComputer {
       }
     }
     else displayFrame.setLocationByPlatform(true)
+    // MCP
+    configureMCPServer()
     // SETTINGS
     loadSettings(args)
     // VIEW

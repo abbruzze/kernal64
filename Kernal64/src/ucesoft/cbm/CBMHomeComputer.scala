@@ -1143,7 +1143,7 @@ abstract class CBMHomeComputer extends CBMComputer with GamePlayer with KeyListe
               }
               catch {
                 case t:Throwable =>
-
+                  t.printStackTrace()
                   showError(s"Error while contacting provider ${provider.name}'s server",t.toString)
               }
             }

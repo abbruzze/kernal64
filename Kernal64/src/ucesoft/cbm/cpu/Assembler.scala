@@ -259,7 +259,7 @@ object Assembler {
             val fc = new JFileChooser
             fc.showOpenDialog(textArea) match {
               case JFileChooser.APPROVE_OPTION =>
-                val src = io.Source.fromFile(fc.getSelectedFile)
+                val src = scala.io.Source.fromFile(fc.getSelectedFile)
                 val text = src.getLines().mkString("\n")
                 src.close
                 textArea.setText(text)

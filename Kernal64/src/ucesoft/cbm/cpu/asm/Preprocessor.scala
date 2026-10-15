@@ -10,7 +10,7 @@ object Preprocessor extends App {
     var keepReading = true
     val sb = new StringBuilder
     while (keepReading) {
-      val line = io.StdIn.readLine(">")
+      val line = scala.io.StdIn.readLine(">")
       if (line == "\\") keepReading = false
       else sb.append(line + "\n")
     }

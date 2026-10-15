@@ -54,7 +54,7 @@ object MemConfig {
   }
   def main(args:Array[String]): Unit = {
     while (true) {
-      val bits = io.StdIn.readLine(">")
+      val bits = scala.io.StdIn.readLine(">")
       for(m <- gen(bits)) {
         println(m + " " + Integer.parseInt(m.reverse,2))
       }

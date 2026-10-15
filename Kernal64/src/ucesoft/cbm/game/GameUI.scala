@@ -412,7 +412,9 @@ object GameUI {
       downloadProgress.setIndeterminate(true)
     }
     private def endDownload()  : Unit = {
-      if (downloadCount.decrementAndGet == 0) downloadProgress.setIndeterminate(false)
+      if (downloadCount.decrementAndGet == 0) {
+        SwingUtilities.invokeLater(() => downloadProgress.setIndeterminate(false))
+      }
     }
     
     private def loadGame(loadButton:AbstractButton) : Unit = {

@@ -208,7 +208,7 @@ object Palette {
   private def parseVPLFile(file:String): Option[Array[(Int,java.awt.Color)]] = {
     var f: BufferedSource = null
     try {
-      f = io.Source.fromFile(file)
+      f = scala.io.Source.fromFile(file)
       val rgbs = f.getLines().filterNot(l => l.trim().startsWith("#") || l.trim().isEmpty).toArray.map { l =>
         l.split(" ") match {
           case rgb@Array(_, _, _) =>

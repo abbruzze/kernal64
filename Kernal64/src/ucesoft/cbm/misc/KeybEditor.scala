@@ -207,7 +207,7 @@ class KeybEditor(keyb:Keyboard,dialog:JDialog,model:CBMComputerModel) extends JP
   private def loadImageLayout(): BufferedImage = ImageIO.read(getClass.getResourceAsStream(s"/resources/keyboardEditor/${prefixName}_layout.png"))
 
   private def readKeys(): (List[KeyPos], Double) = {
-    val source = io.Source.fromInputStream(getClass.getResourceAsStream(s"/resources/keyboardEditor/${prefixName}_layout.csv"))
+    val source = scala.io.Source.fromInputStream(getClass.getResourceAsStream(s"/resources/keyboardEditor/${prefixName}_layout.csv"))
     try {
       val keys = source.getLines()
       var scale = 1.0

@@ -2,6 +2,7 @@ package ucesoft.cbm
 
 import ucesoft.cbm.cpu.{CPU65xx, Memory, ROM}
 import ucesoft.cbm.formats.{Diskette, TAP}
+import ucesoft.cbm.misc.Preferences.PREF_MCP_SERVER
 import ucesoft.cbm.misc._
 import ucesoft.cbm.peripheral.c2n.Datassette
 import ucesoft.cbm.peripheral.drive._
@@ -405,12 +406,18 @@ abstract class CBMComputer extends CBMComponent {
   protected def setPauseSettings(parent: JMenu): Unit = {
     val pauseItem = new JCheckBoxMenuItem("Pause")
     pauseItem.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_P, java.awt.event.InputEvent.ALT_DOWN_MASK))
-    pauseItem.addActionListener(e =>
-      if (e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected) {
-        clock.pause()
-        display.setPaused()
-      } else clock.play())
+    pauseItem.addActionListener(e => setPause(e.getSource.asInstanceOf[JCheckBoxMenuItem].isSelected))
     parent.add(pauseItem)
+  }
+
+  protected def setPause(paused:Boolean) : Unit = {
+    if (paused) {
+      clock.pause()
+      display.setPaused()
+    }
+    else {
+      clock.play()
+    }
   }
 
   protected def writeOnDiskSetting(enabled:Boolean) : Unit = {
@@ -840,5 +847,25 @@ abstract class CBMComputer extends CBMComponent {
         JOptionPane.showMessageDialog(displayFrame,s"Default keyboard configuration file not found for your locale '$locale'","Keyboard layout warning",JOptionPane.WARNING_MESSAGE)
       }
     }
+  }
+
+  protected def configureMCPServer(): Unit = {
+    preferences.add(PREF_MCP_SERVER, "Start mcp server at given address:port", "") { mcp =>
+      if (mcp.nonEmpty && mcp.indexOf(':') > 0) {
+        try {
+          val h = mcp.substring(0, mcp.indexOf(':'))
+          val p = mcp.substring(mcp.indexOf(':') + 1).toInt
+          startMCPServer(h, p)
+        }
+        catch {
+          case t: Throwable =>
+            println(s"Error configuring mcp server $t")
+        }
+      }
+    }
+  }
+
+  protected def startMCPServer(host:String, port:Int): Unit = {
+    println("MCP server not available")
   }
 }

@@ -6,7 +6,7 @@ import java.net.URL
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
-import scala.io.Source
+import scala.io.{BufferedSource, Source}
 
 class GameBaseSpi extends GameProvider {
   private case class Games(index:String,pages:Int,games:Future[List[Game]])
@@ -42,8 +42,14 @@ class GameBaseSpi extends GameProvider {
   @volatile private var interrupted = false
   
   def existsNewerVersion : Boolean = {
-    def ver(v:String) = v.split("""\.""").reverse.zipWithIndex.foldLeft(0)((acc,e) => acc + math.pow(e._1.toInt,e._2 + 1).toInt)
+    def ver(v:String) = {
+      //v.split("""\.""").reverse.zipWithIndex.foldLeft(0)((acc,e) => acc + math.pow(e._1.toInt,e._2 + 1).toInt)
+      val vers = v.split("""\.""")
+      val ver = vers(0).toIntOption.getOrElse(0) * 100 + (if (vers.length > 1) vers(1).toIntOption.getOrElse(0) else 0)
+      ver
+    }
     try {
+      println(s"Found version ${ver(version)}: current version ${ver(repository.currentVersion)}")
       ver(repository.currentVersion) < ver(version)
     }
     catch {
@@ -130,7 +136,23 @@ class GameBaseSpi extends GameProvider {
     	val IMAGE = """.*<img src="(/Screenshots/.*\.png).*""".r
     	val NO_IMAGE = """.*<img src="images/game/nosssmall.gif".*""".r
     	val NAME = """.*<a href="(.*)"><b>(.*)</b>.*""".r
-    	val src = Source.fromURL(url(index,page))
+    	var src : BufferedSource = null
+      var attempts = 0
+      var sleep = 1000
+      var keepTrying = true
+      while (keepTrying && attempts < 5) {
+        try {
+          src = Source.fromURL(url(index, page))
+          keepTrying = false
+        }
+        catch {
+          case t:IOException if t.toString.contains("429") => // too many requests
+            println(s"Error retrieving page $index/$page, attempt ${attempts + 1}: $t")
+            Thread.sleep(sleep)
+            sleep *= 2
+            attempts += 1
+        }
+      }
     	val lines = src.getLines()
     	val list = new collection.mutable.ListBuffer[Game]
     	while (lines.hasNext && !interrupted) {
@@ -163,6 +185,11 @@ class GameBaseSpi extends GameProvider {
     	}  	
     	src.close
     	list.toList
+    }
+    catch {
+      case t:Throwable =>
+        t.printStackTrace()
+        List.empty
     }
     finally {
       val cd = currentDownloaded.addAndGet(1)

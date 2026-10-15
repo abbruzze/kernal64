@@ -31,7 +31,7 @@ abstract class PouetSpi(genre:String,platform:String) extends GameProvider {
   private def makeUrl(page:Int) = s"https://www.pouet.net/prodlist.php?type%5B%5D=$genre&order=release&platform%5B%5D=${platform}&page=$page"
   
   private def openURL[T](url:String)(action: Iterator[String] => T) : T = {
-    val src = io.Source.fromURL(url,"UTF-8")
+    val src = scala.io.Source.fromURL(url,"UTF-8")
     try {
       action(src.getLines())
     }
